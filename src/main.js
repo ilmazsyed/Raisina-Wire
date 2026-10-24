@@ -7,12 +7,13 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const esc = (s = "") => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const IST = { timeZone: "Asia/Kolkata" };
 
-const state = { coverage: [], coverageLead: null, user: null, wire: null, wireError: false, markets: null, marketsError: false, community: null, events: null, installPrompt: null, homeGroup: "india" };
+const state = { articles: [], media: null, coverage: [], coverageLead: null, user: null, wire: null, wireError: false, markets: null, marketsError: false, community: null, events: null, installPrompt: null, homeGroup: "india" };
 const wireIndex = new Map(); // url -> wire item, so the reader can show a headline while it loads
 
 /* ---------- Formatting ---------- */
-const editionDate = iso => new Date(`${iso}T00:00:00+05:30`).toLocaleDateString("en-IN", { ...IST, day: "numeric", month: "short", year: "numeric" });
-const shortDate = iso => new Date(`${iso}T00:00:00+05:30`).toLocaleDateString("en-IN", { ...IST, day: "numeric", month: "short" });
+const toDate = d => new Date(String(d).length === 10 ? `${d}T00:00:00+05:30` : d);
+const editionDate = d => toDate(d).toLocaleDateString("en-IN", { ...IST, day: "numeric", month: "short", year: "numeric" });
+const shortDate = d => toDate(d).toLocaleDateString("en-IN", { ...IST, day: "numeric", month: "short" });
 const clock = iso => iso ? new Date(iso).toLocaleTimeString("en-IN", { ...IST, hour: "2-digit", minute: "2-digit", hour12: false }) : "";
 function ago(iso) {
   if (!iso) return "";
@@ -69,13 +70,14 @@ document.documentElement.style.setProperty("--text-scale", store.get("rw-text", 
 /* ---------- Shell ---------- */
 const NAV = [
   ["Today", "#/", r => r.page === "home"],
-  ["Raisina Wire", "#/editions", r => r.page === "editions" || r.page === "edition"],
+  ["Raisina Wire", "#/editions", r => ["editions", "edition", "article"].includes(r.page)],
   ["Live", "#/live", r => r.page === "live" && !r.arg],
   ["India", "#/live/India", r => r.page === "live" && r.arg === "India"],
   ["Security", "#/live/Security", r => r.page === "live" && r.arg === "Security"],
-  ["Diplomacy", "#/live/Diplomacy", r => r.page === "live" && r.arg === "Diplomacy"],
   ["Markets", "#/markets", r => r.page === "markets"],
-  ["Community", "#/community", r => r.page === "community"],
+  ["Community", "#/community", r => r.page === "community" || r.page === "discussion"],
+  ["Events", "#/events", r => r.page === "events"],
+  ["Watch", "#/watch", r => r.page === "watch"],
   ["Saved", "#/saved", r => r.page === "saved"]
 ];
 
@@ -127,6 +129,16 @@ function renderShell() {
       <button class="btn btn-dark" type="submit" id="authSubmit">Sign in</button></form>
     <div class="auth-switch"><span id="authSwitchText">New to Raisina Wire?</span><button id="authSwitch" type="button">Create an account</button></div>
   </section></div>
+  <dialog class="form-dialog glass" id="formDialog" aria-labelledby="formDialogTitle"><form method="dialog" id="dialogForm">
+    <button class="modal-close" type="button" data-close-dialog aria-label="Close">×</button>
+    <div class="kicker" id="formDialogKicker"></div><h2 id="formDialogTitle"></h2><div id="formDialogFields"></div>
+    <p class="auth-message" id="formDialogMessage" aria-live="polite"></p>
+    <div class="dialog-actions"><button class="btn btn-dark" type="submit" id="formDialogSubmit">Save</button><button class="btn btn-light" type="button" data-close-dialog>Cancel</button></div>
+  </form></dialog>
+  <dialog class="search-dialog glass" id="searchDialog" aria-label="Search"><div class="search-box">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input id="searchInput" type="search" placeholder="Search Raisina Wire and the live wire" aria-label="Search" autocomplete="off"><button class="btn btn-light btn-sm" type="button" data-close-dialog>Esc</button></div>
+    <div id="searchResults" class="search-results"></div></dialog>
   <div class="toast" id="toast" role="status"></div>
   <div class="offline-bar" id="offlineBar" role="status" hidden>You’re offline. Editions and saved stories still open; live data shows the last copy.</div>
   <div class="update-bar glass" id="updateBar" role="status" hidden><span>A new version of Raisina Wire is ready.</span><button class="btn btn-dark btn-sm" type="button" data-action="apply-update">Update</button></div>
@@ -152,6 +164,11 @@ function renderShell() {
   $("#authForm").addEventListener("submit", submitAuth);
   $("#leadForm").addEventListener("submit", submitLead);
   window.addEventListener("online", syncOnline); window.addEventListener("offline", syncOnline); syncOnline();
+  $$("dialog").forEach(d => d.addEventListener("click", e => { if (e.target === d || e.target.closest("[data-close-dialog]")) d.close(); }));
+  $("#searchInput").addEventListener("input", renderSearchResults);
+  $("#searchInput").addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.preventDefault(); $("#searchDialog").close(); return; }
+    if (e.key === "Enter" && e.target.value.trim()) { $("#searchDialog").close(); location.hash = `#/search?q=${encodeURIComponent(e.target.value.trim())}`; } });
   // One delegated handler for every action button rendered by the views.
   document.addEventListener("click", onAction);
   // Hide images from feeds that fail to load rather than showing a broken icon.
@@ -174,18 +191,19 @@ function parseRoute() {
   const [page = "", ...rest] = path.split("/").filter(Boolean);
   return { page: page || "home", arg: rest.length ? decodeURIComponent(rest.join("/")) : "", params: new URLSearchParams(query) };
 }
-const views = { coverage: viewCoverage, home: viewHome, editions: viewEditions, edition: viewEdition, read: viewExternal, live: viewLive, markets: viewMarkets, community: viewHome, saved: viewSaved, search: viewSearch };
+const views = { coverage: viewCoverage, home: viewHome, editions: viewEditions, edition: viewEdition, article: viewArticle, read: viewExternal, live: viewLive, markets: viewMarkets, community: viewCommunity, discussion: viewDiscussion, events: viewEvents, watch: viewWatch, account: viewAccount, saved: viewSaved, search: viewSearch };
 async function route() {
   const r = parseRoute();
   renderNav(r);
   const view = views[r.page] || viewHome;
-  document.body.classList.toggle("is-reading", r.page === "edition" || r.page === "read");
+  // Lists that mix in control-room articles wait briefly for them, so the lead story doesn't flash.
+  if (["home", "editions", "search"].includes(r.page)) await Promise.race([articlesReady, new Promise(res => setTimeout(res, 1200))]);
+  document.body.classList.toggle("is-reading", ["edition", "article", "read"].includes(r.page));
   const main = $("#view");
   main.classList.remove("view-enter"); void main.offsetWidth; main.classList.add("view-enter");
   await view(r);
   updateProgress();
-  if (r.page === "community") $("#community")?.scrollIntoView({ block: "start" });
-  else window.scrollTo(0, 0);
+  window.scrollTo(0, 0);
 }
 
 /* ---------- Scroll effects ---------- */
@@ -211,10 +229,10 @@ function watchScroll() {
 }
 
 /* ---------- Shared pieces ---------- */
-const edHref = e => `#/edition/${e.slug}`;
+const edHref = e => e.href || `#/edition/${e.slug}`;
 const wireHref = i => `#/read?u=${encodeURIComponent(i.url)}`;
 function edCard(e, { dek = false } = {}) {
-  return `<a class="ed-card glass" href="${edHref(e)}"><div class="thumb">${img(e.image)}</div><span class="body"><span class="kicker">${esc(e.topic)}</span><h3>${esc(e.title)}</h3>${dek ? `<p>${esc(e.dek)}</p>` : ""}<span class="meta">${esc(AUTHOR.name)} · ${shortDate(e.date)} · ${e.readMinutes} min</span></span></a>`;
+  return `<a class="ed-card glass" href="${edHref(e)}"><div class="thumb">${img(e.image)}</div><span class="body"><span class="kicker">${esc(e.topic)}</span><h3>${esc(e.title)}</h3>${dek ? `<p>${esc(e.dek)}</p>` : ""}<span class="meta">${esc(e.author || AUTHOR.name)} · ${shortDate(e.date)} · ${e.readMinutes} min</span></span></a>`;
 }
 function marketRow(q) {
   const ch = quoteChange(q);
@@ -230,7 +248,7 @@ function wireEmpty() {
 
 /* ---------- Home ---------- */
 function viewHome() {
-  const [lead, ...rest] = editions;
+  const [lead, ...rest] = stories();
   $("#view").innerHTML = `
   <div class="wrap">
     <section class="dock glass" aria-label="Market pulse"><div class="dock-head"><b>Market pulse</b><span class="muted" id="dockStatus" style="font-size:12px">Loading quotes…</span><a class="link-gold" href="#/markets" style="font-size:13px">All markets →</a></div><div class="dock-grid" id="dock"></div></section>
@@ -239,13 +257,13 @@ function viewHome() {
 
     <div class="lead-grid">
       <section class="side-stack" aria-label="More from Raisina Wire"><div class="kicker">Raisina Wire · Newest</div>
-        ${rest.slice(0, 3).map(e => `<a class="side-item" href="${edHref(e)}"><div class="thumb">${img(e.image)}</div><span class="kicker">${esc(e.topic)}</span><h3>${esc(e.title)}</h3><span class="meta">${esc(AUTHOR.name)} · ${shortDate(e.date)}</span></a>`).join("")}
+        ${rest.slice(0, 3).map(e => `<a class="side-item" href="${edHref(e)}"><div class="thumb">${img(e.image)}</div><span class="kicker">${esc(e.topic)}</span><h3>${esc(e.title)}</h3><span class="meta">${esc(e.author)} · ${shortDate(e.date)}</span></a>`).join("")}
       </section>
       <article class="hero">${img(lead.image, "")}
         <div class="hero-card glass">
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><span class="tag tag-dark">Raisina Wire · Latest</span><span class="kicker">${esc(lead.topic)}</span></div>
           <h1><a href="${edHref(lead)}">${esc(lead.title)}</a></h1><p>${esc(lead.dek)}</p>
-          <div class="hero-foot"><span class="byline"><img src="${AUTHOR.photo}" alt=""><span><b>${esc(AUTHOR.name)}</b> <span class="muted">· ${editionDate(lead.date)} · ${lead.readMinutes} min read</span></span></span><a class="btn btn-dark" href="${edHref(lead)}">Read now</a></div>
+          <div class="hero-foot"><span class="byline"><img src="${AUTHOR.photo}" alt=""><span><b>${esc(lead.author)}</b> <span class="muted">· ${editionDate(lead.date)} · ${lead.readMinutes} min read</span></span></span><a class="btn btn-dark" href="${edHref(lead)}">Read now</a></div>
         </div>
       </article>
       <aside class="live-rail glass" aria-label="Live wire"><div class="live-title"><b><span class="dot-live"></span>Live wire</b><span class="muted" style="font-size:12px" id="railUpdated"></span></div><div id="rail"></div><a class="link-gold" href="#/live" style="display:block;margin-top:16px;font-size:13px">All live updates →</a></aside>
@@ -253,7 +271,7 @@ function viewHome() {
 
     <section class="briefing glass band" aria-labelledby="briefingTitle"><div class="briefing-head"><span class="kicker">The Briefing</span><h2 id="briefingTitle">What you need to know</h2><span class="meta">${new Date().toLocaleDateString("en-IN", { ...IST, weekday: "long", day: "numeric", month: "long" })} · From the live wire</span></div><ol class="briefing-list" id="briefingList"></ol></section>
 
-    <section class="band"><div class="section-head"><h2>From the Raisina Wire desk</h2><a class="link-gold" href="#/editions">All ${editions.length} editions →</a></div>
+    <section class="band"><div class="section-head"><h2>From the Raisina Wire desk</h2><a class="link-gold" href="#/editions">All ${stories().length} stories →</a></div>
       <div class="card-grid">${rest.slice(3, 7).map(e => edCard(e)).join("")}</div></section>
 
     <section class="band editor" aria-labelledby="editorTitle">
@@ -261,7 +279,7 @@ function viewHome() {
       <div class="editor-body"><span class="kicker" id="editorTitle">From the Editor</span>
         <blockquote id="editorQuote">“${esc(lead.dek)}”</blockquote><span class="meta" id="editorQuoteSource">From “${esc(lead.title)}”</span>
         <div class="signature"><span>${esc(AUTHOR.name)}</span><small>${esc(AUTHOR.role)}, Raisina Wire</small></div>
-        <div class="editor-actions"><a class="btn btn-dark" href="${edHref(lead)}">Read the latest edition</a><a class="btn btn-light" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Subscribe on LinkedIn ↗</a></div></div>
+        <div class="editor-actions"><a class="btn btn-dark" href="${edHref(lead)}">Read the latest</a><a class="btn btn-light" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Subscribe on LinkedIn ↗</a></div></div>
       <div class="editor-picks"><span class="kicker">Start here</span><ol>${EDITOR_PICKS.map(slug => editions.find(x => x.slug === slug)).filter(Boolean).map(x => `<li><a href="${edHref(x)}"><span class="kicker">${esc(x.topic)}</span><b>${esc(x.title)}</b></a></li>`).join("")}</ol></div>
     </section>
 
@@ -279,7 +297,7 @@ function viewHome() {
 
     <section class="band" id="community"><div class="community glass">
       <div><div class="kicker">Community</div><h2>Ideas in conversation.</h2><p class="muted" style="margin:10px 0 0;font-size:15px;line-height:1.7">Moderated discussions, expert briefings and research missions.</p>
-        <button class="btn btn-dark" type="button" data-action="discuss" style="margin-top:16px">Start a discussion</button></div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:16px"><button class="btn btn-dark" type="button" data-action="discuss">Start a discussion</button><a class="btn btn-light" href="#/community">All discussions</a></div></div>
       <div class="community-cols"><div class="mini-card"><div class="kicker">Events &amp; briefings</div><ol class="agenda" id="agenda"></ol></div><div class="mini-card"><div class="kicker">Discussions</div><div id="discussions"></div><a class="link-gold" href="https://calibrex.org/academy/" target="_blank" rel="noreferrer" style="display:block;margin-top:14px;font-size:13px">Learn OSINT with Calibrex Academy ↗</a></div></div>
     </div></section>
   </div>`;
@@ -333,14 +351,14 @@ function renderCommunity() {
   agenda.innerHTML = upcoming.length ? upcoming.map(e => { const d = new Date(e.startsAt); return `<li><span class="date"><b>${d.toLocaleDateString("en-IN", { ...IST, day: "2-digit" })}</b><small>${d.toLocaleDateString("en-IN", { ...IST, month: "short" })}</small></span><span><b>${esc(e.title)}</b><span class="meta">${esc(e.eventType)} · ${d.toLocaleTimeString("en-IN", { ...IST, hour: "2-digit", minute: "2-digit" })} IST · ${esc(e.access)}</span></span></li>`; }).join("")
     : `<li class="agenda-empty"><span class="date"><b>—</b><small>Soon</small></span><span><b>Expert briefings and debates</b><span class="meta">New events are announced here first</span></span></li>`;
   const posts = (state.community || []).slice(0, 3);
-  talk.innerHTML = posts.length ? posts.map(p => `<div class="talk"><b>${esc(p.title)}</b><span class="meta">${esc(p.topic)} · ${esc(p.author)} · ${ago(p.createdAt)}</span></div>`).join("")
+  if (talk) talk.innerHTML = posts.length ? posts.map(p => `<div class="talk"><b>${esc(p.title)}</b><span class="meta">${esc(p.topic)} · ${esc(p.author)} · ${ago(p.createdAt)}</span></div>`).join("")
     : `<div class="talk"><b>Be the first to start a conversation</b><span class="meta">Members can open a discussion on any edition</span></div>`;
 }
 
 /* ---------- Editions ---------- */
 function viewEditions() {
   $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Raisina Wire</div><h1>Every edition</h1><p>Open-source analysis of India’s strategic questions by ${esc(AUTHOR.name)}, newest first. Each edition reads in full here and links to the original on LinkedIn.</p></div><a class="btn btn-light" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Subscribe on LinkedIn ↗</a></div>
-  <div class="archive-grid">${editions.map(e => edCard(e, { dek: true })).join("")}</div></div>`;
+  <div class="archive-grid">${stories().map(e => edCard(e, { dek: true })).join("")}</div></div>`;
 }
 
 let bodiesPromise;
@@ -401,7 +419,7 @@ async function viewEdition(r) {
     <div class="prev-next">${newer ? `<a class="glass" href="${edHref(newer)}"><span class="meta">Newer edition</span><b>${esc(newer.title)}</b></a>` : "<span></span>"}${older ? `<a class="glass" href="${edHref(older)}"><span class="meta">Older edition</span><b>${esc(older.title)}</b></a>` : ""}</div>
   </article>
   <aside class="reader-aside"><div class="aside-card glass"><div class="kicker">More from Raisina Wire</div>
-    ${editions.filter(x => x !== e).slice(0, 5).map(x => `<a class="aside-link" href="${edHref(x)}"><span class="thumb">${img(x.image)}</span><span><b>${esc(x.title)}</b><span class="meta" style="display:block;margin-top:5px;font-size:10px">${shortDate(x.date)}</span></span></a>`).join("")}
+    ${stories().filter(x => x.slug !== e.slug).slice(0, 5).map(x => `<a class="aside-link" href="${edHref(x)}"><span class="thumb">${img(x.image)}</span><span><b>${esc(x.title)}</b><span class="meta" style="display:block;margin-top:5px;font-size:10px">${shortDate(x.date)}</span></span></a>`).join("")}
   </div></aside></div></div>`;
   try { const bodies = await loadBodies(); if (parseRoute().arg === e.slug) { const blocks = bodies[e.slug]?.blocks || []; $("#prose").innerHTML = proseHTML(blocks, { pull: pullQuote(blocks) }); } }
   catch { $("#prose").innerHTML = `<p>This edition could not be loaded. <a href="${esc(e.url)}" target="_blank" rel="noreferrer">Read it on LinkedIn ↗</a></p>`; }
@@ -450,7 +468,7 @@ async function viewExternal(r) {
 }
 function renderExtAside() {
   const host = $("#extAside"); if (!host) return;
-  host.innerHTML = `<div class="aside-card glass"><div class="kicker">Raisina Wire analysis</div>${editions.slice(0, 4).map(x => `<a class="aside-link" href="${edHref(x)}"><span class="thumb">${img(x.image)}</span><span><b>${esc(x.title)}</b></span></a>`).join("")}</div>
+  host.innerHTML = `<div class="aside-card glass"><div class="kicker">Raisina Wire analysis</div>${stories().slice(0, 4).map(x => `<a class="aside-link" href="${edHref(x)}"><span class="thumb">${img(x.image)}</span><span><b>${esc(x.title)}</b></span></a>`).join("")}</div>
   <div class="aside-card glass"><div class="kicker" style="color:var(--muted)">Latest on the wire</div>${wireItems().slice(0, 5).map(wireLink).join("") || wireEmpty()}</div>`;
 }
 
@@ -496,7 +514,7 @@ function viewSaved() {
 }
 function viewSearch(r) {
   const q = (r.params.get("q") || "").trim(), ql = q.toLowerCase();
-  const eds = editions.filter(e => `${e.title} ${e.dek} ${e.topic}`.toLowerCase().includes(ql));
+  const eds = stories().filter(e => `${e.title} ${e.dek} ${e.topic}`.toLowerCase().includes(ql));
   const wire = wireItems().filter(i => `${i.title} ${i.summary} ${i.source}`.toLowerCase().includes(ql)).slice(0, 30);
   $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Search</div><h1>“${esc(q)}”</h1><p>${eds.length} Raisina Wire edition${eds.length === 1 ? "" : "s"} · ${wire.length} live stor${wire.length === 1 ? "y" : "ies"}</p></div></div>
   ${eds.length ? `<div class="archive-grid">${eds.map(e => edCard(e, { dek: true })).join("")}</div>` : ""}
@@ -517,12 +535,15 @@ async function onAction(e) {
     try { if (navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(location.href); toast("Link copied."); } } catch { /* cancelled */ }
   }
   if (a === "home-group") { state.homeGroup = el.dataset.group; renderHomeMarkets(); }
-  if (a === "search") { const q = prompt("Search Raisina Wire and the live wire"); if (q?.trim()) location.hash = `#/search?q=${encodeURIComponent(q.trim())}`; }
+  if (a === "search") openSearch();
+  if (a === "ics") downloadIcs(el.dataset.event);
   if (a === "install") { e.preventDefault(); installPWA(); }
   if (a === "install-dismiss") { store.set("rw-install-dismissed", Date.now()); $("#installSheet").hidden = true; }
   if (a === "apply-update") { waitingWorker?.postMessage({ type: "SKIP_WAITING" }); $("#updateBar").hidden = true; }
+  if (a === "signin") openAuth("login");
+  if (a === "join") openAuth("register");
   if (a === "signout") { toggleAccountMenu(false); signOut(); }
-  if (a === "discuss") { if (!state.user) { openAuth("register"); toast("Create a free account to start a discussion."); } else openDiscussionForm(); }
+  if (a === "discuss") { if (!state.user) { openAuth("register"); toast("Create a free account to start a discussion."); } else openDiscussionDialog(); }
 }
 
 /* ---------- Ticker, clocks, live coverage ---------- */
@@ -584,6 +605,210 @@ async function viewCoverage(r) {
   coverageTimer = setInterval(() => { if (!document.hidden) render(false); }, 30e3);
 }
 
+/* ---------- Stories: editions plus articles published from the control room ---------- */
+const GENERIC_ART = { security: "security", diplomacy: "diplomacy", markets: "markets", india: "india", energy: "energy" };
+const genericImage = category => `/editions/generic-${GENERIC_ART[String(category || "").toLowerCase()] || "analysis"}.webp`;
+const EDITION_STORIES = editions.map(e => ({ kind: "edition", slug: e.slug, href: `#/edition/${e.slug}`, title: e.title, dek: e.dek, topic: e.topic, date: e.date, image: e.image, readMinutes: e.readMinutes, author: AUTHOR.name, url: e.url }));
+function stories() {
+  const articles = (state.articles || []).map(a => ({
+    kind: "article", slug: a.slug, href: `#/article/${encodeURIComponent(a.slug)}`, title: a.title, dek: a.dek || "", topic: a.category,
+    date: a.publishedAt, image: a.imageUrl || genericImage(a.category), readMinutes: Math.max(2, Math.round((a.bodyLength || 0) / 1300)),
+    author: a.author || AUTHOR.name, url: a.sourceUrl || ""
+  }));
+  return [...articles, ...EDITION_STORIES].sort((x, y) => toDate(y.date) - toDate(x.date));
+}
+let articlesSettled = false;
+async function loadArticles() {
+  try { const r = await fetch("/api/articles"); state.articles = r.ok ? (await r.json()).articles || [] : []; } catch { state.articles = []; }
+  const first = !articlesSettled; articlesSettled = true;
+  if (!state.articles.length || first) return; // the first load is awaited by route() instead
+  const page = parseRoute().page; // refresh lists that show stories, without moving the reader
+  if (page === "home") viewHome(); else if (page === "editions") viewEditions();
+}
+// Article text from the control room: blank lines separate paragraphs; "## " starts a heading;
+// "- " or "• " lines are bullets; "1. " lines are numbered points.
+function articleBlocks(text) {
+  const blocks = [];
+  for (const chunk of String(text || "").replace(/\r/g, "").split(/\n{2,}/)) {
+    const lines = chunk.split("\n").map(l => l.trim()).filter(Boolean);
+    if (!lines.length) continue;
+    if (lines.every(l => /^([-•*]|\d+\.)\s+/.test(l))) { lines.forEach(l => blocks.push({ t: "li", x: l.replace(/^[-•*]\s+/, "") })); continue; }
+    if (/^#{1,3}\s+/.test(lines[0])) { blocks.push({ t: "h", x: lines[0].replace(/^#{1,3}\s+/, "") }); if (lines.length > 1) blocks.push({ t: "p", x: lines.slice(1).join(" ") }); continue; }
+    blocks.push({ t: "p", x: lines.join(" ") });
+  }
+  return blocks;
+}
+async function viewArticle(r) {
+  const slug = r.arg;
+  $("#view").innerHTML = `<div class="wrap"><div class="reader-layout"><article class="reader-article"><div class="skeleton" style="height:60px"></div><div class="skeleton" style="height:420px;margin-top:20px"></div></article></div></div>`;
+  let a;
+  try { const res = await fetch(`/api/articles/${encodeURIComponent(slug)}`); a = res.ok ? (await res.json()).article : null; } catch { a = null; }
+  if (parseRoute().arg !== slug) return;
+  if (!a) { $("#view").innerHTML = `<div class="wrap"><div class="blocked glass"><h1>Story not found</h1><p class="muted">It may have been unpublished or moved.</p><div class="blocked-actions"><a class="btn btn-dark" href="#/editions">See all stories</a></div></div></div>`; return; }
+  document.title = `${a.title} · Raisina Wire`;
+  const blocks = articleBlocks(a.body), words = blocks.reduce((n, b) => n + b.x.split(/\s+/).length, 0);
+  const href = `#/article/${encodeURIComponent(a.slug)}`;
+  $("#view").innerHTML = `<div class="wrap">${readerBar({ badge: a.status === "published" ? "Raisina Wire" : `Preview · ${a.status}`, original: a.sourceUrl || location.href, originalLabel: a.sourceUrl ? "Original" : "Link", saveItem: { href, title: a.title, source: "Raisina Wire" } })}
+  <div class="reader-layout"><article class="reader-article">
+    <div class="kicker">${esc(a.category)}</div><h1>${esc(a.title)}</h1>${a.dek ? `<p class="dek">${esc(a.dek)}</p>` : ""}
+    <div class="reader-byline"><img src="${AUTHOR.photo}" alt=""><div><b>${esc(a.author || AUTHOR.name)}</b><div class="muted" style="font-size:13px">Raisina Wire</div></div><span class="grow"></span><span class="meta">${a.publishedAt ? editionDate(a.publishedAt) : "Not yet published"} · ${Math.max(1, Math.round(words / 220))} min read</span></div>
+    <div class="reader-hero">${img(a.imageUrl || genericImage(a.category), "")}</div>
+    <div class="prose dropcap">${proseHTML(blocks, { pull: pullQuote(blocks) })}</div>
+    <div class="author-box"><img src="${AUTHOR.photo}" alt=""><div><span class="kicker">About the author</span><b>${esc(a.author || AUTHOR.name)}</b><p>${esc((a.author || AUTHOR.name) === AUTHOR.name ? AUTHOR.bio : "Writes for Raisina Wire.")}</p></div></div>
+  </article>
+  <aside class="reader-aside"><div class="aside-card glass"><div class="kicker">More from Raisina Wire</div>
+    ${stories().filter(x => x.slug !== a.slug).slice(0, 5).map(x => `<a class="aside-link" href="${edHref(x)}"><span class="thumb">${img(x.image)}</span><span><b>${esc(x.title)}</b><span class="meta" style="display:block;margin-top:5px;font-size:10px">${shortDate(x.date)}</span></span></a>`).join("")}
+  </div></aside></div></div>`;
+}
+
+/* ---------- Form dialog (replaces browser prompts) ---------- */
+function openFormDialog({ kicker = "", title, fields, submitLabel = "Save", onSubmit }) {
+  const dlg = $("#formDialog");
+  $("#formDialogKicker").textContent = kicker;
+  $("#formDialogTitle").textContent = title;
+  $("#formDialogSubmit").textContent = submitLabel;
+  $("#formDialogMessage").textContent = "";
+  $("#formDialogFields").innerHTML = fields.map(f => `<label>${esc(f.label)}${f.hint ? ` <small>${esc(f.hint)}</small>` : ""}${
+    f.type === "textarea" ? `<textarea name="${f.name}" rows="${f.rows || 5}" ${f.required ? "required" : ""} minlength="${f.minlength || 0}" maxlength="${f.maxlength || 5000}">${esc(f.value || "")}</textarea>`
+    : f.type === "select" ? `<select name="${f.name}">${f.options.map(o => `<option${o === f.value ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>`
+    : `<input name="${f.name}" type="${f.type || "text"}" value="${esc(f.value || "")}" ${f.required ? "required" : ""} minlength="${f.minlength || 0}" maxlength="${f.maxlength || 300}" ${f.autocomplete ? `autocomplete="${f.autocomplete}"` : ""}>`}</label>`).join("");
+  const form = $("#dialogForm");
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const btn = $("#formDialogSubmit"); btn.disabled = true; $("#formDialogMessage").textContent = "";
+    try { await onSubmit(Object.fromEntries(new FormData(form))); dlg.close(); }
+    catch (err) { $("#formDialogMessage").textContent = err.message; }
+    finally { btn.disabled = false; }
+  };
+  dlg.showModal();
+  form.querySelector("input, textarea, select")?.focus();
+}
+async function apiJSON(path, body, method = "POST") {
+  const r = await fetch(path, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || "Something went wrong. Try again.");
+  return d;
+}
+
+/* ---------- Community ---------- */
+const TOPICS = ["Geopolitics", "Security", "India", "Diplomacy", "Markets", "Energy", "General"];
+function openDiscussionDialog() {
+  openFormDialog({ kicker: "Community", title: "Start a discussion", submitLabel: "Publish discussion", fields: [
+    { name: "title", label: "Title", required: true, minlength: 5, maxlength: 180 },
+    { name: "topic", label: "Topic", type: "select", options: TOPICS, value: "Geopolitics" },
+    { name: "body", label: "Your opening post", type: "textarea", rows: 7, required: true, minlength: 10 }
+  ], onSubmit: async v => { const d = await apiJSON("/api/community/posts", v); toast("Discussion published."); await loadCommunity(); location.hash = `#/discussion/${d.id}`; } });
+}
+function viewCommunity() {
+  const posts = state.community;
+  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Community</div><h1>Ideas in conversation</h1><p>Moderated discussions on India’s strategic questions. Be specific, cite sources, and keep it civil.</p></div><button class="btn btn-dark" type="button" data-action="discuss">Start a discussion</button></div>
+  <div class="community-page"><div class="live-list">${posts === null ? `<div class="skeleton" style="height:240px"></div>` : posts.length ? posts.map(p => `<a class="live-item glass thread-row" href="#/discussion/${encodeURIComponent(p.id)}"><span class="when">${ago(p.createdAt)}</span><span><b>${esc(p.title)}</b><p>${esc(p.body.length > 200 ? p.body.slice(0, 197) + "…" : p.body)}</p><span class="src"><span class="tag">${esc(p.topic)}</span>${esc(p.author)} · ${p.replies || 0} repl${p.replies === 1 ? "y" : "ies"}</span></span></a>`).join("") : `<div class="empty">No discussions yet. Start the first one.</div>`}</div>
+  <aside><div class="aside-card glass"><div class="kicker">Upcoming</div><ol class="agenda" id="agenda"></ol><a class="link-gold" href="#/events" style="display:block;margin-top:12px;font-size:13px">All events →</a></div></aside></div></div>`;
+  renderCommunity();
+}
+async function viewDiscussion(r) {
+  const id = r.arg;
+  $("#view").innerHTML = `<div class="wrap"><div class="coverage"><div class="skeleton" style="height:300px"></div></div></div>`;
+  let d;
+  try { const res = await fetch(`/api/community/posts/${encodeURIComponent(id)}`); d = res.ok ? await res.json() : null; } catch { d = null; }
+  if (parseRoute().arg !== id) return;
+  if (!d) { $("#view").innerHTML = `<div class="wrap"><div class="blocked glass"><h1>Discussion not found</h1><p class="muted">It may have been removed by a moderator.</p><div class="blocked-actions"><a class="btn btn-dark" href="#/community">Back to the community</a></div></div></div>`; return; }
+  document.title = `${d.post.title} · Raisina Wire community`;
+  $("#view").innerHTML = `<div class="wrap"><div class="coverage">
+    <a class="link-gold" href="#/community" style="font-size:13px">← All discussions</a>
+    <header class="coverage-head"><span class="tag" style="margin-top:16px">${esc(d.post.topic)}</span><h1>${esc(d.post.title)}</h1><div class="meta">${esc(d.post.author)} · ${ago(d.post.createdAt)}</div></header>
+    <div class="glass thread-post"><p>${esc(d.post.body)}</p></div>
+    <h2 class="thread-count">${d.replies.length} repl${d.replies.length === 1 ? "y" : "ies"}</h2>
+    <ol class="replies">${d.replies.map(x => `<li class="glass"><div class="reply-head"><span class="avatar avatar-sm" aria-hidden="true">${esc(initials(x.author))}</span><b>${esc(x.author)}</b><span class="meta">${ago(x.createdAt)}</span></div><p>${esc(x.body)}</p></li>`).join("")}</ol>
+    ${state.user ? `<form class="reply-form glass" id="replyForm"><label for="replyBody" class="kicker">Your reply</label><textarea id="replyBody" name="body" rows="4" required minlength="2" maxlength="5000" placeholder="Add to the discussion"></textarea><p class="auth-message" id="replyMessage" aria-live="polite"></p><button class="btn btn-dark" type="submit">Post reply</button></form>`
+      : `<div class="reply-form glass"><p style="margin:0">Sign in to join the discussion.</p><button class="btn btn-dark" type="button" data-action="signin">Sign in</button></div>`}
+  </div></div>`;
+  $("#replyForm")?.addEventListener("submit", async e => {
+    e.preventDefault();
+    const btn = e.currentTarget.querySelector("button"); btn.disabled = true;
+    try { await apiJSON(`/api/community/posts/${encodeURIComponent(id)}/replies`, { body: $("#replyBody").value }); toast("Reply posted."); viewDiscussion(parseRoute()); loadCommunity(); }
+    catch (err) { $("#replyMessage").textContent = err.message; btn.disabled = false; }
+  });
+}
+
+/* ---------- Events ---------- */
+function icsDate(iso) { return new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, ""); }
+function downloadIcs(id) {
+  const ev = (state.events || []).find(x => x.id === id); if (!ev) return;
+  const end = new Date(new Date(ev.startsAt).getTime() + 60 * 60e3).toISOString();
+  const text = (s = "") => String(s).replace(/[\\,;]/g, m => "\\" + m).replace(/\n/g, "\\n");
+  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Raisina Wire//Events//EN", "BEGIN:VEVENT", `UID:${ev.id}@raisinawire`, `DTSTAMP:${icsDate(new Date().toISOString())}`,
+    `DTSTART:${icsDate(ev.startsAt)}`, `DTEND:${icsDate(end)}`, `SUMMARY:${text(ev.title)}`, `DESCRIPTION:${text(ev.description)}`, `URL:${location.origin}/#/events`, "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
+  a.download = `${ev.title.replace(/[^\w]+/g, "-").slice(0, 60)}.ics`;
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function viewEvents() {
+  const evs = state.events;
+  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Events &amp; briefings</div><h1>Upcoming</h1><p>Expert briefings, debates and workshops. Times are shown in India Standard Time.</p></div></div>
+  <div class="live-list">${evs === null ? `<div class="skeleton" style="height:200px"></div>` : evs.length ? evs.map(e => { const d = new Date(e.startsAt); return `<article class="live-item glass event-item"><span class="date-block"><b>${d.toLocaleDateString("en-IN", { ...IST, day: "2-digit" })}</b><small>${d.toLocaleDateString("en-IN", { ...IST, month: "short" })}</small></span>
+    <span><b>${esc(e.title)}</b>${e.description ? `<p>${esc(e.description)}</p>` : ""}<span class="src"><span class="tag">${esc(e.eventType)}</span>${d.toLocaleString("en-IN", { ...IST, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })} IST · ${esc(e.access === "public" ? "Open to all" : e.access === "member" ? "Members" : "Premium members")}</span></span>
+    <button class="btn btn-light btn-sm" type="button" data-action="ics" data-event="${esc(e.id)}">Add to calendar</button></article>`; }).join("") : `<div class="empty">No events are scheduled right now. New briefings are announced here first.</div>`}</div></div>`;
+}
+
+/* ---------- Watch & listen (multimedia from the control room) ---------- */
+async function loadMedia() {
+  try { const r = await fetch("/api/media"); state.media = r.ok ? (await r.json()).items || [] : []; } catch { state.media = []; }
+  if (parseRoute().page === "watch") viewWatch();
+}
+function mediaEmbed(m) {
+  const u = String(m.mediaUrl || "");
+  const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
+  if (yt) return `<div class="media-frame"><iframe src="https://www.youtube-nocookie.com/embed/${yt[1]}" title="${esc(m.title)}" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`;
+  if (m.mediaType === "image" || /\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(u)) return `<div class="media-frame">${img(u, m.title)}</div>`;
+  if (m.mediaType === "audio" || /\.(mp3|m4a|ogg|wav)(\?|$)/i.test(u)) return `<audio controls preload="none" src="${esc(u)}" style="width:100%"></audio>`;
+  if (/\.(mp4|webm)(\?|$)/i.test(u)) return `<div class="media-frame"><video controls preload="none" src="${esc(u)}"${m.thumbnailUrl ? ` poster="${esc(m.thumbnailUrl)}"` : ""}></video></div>`;
+  return `${m.thumbnailUrl ? `<div class="media-frame">${img(m.thumbnailUrl, m.title)}</div>` : ""}<a class="btn btn-light btn-sm" href="${esc(u)}" target="_blank" rel="noreferrer">Open ↗</a>`;
+}
+function viewWatch() {
+  const items = state.media;
+  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Watch &amp; listen</div><h1>Video, audio and images</h1><p>Briefings and explainers from the Raisina Wire desk.</p></div></div>
+  <div class="media-grid">${items == null ? `<div class="skeleton" style="height:300px"></div>` : items.length ? items.map(m => `<article class="glass media-card">${mediaEmbed(m)}<div class="body"><span class="kicker">${esc(m.category || m.mediaType)}</span><h3>${esc(m.title)}</h3>${m.description ? `<p>${esc(m.description)}</p>` : ""}<span class="meta">${m.publishedAt ? shortDate(m.publishedAt) : ""}</span></div></article>`).join("") : `<div class="empty">Nothing published yet. Video and audio briefings will appear here.</div>`}</div></div>`;
+}
+
+/* ---------- Account ---------- */
+function viewAccount() {
+  if (!state.user) {
+    $("#view").innerHTML = `<div class="wrap"><div class="blocked glass"><h1>Sign in to see your account</h1><div class="blocked-actions"><button class="btn btn-dark" type="button" data-action="signin">Sign in</button><button class="btn btn-light" type="button" data-action="join">Create an account</button></div></div></div>`;
+    return;
+  }
+  const u = state.user, saved = store.get("rw-saved", []);
+  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">My account</div><h1>${esc(u.displayName)}</h1><p>${esc(u.email || "")} · ${esc(u.role)}</p></div></div>
+  <div class="mgrid">
+    <form class="mgroup glass account-form" id="nameForm"><h2>Your name</h2><label>Display name<input name="displayName" value="${esc(u.displayName)}" required minlength="2" maxlength="80" autocomplete="name"></label><p class="auth-message" aria-live="polite"></p><button class="btn btn-dark" type="submit">Save name</button></form>
+    <form class="mgroup glass account-form" id="passwordForm"><h2>Password</h2><label>Current password<input name="currentPassword" type="password" required autocomplete="current-password"></label><label>New password <small>(12+ characters)</small><input name="newPassword" type="password" required minlength="12" autocomplete="new-password"></label><p class="auth-message" aria-live="polite"></p><button class="btn btn-dark" type="submit">Change password</button></form>
+    <div class="mgroup glass"><h2>Saved stories</h2><p class="muted">${saved.length} saved on this device.</p><a class="btn btn-light" href="#/saved">Open saved stories</a></div>
+    <div class="mgroup glass"><h2>Session</h2><p class="muted">Signing out ends this session on this device.</p><button class="btn btn-light" type="button" data-action="signout">Sign out</button>${["admin", "editor"].includes(u.role) ? ` <a class="btn btn-dark" href="/admin.html">Open the control room</a>` : ""}</div>
+  </div></div>`;
+  const wire = (id, fn) => $(id).addEventListener("submit", async e => {
+    e.preventDefault(); const f = e.currentTarget, msg = f.querySelector(".auth-message"), btn = f.querySelector("button");
+    btn.disabled = true; msg.textContent = "";
+    try { await fn(Object.fromEntries(new FormData(f))); }
+    catch (err) { msg.textContent = err.message; }
+    finally { btn.disabled = false; }
+  });
+  wire("#nameForm", async v => { const d = await apiJSON("/api/auth/me", v, "PUT"); state.user = { ...state.user, displayName: d.user.displayName }; showUser(); toast("Name updated."); viewAccount(); });
+  wire("#passwordForm", async v => { await apiJSON("/api/auth/password", v); toast("Password changed. Other devices have been signed out."); $("#passwordForm").reset(); });
+}
+
+/* ---------- Search ---------- */
+function openSearch() { $("#searchInput").value = ""; renderSearchResults(); $("#searchDialog").showModal(); $("#searchInput").focus(); }
+function renderSearchResults() {
+  const q = $("#searchInput").value.trim().toLowerCase(), host = $("#searchResults");
+  if (q.length < 2) { host.innerHTML = `<p class="muted">Try a country, a topic or a name. Press Enter for all results.</p>`; return; }
+  const eds = stories().filter(e => `${e.title} ${e.dek} ${e.topic}`.toLowerCase().includes(q)).slice(0, 5);
+  const wire = wireItems().filter(i => `${i.title} ${i.summary} ${i.source}`.toLowerCase().includes(q)).slice(0, 6);
+  host.innerHTML = (eds.length ? `<div class="kicker">Raisina Wire</div>${eds.map(e => `<a href="${edHref(e)}" data-close-dialog><b>${esc(e.title)}</b><span class="meta">${esc(e.topic)} · ${shortDate(e.date)}</span></a>`).join("")}` : "")
+    + (wire.length ? `<div class="kicker">Live wire</div>${wire.map(i => `<a href="${wireHref(i)}" data-close-dialog><b>${esc(i.title)}</b><span class="meta">${esc(i.source)} · ${clock(i.publishedAt)}</span></a>`).join("")}` : "")
+    || `<p class="muted">Nothing matched “${esc(q)}”.</p>`;
+}
+
 /* ---------- Data loading ---------- */
 async function loadWire() {
   try {
@@ -608,6 +833,8 @@ async function loadCommunity() {
   try { state.community = (await fetch("/api/community/posts").then(r => r.json())).posts || []; } catch { state.community = []; }
   try { state.events = (await fetch("/api/events").then(r => r.json())).events || []; } catch { state.events = []; }
   renderCommunity();
+  if (parseRoute().page === "community") viewCommunity();
+  if (parseRoute().page === "events") viewEvents();
 }
 
 /* ---------- Accounts ---------- */
@@ -635,7 +862,7 @@ function showUser() {
   $("#avatarBtn").setAttribute("aria-label", `Account: ${u.displayName}`);
   const staff = ["admin", "editor"].includes(u.role);
   $("#accountMenu").innerHTML = `<div class="account-head"><b>${esc(u.displayName)}</b><span class="meta">${esc(u.role)}</span></div>
-    <a role="menuitem" href="#/saved">Saved stories</a>${staff ? `<a role="menuitem" href="/admin.html">Control room</a>` : ""}
+    <a role="menuitem" href="#/account">My account</a><a role="menuitem" href="#/saved">Saved stories</a>${staff ? `<a role="menuitem" href="/admin.html">Control room</a>` : ""}
     <a role="menuitem" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Newsletter on LinkedIn ↗</a>${isStandalone() ? "" : `<button role="menuitem" type="button" data-action="install">Install the app</button>`}
     <button role="menuitem" type="button" data-action="signout">Sign out</button>`;
 }
@@ -661,14 +888,6 @@ async function submitAuth(e) {
 async function signOut() {
   try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* offline */ }
   state.user = null; showUser(); toast("Signed out.");
-}
-function openDiscussionForm() {
-  const title = prompt("Discussion title (at least 5 characters)"); if (!title) return;
-  const body = prompt("Your opening post (at least 10 characters)"); if (!body) return;
-  const topic = prompt("Topic: Geopolitics, Security, Markets, India or General", "Geopolitics") || "General";
-  fetch("/api/community/posts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title, body, topic }) })
-    .then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || "Could not post"); toast("Discussion sent for publishing."); loadCommunity(); })
-    .catch(err => toast(err.message));
 }
 async function submitLead(e) {
   e.preventDefault();
@@ -737,12 +956,14 @@ if ("serviceWorker" in navigator) {
 }
 
 /* ---------- Boot ---------- */
+const articlesReady = loadArticles();
 renderShell();
 watchScroll();
 window.addEventListener("hashchange", () => { document.title = "Raisina Wire — Ideas. Intelligence. Impact."; route(); });
 route();
-loadWire(); loadMarkets(); loadCommunity(); loadCoverage();
+loadWire(); loadMarkets(); loadCommunity(); loadCoverage(); loadMedia();
 setInterval(() => { if (!document.hidden) loadCoverage(); }, 60e3);
+setInterval(() => { if (!document.hidden) loadArticles(); }, 5 * 60e3);
 fetch("/api/auth/me").then(r => r.json()).then(d => { if (d.user) { state.user = d.user; showUser(); } }).catch(() => {});
 fetch("/api/config").then(r => r.json()).then(c => { if (c.linkedinUrl) $("#linkedinLink").href = c.linkedinUrl; }).catch(() => {});
 setInterval(() => { if (!document.hidden) loadWire(); }, 120e3);
