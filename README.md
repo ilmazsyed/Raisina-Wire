@@ -41,7 +41,9 @@ A premium, mobile-first editorial and geopolitical briefing platform with a live
 
 ## Visual system
 
-The interface follows the Calibrex website style: Manrope for text and headlines, DM Mono for labels, Michroma for the wordmark, gold-gradient accents and glass panels on deep navy (`#070a12`).
+White and glass on `#f8f8fa`, with Newsreader for headlines and reading, Manrope for interface text, DM Mono for labels and Bodoni Moda for the wordmark.
+
+**Brand mark:** the Rashtrapati Bhavan dome as white line art on a crimson tile (`#b8141f`), with tricolour bars beneath, next to the wordmark "Raisina *Wire*" (Wire in crimson italic). There is no seal, emblem or Ashoka Chakra. The mark is drawn once in `src/brand.js` (`MARK_DOME`, `brandMark()`), and the app icons (`icon-192/512.png`, `maskable-512.png`, `apple-touch-icon.png`, `favicon.png`, `favicon.svg`) and `og-image.jpg` are rendered from the same drawing.
 
 ## Local preview
 

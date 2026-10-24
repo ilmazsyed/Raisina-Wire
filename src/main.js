@@ -1,6 +1,6 @@
 import "./style.css";
 import { editions, NEWSLETTER_URL, AUTHOR } from "./editions.js";
-import { domeMark, skyline, tribar, wordmark } from "./brand.js";
+import { brandMark, skyline, tribar, wordmark } from "./brand.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -99,7 +99,7 @@ function renderShell() {
       </div>
     </div>
     <div class="masthead" id="masthead">
-      <div class="nameplate"><a class="nameplate-link" href="#/" aria-label="Raisina Wire home">${domeMark("dome-mark")}<span class="wordmark">${wordmark()}</span></a>
+      <div class="nameplate"><a class="nameplate-link" href="#/" aria-label="Raisina Wire home">${brandMark()}<span class="wordmark">${wordmark()}</span></a>
         <div class="nameplate-tag">${tribar()}<p><span class="l">An Indian perspective</span> <span class="l">on a changing world</span> <span class="l gold">New Delhi · Est. 2026</span></p></div></div>
       ${skyline("skyline-band", true)}
     </div>
@@ -108,7 +108,7 @@ function renderShell() {
   <div class="read-progress" id="readProgress" aria-hidden="true"></div>
   <main id="view" tabindex="-1"></main>
   <footer class="site-footer"><div class="wrap">
-    <div class="footer-top"><a class="footer-brand" href="#/" aria-label="Raisina Wire home">${domeMark("dome-mark")}<span class="wordmark">${wordmark()}</span>${tribar()}</a>
+    <div class="footer-top"><a class="footer-brand" href="#/" aria-label="Raisina Wire home">${brandMark()}<span class="wordmark">${wordmark()}</span></a>
       <div class="footer-links"><a href="#/editions">All editions</a><a href="#/live">Live wire</a><a href="#/markets">Markets</a><a href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer" id="linkedinLink">Newsletter on LinkedIn ↗</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="#" data-action="install" class="install-link">Install the app</a></div></div>
     <form class="lead-form glass" id="leadForm"><span class="kicker">Briefings &amp; partnerships</span>
       <label class="sr-only" for="leadName">Your name</label><input id="leadName" name="name" placeholder="Your name" required minlength="2" autocomplete="name">
@@ -179,7 +179,7 @@ function renderShell() {
 }
 
 function renderNav(route) {
-  $("#siteNav").innerHTML = `<a class="nav-brand" href="#/" aria-label="Raisina Wire home" tabindex="-1">${domeMark("dome-mark")}<span class="wordmark">${wordmark()}</span>${tribar()}</a>` + NAV.map(([label, href, active]) => `<a href="${href}"${active(route) ? ' aria-current="page"' : ""}>${label === "Live" && state.coverage.length ? `<span class="nav-live" aria-label="Live coverage running"></span>` : ""}${label}</a>`).join("")
+  $("#siteNav").innerHTML = `<a class="nav-brand" href="#/" aria-label="Raisina Wire home" tabindex="-1">${brandMark()}<span class="wordmark">${wordmark()}</span></a>` + NAV.map(([label, href, active]) => `<a href="${href}"${active(route) ? ' aria-current="page"' : ""}>${label === "Live" && state.coverage.length ? `<span class="nav-live" aria-label="Live coverage running"></span>` : ""}${label}</a>`).join("")
     + `<button class="search-btn" type="button" data-action="search" aria-label="Search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>`;
   $("#siteNav").dispatchEvent(new Event("scroll"));
 }
