@@ -216,7 +216,8 @@ async function api(request, env, ctx) {
   }
   if (url.pathname === "/api/read") {
     const target = url.searchParams.get("url") || "";
-    const result = await cached(`read:${target}`, 10 * 60e3, () => readArticle(target));
+    const optOut = String(env.PUBLISHER_OPT_OUT || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
+    const result = await cached(`read:${target}`, 10 * 60e3, () => readArticle(target, { optOut }));
     return json(result, 200, { "cache-control":"public, max-age=600, s-maxage=600" });
   }
   if (url.pathname === "/api/config") {
@@ -283,6 +284,24 @@ async function api(request, env, ctx) {
     if (displayName.length < 2) return err("Your name must be at least 2 characters.");
     await env.DB.prepare("UPDATE users SET display_name=? WHERE id=?").bind(displayName, user.id).run();
     return json({ ok: true, user: { ...user, displayName } }, 200, { "cache-control": "no-store" });
+  }
+  // Account deletion (Privacy Policy, DPDP Act): removes the member and, by cascade, their sessions,
+  // saved stories, topics, discussions and replies. Staff accounts are removed by an administrator.
+  if (url.pathname === "/api/auth/me" && request.method === "DELETE") {
+    const user = await currentUser(request, env);
+    if (!user) return err("Sign in required.", 401);
+    if (isStaff(user)) return err("Editor and administrator accounts can’t be deleted here. Ask an administrator.", 400);
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM community_replies WHERE user_id=?").bind(user.id),
+      env.DB.prepare("DELETE FROM community_replies WHERE post_id IN (SELECT id FROM community_posts WHERE user_id=?)").bind(user.id),
+      env.DB.prepare("DELETE FROM community_posts WHERE user_id=?").bind(user.id),
+      env.DB.prepare("DELETE FROM saved_items WHERE user_id=?").bind(user.id),
+      env.DB.prepare("DELETE FROM saved_topics WHERE user_id=?").bind(user.id),
+      env.DB.prepare("UPDATE push_subscriptions SET user_id=NULL WHERE user_id=?").bind(user.id),
+      env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(user.id),
+      env.DB.prepare("DELETE FROM users WHERE id=?").bind(user.id)
+    ]);
+    return json({ ok: true }, 200, { "set-cookie": cookie("rw_session", "", 0), "cache-control": "no-store" });
   }
   if (url.pathname === "/api/auth/password" && request.method === "POST") {
     const user = await currentUser(request, env);
@@ -866,6 +885,7 @@ export default {
     try {
       if (url.pathname.startsWith("/media/")) return await serveMedia(request, env, ctx);
       if (url.pathname === "/robots.txt") return robots(request, env);
+      if (url.pathname === "/privacy.html" || url.pathname === "/terms.html") return Response.redirect(new URL(url.pathname.replace(".html", ""), request.url).toString(), 301);
       if (url.pathname === "/sitemap.xml" && env.DB) return await sitemap(request, env, ensureSchema);
       if (url.pathname === "/news-sitemap.xml" && env.DB) return await newsSitemap(request, env, ensureSchema);
       if ((url.pathname === "/feed.xml" || url.pathname === "/rss.xml") && env.DB) return await feed(request, env, ensureSchema);

@@ -42,6 +42,12 @@ To switch it on:
 
 Without the key, Listen uses the device's own voice, choosing a female Indian English voice when the device has one, read sentence by sentence with pauses. Wire stories from other publishers always use the device voice.
 
+## Legal pages and how we use other publishers' work
+
+The About page (`/about`) and the legal pages (`/terms`, `/privacy`, `/disclaimer`, `/copyright`, `/community-guidelines`, `/grievance`) are in `src/legal.js`, shown in the app and rendered by the Worker for search engines. They were drafted with care for Indian law (Copyright Act 1957 s.52 and Copyright Rules 2013 r.75; IT Act 2000 s.79 and IT Rules 2021; DPDP Act 2023; SEBI rules on investment advice; the Emblems and State Emblem Acts) but **should be reviewed by an Indian lawyer** before you rely on them.
+
+To keep the live wire on the right side of copyright, the in-app reader shows only an **excerpt** of other publishers' stories (at most about 120 words, the opening paragraphs, credited and labelled) with a prominent link to read the full story on the publisher's site. It never returns the full text. It identifies itself honestly as `RaisinaWireReader`, shows no excerpt where a page's robots meta says `nosnippet`, `noarchive` or `none`, and applies `max-snippet`. Publishers who ask to opt out are added to `PUBLISHER_OPT_OUT` in `wrangler.toml` (comma-separated domains). Members can delete their own account from My account.
+
 ## Getting found on Google
 
 1. The live address is `https://raisinawire.calibrex.org`, set as `SITE_URL` in `wrangler.toml`. Canonical links, sitemaps, the feed and social cards use it, and page visits to the `workers.dev` address are redirected to it (the API keeps working on both).
