@@ -18,6 +18,18 @@ A premium, mobile-first editorial and geopolitical briefing platform with a live
 2. Market pulse uses public Yahoo Finance chart endpoints without a key. Coverage, delays, endpoint access and public-display rights can vary; this is not a guaranteed real-time exchange feed.
 3. If Yahoo Finance is unavailable, USD/INR may fall back to Frankfurter, which provides a daily reference rate rather than real-time FX. Other unavailable instruments are shown as unavailable, never fabricated.
 
+## Project layout
+
+- `index.html`, `admin.html`, `privacy.html`, `terms.html` — Vite page entries (see `vite.config.js`)
+- `src/main.js`, `src/style.css` — public site; `src/worker.js` — Cloudflare Worker API
+- `admin.js`, `admin.css` — control room
+- `public/` — copied as-is into `dist/` (favicon, manifest, service worker, `_headers`)
+- `migrations/` — D1 schema migrations
+
+## Visual system
+
+The interface follows the Calibrex website style: Manrope for text and headlines, DM Mono for labels, Michroma for the wordmark, gold-gradient accents and glass panels on deep navy (`#070a12`).
+
 ## Local preview
 
 Requires Node.js 20+ and npm.
