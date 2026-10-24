@@ -81,6 +81,30 @@ function toggleTheme() {
 }
 darkQuery.addEventListener?.("change", applyTheme); applyTheme();
 
+/* ---------- Calibrex: platform credit and OSINT Studio ---------- */
+const CX = "utm_source=raisinawire&utm_medium=referral";
+const cxLink = (path, campaign) => `https://calibrex.org${path}?${CX}&utm_campaign=${campaign}`;
+const STUDIO_APP = campaign => `https://app.calibrex.org/?${CX}&utm_campaign=${campaign}`;
+const cxWordmark = `<span class="cx-word">CALIBRE<span>X</span></span>`;
+function poweredByCalibrex() {
+  return `<a class="powered-cx" href="${cxLink("/", "powered_by")}" target="_blank" rel="noopener" aria-label="Powered by Calibrex (opens calibrex.org)"><span>Powered by</span><img src="/partners/calibrex-mark.svg" alt="" width="20" height="20">${cxWordmark}<span class="cx-arrow">↗</span></a>`;
+}
+function studioAd(campaign = "footer_ad") {
+  return `<aside class="studio-ad" aria-label="Advertisement: Calibrex OSINT Studio">
+    <div class="sa-copy"><span class="sa-eyebrow"><img src="/partners/calibrex-mark.svg" alt="" width="18" height="18">From Calibrex<span class="sa-ad">Ad</span></span>
+      <h3>Calibrex OSINT Studio</h3><p class="sa-line">Make research defensible.</p>
+      <p>OSINT software for teams who investigate, verify and analyse public information: source discovery, entity research, timelines, link analysis and sourced briefs.</p>
+      <ul class="sa-facts"><li>50+ live sources</li><li>5-minute refresh</li><li>India-first, globally aware</li><li>Web, iPhone, Android, desktop</li></ul>
+      <div class="sa-actions"><a class="btn sa-cta" href="${STUDIO_APP(campaign)}" target="_blank" rel="noopener sponsored">Try OSINT Studio free ↗</a><a class="sa-more" href="${cxLink("/osint-studio/", campaign)}" target="_blank" rel="noopener sponsored">Learn more ↗</a></div></div>
+    <div class="sa-phone" aria-hidden="true"><img src="/partners/osint-studio.webp" alt="" loading="lazy" width="640" height="975"></div>
+  </aside>`;
+}
+function studioMiniAd(campaign = "community_ad") {
+  return `<aside class="studio-mini" aria-label="Advertisement: Calibrex OSINT Studio"><span class="sa-eyebrow"><img src="/partners/calibrex-mark.svg" alt="" width="16" height="16">From Calibrex<span class="sa-ad">Ad</span></span>
+    <b>Check the claims yourself.</b><p>Calibrex OSINT Studio: discover sources, verify evidence and turn public information into a sourced brief.</p>
+    <a class="btn sa-cta btn-sm" href="${STUDIO_APP(campaign)}" target="_blank" rel="noopener sponsored">Try OSINT Studio free ↗</a></aside>`;
+}
+
 /* ---------- Shell ---------- */
 const NAV = [
   ["Today", "/", r => r.page === "home"],
@@ -109,7 +133,8 @@ function renderShell() {
       <div class="utility-left"><span id="today"></span><span id="wireStatus"><span class="dot-ok"></span>Connecting to the live wire…</span></div>
       <div class="utility-right">
         <button class="icon-btn" type="button" data-action="theme" aria-label="Switch between light and dark" title="Light or dark"><svg class="i-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg><svg class="i-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
-        <button class="icon-btn" type="button" data-action="alerts" aria-label="Breaking-news alerts" aria-pressed="false">${ICON_BELL}</button>
+        <span class="alerts-wrap"><button class="icon-btn" type="button" data-action="alerts" aria-label="Alerts" aria-haspopup="dialog" aria-controls="alertsPanel">${ICON_BELL}</button>
+          <div class="alerts-panel glass" id="alertsPanel" role="dialog" aria-label="Alerts" hidden></div></span>
         <span class="guest" id="guestActions"><button class="text-btn" type="button" id="signInBtn">Sign in</button><button class="btn btn-red btn-sm" type="button" id="joinBtn">Join free</button></span>
         <div class="account hidden" id="account"><button class="avatar" type="button" id="avatarBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu"></button>
           <div class="account-menu glass" id="accountMenu" role="menu" hidden></div></div>
@@ -133,6 +158,8 @@ function renderShell() {
       <label class="sr-only" for="leadOrg">Organisation</label><input id="leadOrg" name="organisation" placeholder="Organisation (optional)" autocomplete="organization">
       <label class="sr-only" for="leadInterest">Interest</label><select id="leadInterest" name="interest"><option>Daily briefing</option><option>Academy training</option><option>Calibrex enterprise enquiry</option><option>Speaking / partnership</option></select>
       <button class="btn btn-dark" type="submit">Request contact</button><small id="leadMessage" aria-live="polite"></small></form>
+    ${studioAd()}
+    <div class="footer-base">${poweredByCalibrex()}</div>
     <p class="copyright">© ${new Date().getFullYear()} Raisina Wire. Independent editorial platform. Live headlines and quotes come from the named publishers and public feeds.</p>
   </div></footer>
   <div class="modal-backdrop hidden" id="modalBackdrop"><section class="modal glass" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
@@ -158,6 +185,14 @@ function renderShell() {
     <input id="searchInput" type="search" placeholder="Search Raisina Wire and the live wire" aria-label="Search" autocomplete="off"><button class="btn btn-light btn-sm" type="button" data-close-dialog>Esc</button></div>
     <div id="searchResults" class="search-results"></div></dialog>
   <div class="toast" id="toast" role="status"></div>
+  <div class="alert-banner glass" id="alertBanner" role="status" hidden></div>
+  <section class="install-sheet alerts-sheet glass" id="alertsSheet" role="dialog" aria-labelledby="alertsSheetTitle" hidden>
+    <button class="modal-close" type="button" data-action="alerts-later" aria-label="Close">×</button>
+    <div class="install-head"><span class="sheet-bell">${ICON_BELL}</span><div><span class="kicker">Alerts are on</span><h2 id="alertsSheetTitle">Get Raisina Wire alerts on this device</h2></div></div>
+    <ul>${ALERT_TYPES.map(t => `<li>${t}</li>`).join("")}</ul>
+    <div class="install-actions"><button class="btn btn-red" type="button" data-action="alerts-allow">Allow alerts</button><button class="btn btn-light" type="button" data-action="alerts-later">Not now</button></div>
+    <p class="muted" style="margin:10px 0 0;font-size:12px">Your browser will ask you to confirm. You can turn them off any time from the bell.</p>
+  </section>
   <div class="offline-bar" id="offlineBar" role="status" hidden>You’re offline. Editions and saved stories still open; live data shows the last copy.</div>
   <div class="update-bar glass" id="updateBar" role="status" hidden><span>A new version of Raisina Wire is ready.</span><button class="btn btn-dark btn-sm" type="button" data-action="apply-update">Update</button></div>
   <section class="install-sheet glass" id="installSheet" role="dialog" aria-labelledby="installTitle" hidden>
@@ -172,7 +207,7 @@ function renderShell() {
   $("#signInBtn").addEventListener("click", () => openAuth("login"));
   $("#joinBtn").addEventListener("click", () => openAuth("register"));
   $("#avatarBtn").addEventListener("click", () => toggleAccountMenu());
-  document.addEventListener("click", e => { if (!e.target.closest("#account")) toggleAccountMenu(false); });
+  document.addEventListener("click", e => { if (!e.target.closest("#account")) toggleAccountMenu(false); if (!e.target.closest(".alerts-wrap") && $("#alertsPanel") && !$("#alertsPanel").hidden) toggleAlertsPanel(false); });
   document.addEventListener("keydown", e => { if (e.key === "Escape") toggleAccountMenu(false); });
   renderClocks(); setInterval(renderClocks, 20e3);
   $("#modalClose").addEventListener("click", closeAuth);
@@ -401,6 +436,7 @@ function joinBand() {
     </div>
     <div class="join-side">
       <div class="join-card"><div class="kicker">Latest discussions</div><div id="discussions"></div><a class="join-link" href="/community">All discussions →</a></div>
+      ${studioMiniAd("community_band")}
       <div class="join-card"><div class="kicker">Upcoming briefings</div><ol class="agenda" id="agenda"></ol><a class="join-link" href="/events">All events →</a></div>
     </div>
   </div></section>`;
@@ -664,7 +700,7 @@ async function viewMy() {
   const suggest = [...CATEGORY_TOPICS.map(name => ({ name })), ...allTagsFromStories().slice(0, 18)].filter((x, i, arr) => arr.findIndex(y => y.name.toLowerCase() === x.name.toLowerCase()) === i);
   const saved = await savedItems();
   if (parseRoute().page !== "my") return;
-  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">My Raisina</div><h1>${esc(state.user.displayName.split(" ")[0])}’s front page</h1><p>Stories on the topics you follow, newest first, and your saved stories. Synced to your account.</p></div><button class="btn btn-light" type="button" data-action="alerts">${ICON_BELL} Breaking-news alerts</button></div>
+  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">My Raisina</div><h1>${esc(state.user.displayName.split(" ")[0])}’s front page</h1><p>Stories on the topics you follow, newest first, and your saved stories. Synced to your account.</p></div><button class="btn btn-light" type="button" data-action="alerts">${ICON_BELL} Alerts</button></div>
     <section class="my-topics glass"><div class="kicker">Topics you follow</div><div class="chips">${suggest.map(x => `<button type="button" class="chip" data-action="follow" data-topic="${esc(x.name)}" aria-pressed="${fl.has(x.name.toLowerCase())}">${fl.has(x.name.toLowerCase()) ? "✓ " : "+ "}${esc(x.name)}</button>`).join("")}</div></section>
     ${followed.length ? `<section class="band"><div class="section-head"><h2>For you</h2></div><div class="archive-grid">${mine.slice(0, 12).map(e => edCard(e, { dek: true })).join("") || `<div class="empty">Nothing new on your topics yet.</div>`}</div></section>
       ${wire.length ? `<section class="band"><div class="section-head"><h2>On the wire for you</h2><a class="link-gold" href="/live">Live wire →</a></div><div class="live-list">${wire.map(i => `<a class="live-item glass" href="${wireHref(i)}" style="grid-template-columns:88px minmax(0,1fr)"><span class="when">${clock(i.publishedAt)}</span><span><b>${esc(i.title)}</b><span class="src"><span class="tag">${esc(i.category)}</span>${esc(i.source)}</span></span></a>`).join("")}</div></section>` : ""}`
@@ -677,36 +713,88 @@ const ICON_BELL = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" s
 const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 const b64ToBytes = s => { const b = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)); return Uint8Array.from(b, c => c.charCodeAt(0)); };
 async function currentPush() { try { const reg = await navigator.serviceWorker.ready; return await reg.pushManager.getSubscription(); } catch { return null; } }
+// Alerts are on by default. Everyone gets them inside the site (the bell's inbox and a banner
+// for new ones); phone and desktop notifications need the reader's one-time "Allow", which
+// browsers require, so the site asks for it automatically and re-subscribes silently.
+const ALERT_TYPES = ["Every new Raisina Wire story", "Live coverage as it starts", "New briefings and events", "Morning brief at 9 am, evening wrap at 9 pm", "Major breaking news"];
 async function syncAlertsButton() {
   const on = pushSupported() && Notification.permission === "granted" && !!(await currentPush());
-  $$("[data-action=alerts]").forEach(b => { b.setAttribute("aria-pressed", String(on)); b.classList.toggle("is-on", on); b.title = on ? "Breaking-news alerts are on" : "Get breaking-news alerts"; });
+  state.pushOn = on;
+  $$(".icon-btn[data-action=alerts]").forEach(b => { b.classList.toggle("is-on", on); b.title = on ? "Alerts are on on this device" : "Alerts"; });
+  renderAlertsPanel();
   return on;
 }
-async function toggleAlerts() {
+async function enableAlerts({ silent = false } = {}) {
   if (!pushSupported()) {
-    if (isIOS() && !isStandalone()) { showInstallSheet({ force: true }); toast("On iPhone, add Raisina Wire to your Home Screen first, then turn on alerts from the app."); }
-    else toast("This browser can’t receive alerts. Try Chrome, Edge, Firefox or Safari.");
-    return;
+    if (silent) return false;
+    if (isIOS() && !isStandalone()) { showInstallSheet({ force: true }); toast("On iPhone, add Raisina Wire to your Home Screen, open it from there, and alerts will be offered."); }
+    else toast("This browser can’t show notifications. You’ll still see alerts here on the site.");
+    return false;
   }
-  const existing = await currentPush();
-  if (existing && Notification.permission === "granted") {
-    await fetch("/api/push/unsubscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint: existing.endpoint }) }).catch(() => {});
-    await existing.unsubscribe().catch(() => {});
-    toast("Breaking-news alerts are off."); syncAlertsButton(); return;
-  }
-  if (Notification.permission === "denied") { toast("Alerts are blocked for this site. Allow notifications in your browser settings, then try again."); return; }
-  if (await Notification.requestPermission() !== "granted") { toast("Alerts weren’t turned on."); return; }
+  if (Notification.permission === "denied") { if (!silent) toast("Notifications are blocked for this site. Allow them in your browser’s site settings to get alerts on this device."); return false; }
+  if (Notification.permission !== "granted" && (silent || await Notification.requestPermission() !== "granted")) { if (!silent) toast("Not turned on. You’ll still see alerts here on the site."); return false; }
   try {
     const { publicKey } = await fetch("/api/push/key").then(r => r.json());
     const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(publicKey) });
+    const sub = await reg.pushManager.getSubscription() || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(publicKey) });
     const r = await fetch("/api/push/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error);
-    toast("Alerts are on. You’ll hear when live coverage starts or a new edition is out.");
-  } catch (e) { toast(e.message || "Alerts couldn’t be turned on. Try again."); }
-  syncAlertsButton();
+    if (!silent) toast("Alerts are on for this device.");
+  } catch (e) { if (!silent) toast(e.message || "Alerts couldn’t be turned on. Try again."); }
+  return syncAlertsButton();
 }
-
+async function disableAlerts() {
+  const existing = await currentPush();
+  if (existing) {
+    await fetch("/api/push/unsubscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint: existing.endpoint }) }).catch(() => {});
+    await existing.unsubscribe().catch(() => {});
+  }
+  store.set("rw-alerts-optout", Date.now());
+  toast("Notifications are off on this device. Alerts still appear here on the site."); syncAlertsButton();
+}
+// The bell: an inbox of recent alerts, unread count, and the device switch.
+async function loadAlerts() {
+  try {
+    const list = (await fetch("/api/alerts").then(r => r.json())).alerts || [];
+    const known = state.alerts?.[0]?.id, fresh = list[0];
+    state.alerts = list;
+    // A new alert while the site is open: show it as a banner.
+    if (known && fresh && fresh.id !== known && !document.hidden) showAlertBanner(fresh);
+  } catch { state.alerts = state.alerts || []; }
+  renderAlertsPanel();
+}
+const alertTime = d => new Date(String(d).replace(" ", "T") + (/[zZ+]/.test(String(d)) ? "" : "Z"));
+function unreadAlerts() { const seen = store.get("rw-alerts-seen", 0); return (state.alerts || []).filter(a => alertTime(a.createdAt) > seen).length; }
+function renderAlertsPanel() {
+  const n = unreadAlerts();
+  $$(".icon-btn[data-action=alerts]").forEach(b => { b.dataset.count = n > 9 ? "9+" : n || ""; b.setAttribute("aria-label", n ? `Alerts, ${n} new` : "Alerts"); });
+  const panel = $("#alertsPanel"); if (!panel || panel.hidden) return;
+  const device = state.pushOn ? `<div class="ap-device on"><span><b>On for this device</b><small>Stories, live coverage, briefings, 9 am and 9 pm.</small></span><button class="btn btn-light btn-sm" type="button" data-action="alerts-off">Turn off</button></div>`
+    : `<div class="ap-device"><span><b>Get these on your ${isIOS() || /Android/i.test(navigator.userAgent) ? "phone" : "device"}</b><small>${pushSupported() ? "One tap to allow notifications." : isIOS() && !isStandalone() ? "Add Raisina Wire to your Home Screen first." : "This browser can’t show notifications."}</small></span><button class="btn btn-red btn-sm" type="button" data-action="alerts-on">Turn on</button></div>`;
+  panel.innerHTML = `<div class="ap-head"><b>Alerts</b><button class="modal-close" type="button" data-action="alerts-close" aria-label="Close">×</button></div>${device}
+    <ol class="ap-list">${(state.alerts || []).map(a => `<li class="${alertTime(a.createdAt) > store.get("rw-alerts-seen", 0) ? "unread" : ""}"><a href="${esc(a.url || "/")}" data-action="alerts-close"><b>${esc(a.title)}</b>${a.body ? `<span>${esc(a.body)}</span>` : ""}<small>${ago(alertTime(a.createdAt).toISOString())}</small></a></li>`).join("") || `<li class="ap-empty">No alerts yet. New stories, live coverage, briefings and the 9 am and 9 pm briefs will appear here.</li>`}</ol>`;
+}
+function toggleAlertsPanel(force) {
+  const panel = $("#alertsPanel"), open = force ?? panel.hidden;
+  panel.hidden = !open;
+  if (open) { renderAlertsPanel(); store.set("rw-alerts-seen", Date.now()); setTimeout(renderAlertsPanel, 1500); loadAlerts(); }
+  else renderAlertsPanel();
+}
+function showAlertBanner(a) {
+  const el = $("#alertBanner");
+  el.innerHTML = `<span class="live-badge"><span class="pulse"></span>Alert</span><a href="${esc(a.url || "/")}" data-action="banner-close"><b>${esc(a.title)}</b>${a.body ? ` <span>${esc(a.body)}</span>` : ""}</a><button class="modal-close" type="button" data-action="banner-close" aria-label="Dismiss">×</button>`;
+  el.hidden = false; clearTimeout(showAlertBanner.t); showAlertBanner.t = setTimeout(() => { el.hidden = true; }, 12000);
+}
+// Ask for notifications automatically: once on a first visit, and again after three days if
+// the reader said "Not now". Readers who turned them off themselves are not asked again.
+function maybeAskForAlerts() {
+  if (!pushSupported() || Notification.permission !== "default" || store.get("rw-alerts-optout", 0)) return;
+  if (Date.now() - (store.get("rw-alerts-asked", 0) || 0) < 3 * 864e5) return;
+  setTimeout(() => {
+    if (Notification.permission !== "default" || !$("#installSheet").hidden || !$("#modalBackdrop").classList.contains("hidden")) return;
+    $("#alertsSheet").hidden = false; store.set("rw-alerts-asked", Date.now());
+  }, 5000);
+}
 /* ---------- Writers ---------- */
 function viewAuthor(r) {
   const w = WRITERS.find(x => x.key === r.arg);
@@ -863,7 +951,12 @@ async function onAction(e) {
   if (a === "copy-link" || a === "copy-quote") { e.preventDefault(); const text = a === "copy-link" ? el.dataset.url : el.closest(".quote-bubble")?.dataset.quote; try { await navigator.clipboard.writeText(text); toast(a === "copy-link" ? "Link copied." : "Quote copied with a link."); } catch { toast("Couldn’t copy. Select and copy instead."); } }
   if (a === "unsave") unsave(el.dataset.href);
   if (a === "follow") toggleFollow(el.dataset.topic);
-  if (a === "alerts") { toggleAccountMenu(false); toggleAlerts(); }
+  if (a === "alerts") { e.stopPropagation(); toggleAccountMenu(false); toggleAlertsPanel(); }
+  if (a === "alerts-close") toggleAlertsPanel(false);
+  if (a === "alerts-on" || a === "alerts-allow") { $("#alertsSheet").hidden = true; enableAlerts(); }
+  if (a === "alerts-later") { $("#alertsSheet").hidden = true; store.set("rw-alerts-asked", Date.now()); }
+  if (a === "alerts-off") disableAlerts();
+  if (a === "banner-close") $("#alertBanner").hidden = true;
   if (a === "theme") toggleTheme();
   if (a === "discuss") { if (!state.user) { openAuth("register"); toast("Create a free account to start a discussion."); } else openDiscussionDialog(el.dataset.title ? `On “${el.dataset.title}”` : ""); }
 }
@@ -999,7 +1092,7 @@ function viewCommunity() {
   const posts = state.community;
   $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Community</div><h1>Ideas in conversation</h1><p>Moderated discussions on India’s strategic questions. Be specific, cite sources, and keep it civil.</p></div><button class="btn btn-dark" type="button" data-action="discuss">Start a discussion</button></div>
   <div class="community-page"><div class="live-list">${posts === null ? `<div class="skeleton" style="height:240px"></div>` : posts.length ? posts.map(p => `<a class="live-item glass thread-row" href="/discussion/${encodeURIComponent(p.id)}"><span class="when">${ago(p.createdAt)}</span><span><b>${esc(p.title)}</b><p>${esc(p.body.length > 200 ? p.body.slice(0, 197) + "…" : p.body)}</p><span class="src"><span class="tag">${esc(p.topic)}</span>${esc(p.author)} · ${p.replies || 0} repl${p.replies === 1 ? "y" : "ies"}</span></span></a>`).join("") : `<div class="empty">No discussions yet. Start the first one.</div>`}</div>
-  <aside><div class="aside-card glass"><div class="kicker">Upcoming</div><ol class="agenda" id="agenda"></ol><a class="link-gold" href="/events" style="display:block;margin-top:12px;font-size:13px">All events →</a></div></aside></div></div>`;
+  <aside>${studioMiniAd("community_page")}<div class="aside-card glass"><div class="kicker">Upcoming</div><ol class="agenda" id="agenda"></ol><a class="link-gold" href="/events" style="display:block;margin-top:12px;font-size:13px">All events →</a></div></aside></div></div>`;
   renderCommunity();
 }
 async function viewDiscussion(r) {
@@ -1267,7 +1360,8 @@ window.addEventListener("hashchange", () => { if (fromHash()) route(); });
 window.addEventListener("popstate", () => route());
 userReady.then(() => { if (state.user) { showUser(); loadTopics().then(() => { const pg = parseRoute(); if (pg.page === "tag") viewTag(pg); }); } });
 quoteShare();
-navigator.serviceWorker?.ready.then(syncAlertsButton).catch(() => {});
+navigator.serviceWorker?.ready.then(async () => { if (pushSupported() && Notification.permission === "granted" && !store.get("rw-alerts-optout", 0)) await enableAlerts({ silent: true }); else await syncAlertsButton(); maybeAskForAlerts(); }).catch(() => {});
+loadAlerts(); setInterval(() => { if (!document.hidden) loadAlerts(); }, 60e3);
 document.addEventListener("click", interceptLinks);
 route();
 loadWire(); loadMarkets(); loadCommunity(); loadCoverage(); loadMedia();

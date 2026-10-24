@@ -108,11 +108,13 @@ const imageRef = v => { const s = String(v || "").trim().slice(0, 1500); return 
 const writerKey = v => WRITERS.some(w => w.key === v) ? v : DEFAULT_WRITER;
 const tagsValue = v => splitTags(Array.isArray(v) ? v.join(",") : v).map(t => t.slice(0, 40)).join(",");
 const truthy = v => v === true || v === "on" || v === "true" || v === "1";
+// Alerts are on by default; the newsroom can switch one off for a single item.
+const wantsAlert = v => !(v === false || v === "false" || v === "0" || v === "off");
 // A story alert goes out when the story is public; a scheduled story's alert waits for the cron.
 async function storyAlert(env, ctx, user, row) {
   const live = row.status === "published" && row.published_at && row.published_at <= new Date().toISOString();
   if (!live) { await env.DB.prepare("UPDATE articles SET alert_state='pending' WHERE id=?").bind(row.id).run(); return "pending"; }
-  await createAlert(env, ctx, { title: row.kind === "edition" ? "New Raisina Wire edition" : "Raisina Wire", body: row.title, url: `/${row.kind === "edition" ? "edition" : "article"}/${encodeURIComponent(row.slug)}`, userId: user?.id });
+  await createAlert(env, ctx, { title: row.kind === "edition" ? "New Raisina Wire edition" : "New on Raisina Wire", body: row.title, url: `/${row.kind === "edition" ? "edition" : "article"}/${encodeURIComponent(row.slug)}`, userId: user?.id });
   await env.DB.prepare("UPDATE articles SET alert_state='sent' WHERE id=?").bind(row.id).run();
   return "sent";
 }
@@ -362,7 +364,7 @@ async function api(request, env, ctx) {
     const id=randomId(), slug=await uniqueSlug(env,"live_coverage",b.slug||title), status=b.status==="live"?"live":"draft";
     await env.DB.prepare("INSERT INTO live_coverage (id,slug,title,summary,status,author_id,started_at) VALUES (?,?,?,?,?,?,?)").bind(id,slug,title,String(b.summary||"").slice(0,500),status,user.id,status==="live"?new Date().toISOString():null).run();
     await audit(env,user,"live.create","live_coverage",id,{title,status});
-    if (status === "live" && truthy(b.notify)) await createAlert(env, ctx, { title: "LIVE · Raisina Wire", body: title, url: `/coverage/${encodeURIComponent(slug)}`, userId: user.id });
+    if (status === "live" && wantsAlert(b.notify)) await createAlert(env, ctx, { title: "LIVE · Raisina Wire", body: title, url: `/coverage/${encodeURIComponent(slug)}`, userId: user.id });
     return json({ok:true,id,slug},201,{"cache-control":"no-store"});
   }
   if (url.pathname.startsWith("/api/admin/live/") && !url.pathname.endsWith("/updates") && request.method === "PUT") {
@@ -376,7 +378,7 @@ async function api(request, env, ctx) {
       ended_at=CASE WHEN ?='ended' THEN ? ELSE NULL END, updated_at=? WHERE id=?`).bind(status,status,now,status,now,now,id).run();
     if(!res.meta.changes) return err("Live coverage not found.",404);
     await audit(env,user,"live.status","live_coverage",id,{status});
-    if (status === "live" && truthy(b.notify)) {
+    if (status === "live" && wantsAlert(b.notify) && b.notify !== undefined) {
       const row = await env.DB.prepare("SELECT slug,title FROM live_coverage WHERE id=?").bind(id).first();
       await createAlert(env, ctx, { title: "LIVE · Raisina Wire", body: row.title, url: `/coverage/${encodeURIComponent(row.slug)}`, userId: user.id });
     }
@@ -390,6 +392,10 @@ async function api(request, env, ctx) {
     const exists=await env.DB.prepare("SELECT id FROM live_coverage WHERE id=?").bind(id).first();
     if(!exists) return err("Live coverage not found.",404);
     await env.DB.prepare("INSERT INTO live_updates (id,coverage_id,body,media_url,source_url,author_id) VALUES (?,?,?,?,?,?)").bind(randomId(),id,body.slice(0,12000),String(b.mediaUrl||"").slice(0,1500),String(b.sourceUrl||"").slice(0,1500),user.id).run();
+    if (truthy(b.notify)) {
+      const cov = await env.DB.prepare("SELECT slug,title FROM live_coverage WHERE id=?").bind(id).first();
+      await createAlert(env, ctx, { title: `LIVE · ${cov.title}`.slice(0, 140), body: body.slice(0, 200), url: `/coverage/${encodeURIComponent(cov.slug)}`, userId: user.id });
+    }
     await env.DB.prepare("UPDATE live_coverage SET status='live', started_at=COALESCE(started_at,?), updated_at=? WHERE id=?").bind(new Date().toISOString(),new Date().toISOString(),id).run();
     return json({ok:true},201,{"cache-control":"no-store"});
   }
@@ -444,7 +450,7 @@ async function api(request, env, ctx) {
       id, slug, b.kind === "edition" ? "edition" : "article", title, String(b.dek||"").trim().slice(0,400), String(b.topic||"").trim().slice(0,80), tagsValue(b.tags), String(b.body||"").slice(0,100000),
       category, status, user.id, writerKey(b.writer), publishedAt, imageRef(b.imageUrl), imageRef(b.heroUrl), String(b.heroCaption||"").trim().slice(0,300), httpsUrl(b.sourceUrl)).run();
     await audit(env, user, "article.create", "article", id, { title, status });
-    const alert = truthy(b.notify) && status === "published" ? await storyAlert(env, ctx, user, { id, slug, title, status, kind: b.kind === "edition" ? "edition" : "article", published_at: publishedAt }) : "";
+    const alert = wantsAlert(b.notify) && status === "published" ? await storyAlert(env, ctx, user, { id, slug, title, status, kind: b.kind === "edition" ? "edition" : "article", published_at: publishedAt }) : "";
     return json({ok:true,id,slug,alert},201,{"cache-control":"no-store"});
   }
   if (url.pathname.startsWith("/api/admin/articles/") && request.method === "PUT") {
@@ -475,7 +481,9 @@ async function api(request, env, ctx) {
       pick("sourceUrl", httpsUrl, c.source_url),
       new Date().toISOString(), status, id).run();
     await audit(env,user,"article.update","article",id,{title,status});
-    const alert = truthy(b.notify) && status === "published" && c.alert_state !== "sent" ? await storyAlert(env, ctx, user, { id, slug: c.slug, title, status, kind: b.kind === "edition" || (b.kind === undefined && c.kind === "edition") ? "edition" : "article", published_at: publishedAt }) : "";
+    // First publication of a story sends its alert (unless switched off); later edits never re-send.
+    const firstPublish = c.status !== "published" || c.alert_state === "pending";
+    const alert = wantsAlert(b.notify) && status === "published" && firstPublish && c.alert_state !== "sent" ? await storyAlert(env, ctx, user, { id, slug: c.slug, title, status, kind: b.kind === "edition" || (b.kind === undefined && c.kind === "edition") ? "edition" : "article", published_at: publishedAt }) : "";
     return json({ok:true,slug:c.slug,alert},200,{"cache-control":"no-store"});
   }
 
@@ -562,6 +570,18 @@ async function api(request, env, ctx) {
     await env.DB.prepare("DELETE FROM push_subscriptions WHERE endpoint=?").bind(String(b.endpoint || "")).run();
     return json({ ok: true }, 200, { "cache-control": "no-store" });
   }
+  if (url.pathname === "/api/alerts" && request.method === "GET") {
+    const { results } = await env.DB.prepare("SELECT id,title,body,url,created_at AS createdAt FROM alerts ORDER BY created_at DESC LIMIT 20").all();
+    return json({ alerts: results }, 200, { "cache-control": "no-cache" });
+  }
+  if (url.pathname === "/api/admin/alert-settings" && request.method === "PUT") {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const b = await request.json().catch(() => ({}));
+    await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('daily_alerts',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(b.daily === false ? "off" : "on").run();
+    await audit(env, user, "alerts.daily", "settings", "daily_alerts", { on: b.daily !== false });
+    return json({ ok: true }, 200, { "cache-control": "no-store" });
+  }
   if (url.pathname === "/api/alerts/latest" && request.method === "GET") {
     const a = await env.DB.prepare("SELECT title,body,url,created_at AS createdAt FROM alerts ORDER BY created_at DESC LIMIT 1").first();
     return json({ alert: a || null }, 200, { "cache-control": "no-store" });
@@ -570,7 +590,8 @@ async function api(request, env, ctx) {
     const user = await currentUser(request, env);
     if (!isStaff(user)) return err("Editor access required.", 403);
     const [list, subs] = await Promise.all([env.DB.prepare("SELECT id,title,body,url,sent,done,created_at AS createdAt FROM alerts ORDER BY created_at DESC LIMIT 30").all(), env.DB.prepare("SELECT COUNT(*) AS n FROM push_subscriptions").first()]);
-    return json({ alerts: list.results, subscribers: subs.n }, 200, { "cache-control": "no-store" });
+    const daily = await env.DB.prepare("SELECT value FROM settings WHERE key='daily_alerts'").first();
+    return json({ alerts: list.results, subscribers: subs.n, daily: daily?.value !== "off" }, 200, { "cache-control": "no-store" });
   }
   if (url.pathname === "/api/admin/alerts" && request.method === "POST") {
     const user = await currentUser(request, env);
@@ -685,6 +706,10 @@ async function api(request, env, ctx) {
     if(title.length<5 || Number.isNaN(Date.parse(starts))) return err("A title and valid start date are required.");
     const id=randomId();
     await env.DB.prepare("INSERT INTO events (id,title,description,event_type,starts_at,access,status,created_by) VALUES (?,?,?,?,?,?,?,?)").bind(id,title,String(b.description||"").slice(0,3000),String(b.eventType||"Briefing").slice(0,40),new Date(starts).toISOString(),["public","member","premium"].includes(b.access)?b.access:"public","published",user.id).run();
+    if (wantsAlert(b.notify)) {
+      const when = new Date(starts).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+      await createAlert(env, ctx, { title: `New ${String(b.eventType || "briefing").toLowerCase()}: ${title}`.slice(0, 140), body: `${when} IST. Add it to your calendar on Raisina Wire.`, url: "/events", userId: user.id });
+    }
     return json({ok:true,id},201,{"cache-control":"no-store"});
   }
   if (url.pathname === "/api/admin/events" && request.method === "GET") {
@@ -792,8 +817,33 @@ async function scheduled(env) {
   if (!env.DB) return;
   await ensureSchema(env);
   const { results } = await env.DB.prepare(`SELECT id,slug,title,kind,status,published_at FROM articles WHERE alert_state='pending' AND status='published' AND published_at<=? LIMIT 5`).bind(new Date().toISOString()).all();
-  for (const row of results) await storyAlert(env, null, null, row);
-  await drainAlerts(env);
+  // Each step runs on its own, so one failure can't hold up the others; errors go to the Worker logs.
+  const step = async (name, fn) => { try { await fn(); } catch (e) { console.error(`cron ${name} failed:`, e?.stack || e); } };
+  await step("scheduled stories", async () => { for (const row of results) await storyAlert(env, null, null, row); });
+  await step("daily alerts", () => dailyAlerts(env, env.CRON_TEST_NOW ? new Date(env.CRON_TEST_NOW) : new Date())); // CRON_TEST_NOW: local tests only
+  await step("push delivery", () => drainAlerts(env));
+}
+// 9 am and 9 pm India time, every day (unless switched off in the control room).
+// The settings row makes each one send exactly once, even if two cron runs overlap.
+async function dailyAlerts(env, now = new Date()) {
+  const ist = new Date(now.getTime() + 5.5 * 3600e3), h = ist.getUTCHours(), m = ist.getUTCMinutes();
+  const slot = h === 9 && m < 15 ? "am" : h === 21 && m < 15 ? "pm" : null;
+  if (!slot) return null;
+  const off = await env.DB.prepare("SELECT value FROM settings WHERE key='daily_alerts'").first();
+  if (off?.value === "off") return null;
+  const key = `daily:${slot}:${ist.toISOString().slice(0, 10)}`;
+  const claim = await env.DB.prepare("INSERT OR IGNORE INTO settings (key,value) VALUES (?,?)").bind(key, now.toISOString()).run();
+  if (!claim.meta.changes) return null;
+  try { return await sendDaily(env, slot); }
+  catch (e) { await env.DB.prepare("DELETE FROM settings WHERE key=?").bind(key).run(); throw e; } // retry next minute
+}
+async function sendDaily(env, slot) {
+  const latest = (await listPublished(env, { limit: 1 }))[0];
+  const alert = slot === "am"
+    ? { title: "Good morning from Raisina Wire", body: `Markets open at 9:15. Check the market board, the live wire and today’s briefing.${latest ? ` Latest analysis: ${latest.title}` : ""}`, url: "/" }
+    : { title: "Tonight on Raisina Wire", body: `Catch up on what happened today: the day’s headlines, markets at the close and live coverage.${latest ? ` Latest analysis: ${latest.title}` : ""}`, url: "/" };
+  await createAlert(env, null, { ...alert, body: alert.body.slice(0, 240) });
+  return slot;
 }
 
 export default {
