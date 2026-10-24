@@ -2,10 +2,6 @@ name = "raisina-wire"
 main = "src/worker.js"
 compatibility_date = "2026-10-16"
 
-# Build the site before every upload (deploys, preview builds, wrangler dev), so ./dist always exists.
-[build]
-command = "npm run build"
-
 [assets]
 directory = "./dist"
 binding = "ASSETS"
