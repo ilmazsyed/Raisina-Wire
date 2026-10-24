@@ -2,10 +2,11 @@ import { cached, liveWire, readArticle, marketBoard } from "./feeds.js";
 import m0001 from "../migrations/0001_init.sql";
 import m0002 from "../migrations/0002_platform_modules.sql";
 import m0003 from "../migrations/0003_editorial_console.sql";
+import m0004 from "../migrations/0004_app_completion.sql";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
-  "cache-control": "public, max-age=60, s-maxage=120",
+  "cache-control": "no-cache", // editorial data must show changes at once; wire/markets set their own short caching
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
   "access-control-allow-headers": "content-type"
@@ -45,7 +46,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -76,6 +77,40 @@ async function currentUser(request, env) {
 }
 function slugify(s) { return s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,90) || randomId(); }
 function allowedRoles(user, roles) { return user && roles.includes(user.role); }
+const isStaff = user => allowedRoles(user, ["admin", "editor"]);
+const httpsUrl = (v, max = 1500) => { const s = String(v || "").trim().slice(0, max); return /^https:\/\//i.test(s) ? s : ""; };
+// A slug that is free in `table`: "my-title", then "my-title-2", "my-title-3"…
+async function uniqueSlug(env, table, wanted, exceptId = null) {
+  const base = slugify(wanted);
+  for (let i = 1; i < 50; i++) {
+    const slug = i === 1 ? base : `${base.slice(0, 84)}-${i}`;
+    const row = await env.DB.prepare(`SELECT id FROM ${table} WHERE slug=?`).bind(slug).first();
+    if (!row || row.id === exceptId) return slug;
+  }
+  return `${base.slice(0, 70)}-${randomId().slice(0, 8)}`;
+}
+async function audit(env, user, action, type, id, details) {
+  await env.DB.prepare("INSERT INTO audit_log (id,actor_id,action,target_type,target_id,details) VALUES (?,?,?,?,?,?)").bind(randomId(), user.id, action, type, id, JSON.stringify(details || {})).run();
+}
+// Sign-in throttling: 8 failures per email and 30 per address in 15 minutes.
+const LOGIN_WINDOW = 15 * 60;
+async function loginBlocked(env, keys) {
+  const now = Math.floor(Date.now() / 1000);
+  for (const [key, limit] of keys) {
+    const row = await env.DB.prepare("SELECT failures,window_start FROM login_attempts WHERE key=?").bind(key).first();
+    if (row && now - row.window_start < LOGIN_WINDOW && row.failures >= limit) return true;
+  }
+  return false;
+}
+async function recordLoginFailure(env, keys) {
+  const now = Math.floor(Date.now() / 1000);
+  for (const [key] of keys) {
+    await env.DB.prepare(`INSERT INTO login_attempts (key,failures,window_start) VALUES (?,1,?)
+      ON CONFLICT(key) DO UPDATE SET failures=CASE WHEN ?-window_start>=? THEN 1 ELSE failures+1 END,
+      window_start=CASE WHEN ?-window_start>=? THEN ? ELSE window_start END`).bind(key, now, now, LOGIN_WINDOW, now, LOGIN_WINDOW, now).run();
+  }
+}
+const clearLoginFailures = (env, keys) => Promise.all(keys.map(([key]) => env.DB.prepare("DELETE FROM login_attempts WHERE key=?").bind(key).run()));
 // Built-in admin: ADMIN_EMAIL is a plain var, ADMIN_PASSWORD a Worker secret (never in the repo).
 function adminEmail(env) { return String(env.ADMIN_EMAIL || "").trim().toLowerCase(); }
 async function isAdminLogin(env, email, password) {
@@ -159,6 +194,9 @@ async function api(request, env) {
   if (url.pathname === "/api/auth/login" && request.method === "POST") {
     const body = await request.json().catch(() => ({}));
     const email = String(body.email || "").trim().toLowerCase(), password = String(body.password || "");
+    const ip = request.headers.get("cf-connecting-ip") || "unknown";
+    const keys = [[`email:${email}`, 8], [`ip:${ip}`, 30]];
+    if (await loginBlocked(env, keys)) return err("Too many sign-in attempts. Wait 15 minutes and try again.", 429);
     let row = await env.DB.prepare("SELECT id,email,display_name,role,password_hash FROM users WHERE email=?").bind(email).first();
     if (await isAdminLogin(env, email, password)) {
       // The secret is the source of truth: create the admin account on first sign-in, keep it admin afterwards.
@@ -166,7 +204,8 @@ async function api(request, env) {
       if (row) await env.DB.prepare("UPDATE users SET role='admin', password_hash=? WHERE id=?").bind(hash,row.id).run();
       else await env.DB.prepare("INSERT INTO users (id,email,display_name,password_hash,role) VALUES (?,?,?,?,'admin')").bind(randomId(),email,"Ilmaz Syed",hash).run();
       row = await env.DB.prepare("SELECT id,email,display_name,role,password_hash FROM users WHERE email=?").bind(email).first();
-    } else if (!row || !(await verifyPassword(password, row.password_hash))) return err("Email or password is incorrect.", 401);
+    } else if (!row || !(await verifyPassword(password, row.password_hash))) { await recordLoginFailure(env, keys); return err("Email or password is incorrect.", 401); }
+    await clearLoginFailures(env, keys);
     const token = b64(crypto.getRandomValues(new Uint8Array(32))).replace(/[+/=]/g, c => ({"+":"-","/":"_","=":""}[c]));
     const tokenHash = await sha256(token), expires = Math.floor(Date.now()/1000) + 60*60*24*14;
     await env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)").bind(tokenHash,row.id,expires).run();
@@ -182,6 +221,32 @@ async function api(request, env) {
   if (url.pathname === "/api/auth/me" && request.method === "GET") {
     const user = await currentUser(request,env);
     return json({ user: user ? { id:user.id,email:user.email,displayName:user.display_name,role:user.role } : null },200,{ "cache-control":"no-store" });
+  }
+
+  if (url.pathname === "/api/auth/me" && request.method === "PUT") {
+    const user = await currentUser(request, env);
+    if (!user) return err("Sign in required.", 401);
+    const b = await request.json().catch(() => ({}));
+    const displayName = String(b.displayName || "").trim().slice(0, 80);
+    if (displayName.length < 2) return err("Your name must be at least 2 characters.");
+    await env.DB.prepare("UPDATE users SET display_name=? WHERE id=?").bind(displayName, user.id).run();
+    return json({ ok: true, user: { ...user, displayName } }, 200, { "cache-control": "no-store" });
+  }
+  if (url.pathname === "/api/auth/password" && request.method === "POST") {
+    const user = await currentUser(request, env);
+    if (!user) return err("Sign in required.", 401);
+    if (user.email === adminEmail(env) && env.ADMIN_PASSWORD) return err("The built-in admin password is set in Cloudflare (ADMIN_PASSWORD), not here.", 400);
+    const b = await request.json().catch(() => ({}));
+    const current = String(b.currentPassword || ""), next = String(b.newPassword || "");
+    if (next.length < 12) return err("The new password must be at least 12 characters.");
+    const row = await env.DB.prepare("SELECT password_hash FROM users WHERE id=?").bind(user.id).first();
+    if (!row || !(await verifyPassword(current, row.password_hash))) return err("Your current password is incorrect.", 401);
+    const hash = await passwordHash(next, b64(crypto.getRandomValues(new Uint8Array(16))));
+    await env.DB.prepare("UPDATE users SET password_hash=? WHERE id=?").bind(hash, user.id).run();
+    // Sign out other devices; keep this session.
+    const token = getCookie(request, "rw_session");
+    await env.DB.prepare("DELETE FROM sessions WHERE user_id=? AND token_hash<>?").bind(user.id, token ? await sha256(token) : "").run();
+    return json({ ok: true }, 200, { "cache-control": "no-store" });
   }
 
   if (url.pathname === "/api/topics" && request.method === "GET") {
@@ -225,6 +290,16 @@ async function api(request, env) {
     await env.DB.prepare("INSERT INTO media_items (id,title,description,media_type,media_url,thumbnail_url,category,status,author_id,published_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id,title,String(b.description||"").slice(0,2000),type,mediaUrl,String(b.thumbnailUrl||"").slice(0,1500),String(b.category||"Geopolitics").slice(0,50),status,user.id,status==="published"?new Date().toISOString():null).run();
     return json({ok:true,id},201,{"cache-control":"no-store"});
   }
+  if (url.pathname.startsWith("/api/admin/media/") && request.method === "PUT") {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const id = decodeURIComponent(url.pathname.split("/").pop()), b = await request.json().catch(() => ({}));
+    const status = b.status === "published" ? "published" : "draft";
+    const res = await env.DB.prepare("UPDATE media_items SET status=?, published_at=CASE WHEN ?='published' THEN COALESCE(published_at,?) ELSE published_at END, updated_at=? WHERE id=?").bind(status, status, new Date().toISOString(), new Date().toISOString(), id).run();
+    if (!res.meta.changes) return err("Media item not found.", 404);
+    await audit(env, user, "media.status", "media_item", id, { status });
+    return json({ ok: true }, 200, { "cache-control": "no-store" });
+  }
   if (url.pathname === "/api/admin/live" && request.method === "GET") {
     const user = await currentUser(request,env);
     if (!allowedRoles(user,["admin","editor"])) return err("Editor access required.",403);
@@ -236,10 +311,23 @@ async function api(request, env) {
     if (!allowedRoles(user,["admin","editor"])) return err("Editor access required.",403);
     const b=await request.json().catch(()=>({})), title=String(b.title||"").trim().slice(0,180);
     if(title.length<5) return err("Live coverage title must be at least 5 characters.");
-    const id=randomId(), slug=slugify(b.slug||title), status=b.status==="live"?"live":"draft";
-    try { await env.DB.prepare("INSERT INTO live_coverage (id,slug,title,summary,status,author_id,started_at) VALUES (?,?,?,?,?,?,?)").bind(id,slug,title,String(b.summary||"").slice(0,500),status,user.id,status==="live"?new Date().toISOString():null).run(); }
-    catch(e){ return err("Could not create live coverage. Check that the editorial migration is applied and the slug is unique.",500); }
+    const id=randomId(), slug=await uniqueSlug(env,"live_coverage",b.slug||title), status=b.status==="live"?"live":"draft";
+    await env.DB.prepare("INSERT INTO live_coverage (id,slug,title,summary,status,author_id,started_at) VALUES (?,?,?,?,?,?,?)").bind(id,slug,title,String(b.summary||"").slice(0,500),status,user.id,status==="live"?new Date().toISOString():null).run();
+    await audit(env,user,"live.create","live_coverage",id,{title,status});
     return json({ok:true,id,slug},201,{"cache-control":"no-store"});
+  }
+  if (url.pathname.startsWith("/api/admin/live/") && !url.pathname.endsWith("/updates") && request.method === "PUT") {
+    const user=await currentUser(request,env);
+    if (!isStaff(user)) return err("Editor access required.",403);
+    const id=decodeURIComponent(url.pathname.split("/").pop()), b=await request.json().catch(()=>({}));
+    const status=["live","ended","draft"].includes(b.status)?b.status:null;
+    if(!status) return err("Status must be live, ended or draft.");
+    const now=new Date().toISOString();
+    const res=await env.DB.prepare(`UPDATE live_coverage SET status=?, started_at=CASE WHEN ?='live' THEN COALESCE(started_at,?) ELSE started_at END,
+      ended_at=CASE WHEN ?='ended' THEN ? ELSE NULL END, updated_at=? WHERE id=?`).bind(status,status,now,status,now,now,id).run();
+    if(!res.meta.changes) return err("Live coverage not found.",404);
+    await audit(env,user,"live.status","live_coverage",id,{status});
+    return json({ok:true},200,{"cache-control":"no-store"});
   }
   if (url.pathname.startsWith("/api/admin/live/") && url.pathname.endsWith("/updates") && request.method === "POST") {
     const user=await currentUser(request,env);
@@ -269,8 +357,15 @@ async function api(request, env) {
   }
 
   if (url.pathname === "/api/articles" && request.method === "GET") {
-    const rows = await env.DB.prepare("SELECT id,slug,title,dek,category,published_at AS publishedAt FROM articles WHERE status='published' ORDER BY published_at DESC LIMIT 50").all();
+    const rows = await env.DB.prepare("SELECT a.id,a.slug,a.title,a.dek,a.category,a.image_url AS imageUrl,a.source_url AS sourceUrl,a.published_at AS publishedAt,length(a.body) AS bodyLength,u.display_name AS author FROM articles a LEFT JOIN users u ON u.id=a.author_id WHERE a.status='published' ORDER BY a.published_at DESC LIMIT 100").all();
     return json({ articles:rows.results });
+  }
+  if (url.pathname.startsWith("/api/articles/") && request.method === "GET") {
+    const slug = decodeURIComponent(url.pathname.split("/").pop() || "");
+    const row = await env.DB.prepare("SELECT a.id,a.slug,a.title,a.dek,a.body,a.category,a.status,a.image_url AS imageUrl,a.source_url AS sourceUrl,a.published_at AS publishedAt,a.updated_at AS updatedAt,u.display_name AS author FROM articles a LEFT JOIN users u ON u.id=a.author_id WHERE a.slug=?").bind(slug).first();
+    if (!row) return err("Article not found.", 404);
+    if (row.status !== "published" && !isStaff(await currentUser(request, env))) return err("Article not found.", 404);
+    return json({ article: row }, 200, { "cache-control": row.status === "published" ? "no-cache" : "no-store" });
   }
 
   if (url.pathname === "/api/admin/articles" && request.method === "GET") {
@@ -285,10 +380,35 @@ async function api(request, env) {
     const body = await request.json().catch(()=>({}));
     const title = String(body.title||"").trim().slice(0,180), dek = String(body.dek||"").trim().slice(0,400), bodyText = String(body.body||"").slice(0,100000), category = String(body.category||"Analysis").slice(0,40);
     if (title.length < 8) return err("Title must be at least 8 characters.");
-    const id = randomId(), slug = slugify(body.slug || title), status = body.status === "published" ? "published" : "draft";
-    await env.DB.prepare("INSERT INTO articles (id,slug,title,dek,body,category,status,author_id,published_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(id,slug,title,dek,bodyText,category,status,user.id,status==="published"?new Date().toISOString():null).run();
+    const id = randomId(), slug = await uniqueSlug(env, "articles", body.slug || title), status = body.status === "published" ? "published" : "draft";
+    const publishedAt = status === "published" ? (Date.parse(body.publishedAt) ? new Date(body.publishedAt).toISOString() : new Date().toISOString()) : null;
+    await env.DB.prepare("INSERT INTO articles (id,slug,title,dek,body,category,status,author_id,published_at,image_url,source_url) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(id,slug,title,dek,bodyText,category,status,user.id,publishedAt,httpsUrl(body.imageUrl),httpsUrl(body.sourceUrl)).run();
     await env.DB.prepare("INSERT INTO audit_log (id,actor_id,action,target_type,target_id,details) VALUES (?,?,?,?,?,?)").bind(randomId(),user.id,"article.create","article",id,JSON.stringify({title,status})).run();
     return json({ok:true,id,slug},201,{"cache-control":"no-store"});
+  }
+
+  if (url.pathname.startsWith("/api/admin/articles/") && request.method === "PUT") {
+    const user = await currentUser(request,env);
+    if (!isStaff(user)) return err("Editor access required.",403);
+    const id = decodeURIComponent(url.pathname.split("/").pop());
+    const current = await env.DB.prepare("SELECT * FROM articles WHERE id=?").bind(id).first();
+    if (!current) return err("Article not found.",404);
+    const b = await request.json().catch(()=>({}));
+    const title = b.title !== undefined ? String(b.title).trim().slice(0,180) : current.title;
+    if (title.length < 8) return err("Title must be at least 8 characters.");
+    const status = ["draft","published","archived"].includes(b.status) ? b.status : current.status;
+    const publishedAt = status === "published" ? (Date.parse(b.publishedAt) ? new Date(b.publishedAt).toISOString() : (current.published_at || new Date().toISOString())) : current.published_at;
+    await env.DB.prepare("UPDATE articles SET title=?,dek=?,body=?,category=?,status=?,published_at=?,image_url=?,source_url=?,updated_at=? WHERE id=?").bind(
+      title,
+      b.dek !== undefined ? String(b.dek).trim().slice(0,400) : current.dek,
+      b.body !== undefined ? String(b.body).slice(0,100000) : current.body,
+      b.category !== undefined ? String(b.category).slice(0,40) : current.category,
+      status, publishedAt,
+      b.imageUrl !== undefined ? httpsUrl(b.imageUrl) : current.image_url,
+      b.sourceUrl !== undefined ? httpsUrl(b.sourceUrl) : current.source_url,
+      new Date().toISOString(), id).run();
+    await audit(env,user,"article.update","article",id,{title,status});
+    return json({ok:true,slug:current.slug},200,{"cache-control":"no-store"});
   }
 
   if (url.pathname === "/api/admin/overview" && request.method === "GET") {
@@ -308,7 +428,7 @@ async function api(request, env) {
 
   if (url.pathname === "/api/community/posts" && request.method === "GET") {
     const rows = await env.DB.prepare(
-      "SELECT p.id,p.title,p.body,p.topic,p.created_at AS createdAt,u.display_name AS author FROM community_posts p JOIN users u ON u.id=p.user_id WHERE p.status='published' ORDER BY p.created_at DESC LIMIT 50"
+      "SELECT p.id,p.title,p.body,p.topic,p.created_at AS createdAt,u.display_name AS author,(SELECT COUNT(*) FROM community_replies r WHERE r.post_id=p.id) AS replies FROM community_posts p JOIN users u ON u.id=p.user_id WHERE p.status='published' ORDER BY p.created_at DESC LIMIT 50"
     ).all();
     return json({ posts: rows.results });
   }
@@ -325,6 +445,40 @@ async function api(request, env) {
     return json({ok:true,id},201,{"cache-control":"no-store"});
   }
 
+  if (/^\/api\/community\/posts\/[^/]+$/.test(url.pathname) && request.method === "GET") {
+    const id = decodeURIComponent(url.pathname.split("/").pop());
+    const post = await env.DB.prepare("SELECT p.id,p.title,p.body,p.topic,p.created_at AS createdAt,u.display_name AS author FROM community_posts p JOIN users u ON u.id=p.user_id WHERE p.id=? AND p.status='published'").bind(id).first();
+    if (!post) return err("Discussion not found.", 404);
+    const replies = await env.DB.prepare("SELECT r.id,r.body,r.created_at AS createdAt,u.display_name AS author FROM community_replies r JOIN users u ON u.id=r.user_id WHERE r.post_id=? ORDER BY r.created_at LIMIT 500").bind(id).all();
+    return json({ post, replies: replies.results }, 200, { "cache-control": "no-store" });
+  }
+  if (/^\/api\/community\/posts\/[^/]+\/replies$/.test(url.pathname) && request.method === "POST") {
+    const user = await currentUser(request, env);
+    if (!user) return err("Sign in to reply.", 401);
+    const id = decodeURIComponent(url.pathname.split("/")[4]);
+    const post = await env.DB.prepare("SELECT id FROM community_posts WHERE id=? AND status='published'").bind(id).first();
+    if (!post) return err("Discussion not found.", 404);
+    const b = await request.json().catch(() => ({}));
+    const body = String(b.body || "").trim().slice(0, 5000);
+    if (body.length < 2) return err("Write a reply first.");
+    const replyId = randomId();
+    await env.DB.prepare("INSERT INTO community_replies (id,post_id,user_id,body) VALUES (?,?,?,?)").bind(replyId, id, user.id, body).run();
+    return json({ ok: true, id: replyId }, 201, { "cache-control": "no-store" });
+  }
+  if (url.pathname === "/api/admin/community" && request.method === "GET") {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const rows = await env.DB.prepare("SELECT p.id,p.title,p.body,p.topic,p.status,p.created_at AS createdAt,u.display_name AS author,(SELECT COUNT(*) FROM community_replies r WHERE r.post_id=p.id) AS replies FROM community_posts p JOIN users u ON u.id=p.user_id WHERE p.status<>'removed' ORDER BY p.created_at DESC LIMIT 200").all();
+    return json({ posts: rows.results }, 200, { "cache-control": "no-store" });
+  }
+  if (url.pathname.startsWith("/api/admin/community-replies/") && request.method === "DELETE") {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const id = decodeURIComponent(url.pathname.split("/").pop());
+    await env.DB.prepare("DELETE FROM community_replies WHERE id=?").bind(id).run();
+    await audit(env, user, "community.reply.delete", "community_reply", id, {});
+    return json({ ok: true }, 200, { "cache-control": "no-store" });
+  }
   if (url.pathname.startsWith("/api/admin/community/") && request.method === "PUT") {
     const user=await currentUser(request,env);
     if(!allowedRoles(user,["admin","editor"])) return err("Editor access required.",403);
@@ -350,6 +504,23 @@ async function api(request, env) {
     await env.DB.prepare("INSERT INTO events (id,title,description,event_type,starts_at,access,status,created_by) VALUES (?,?,?,?,?,?,?,?)").bind(id,title,String(b.description||"").slice(0,3000),String(b.eventType||"Briefing").slice(0,40),new Date(starts).toISOString(),["public","member","premium"].includes(b.access)?b.access:"public","published",user.id).run();
     return json({ok:true,id},201,{"cache-control":"no-store"});
   }
+  if (url.pathname === "/api/admin/events" && request.method === "GET") {
+    const user = await currentUser(request,env);
+    if (!isStaff(user)) return err("Editor access required.",403);
+    const rows = await env.DB.prepare("SELECT id,title,description,event_type AS eventType,starts_at AS startsAt,access,status FROM events ORDER BY starts_at DESC LIMIT 200").all();
+    return json({events:rows.results},200,{"cache-control":"no-store"});
+  }
+  if (url.pathname.startsWith("/api/admin/events/") && request.method === "PUT") {
+    const user = await currentUser(request,env);
+    if (!isStaff(user)) return err("Editor access required.",403);
+    const id = decodeURIComponent(url.pathname.split("/").pop()), b = await request.json().catch(()=>({}));
+    const status = ["published","cancelled","draft"].includes(b.status) ? b.status : null;
+    if (!status) return err("Status must be published, cancelled or draft.");
+    const res = await env.DB.prepare("UPDATE events SET status=? WHERE id=?").bind(status,id).run();
+    if (!res.meta.changes) return err("Event not found.",404);
+    await audit(env,user,"event.status","event",id,{status});
+    return json({ok:true},200,{"cache-control":"no-store"});
+  }
   if (url.pathname === "/api/lead" && request.method === "POST") {
     const b = await request.json().catch(()=>({}));
     const name=String(b.name||"").trim().slice(0,120), email=String(b.email||"").trim().toLowerCase().slice(0,180);
@@ -357,19 +528,6 @@ async function api(request, env) {
     const id=randomId();
     await env.DB.prepare("INSERT INTO leads (id,name,email,organisation,interest,source) VALUES (?,?,?,?,?,?)").bind(id,name,email,String(b.organisation||"").slice(0,180),String(b.interest||"General").slice(0,100),String(b.source||"Raisina Wire website").slice(0,100)).run();
     return json({ok:true,message:"Thanks. Your request has been received."},201,{"cache-control":"no-store"});
-  }
-  if (url.pathname === "/api/admin/overview" && request.method === "GET") {
-    const user = await currentUser(request,env);
-    if (!allowedRoles(user,["admin"])) return err("Administrator access required.",403);
-    const [members, published, drafts, leads, discussions, events] = await Promise.all([
-      env.DB.prepare("SELECT COUNT(*) AS n FROM users").first(),
-      env.DB.prepare("SELECT COUNT(*) AS n FROM articles WHERE status='published'").first(),
-      env.DB.prepare("SELECT COUNT(*) AS n FROM articles WHERE status='draft'").first(),
-      env.DB.prepare("SELECT COUNT(*) AS n FROM leads").first(),
-      env.DB.prepare("SELECT COUNT(*) AS n FROM community_posts WHERE status='published'").first(),
-      env.DB.prepare("SELECT COUNT(*) AS n FROM events WHERE status='published'").first()
-    ]);
-    return json({members:members.n,published:published.n,drafts:drafts.n,leads:leads.n,discussions:discussions.n,events:events.n,generatedAt:new Date().toISOString()},200,{"cache-control":"no-store"});
   }
   if (url.pathname === "/api/admin/leads" && request.method === "GET") {
     const user=await currentUser(request,env);
