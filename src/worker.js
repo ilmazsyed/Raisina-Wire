@@ -6,6 +6,7 @@ import m0004 from "../migrations/0004_app_completion.sql";
 import m0005 from "../migrations/0005_editions_media_writers.sql";
 import m0006 from "../migrations/0006_tags_views_alerts.sql";
 import m0007 from "../migrations/0007_tts_audio.sql";
+import m0008 from "../migrations/0008_community_votes.sql";
 import { handleTts } from "./tts.js";
 import { editions } from "./editions.js";
 import editionBodies from "./edition-bodies.json";
@@ -55,7 +56,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -653,11 +654,33 @@ async function api(request, env, ctx) {
   }
 
 
+  // Discussions with replies, votes, latest activity and the most recent participants.
   if (url.pathname === "/api/community/posts" && request.method === "GET") {
-    const rows = await env.DB.prepare(
-      "SELECT p.id,p.title,p.body,p.topic,p.created_at AS createdAt,u.display_name AS author,(SELECT COUNT(*) FROM community_replies r WHERE r.post_id=p.id) AS replies FROM community_posts p JOIN users u ON u.id=p.user_id WHERE p.status='published' ORDER BY p.created_at DESC LIMIT 50"
-    ).all();
-    return json({ posts: rows.results });
+    const user = await currentUser(request, env).catch(() => null);
+    const sort = url.searchParams.get("sort") === "top" ? "top" : "latest";
+    const topic = String(url.searchParams.get("topic") || "").slice(0, 80);
+    const rows = await env.DB.prepare(`SELECT p.id,p.title,p.body,p.topic,p.created_at AS createdAt,u.display_name AS author,
+        (SELECT COUNT(*) FROM community_replies r WHERE r.post_id=p.id) AS replies,
+        (SELECT COUNT(*) FROM community_votes v WHERE v.post_id=p.id) AS votes,
+        (SELECT MAX(r.created_at) FROM community_replies r WHERE r.post_id=p.id) AS lastReplyAt,
+        (SELECT group_concat(name, '|') FROM (SELECT DISTINCT u2.display_name AS name FROM community_replies r2 JOIN users u2 ON u2.id=r2.user_id WHERE r2.post_id=p.id ORDER BY r2.created_at DESC LIMIT 4)) AS repliers,
+        ${user ? "EXISTS(SELECT 1 FROM community_votes v WHERE v.post_id=p.id AND v.user_id=?)" : "0"} AS voted
+      FROM community_posts p JOIN users u ON u.id=p.user_id
+      WHERE p.status='published' ${topic ? "AND p.topic=?" : ""}
+      ORDER BY ${sort === "top" ? "(votes*2 + replies) DESC, COALESCE(lastReplyAt, p.created_at) DESC" : "COALESCE(lastReplyAt, p.created_at) DESC"} LIMIT 60`)
+      .bind(...[user?.id, topic || undefined].filter(v => v !== undefined)).all();
+    return json({ posts: rows.results.map(p => ({ ...p, voted: !!p.voted, repliers: p.repliers ? p.repliers.split("|") : [] })) }, 200, { "cache-control": "no-store" });
+  }
+  if (/^\/api\/community\/posts\/[^/]+\/vote$/.test(url.pathname) && request.method === "POST") {
+    const user = await currentUser(request, env);
+    if (!user) return err("Sign in to vote.", 401);
+    const id = decodeURIComponent(url.pathname.split("/")[4]);
+    const post = await env.DB.prepare("SELECT id FROM community_posts WHERE id=? AND status='published'").bind(id).first();
+    if (!post) return err("Discussion not found.", 404);
+    const del = await env.DB.prepare("DELETE FROM community_votes WHERE post_id=? AND user_id=?").bind(id, user.id).run();
+    if (!del.meta.changes) await env.DB.prepare("INSERT INTO community_votes (post_id,user_id) VALUES (?,?)").bind(id, user.id).run();
+    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM community_votes WHERE post_id=?").bind(id).first();
+    return json({ ok: true, voted: !del.meta.changes, votes: n.n }, 200, { "cache-control": "no-store" });
   }
   if (url.pathname === "/api/community/posts" && request.method === "POST") {
     const user = await currentUser(request, env);
@@ -674,8 +697,13 @@ async function api(request, env, ctx) {
 
   if (/^\/api\/community\/posts\/[^/]+$/.test(url.pathname) && request.method === "GET") {
     const id = decodeURIComponent(url.pathname.split("/").pop());
-    const post = await env.DB.prepare("SELECT p.id,p.title,p.body,p.topic,p.created_at AS createdAt,u.display_name AS author FROM community_posts p JOIN users u ON u.id=p.user_id WHERE p.id=? AND p.status='published'").bind(id).first();
+    const viewer = await currentUser(request, env).catch(() => null);
+    const post = await env.DB.prepare(`SELECT p.id,p.title,p.body,p.topic,p.created_at AS createdAt,u.display_name AS author,
+      (SELECT COUNT(*) FROM community_votes v WHERE v.post_id=p.id) AS votes,
+      ${viewer ? "EXISTS(SELECT 1 FROM community_votes v WHERE v.post_id=p.id AND v.user_id=?)" : "0"} AS voted
+      FROM community_posts p JOIN users u ON u.id=p.user_id WHERE p.id=? AND p.status='published'`).bind(...(viewer ? [viewer.id, id] : [id])).first();
     if (!post) return err("Discussion not found.", 404);
+    post.voted = !!post.voted;
     const replies = await env.DB.prepare("SELECT r.id,r.body,r.created_at AS createdAt,u.display_name AS author FROM community_replies r JOIN users u ON u.id=r.user_id WHERE r.post_id=? ORDER BY r.created_at LIMIT 500").bind(id).all();
     return json({ post, replies: replies.results }, 200, { "cache-control": "no-store" });
   }
