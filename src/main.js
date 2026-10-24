@@ -84,9 +84,10 @@ function renderShell() {
       <div class="utility-left"><span id="today"></span><span id="wireStatus"><span class="dot-ok"></span>Connecting to the live wire…</span></div>
       <div class="utility-right"><button class="text-btn" type="button" id="signInBtn">Sign in</button><button class="btn btn-gold btn-sm" type="button" id="joinBtn">Join free</button></div>
     </div>
-    <div class="masthead"><a href="#/" aria-label="Raisina Wire home">Raisina <i>Wire</i></a><div class="meta">An Indian perspective on a changing world</div></div>
-    <nav class="site-nav glass" id="siteNav" aria-label="Sections"></nav>
+    <div class="masthead" id="masthead"><a href="#/" aria-label="Raisina Wire home">Raisina <i>Wire</i></a><div class="meta">An Indian perspective on a changing world</div></div>
   </header>
+  <div class="nav-dock"><div class="wrap"><nav class="site-nav glass" id="siteNav" aria-label="Sections"></nav></div></div>
+  <div class="read-progress" id="readProgress" aria-hidden="true"></div>
   <main id="view" tabindex="-1"></main>
   <footer class="site-footer"><div class="wrap">
     <div class="footer-top"><a class="footer-brand" href="#/">Raisina <i>Wire</i></a>
@@ -133,8 +134,9 @@ function renderShell() {
 }
 
 function renderNav(route) {
-  $("#siteNav").innerHTML = NAV.map(([label, href, active]) => `<a href="${href}"${active(route) ? ' aria-current="page"' : ""}>${label}</a>`).join("")
+  $("#siteNav").innerHTML = `<a class="nav-brand" href="#/" aria-label="Raisina Wire home" tabindex="-1">Raisina <i>Wire</i></a>` + NAV.map(([label, href, active]) => `<a href="${href}"${active(route) ? ' aria-current="page"' : ""}>${label}</a>`).join("")
     + `<button class="search-btn" type="button" data-action="search" aria-label="Search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>`;
+  $("#siteNav").dispatchEvent(new Event("scroll"));
 }
 
 /* ---------- Router ---------- */
@@ -149,9 +151,35 @@ async function route() {
   const r = parseRoute();
   renderNav(r);
   const view = views[r.page] || viewHome;
+  document.body.classList.toggle("is-reading", r.page === "edition" || r.page === "read");
+  const main = $("#view");
+  main.classList.remove("view-enter"); void main.offsetWidth; main.classList.add("view-enter");
   await view(r);
+  updateProgress();
   if (r.page === "community") $("#community")?.scrollIntoView({ block: "start" });
   else window.scrollTo(0, 0);
+}
+
+/* ---------- Scroll effects ---------- */
+function updateProgress() {
+  const bar = $("#readProgress"); if (!bar) return;
+  if (!document.body.classList.contains("is-reading")) { bar.style.transform = "scaleX(0)"; return; }
+  const article = $(".reader-article"); if (!article) return;
+  const top = article.getBoundingClientRect().top + window.scrollY, height = article.offsetHeight - window.innerHeight * 0.6;
+  bar.style.transform = `scaleX(${Math.min(1, Math.max(0, (window.scrollY - top + 120) / Math.max(1, height)))})`;
+}
+function watchScroll() {
+  let ticking = false;
+  window.addEventListener("scroll", () => {
+    if (ticking) return; ticking = true;
+    requestAnimationFrame(() => { ticking = false; updateProgress(); });
+  }, { passive: true });
+  // The compact wordmark appears in the pinned menu once the masthead has scrolled away.
+  new IntersectionObserver(([entry]) => document.body.classList.toggle("nav-stuck", !entry.isIntersecting), { rootMargin: "-20px 0px 0px 0px" }).observe($("#masthead"));
+  // On narrow screens the menu scrolls sideways; fade its edge until the end is reached.
+  const nav = $("#siteNav");
+  const edge = () => nav.classList.toggle("at-end", nav.scrollLeft + nav.clientWidth >= nav.scrollWidth - 4);
+  nav.addEventListener("scroll", edge, { passive: true }); window.addEventListener("resize", edge); edge();
 }
 
 /* ---------- Shared pieces ---------- */
@@ -275,11 +303,16 @@ function proseHTML(blocks) {
   flush();
   return html;
 }
+const ICON = {
+  back: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>`,
+  save: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg>`,
+  share: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg>`
+};
 function readerBar({ badge, original, originalLabel, saveItem }) {
-  return `<div class="reader-bar glass"><a class="btn btn-light btn-sm" href="#/" data-action="back">← Back</a><span class="badge">${esc(badge)}</span><span class="grow"></span>
+  return `<div class="reader-bar glass"><a class="btn btn-light btn-sm" href="#/" data-action="back" aria-label="Back">${ICON.back}<span class="lbl">Back</span></a><span class="badge">${esc(badge)}</span><span class="grow"></span>
     <button class="btn btn-light btn-sm" type="button" data-action="text-smaller" aria-label="Smaller text">A−</button><button class="btn btn-light btn-sm" type="button" data-action="text-larger" aria-label="Larger text">A+</button>
-    <button class="btn btn-light btn-sm" type="button" data-action="save" data-item='${esc(JSON.stringify(saveItem))}'>Save</button><button class="btn btn-light btn-sm" type="button" data-action="share" data-title="${esc(saveItem.title)}">Share</button>
-    <a class="btn btn-dark btn-sm" href="${esc(original)}" target="_blank" rel="noreferrer">${esc(originalLabel)} ↗</a></div>`;
+    <button class="btn btn-light btn-sm" type="button" data-action="save" aria-label="Save" data-item='${esc(JSON.stringify(saveItem))}'>${ICON.save}<span class="lbl">Save</span></button><button class="btn btn-light btn-sm" type="button" data-action="share" aria-label="Share" data-title="${esc(saveItem.title)}">${ICON.share}<span class="lbl">Share</span></button>
+    <a class="btn btn-dark btn-sm original-btn" href="${esc(original)}" target="_blank" rel="noreferrer"><span class="lbl">${esc(originalLabel)}</span><span class="lbl-short">Original</span> ↗</a></div>`;
 }
 async function viewEdition(r) {
   const i = editions.findIndex(e => e.slug === r.arg);
@@ -334,7 +367,7 @@ async function viewExternal(r) {
     return;
   }
   $(".reader-bar .badge").textContent = `${site} · Reader view`;
-  $(".reader-bar .btn-dark").textContent = `Original on ${site} ↗`;
+  $(".reader-bar .original-btn .lbl").textContent = `Original on ${site}`;
   $("#extArticle").innerHTML = `<div class="kicker">${esc(known.category || site)}</div><h1>${esc(title)}</h1>
     ${data.description ? `<p class="dek">${esc(data.description)}</p>` : ""}
     <div class="reader-byline"><div><b>${esc(data.byline || site)}</b><div class="muted" style="font-size:13px">${esc(site)}</div></div><span class="grow"></span><span class="meta">${data.publishedAt ? new Date(data.publishedAt).toLocaleString("en-IN", { ...IST, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : known.publishedAt ? `${clock(known.publishedAt)} IST` : ""}</span></div>
@@ -510,6 +543,7 @@ window.addEventListener("appinstalled", () => toast("Raisina Wire installed."));
 
 /* ---------- Boot ---------- */
 renderShell();
+watchScroll();
 window.addEventListener("hashchange", () => { document.title = "Raisina Wire — Ideas. Intelligence. Impact."; route(); });
 route();
 loadWire(); loadMarkets(); loadCommunity();
