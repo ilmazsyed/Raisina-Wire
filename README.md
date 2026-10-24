@@ -4,13 +4,18 @@ A premium, mobile-first editorial and geopolitical briefing platform with a live
 
 ## What is live now
 
-- **News and coverage clusters:** GDELT DOC 2.0 article search. The homepage refreshes on a timer and labels the actual last successful sync.
-- **Market pulse:** Keyless market pulse: the Worker queries public Yahoo Finance chart endpoints for S&P 500, Apple, Reliance, TCS, USD/INR, EUR/USD, gold futures and WTI crude futures. Each quote carries source, timestamp/status, currency and percentage change when available. If both Yahoo endpoints fail for USD/INR, the UI may show Frankfurter’s daily reference rate. Other failed symbols are marked unavailable; no prices are fabricated. These public feeds are not guaranteed uptime or licensed real-time exchange feeds, and delay/coverage vary by instrument.
-- **Fallback mode:** Without the key, Stooq daily closes and Frankfurter daily FX reference rates may appear, explicitly labelled as daily/delayed—not live intraday prices. Unavailable values remain blank rather than being fabricated.
-- **Dynamic globe:** WebGL-free animated canvas globe with thematic coverage markers. Their visual emphasis can be connected to current article-category counts; the displayed locations are illustrative regional anchors, **not geolocated events or operational tracks**.
-- **Installable PWA:** manifest, service worker, install prompt and responsive layout.
-- **Member / admin foundation:** Worker routes and D1 schema for registration/login, session cookies, saved topics, articles, community discussions and moderation, events, leads, social metrics, member roles and audit log. The `/admin.html` control room separates Editorial CMS, Members, Community, Events, Sales & Leads, and Social Metrics. D1 and secrets must be configured before these endpoints become persistent/usable in production.
-- **LinkedIn:** A follow button can link to the official Raisina Wire LinkedIn page once the exact public URL is configured. No scraping or automated extraction of private LinkedIn content is included.
+- **Raisina Wire editions, in the app:** all published editions of the LinkedIn newsletter, with full text, read inside the site (newest first on the home page, in the archive and in "More from Raisina Wire"). Each links to its original on LinkedIn. Data: `src/editions.js` (metadata) and `src/edition-bodies.json` (text, loaded only when an edition is opened). Artwork: `public/editions/<slug>.webp`.
+- **Live wire:** `/api/wire` merges public RSS feeds from The Hindu, Indian Express, NDTV, Mint, BBC News, Al Jazeera and The Diplomat, newest first, de-duplicated and tagged India / Security / Diplomacy / Markets / Energy / World. Items older than 72 hours are dropped. A feed that fails is listed as unavailable; the others still show.
+- **Reader view:** `/api/read?url=` fetches a story and extracts its headline, byline and paragraphs for in-app reading, with the publisher credited and a link to the original. Paywalled, script-only or blocked pages fall back to a "Read original" screen with the feed summary.
+- **Markets:** `/api/markets` returns 39 instruments in eight groups (India indices, India stocks, defence stocks, global indices, currencies, commodities, US bond yields, crypto) with intraday sparklines, from public Yahoo Finance chart data. Delayed or last available; failed quotes are shown as unavailable, never estimated.
+- **Accounts, community, events, contact form, admin control room** as before (D1 tables are created automatically on first use). The built-in admin is `ADMIN_EMAIL` with the `ADMIN_PASSWORD` secret.
+- **Installable PWA:** manifest, service worker and install prompt.
+
+## Adding a new Raisina Wire edition
+
+1. Add its entry at the top of `src/editions.js` (slug, date, topic, title, dek, LinkedIn URL, image path, read minutes).
+2. Add its text to `src/edition-bodies.json` under the same slug, as blocks of `{"t":"p"|"h"|"li","x":"text"}`.
+3. Add artwork at `public/editions/<slug>.webp` (1600×1000).
 
 ## Data-source notes
 
