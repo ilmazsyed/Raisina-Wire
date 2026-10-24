@@ -20,10 +20,10 @@
     { "src": "/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Live wire", "short_name": "Live", "description": "Latest headlines from the live wire", "url": "/#/live", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Raisina Wire editions", "short_name": "Editions", "description": "Every Raisina Wire edition", "url": "/#/editions", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Markets", "short_name": "Markets", "description": "Market board", "url": "/#/markets", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Saved stories", "short_name": "Saved", "description": "Stories saved for offline reading", "url": "/#/saved", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+    { "name": "Live wire", "short_name": "Live", "description": "Latest headlines from the live wire", "url": "/live", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Raisina Wire editions", "short_name": "Editions", "description": "Every Raisina Wire edition", "url": "/editions", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Markets", "short_name": "Markets", "description": "Market board", "url": "/markets", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Saved stories", "short_name": "Saved", "description": "Stories saved for offline reading", "url": "/saved", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
   ],
   "screenshots": [
     { "src": "/screenshots/edition-narrow.webp", "sizes": "412x915", "type": "image/webp", "form_factor": "narrow", "label": "Read every Raisina Wire edition in the app, online or offline" },

@@ -1,6 +1,7 @@
 import "./style.css";
 import { editions, NEWSLETTER_URL, AUTHOR } from "./editions.js";
 import { brandMark, skyline, tribar, wordmark } from "./brand.js";
+import { WRITERS, writer } from "./writers.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -69,16 +70,16 @@ document.documentElement.style.setProperty("--text-scale", store.get("rw-text", 
 
 /* ---------- Shell ---------- */
 const NAV = [
-  ["Today", "#/", r => r.page === "home"],
-  ["Raisina Wire", "#/editions", r => ["editions", "edition", "article"].includes(r.page)],
-  ["Live", "#/live", r => r.page === "live" && !r.arg],
-  ["India", "#/live/India", r => r.page === "live" && r.arg === "India"],
-  ["Security", "#/live/Security", r => r.page === "live" && r.arg === "Security"],
-  ["Markets", "#/markets", r => r.page === "markets"],
-  ["Community", "#/community", r => r.page === "community" || r.page === "discussion"],
-  ["Events", "#/events", r => r.page === "events"],
-  ["Watch", "#/watch", r => r.page === "watch"],
-  ["Saved", "#/saved", r => r.page === "saved"]
+  ["Today", "/", r => r.page === "home"],
+  ["Raisina Wire", "/editions", r => ["editions", "edition", "article"].includes(r.page)],
+  ["Live", "/live", r => r.page === "live" && !r.arg],
+  ["India", "/live/India", r => r.page === "live" && r.arg === "India"],
+  ["Security", "/live/Security", r => r.page === "live" && r.arg === "Security"],
+  ["Markets", "/markets", r => r.page === "markets"],
+  ["Community", "/community", r => r.page === "community" || r.page === "discussion"],
+  ["Events", "/events", r => r.page === "events"],
+  ["Watch", "/watch", r => r.page === "watch"],
+  ["Saved", "/saved", r => r.page === "saved"]
 ];
 
 function renderShell() {
@@ -87,19 +88,20 @@ function renderShell() {
   <div class="ticker" role="region" aria-label="Latest headlines"><div class="wrap ticker-in">
     <span class="ticker-label"><span class="pulse"></span>Live</span>
     <div class="ticker-track"><div class="ticker-move" id="tickerMove"><span class="ticker-item muted">Connecting to the live wire…</span></div></div>
+    <button class="ticker-toggle" type="button" data-action="ticker-toggle" aria-label="Pause headlines" aria-pressed="false"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path class="i-pause" d="M3 2h2v8H3zM7 2h2v8H7z" fill="currentColor"/><path class="i-play" d="M3 1.5l7 4.5-7 4.5z" fill="currentColor"/></svg></button>
     <div class="clocks" id="clocks" aria-label="World clocks"></div>
   </div></div>
   <header class="wrap">
     <div class="utility">
       <div class="utility-left"><span id="today"></span><span id="wireStatus"><span class="dot-ok"></span>Connecting to the live wire…</span></div>
       <div class="utility-right">
-        <span class="guest" id="guestActions"><button class="text-btn" type="button" id="signInBtn">Sign in</button><button class="btn btn-dark btn-sm" type="button" id="joinBtn">Subscribe</button></span>
+        <span class="guest" id="guestActions"><button class="text-btn" type="button" id="signInBtn">Sign in</button><button class="btn btn-red btn-sm" type="button" id="joinBtn">Join free</button></span>
         <div class="account hidden" id="account"><button class="avatar" type="button" id="avatarBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu"></button>
           <div class="account-menu glass" id="accountMenu" role="menu" hidden></div></div>
       </div>
     </div>
     <div class="masthead" id="masthead">
-      <div class="nameplate"><a class="nameplate-link" href="#/" aria-label="Raisina Wire home">${brandMark()}<span class="wordmark">${wordmark()}</span></a>
+      <div class="nameplate"><a class="nameplate-link" href="/" aria-label="Raisina Wire home">${brandMark()}<span class="wordmark">${wordmark()}</span></a>
         <div class="nameplate-tag">${tribar()}<p><span class="l">An Indian perspective</span> <span class="l">on a changing world</span> <span class="l gold">New Delhi · Est. 2026</span></p></div></div>
       ${skyline("skyline-band", true)}
     </div>
@@ -108,8 +110,8 @@ function renderShell() {
   <div class="read-progress" id="readProgress" aria-hidden="true"></div>
   <main id="view" tabindex="-1"></main>
   <footer class="site-footer"><div class="wrap">
-    <div class="footer-top"><a class="footer-brand" href="#/" aria-label="Raisina Wire home">${brandMark()}<span class="wordmark">${wordmark()}</span></a>
-      <div class="footer-links"><a href="#/editions">All editions</a><a href="#/live">Live wire</a><a href="#/markets">Markets</a><a href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer" id="linkedinLink">Newsletter on LinkedIn ↗</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="#" data-action="install" class="install-link">Install the app</a></div></div>
+    <div class="footer-top"><a class="footer-brand" href="/" aria-label="Raisina Wire home">${brandMark()}<span class="wordmark">${wordmark()}</span></a>
+      <div class="footer-links"><a href="/editions">All editions</a><a href="/live">Live wire</a><a href="/markets">Markets</a><a href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer" id="linkedinLink">Newsletter on LinkedIn ↗</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="#" data-action="install" class="install-link">Install the app</a></div></div>
     <form class="lead-form glass" id="leadForm"><span class="kicker">Briefings &amp; partnerships</span>
       <label class="sr-only" for="leadName">Your name</label><input id="leadName" name="name" placeholder="Your name" required minlength="2" autocomplete="name">
       <label class="sr-only" for="leadEmail">Work email</label><input id="leadEmail" name="email" type="email" placeholder="Work email" required autocomplete="email">
@@ -121,7 +123,8 @@ function renderShell() {
   <div class="modal-backdrop hidden" id="modalBackdrop"><section class="modal glass" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <button class="modal-close" id="modalClose" type="button" aria-label="Close">×</button>
     <div class="kicker">Raisina Wire membership</div><h2 id="modalTitle">Welcome back.</h2>
-    <p class="modal-intro">A free account lets you follow topics and join community discussions.</p>
+    <p class="modal-intro">A free account lets you join community discussions and members’ briefings.</p>
+    <ul class="auth-perks" id="authPerks">${PERKS.map(([icon, title]) => `<li><span class="perk-icon">${PERK_ICONS[icon]}</span>${title}</li>`).join("")}</ul>
     <div id="authMessage" class="auth-message" aria-live="polite"></div>
     <form id="authForm"><label id="nameField" class="hidden">Your name<input name="displayName" autocomplete="name" minlength="2"></label>
       <label>Email address<input name="email" type="email" autocomplete="email" required></label>
@@ -168,7 +171,7 @@ function renderShell() {
   $("#searchInput").addEventListener("input", renderSearchResults);
   $("#searchInput").addEventListener("keydown", e => {
     if (e.key === "Escape") { e.preventDefault(); $("#searchDialog").close(); return; }
-    if (e.key === "Enter" && e.target.value.trim()) { $("#searchDialog").close(); location.hash = `#/search?q=${encodeURIComponent(e.target.value.trim())}`; } });
+    if (e.key === "Enter" && e.target.value.trim()) { $("#searchDialog").close(); navigate(`/search?q=${encodeURIComponent(e.target.value.trim())}`); } });
   // One delegated handler for every action button rendered by the views.
   document.addEventListener("click", onAction);
   // Hide images from feeds that fail to load rather than showing a broken icon.
@@ -179,25 +182,42 @@ function renderShell() {
 }
 
 function renderNav(route) {
-  $("#siteNav").innerHTML = `<a class="nav-brand" href="#/" aria-label="Raisina Wire home" tabindex="-1">${brandMark()}<span class="wordmark">${wordmark()}</span></a>` + NAV.map(([label, href, active]) => `<a href="${href}"${active(route) ? ' aria-current="page"' : ""}>${label === "Live" && state.coverage.length ? `<span class="nav-live" aria-label="Live coverage running"></span>` : ""}${label}</a>`).join("")
+  $("#siteNav").innerHTML = `<a class="nav-brand" href="/" aria-label="Raisina Wire home" tabindex="-1">${brandMark()}<span class="wordmark">${wordmark()}</span></a>` + NAV.map(([label, href, active]) => `<a href="${href}"${active(route) ? ' aria-current="page"' : ""}>${label === "Live" && state.coverage.length ? `<span class="nav-live" aria-label="Live coverage running"></span>` : ""}${label}</a>`).join("")
     + `<button class="search-btn" type="button" data-action="search" aria-label="Search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>`;
   $("#siteNav").dispatchEvent(new Event("scroll"));
 }
 
 /* ---------- Router ---------- */
+// Clean URLs (/edition/slug, /live/India …) so every page can be indexed and shared.
 function parseRoute() {
-  const raw = location.hash.replace(/^#\/?/, "");
-  const [path, query = ""] = raw.split("?");
-  const [page = "", ...rest] = path.split("/").filter(Boolean);
-  return { page: page || "home", arg: rest.length ? decodeURIComponent(rest.join("/")) : "", params: new URLSearchParams(query) };
+  const [page = "", ...rest] = location.pathname.split("/").filter(Boolean);
+  return { page: page || "home", arg: rest.length ? decodeURIComponent(rest.join("/")) : "", params: new URLSearchParams(location.search) };
 }
-const views = { coverage: viewCoverage, home: viewHome, editions: viewEditions, edition: viewEdition, article: viewArticle, read: viewExternal, live: viewLive, markets: viewMarkets, community: viewCommunity, discussion: viewDiscussion, events: viewEvents, watch: viewWatch, account: viewAccount, saved: viewSaved, search: viewSearch };
+function navigate(href, { replace = false } = {}) {
+  if (href === location.pathname + location.search) return route({ keepScroll: false });
+  history[replace ? "replaceState" : "pushState"]({ rw: true }, "", href);
+  route();
+}
+// Links inside the app change the view without a page load; files and other sites load normally.
+function interceptLinks(e) {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const a = e.target.closest("a[href]"); if (!a || a.target || a.hasAttribute("download")) return;
+  const href = a.getAttribute("href");
+  if (!href.startsWith("/") || href.startsWith("//") || /^\/(api|admin|media)\b|\.(html|xml|txt|json|webmanifest|jpg|png|webp|pdf)$/i.test(href.split("?")[0])) return;
+  e.preventDefault();
+  a.closest("dialog")?.close();
+  navigate(href);
+}
+const views = { coverage: viewCoverage, home: viewHome, editions: viewEditions, edition: viewStory, article: viewStory, author: viewAuthor, read: viewExternal, live: viewLive, markets: viewMarkets, community: viewCommunity, discussion: viewDiscussion, events: viewEvents, watch: viewWatch, account: viewAccount, saved: viewSaved, search: viewSearch };
+const DEFAULT_TITLE = "Raisina Wire — India’s strategic briefing on geopolitics, security and markets";
 async function route() {
   const r = parseRoute();
+  document.title = DEFAULT_TITLE;
   renderNav(r);
-  const view = views[r.page] || viewHome;
+  const view = views[r.page] || viewNotFound;
   // Lists that mix in control-room articles wait briefly for them, so the lead story doesn't flash.
-  if (["home", "editions", "search"].includes(r.page)) await Promise.race([articlesReady, new Promise(res => setTimeout(res, 1200))]);
+  if (["home", "editions", "search", "author", "edition", "article"].includes(r.page)) await Promise.race([articlesReady, new Promise(res => setTimeout(res, 1200))]);
+  if (["account", "discussion"].includes(r.page)) await Promise.race([userReady, new Promise(res => setTimeout(res, 2500))]);
   document.body.classList.toggle("is-reading", ["edition", "article", "read"].includes(r.page));
   const main = $("#view");
   main.classList.remove("view-enter"); void main.offsetWidth; main.classList.add("view-enter");
@@ -229,8 +249,8 @@ function watchScroll() {
 }
 
 /* ---------- Shared pieces ---------- */
-const edHref = e => e.href || `#/edition/${e.slug}`;
-const wireHref = i => `#/read?u=${encodeURIComponent(i.url)}`;
+const edHref = e => e.href || `/edition/${e.slug}`;
+const wireHref = i => `/read?u=${encodeURIComponent(i.url)}`;
 function edCard(e, { dek = false } = {}) {
   return `<a class="ed-card glass" href="${edHref(e)}"><div class="thumb">${img(e.image)}</div><span class="body"><span class="kicker">${esc(e.topic)}</span><h3>${esc(e.title)}</h3>${dek ? `<p>${esc(e.dek)}</p>` : ""}<span class="meta">${esc(e.author || AUTHOR.name)} · ${shortDate(e.date)} · ${e.readMinutes} min</span></span></a>`;
 }
@@ -251,7 +271,7 @@ function viewHome() {
   const [lead, ...rest] = stories();
   $("#view").innerHTML = `
   <div class="wrap">
-    <section class="dock glass" aria-label="Market pulse"><div class="dock-head"><b>Market pulse</b><span class="muted" id="dockStatus" style="font-size:12px">Loading quotes…</span><a class="link-gold" href="#/markets" style="font-size:13px">All markets →</a></div><div class="dock-grid" id="dock"></div></section>
+    <section class="dock glass" aria-label="Market pulse"><div class="dock-head"><b>Market pulse</b><span class="muted" id="dockStatus" style="font-size:12px">Loading quotes…</span><a class="link-gold" href="/markets" style="font-size:13px">All markets →</a></div><div class="dock-grid" id="dock"></div></section>
 
     <section id="liveBanner" class="band-tight" aria-label="Live coverage" hidden></section>
 
@@ -263,43 +283,40 @@ function viewHome() {
         <div class="hero-card glass">
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><span class="tag tag-dark">Raisina Wire · Latest</span><span class="kicker">${esc(lead.topic)}</span></div>
           <h1><a href="${edHref(lead)}">${esc(lead.title)}</a></h1><p>${esc(lead.dek)}</p>
-          <div class="hero-foot"><span class="byline"><img src="${AUTHOR.photo}" alt=""><span><b>${esc(lead.author)}</b> <span class="muted">· ${editionDate(lead.date)} · ${lead.readMinutes} min read</span></span></span><a class="btn btn-dark" href="${edHref(lead)}">Read now</a></div>
+          <div class="hero-foot"><span class="byline"><img src="${writer(lead.writer).photo}" alt="" class="${writer(lead.writer).isDesk ? "desk" : ""}"><span><b>${esc(lead.author)}</b> <span class="muted">· ${editionDate(lead.date)} · ${lead.readMinutes} min read</span></span></span><a class="btn btn-dark" href="${edHref(lead)}">Read now</a></div>
         </div>
       </article>
-      <aside class="live-rail glass" aria-label="Live wire"><div class="live-title"><b><span class="dot-live"></span>Live wire</b><span class="muted" style="font-size:12px" id="railUpdated"></span></div><div id="rail"></div><a class="link-gold" href="#/live" style="display:block;margin-top:16px;font-size:13px">All live updates →</a></aside>
+      <aside class="live-rail glass" aria-label="Live wire"><div class="live-title"><b><span class="dot-live"></span>Live wire</b><span class="muted" style="font-size:12px" id="railUpdated"></span></div><div id="rail"></div><a class="link-gold" href="/live" style="display:block;margin-top:16px;font-size:13px">All live updates →</a></aside>
     </div>
 
     <section class="briefing glass band" aria-labelledby="briefingTitle"><div class="briefing-head"><span class="kicker">The Briefing</span><h2 id="briefingTitle">What you need to know</h2><span class="meta">${new Date().toLocaleDateString("en-IN", { ...IST, weekday: "long", day: "numeric", month: "long" })} · From the live wire</span></div><ol class="briefing-list" id="briefingList"></ol></section>
 
-    <section class="band"><div class="section-head"><h2>From the Raisina Wire desk</h2><a class="link-gold" href="#/editions">All ${stories().length} stories →</a></div>
+    <section class="band"><div class="section-head"><h2>From the Raisina Wire desk</h2><a class="link-gold" href="/editions">All ${stories().length} stories →</a></div>
       <div class="card-grid">${rest.slice(3, 7).map(e => edCard(e)).join("")}</div></section>
 
+    ${joinBand()}
+
     <section class="band editor" aria-labelledby="editorTitle">
-      <div class="editor-portrait"><img src="${AUTHOR.portrait}" alt="Portrait of ${esc(AUTHOR.name)}" loading="lazy"></div>
+      <a class="editor-portrait" href="/author/ilmaz-syed"><img src="${AUTHOR.portrait}" alt="Portrait of ${esc(AUTHOR.name)}" loading="lazy"></a>
       <div class="editor-body"><span class="kicker" id="editorTitle">From the Editor</span>
         <blockquote id="editorQuote">“${esc(lead.dek)}”</blockquote><span class="meta" id="editorQuoteSource">From “${esc(lead.title)}”</span>
         <div class="signature"><span>${esc(AUTHOR.name)}</span><small>${esc(AUTHOR.role)}, Raisina Wire</small></div>
         <div class="editor-actions"><a class="btn btn-dark" href="${edHref(lead)}">Read the latest</a><a class="btn btn-light" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Subscribe on LinkedIn ↗</a></div></div>
-      <div class="editor-picks"><span class="kicker">Start here</span><ol>${EDITOR_PICKS.map(slug => editions.find(x => x.slug === slug)).filter(Boolean).map(x => `<li><a href="${edHref(x)}"><span class="kicker">${esc(x.topic)}</span><b>${esc(x.title)}</b></a></li>`).join("")}</ol></div>
+      <div class="editor-picks"><span class="kicker">Start here</span><ol>${EDITOR_PICKS.map(slug => stories().find(x => x.slug === slug)).filter(Boolean).map(x => `<li><a href="${edHref(x)}"><span class="kicker">${esc(x.topic)}</span><b>${esc(x.title)}</b></a></li>`).join("")}</ol></div>
     </section>
 
     <section class="band split">
       <div><div class="section-head"><h2>India &amp; the World</h2></div>
         ${rest[7] ? `<a class="feature glass" href="${edHref(rest[7])}"><div class="thumb">${img(rest[7].image)}</div><span class="body"><span class="kicker">${esc(rest[7].topic)}</span><h3>${esc(rest[7].title)}</h3><p>${esc(rest[7].dek)}</p></span></a>` : ""}
-        <div class="pair">${rest.slice(8, 10).map(e => `<a href="${edHref(e)}"><span class="kicker">${esc(e.topic)}</span><h3>${esc(e.title)}</h3><span class="meta">Raisina Wire · ${shortDate(e.date)}</span></a>`).join("")}</div>
+        <div class="pair">${rest.slice(8, 10).map(e => `<a href="${edHref(e)}"><span class="kicker">${esc(e.topic)}</span><h3>${esc(e.title)}</h3><span class="meta">${esc(e.author)} · ${shortDate(e.date)}</span></a>`).join("")}</div>
       </div>
-      <div class="markets-panel glass"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><h2>Markets</h2><a class="link-gold" href="#/markets" style="font-size:13px">Full board →</a></div>
+      <div class="markets-panel glass"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><h2>Markets</h2><a class="link-gold" href="/markets" style="font-size:13px">Full board →</a></div>
         <div class="pill-tabs" role="tablist" aria-label="Market groups" id="homeTabs" style="margin-top:12px"></div><div id="homeMarkets" style="margin-top:8px"></div>
         <p class="muted" style="margin:12px 0 0;font-size:12px">Delayed quotes from public feeds · Not investment advice</p></div>
     </section>
 
-    <section class="band"><div class="section-head"><h2>Live coverage</h2><a class="link-gold" href="#/live">Live wire →</a></div><div class="topic-cols" id="topicCols"></div></section>
+    <section class="band"><div class="section-head"><h2>Live coverage</h2><a class="link-gold" href="/live">Live wire →</a></div><div class="topic-cols" id="topicCols"></div></section>
 
-    <section class="band" id="community"><div class="community glass">
-      <div><div class="kicker">Community</div><h2>Ideas in conversation.</h2><p class="muted" style="margin:10px 0 0;font-size:15px;line-height:1.7">Moderated discussions, expert briefings and research missions.</p>
-        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:16px"><button class="btn btn-dark" type="button" data-action="discuss">Start a discussion</button><a class="btn btn-light" href="#/community">All discussions</a></div></div>
-      <div class="community-cols"><div class="mini-card"><div class="kicker">Events &amp; briefings</div><ol class="agenda" id="agenda"></ol></div><div class="mini-card"><div class="kicker">Discussions</div><div id="discussions"></div><a class="link-gold" href="https://calibrex.org/academy/" target="_blank" rel="noreferrer" style="display:block;margin-top:14px;font-size:13px">Learn OSINT with Calibrex Academy ↗</a></div></div>
-    </div></section>
   </div>`;
   renderDock(); renderRail(); renderHomeMarkets(); renderTopicCols(); renderCommunity(); renderLiveBanner(); renderBriefing();
   loadBodies().then(bodies => { const q = pullQuote(bodies[lead.slug]?.blocks || []); if (q && $("#editorQuote")) $("#editorQuote").textContent = `“${q}”`; }).catch(() => {});
@@ -320,7 +337,7 @@ function renderBriefing() {
 function renderDock() {
   const host = $("#dock"); if (!host) return;
   if (!state.markets) { host.innerHTML = Array.from({ length: 8 }, () => `<div class="skeleton" style="height:78px"></div>`).join(""); $("#dockStatus").textContent = state.marketsError ? "Quotes unavailable · retrying" : "Loading quotes…"; return; }
-  host.innerHTML = state.markets.overview.map(q => { const ch = quoteChange(q); return `<a class="tile" href="#/markets"><div class="tile-label">${esc(q.label)}</div><div class="tile-row"><span class="tile-value">${quoteValue(q)}</span><span class="tile-change ${ch.cls}">${ch.text}</span></div>${sparkline(q.spark, ch.cls)}</a>`; }).join("");
+  host.innerHTML = state.markets.overview.map(q => { const ch = quoteChange(q); return `<a class="tile" href="/markets"><div class="tile-label">${esc(q.label)}</div><div class="tile-row"><span class="tile-value">${quoteValue(q)}</span><span class="tile-change ${ch.cls}">${ch.text}</span></div>${sparkline(q.spark, ch.cls)}</a>`; }).join("");
   $("#dockStatus").textContent = `${state.markets.offline ? "Offline copy" : "Delayed"} · updated ${clock(state.markets.updatedAt)} IST`;
 }
 function renderRail() {
@@ -342,22 +359,61 @@ function renderTopicCols() {
   host.innerHTML = ["India", "Security", "Diplomacy", "Markets"].map(cat => {
     const list = wireItems().filter(i => i.category === cat).slice(0, 4);
     const top = list.find(i => i.image);
-    return `<div class="topic-col"><h3>${cat}<a class="link-gold" href="#/live/${cat}" style="font-size:12px;letter-spacing:0;text-transform:none">More →</a></h3>${top ? `<a class="thumb" href="${wireHref(top)}" style="display:block">${img(top.image)}</a>` : ""}${list.length ? list.map(wireLink).join("") : `<p class="muted" style="font-size:14px">No ${cat.toLowerCase()} items in the last few hours.</p>`}</div>`;
+    return `<div class="topic-col"><h3>${cat}<a class="link-gold" href="/live/${cat}" style="font-size:12px;letter-spacing:0;text-transform:none">More →</a></h3>${top ? `<a class="thumb" href="${wireHref(top)}" style="display:block">${img(top.image)}</a>` : ""}${list.length ? list.map(wireLink).join("") : `<p class="muted" style="font-size:14px">No ${cat.toLowerCase()} items in the last few hours.</p>`}</div>`;
   }).join("");
 }
+/* ---------- Community: the join band on the front page ---------- */
+const PERK_ICONS = {
+  talk: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 5h16v10H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg>`,
+  brief: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
+  voice: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>`
+};
+const PERKS = [
+  ["talk", "Moderated discussions", "Start threads and reply on any story. Sourced, civil, moderated by the desk."],
+  ["brief", "Briefings and members’ events", "Invitations to expert briefings, debates and members-only events, added to your calendar in one tap."],
+  ["voice", "Your name on your ideas", "A member profile for your contributions, and a direct line to the Raisina Wire desk."]
+];
+function joinBand() {
+  return `<section class="band join" id="community" aria-labelledby="joinTitle"><div class="join-panel">
+    <div class="join-copy">
+      <span class="join-eyebrow"><span class="pulse"></span>The Raisina Wire community</span>
+      <h2 id="joinTitle">Don’t just read the news. <em>Argue it out.</em></h2>
+      <p class="join-lede">Join readers who follow India’s strategic questions closely: security, diplomacy, the neighbourhood and markets. Membership is free and takes thirty seconds.</p>
+      <ul class="perks">${PERKS.map(([icon, title, text]) => `<li><span class="perk-icon">${PERK_ICONS[icon]}</span><span><b>${title}</b><span>${text}</span></span></li>`).join("")}</ul>
+      <div class="join-actions" id="joinActions"></div>
+      <p class="join-stats" id="joinStats" hidden></p>
+    </div>
+    <div class="join-side">
+      <div class="join-card"><div class="kicker">Latest discussions</div><div id="discussions"></div><a class="join-link" href="/community">All discussions →</a></div>
+      <div class="join-card"><div class="kicker">Upcoming briefings</div><ol class="agenda" id="agenda"></ol><a class="join-link" href="/events">All events →</a></div>
+    </div>
+  </div></section>`;
+}
+function communityAside() {
+  return `<div class="aside-card glass join-aside"><span class="join-eyebrow"><span class="pulse"></span>Community</span><b>Join the conversation</b><p class="muted">Discuss this story with other readers in moderated threads.</p>${state.user ? `<a class="btn btn-dark btn-sm" href="/community">Open the community</a>` : `<button class="btn btn-dark btn-sm" type="button" data-action="join">Join free</button>`}</div>`;
+}
+function renderJoin() {
+  const actions = $("#joinActions"); if (!actions) return;
+  actions.innerHTML = state.user
+    ? `<button class="btn btn-red" type="button" data-action="discuss">Start a discussion</button><a class="btn btn-ghost" href="/community">Open the community</a><span class="join-note">Signed in as ${esc(state.user.displayName)}</span>`
+    : `<button class="btn btn-red" type="button" data-action="join">Create a free account</button><button class="btn btn-ghost" type="button" data-action="signin">Sign in</button><span class="join-note">Free · No card · Leave any time</span>`;
+  const st = state.communityStats, stats = $("#joinStats");
+  if (stats && st && st.members >= 25) { stats.hidden = false; stats.textContent = `${st.members.toLocaleString("en-IN")} members · ${st.discussions.toLocaleString("en-IN")} discussions · ${st.replies.toLocaleString("en-IN")} replies`; }
+}
 function renderCommunity() {
+  renderJoin();
   const agenda = $("#agenda"), talk = $("#discussions"); if (!agenda) return;
   const upcoming = (state.events || []).filter(e => !e.startsAt || new Date(e.startsAt) > Date.now() - 6 * 3600e3).slice(0, 3);
   agenda.innerHTML = upcoming.length ? upcoming.map(e => { const d = new Date(e.startsAt); return `<li><span class="date"><b>${d.toLocaleDateString("en-IN", { ...IST, day: "2-digit" })}</b><small>${d.toLocaleDateString("en-IN", { ...IST, month: "short" })}</small></span><span><b>${esc(e.title)}</b><span class="meta">${esc(e.eventType)} · ${d.toLocaleTimeString("en-IN", { ...IST, hour: "2-digit", minute: "2-digit" })} IST · ${esc(e.access)}</span></span></li>`; }).join("")
     : `<li class="agenda-empty"><span class="date"><b>—</b><small>Soon</small></span><span><b>Expert briefings and debates</b><span class="meta">New events are announced here first</span></span></li>`;
   const posts = (state.community || []).slice(0, 3);
-  if (talk) talk.innerHTML = posts.length ? posts.map(p => `<div class="talk"><b>${esc(p.title)}</b><span class="meta">${esc(p.topic)} · ${esc(p.author)} · ${ago(p.createdAt)}</span></div>`).join("")
-    : `<div class="talk"><b>Be the first to start a conversation</b><span class="meta">Members can open a discussion on any edition</span></div>`;
+  if (talk) talk.innerHTML = posts.length ? posts.map(p => `<a class="talk" href="/discussion/${encodeURIComponent(p.id)}"><span class="avatar avatar-sm" aria-hidden="true">${esc(initials(p.author))}</span><span><b>${esc(p.title)}</b><span class="meta">${esc(p.topic)} · ${esc(p.author)} · ${p.replies || 0} repl${p.replies === 1 ? "y" : "ies"} · ${ago(p.createdAt)}</span></span></a>`).join("")
+    : `<div class="talk"><span class="avatar avatar-sm" aria-hidden="true">RW</span><span><b>Be the first to start a conversation</b><span class="meta">Members can open a discussion on any story</span></span></div>`;
 }
 
 /* ---------- Editions ---------- */
 function viewEditions() {
-  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Raisina Wire</div><h1>Every edition</h1><p>Open-source analysis of India’s strategic questions by ${esc(AUTHOR.name)}, newest first. Each edition reads in full here and links to the original on LinkedIn.</p></div><a class="btn btn-light" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Subscribe on LinkedIn ↗</a></div>
+  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Raisina Wire</div><h1>Every story</h1><p>Editions and analysis from ${WRITERS.map(w => `<a href="/author/${w.key}">${esc(w.name)}</a>`).join(" and ")}, newest first. Every story reads in full here; editions link to the original on LinkedIn.</p></div><a class="btn btn-light" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Subscribe on LinkedIn ↗</a></div>
   <div class="archive-grid">${stories().map(e => edCard(e, { dek: true })).join("")}</div></div>`;
 }
 
@@ -398,31 +454,67 @@ const ICON = {
   share: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg>`
 };
 function readerBar({ badge, original, originalLabel, saveItem }) {
-  return `<div class="reader-bar glass"><a class="btn btn-light btn-sm" href="#/" data-action="back" aria-label="Back">${ICON.back}<span class="lbl">Back</span></a><span class="badge">${esc(badge)}</span><span class="grow"></span>
+  return `<div class="reader-bar glass"><a class="btn btn-light btn-sm" href="/" data-action="back" aria-label="Back">${ICON.back}<span class="lbl">Back</span></a><span class="badge">${esc(badge)}</span><span class="grow"></span>
     <button class="btn btn-light btn-sm" type="button" data-action="text-smaller" aria-label="Smaller text">A−</button><button class="btn btn-light btn-sm" type="button" data-action="text-larger" aria-label="Larger text">A+</button>
     <button class="btn btn-light btn-sm" type="button" data-action="save" aria-label="Save" data-item='${esc(JSON.stringify(saveItem))}'>${ICON.save}<span class="lbl">Save</span></button><button class="btn btn-light btn-sm" type="button" data-action="share" aria-label="Share" data-title="${esc(saveItem.title)}">${ICON.share}<span class="lbl">Share</span></button>
-    <a class="btn btn-dark btn-sm original-btn" href="${esc(original)}" target="_blank" rel="noreferrer"><span class="lbl">${esc(originalLabel)}</span><span class="lbl-short">Original</span> ↗</a></div>`;
+    ${original ? `<a class="btn btn-dark btn-sm original-btn" href="${esc(original)}" target="_blank" rel="noreferrer"><span class="lbl">${esc(originalLabel)}</span><span class="lbl-short">Original</span> ↗</a>` : ""}</div>`;
 }
-async function viewEdition(r) {
-  const i = editions.findIndex(e => e.slug === r.arg);
-  if (i < 0) { $("#view").innerHTML = `<div class="wrap"><div class="blocked glass"><h1>Edition not found</h1><div class="blocked-actions"><a class="btn btn-dark" href="#/editions">See all editions</a></div></div></div>`; return; }
-  const e = editions[i], newer = editions[i - 1], older = editions[i + 1];
-  document.title = `${e.title} · Raisina Wire`;
-  $("#view").innerHTML = `<div class="wrap">${readerBar({ badge: "Raisina Wire · Native article", original: e.url, originalLabel: "Original on LinkedIn", saveItem: { href: edHref(e), title: e.title, source: "Raisina Wire" } })}
+function viewNotFound() {
+  $("#view").innerHTML = `<div class="wrap"><div class="blocked glass"><span class="kicker">404</span><h1>We couldn’t find that page</h1><p class="muted">It may have moved. Try the latest stories or search.</p><div class="blocked-actions"><a class="btn btn-dark" href="/">Go to today’s front page</a><button class="btn btn-light" type="button" data-action="search">Search</button></div></div></div>`;
+}
+
+/* ---------- Stories (editions and articles) ---------- */
+const storyNotFound = () => { $("#view").innerHTML = `<div class="wrap"><div class="blocked glass"><h1>Story not found</h1><p class="muted">It may have been unpublished or moved.</p><div class="blocked-actions"><a class="btn btn-dark" href="/editions">See all stories</a></div></div></div>`; };
+// An edition from the copy bundled with the app, used when the reader is offline.
+function bundledStory(e, body) {
+  return { kind: "edition", slug: e.slug, href: `/edition/${e.slug}`, title: e.title, dek: e.dek, topic: e.topic, category: e.topic, image: e.image, imageUrl: e.image, heroUrl: "", heroCaption: "",
+    sourceUrl: e.url, publishedAt: e.date, writer: "ilmaz-syed", author: AUTHOR.name, status: "published", blocks: body?.blocks || [] };
+}
+async function viewStory(r) {
+  const slug = r.arg;
+  $("#view").innerHTML = `<div class="wrap"><div class="reader-layout"><article class="reader-article"><div class="skeleton" style="height:60px"></div><div class="skeleton" style="height:420px;margin-top:20px"></div></article></div></div>`;
+  let a = null, reachable = true;
+  try { const res = await fetch(`/api/articles/${encodeURIComponent(slug)}`); if (res.ok) a = (await res.json()).article; else if (res.status !== 404) reachable = false; }
+  catch { reachable = false; }
+  if (parseRoute().arg !== slug) return;
+  if (!a && !reachable) {
+    const e = editions.find(x => x.slug === slug);
+    if (e) a = bundledStory(e, (await loadBodies().catch(() => ({})))[slug]);
+  }
+  if (!a) return storyNotFound();
+  if (a.href && a.href !== location.pathname) history.replaceState({ rw: true }, "", a.href);
+  const w = writer(a.writer), blocks = a.blocks || articleBlocks(a.body);
+  const words = blocks.reduce((n, b) => n + b.x.split(/\s+/).length, 0);
+  const list = stories(), i = list.findIndex(x => x.slug === a.slug), newer = list[i - 1], older = i >= 0 ? list[i + 1] : null;
+  const linkedin = /linkedin\.com/.test(a.sourceUrl || ""), edition = a.kind === "edition";
+  const hero = a.heroUrl || a.imageUrl || genericImage(a.category);
+  document.title = `${a.title} · Raisina Wire`;
+  $("#view").innerHTML = `<div class="wrap">${readerBar({ badge: a.status === "published" ? (edition ? "Raisina Wire · Edition" : `Raisina Wire · ${a.category}`) : `Preview · ${a.status}`, original: a.sourceUrl, originalLabel: linkedin ? "Original on LinkedIn" : "Original", saveItem: { href: a.href, title: a.title, source: "Raisina Wire" } })}
   <div class="reader-layout"><article class="reader-article">
-    <div class="kicker">${esc(e.topic)}</div><h1>${esc(e.title)}</h1><p class="dek">${esc(e.dek)}</p>
-    <div class="reader-byline"><img src="${AUTHOR.photo}" alt=""><div><b>${esc(AUTHOR.name)}</b><div class="muted" style="font-size:13px">${esc(AUTHOR.role)}, Raisina Wire</div></div><span class="grow"></span><span class="meta">${editionDate(e.date)} · ${e.readMinutes} min read</span></div>
-    <div class="reader-hero">${img(e.image, "")}</div>
-    <div class="prose dropcap" id="prose"><div class="skeleton" style="height:420px"></div></div>
-    <div class="author-box"><img src="${AUTHOR.photo}" alt=""><div><span class="kicker">About the author</span><b>${esc(AUTHOR.name)}</b><p>${esc(AUTHOR.bio)}</p></div></div>
-    <div class="reader-end glass"><div><b style="font-size:16px">Follow Raisina Wire</b><div class="muted" style="font-size:14px;margin-top:4px">First published in the Raisina Wire newsletter on LinkedIn.</div></div><a class="btn btn-dark" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Subscribe ↗</a></div>
-    <div class="prev-next">${newer ? `<a class="glass" href="${edHref(newer)}"><span class="meta">Newer edition</span><b>${esc(newer.title)}</b></a>` : "<span></span>"}${older ? `<a class="glass" href="${edHref(older)}"><span class="meta">Older edition</span><b>${esc(older.title)}</b></a>` : ""}</div>
+    <div class="kicker">${esc(a.topic || a.category)}</div><h1>${esc(a.title)}</h1>${a.dek ? `<p class="dek">${esc(a.dek)}</p>` : ""}
+    <div class="reader-byline"><a href="/author/${w.key}" class="byline-link"><img src="${w.photo}" alt="" class="${w.isDesk ? "desk" : ""}"><span><b>${esc(w.name)}</b><span class="muted" style="display:block;font-size:13px">${esc(w.role)}</span></span></a><span class="grow"></span><span class="meta">${a.publishedAt ? editionDate(a.publishedAt) : "Not yet published"} · ${Math.max(1, Math.round(words / 220))} min read</span></div>
+    <figure class="reader-hero">${img(hero, a.heroCaption || "")}${a.heroCaption ? `<figcaption>${esc(a.heroCaption)}</figcaption>` : ""}</figure>
+    <div class="prose dropcap">${blocks.length ? proseHTML(blocks, { pull: pullQuote(blocks) }) : `<p>This story could not be loaded.${a.sourceUrl ? ` <a href="${esc(a.sourceUrl)}" target="_blank" rel="noreferrer">Read the original ↗</a>` : ""}</p>`}</div>
+    <div class="author-box"><img src="${w.photo}" alt="" class="${w.isDesk ? "desk" : ""}"><div><span class="kicker">${w.isDesk ? "From the desk" : "About the author"}</span><b><a href="/author/${w.key}">${esc(w.name)}</a></b><p>${esc(w.bio)}</p><a class="link-gold" href="/author/${w.key}" style="font-size:13px">More from ${esc(w.name)} →</a></div></div>
+    <div class="reader-end glass discuss-end"><div><span class="kicker">Community</span><b style="display:block;font-size:17px;margin-top:4px">What do you make of this?</b><div class="muted" style="font-size:14px;margin-top:4px">Members discuss every story in moderated threads. Free to join.</div></div><button class="btn btn-dark" type="button" data-action="discuss" data-title="${esc(a.title)}">Discuss this story</button></div>
+    ${linkedin ? `<div class="reader-end glass"><div><b style="font-size:16px">Follow Raisina Wire on LinkedIn</b><div class="muted" style="font-size:14px;margin-top:4px">${edition ? "First published in the Raisina Wire newsletter." : "New editions every week."}</div></div><a class="btn btn-light" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Subscribe ↗</a></div>` : ""}
+    <div class="prev-next">${newer ? `<a class="glass" href="${edHref(newer)}"><span class="meta">Newer</span><b>${esc(newer.title)}</b></a>` : "<span></span>"}${older ? `<a class="glass" href="${edHref(older)}"><span class="meta">Older</span><b>${esc(older.title)}</b></a>` : ""}</div>
   </article>
-  <aside class="reader-aside"><div class="aside-card glass"><div class="kicker">More from Raisina Wire</div>
-    ${stories().filter(x => x.slug !== e.slug).slice(0, 5).map(x => `<a class="aside-link" href="${edHref(x)}"><span class="thumb">${img(x.image)}</span><span><b>${esc(x.title)}</b><span class="meta" style="display:block;margin-top:5px;font-size:10px">${shortDate(x.date)}</span></span></a>`).join("")}
+  <aside class="reader-aside">${communityAside()}<div class="aside-card glass"><div class="kicker">More from Raisina Wire</div>
+    ${list.filter(x => x.slug !== a.slug).slice(0, 5).map(x => `<a class="aside-link" href="${edHref(x)}"><span class="thumb">${img(x.image)}</span><span><b>${esc(x.title)}</b><span class="meta" style="display:block;margin-top:5px;font-size:10px">${shortDate(x.date)}</span></span></a>`).join("")}
   </div></aside></div></div>`;
-  try { const bodies = await loadBodies(); if (parseRoute().arg === e.slug) { const blocks = bodies[e.slug]?.blocks || []; $("#prose").innerHTML = proseHTML(blocks, { pull: pullQuote(blocks) }); } }
-  catch { $("#prose").innerHTML = `<p>This edition could not be loaded. <a href="${esc(e.url)}" target="_blank" rel="noreferrer">Read it on LinkedIn ↗</a></p>`; }
+}
+
+/* ---------- Writers ---------- */
+function viewAuthor(r) {
+  const w = WRITERS.find(x => x.key === r.arg);
+  if (!w) return viewNotFound();
+  const list = stories().filter(x => (x.writer || "ilmaz-syed") === w.key);
+  document.title = `${w.name} · Raisina Wire`;
+  $("#view").innerHTML = `<div class="wrap"><section class="author-hero glass">
+    <img class="author-portrait${w.isDesk ? " desk" : ""}" src="${w.portrait}" alt="${w.isDesk ? "" : `Portrait of ${esc(w.name)}`}">
+    <div><span class="kicker">${w.isDesk ? "Desk" : "Writer"}</span><h1>${esc(w.name)}</h1><p class="author-role">${esc(w.role)}</p><p>${esc(w.bio)}</p><span class="meta">${list.length} stor${list.length === 1 ? "y" : "ies"} on Raisina Wire</span></div></section>
+    <div class="archive-grid">${list.map(e => edCard(e, { dek: true })).join("") || `<div class="empty">No published stories yet.</div>`}</div></div>`;
 }
 
 /* ---------- External reader ---------- */
@@ -430,7 +522,7 @@ async function viewExternal(r) {
   const url = r.params.get("u") || "";
   const known = wireIndex.get(url) || {};
   const host = (() => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; } })();
-  if (!host) { location.hash = "#/live"; return; }
+  if (!host) { navigate("/live", { replace: true }); return; }
   const source = known.source || host;
   const saveItem = { href: wireHref({ url }), title: known.title || url, source };
   $("#view").innerHTML = `<div class="wrap">${readerBar({ badge: `${source} · Reader view`, original: url, originalLabel: `Original on ${source}`, saveItem })}
@@ -452,7 +544,7 @@ async function viewExternal(r) {
       <h1 id="blockedTitle">${esc(title)}</h1>
       ${(known.summary || data.description) ? `<p style="margin:14px 0 0;font-size:16px;line-height:1.65;color:var(--ink-2)">${esc(known.summary || data.description)}</p>` : ""}
       <div class="notice">${ICON_LOCK}<span>${esc(site)} doesn’t allow its full story to be shown inside Raisina Wire. You can read it on their site.</span></div>
-      <div class="blocked-actions"><a class="btn btn-dark" href="${esc(url)}" target="_blank" rel="noreferrer">Read original on ${esc(site)} ↗</a><button class="btn btn-light" type="button" data-action="save" data-item='${esc(JSON.stringify(saveItem))}'>Save for later</button><a class="btn btn-light" href="#/" data-action="back">Back</a></div>
+      <div class="blocked-actions"><a class="btn btn-dark" href="${esc(url)}" target="_blank" rel="noreferrer">Read original on ${esc(site)} ↗</a><button class="btn btn-light" type="button" data-action="save" data-item='${esc(JSON.stringify(saveItem))}'>Save for later</button><a class="btn btn-light" href="/" data-action="back">Back</a></div>
     </section></div>`;
     return;
   }
@@ -477,7 +569,7 @@ const CATS = ["All", "India", "Security", "Diplomacy", "Markets", "Energy", "Wor
 function viewLive(r) {
   const cat = CATS.includes(r.arg) ? r.arg : "All";
   $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker" style="display:flex;align-items:center;gap:8px"><span class="dot-live"></span>Live wire</div><h1>${cat === "All" ? "Latest from the wire" : cat}</h1><p>Headlines from named publishers, newest first. Open any story in the reader, with a link to the original.</p></div><span class="muted" id="liveUpdated" style="font-size:13px"></span></div>
-    <div class="chips" style="margin-top:20px">${CATS.map(c => `<a class="chip" href="#/live${c === "All" ? "" : `/${c}`}" aria-pressed="${c === cat}">${c}</a>`).join("")}</div>
+    <div class="chips" style="margin-top:20px">${CATS.map(c => `<a class="chip" href="/live${c === "All" ? "" : `/${c}`}" aria-pressed="${c === cat}">${c}</a>`).join("")}</div>
     <div class="live-list" id="liveList" data-cat="${cat}"></div><div class="sources" id="liveSources"></div></div>`;
   renderLiveList();
 }
@@ -526,7 +618,7 @@ function viewSearch(r) {
 async function onAction(e) {
   const el = e.target.closest("[data-action]"); if (!el) return;
   const a = el.dataset.action;
-  if (a === "back") { e.preventDefault(); history.length > 1 ? history.back() : (location.hash = "#/"); }
+  if (a === "back") { e.preventDefault(); history.state?.rw ? history.back() : navigate("/"); }
   if (a === "text-smaller") setTextScale(-0.08);
   if (a === "text-larger") setTextScale(0.08);
   if (a === "save") { try { saveForLater(JSON.parse(el.dataset.item)); } catch { /* malformed */ } }
@@ -534,6 +626,7 @@ async function onAction(e) {
     const data = { title: el.dataset.title, url: location.href };
     try { if (navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(location.href); toast("Link copied."); } } catch { /* cancelled */ }
   }
+  if (a === "ticker-toggle") { const paused = $(".ticker").classList.toggle("paused"); el.setAttribute("aria-pressed", String(paused)); el.setAttribute("aria-label", paused ? "Play headlines" : "Pause headlines"); }
   if (a === "home-group") { state.homeGroup = el.dataset.group; renderHomeMarkets(); }
   if (a === "search") openSearch();
   if (a === "ics") downloadIcs(el.dataset.event);
@@ -543,7 +636,7 @@ async function onAction(e) {
   if (a === "signin") openAuth("login");
   if (a === "join") openAuth("register");
   if (a === "signout") { toggleAccountMenu(false); signOut(); }
-  if (a === "discuss") { if (!state.user) { openAuth("register"); toast("Create a free account to start a discussion."); } else openDiscussionDialog(); }
+  if (a === "discuss") { if (!state.user) { openAuth("register"); toast("Create a free account to start a discussion."); } else openDiscussionDialog(el.dataset.title ? `On “${el.dataset.title}”` : ""); }
 }
 
 /* ---------- Ticker, clocks, live coverage ---------- */
@@ -554,7 +647,7 @@ function renderClocks() {
 }
 function renderTicker() {
   const host = $("#tickerMove"); if (!host) return;
-  const live = state.coverage.slice(0, 2).map(c => `<a class="ticker-item is-live" href="#/coverage/${encodeURIComponent(c.slug)}"><b>Live</b>${esc(c.title)}</a>`);
+  const live = state.coverage.slice(0, 2).map(c => `<a class="ticker-item is-live" href="/coverage/${encodeURIComponent(c.slug)}"><b>Live</b>${esc(c.title)}</a>`);
   const wire = wireItems().slice(0, 12).map(i => `<a class="ticker-item" href="${wireHref(i)}"><time>${clock(i.publishedAt)}</time>${esc(i.title)}<span class="src">${esc(i.source)}</span></a>`);
   const items = [...live, ...wire];
   if (!items.length) { host.innerHTML = `<span class="ticker-item muted">${state.wireError ? "Live wire unavailable · retrying" : "Connecting to the live wire…"}</span>`; host.classList.remove("moving"); return; }
@@ -576,7 +669,7 @@ function renderLiveBanner() {
   const lead = state.coverageLead;
   if (!lead?.item) { host.innerHTML = ""; host.hidden = true; return; }
   host.hidden = false;
-  const href = `#/coverage/${encodeURIComponent(lead.item.slug)}`;
+  const href = `/coverage/${encodeURIComponent(lead.item.slug)}`;
   host.innerHTML = `<div class="live-banner glass"><div class="lb-main"><span class="live-badge"><span class="pulse"></span>Live</span>
       <h2><a href="${href}">${esc(lead.item.title)}</a></h2>${lead.item.summary ? `<p>${esc(lead.item.summary)}</p>` : ""}
       <a class="btn btn-dark btn-sm" href="${href}">Follow live coverage</a><span class="meta" style="margin-left:12px">Since ${clock(lead.item.startedAt)} IST · ${lead.updates.length} update${lead.updates.length === 1 ? "" : "s"}</span></div>
@@ -590,7 +683,7 @@ async function viewCoverage(r) {
     let d;
     try { const res = await fetch(`/api/live/${encodeURIComponent(slug)}`); d = res.ok ? await res.json() : null; } catch { d = null; }
     if (parseRoute().page !== "coverage" || parseRoute().arg !== slug) return clearInterval(coverageTimer);
-    if (!d) { if (first) $("#view").innerHTML = `<div class="wrap"><div class="blocked glass"><h1>This live coverage isn’t available</h1><p class="muted">It may have ended or been removed.</p><div class="blocked-actions"><a class="btn btn-dark" href="#/live">Go to the live wire</a></div></div></div>`; return; }
+    if (!d) { if (first) $("#view").innerHTML = `<div class="wrap"><div class="blocked glass"><h1>This live coverage isn’t available</h1><p class="muted">It may have ended or been removed.</p><div class="blocked-actions"><a class="btn btn-dark" href="/live">Go to the live wire</a></div></div></div>`; return; }
     const isLive = d.item.status === "live";
     document.title = `${isLive ? "LIVE: " : ""}${d.item.title} · Raisina Wire`;
     $("#view").innerHTML = `<div class="wrap"><div class="coverage">
@@ -605,25 +698,22 @@ async function viewCoverage(r) {
   coverageTimer = setInterval(() => { if (!document.hidden) render(false); }, 30e3);
 }
 
-/* ---------- Stories: editions plus articles published from the control room ---------- */
+/* ---------- Stories: editions and articles from the CMS, newest first ---------- */
 const GENERIC_ART = { security: "security", diplomacy: "diplomacy", markets: "markets", india: "india", energy: "energy" };
 const genericImage = category => `/editions/generic-${GENERIC_ART[String(category || "").toLowerCase()] || "analysis"}.webp`;
-const EDITION_STORIES = editions.map(e => ({ kind: "edition", slug: e.slug, href: `#/edition/${e.slug}`, title: e.title, dek: e.dek, topic: e.topic, date: e.date, image: e.image, readMinutes: e.readMinutes, author: AUTHOR.name, url: e.url }));
+// The bundled editions stand in until the CMS answers, and when the reader is offline.
+const EDITION_STORIES = editions.map(e => ({ kind: "edition", slug: e.slug, href: `/edition/${e.slug}`, title: e.title, dek: e.dek, topic: e.topic, date: e.date, image: e.image, readMinutes: e.readMinutes, author: AUTHOR.name, writer: "ilmaz-syed", url: e.url }));
 function stories() {
-  const articles = (state.articles || []).map(a => ({
-    kind: "article", slug: a.slug, href: `#/article/${encodeURIComponent(a.slug)}`, title: a.title, dek: a.dek || "", topic: a.category,
-    date: a.publishedAt, image: a.imageUrl || genericImage(a.category), readMinutes: Math.max(2, Math.round((a.bodyLength || 0) / 1300)),
-    author: a.author || AUTHOR.name, url: a.sourceUrl || ""
-  }));
-  return [...articles, ...EDITION_STORIES].sort((x, y) => toDate(y.date) - toDate(x.date));
+  if (!state.articles?.length) return EDITION_STORIES;
+  return state.articles.map(a => ({ ...a, date: a.publishedAt, topic: a.topic || a.category, url: a.sourceUrl }));
 }
 let articlesSettled = false;
 async function loadArticles() {
-  try { const r = await fetch("/api/articles"); state.articles = r.ok ? (await r.json()).articles || [] : []; } catch { state.articles = []; }
+  try { const r = await fetch("/api/articles"); if (r.ok) state.articles = (await r.json()).articles || []; } catch { /* keep what we have */ }
   const first = !articlesSettled; articlesSettled = true;
-  if (!state.articles.length || first) return; // the first load is awaited by route() instead
+  if (first) return; // the first load is awaited by route() instead
   const page = parseRoute().page; // refresh lists that show stories, without moving the reader
-  if (page === "home") viewHome(); else if (page === "editions") viewEditions();
+  if (page === "home") viewHome(); else if (page === "editions") viewEditions(); else if (page === "author") viewAuthor(parseRoute());
 }
 // Article text from the control room: blank lines separate paragraphs; "## " starts a heading;
 // "- " or "• " lines are bullets; "1. " lines are numbered points.
@@ -638,29 +728,6 @@ function articleBlocks(text) {
   }
   return blocks;
 }
-async function viewArticle(r) {
-  const slug = r.arg;
-  $("#view").innerHTML = `<div class="wrap"><div class="reader-layout"><article class="reader-article"><div class="skeleton" style="height:60px"></div><div class="skeleton" style="height:420px;margin-top:20px"></div></article></div></div>`;
-  let a;
-  try { const res = await fetch(`/api/articles/${encodeURIComponent(slug)}`); a = res.ok ? (await res.json()).article : null; } catch { a = null; }
-  if (parseRoute().arg !== slug) return;
-  if (!a) { $("#view").innerHTML = `<div class="wrap"><div class="blocked glass"><h1>Story not found</h1><p class="muted">It may have been unpublished or moved.</p><div class="blocked-actions"><a class="btn btn-dark" href="#/editions">See all stories</a></div></div></div>`; return; }
-  document.title = `${a.title} · Raisina Wire`;
-  const blocks = articleBlocks(a.body), words = blocks.reduce((n, b) => n + b.x.split(/\s+/).length, 0);
-  const href = `#/article/${encodeURIComponent(a.slug)}`;
-  $("#view").innerHTML = `<div class="wrap">${readerBar({ badge: a.status === "published" ? "Raisina Wire" : `Preview · ${a.status}`, original: a.sourceUrl || location.href, originalLabel: a.sourceUrl ? "Original" : "Link", saveItem: { href, title: a.title, source: "Raisina Wire" } })}
-  <div class="reader-layout"><article class="reader-article">
-    <div class="kicker">${esc(a.category)}</div><h1>${esc(a.title)}</h1>${a.dek ? `<p class="dek">${esc(a.dek)}</p>` : ""}
-    <div class="reader-byline"><img src="${AUTHOR.photo}" alt=""><div><b>${esc(a.author || AUTHOR.name)}</b><div class="muted" style="font-size:13px">Raisina Wire</div></div><span class="grow"></span><span class="meta">${a.publishedAt ? editionDate(a.publishedAt) : "Not yet published"} · ${Math.max(1, Math.round(words / 220))} min read</span></div>
-    <div class="reader-hero">${img(a.imageUrl || genericImage(a.category), "")}</div>
-    <div class="prose dropcap">${proseHTML(blocks, { pull: pullQuote(blocks) })}</div>
-    <div class="author-box"><img src="${AUTHOR.photo}" alt=""><div><span class="kicker">About the author</span><b>${esc(a.author || AUTHOR.name)}</b><p>${esc((a.author || AUTHOR.name) === AUTHOR.name ? AUTHOR.bio : "Writes for Raisina Wire.")}</p></div></div>
-  </article>
-  <aside class="reader-aside"><div class="aside-card glass"><div class="kicker">More from Raisina Wire</div>
-    ${stories().filter(x => x.slug !== a.slug).slice(0, 5).map(x => `<a class="aside-link" href="${edHref(x)}"><span class="thumb">${img(x.image)}</span><span><b>${esc(x.title)}</b><span class="meta" style="display:block;margin-top:5px;font-size:10px">${shortDate(x.date)}</span></span></a>`).join("")}
-  </div></aside></div></div>`;
-}
-
 /* ---------- Form dialog (replaces browser prompts) ---------- */
 function openFormDialog({ kicker = "", title, fields, submitLabel = "Save", onSubmit }) {
   const dlg = $("#formDialog");
@@ -692,18 +759,18 @@ async function apiJSON(path, body, method = "POST") {
 
 /* ---------- Community ---------- */
 const TOPICS = ["Geopolitics", "Security", "India", "Diplomacy", "Markets", "Energy", "General"];
-function openDiscussionDialog() {
+function openDiscussionDialog(title = "") {
   openFormDialog({ kicker: "Community", title: "Start a discussion", submitLabel: "Publish discussion", fields: [
-    { name: "title", label: "Title", required: true, minlength: 5, maxlength: 180 },
+    { name: "title", label: "Title", required: true, minlength: 5, maxlength: 180, value: title.slice(0, 180) },
     { name: "topic", label: "Topic", type: "select", options: TOPICS, value: "Geopolitics" },
     { name: "body", label: "Your opening post", type: "textarea", rows: 7, required: true, minlength: 10 }
-  ], onSubmit: async v => { const d = await apiJSON("/api/community/posts", v); toast("Discussion published."); await loadCommunity(); location.hash = `#/discussion/${d.id}`; } });
+  ], onSubmit: async v => { const d = await apiJSON("/api/community/posts", v); toast("Discussion published."); await loadCommunity(); navigate(`/discussion/${d.id}`); } });
 }
 function viewCommunity() {
   const posts = state.community;
   $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Community</div><h1>Ideas in conversation</h1><p>Moderated discussions on India’s strategic questions. Be specific, cite sources, and keep it civil.</p></div><button class="btn btn-dark" type="button" data-action="discuss">Start a discussion</button></div>
-  <div class="community-page"><div class="live-list">${posts === null ? `<div class="skeleton" style="height:240px"></div>` : posts.length ? posts.map(p => `<a class="live-item glass thread-row" href="#/discussion/${encodeURIComponent(p.id)}"><span class="when">${ago(p.createdAt)}</span><span><b>${esc(p.title)}</b><p>${esc(p.body.length > 200 ? p.body.slice(0, 197) + "…" : p.body)}</p><span class="src"><span class="tag">${esc(p.topic)}</span>${esc(p.author)} · ${p.replies || 0} repl${p.replies === 1 ? "y" : "ies"}</span></span></a>`).join("") : `<div class="empty">No discussions yet. Start the first one.</div>`}</div>
-  <aside><div class="aside-card glass"><div class="kicker">Upcoming</div><ol class="agenda" id="agenda"></ol><a class="link-gold" href="#/events" style="display:block;margin-top:12px;font-size:13px">All events →</a></div></aside></div></div>`;
+  <div class="community-page"><div class="live-list">${posts === null ? `<div class="skeleton" style="height:240px"></div>` : posts.length ? posts.map(p => `<a class="live-item glass thread-row" href="/discussion/${encodeURIComponent(p.id)}"><span class="when">${ago(p.createdAt)}</span><span><b>${esc(p.title)}</b><p>${esc(p.body.length > 200 ? p.body.slice(0, 197) + "…" : p.body)}</p><span class="src"><span class="tag">${esc(p.topic)}</span>${esc(p.author)} · ${p.replies || 0} repl${p.replies === 1 ? "y" : "ies"}</span></span></a>`).join("") : `<div class="empty">No discussions yet. Start the first one.</div>`}</div>
+  <aside><div class="aside-card glass"><div class="kicker">Upcoming</div><ol class="agenda" id="agenda"></ol><a class="link-gold" href="/events" style="display:block;margin-top:12px;font-size:13px">All events →</a></div></aside></div></div>`;
   renderCommunity();
 }
 async function viewDiscussion(r) {
@@ -712,10 +779,10 @@ async function viewDiscussion(r) {
   let d;
   try { const res = await fetch(`/api/community/posts/${encodeURIComponent(id)}`); d = res.ok ? await res.json() : null; } catch { d = null; }
   if (parseRoute().arg !== id) return;
-  if (!d) { $("#view").innerHTML = `<div class="wrap"><div class="blocked glass"><h1>Discussion not found</h1><p class="muted">It may have been removed by a moderator.</p><div class="blocked-actions"><a class="btn btn-dark" href="#/community">Back to the community</a></div></div></div>`; return; }
+  if (!d) { $("#view").innerHTML = `<div class="wrap"><div class="blocked glass"><h1>Discussion not found</h1><p class="muted">It may have been removed by a moderator.</p><div class="blocked-actions"><a class="btn btn-dark" href="/community">Back to the community</a></div></div></div>`; return; }
   document.title = `${d.post.title} · Raisina Wire community`;
   $("#view").innerHTML = `<div class="wrap"><div class="coverage">
-    <a class="link-gold" href="#/community" style="font-size:13px">← All discussions</a>
+    <a class="link-gold" href="/community" style="font-size:13px">← All discussions</a>
     <header class="coverage-head"><span class="tag" style="margin-top:16px">${esc(d.post.topic)}</span><h1>${esc(d.post.title)}</h1><div class="meta">${esc(d.post.author)} · ${ago(d.post.createdAt)}</div></header>
     <div class="glass thread-post"><p>${esc(d.post.body)}</p></div>
     <h2 class="thread-count">${d.replies.length} repl${d.replies.length === 1 ? "y" : "ies"}</h2>
@@ -738,7 +805,7 @@ function downloadIcs(id) {
   const end = new Date(new Date(ev.startsAt).getTime() + 60 * 60e3).toISOString();
   const text = (s = "") => String(s).replace(/[\\,;]/g, m => "\\" + m).replace(/\n/g, "\\n");
   const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Raisina Wire//Events//EN", "BEGIN:VEVENT", `UID:${ev.id}@raisinawire`, `DTSTAMP:${icsDate(new Date().toISOString())}`,
-    `DTSTART:${icsDate(ev.startsAt)}`, `DTEND:${icsDate(end)}`, `SUMMARY:${text(ev.title)}`, `DESCRIPTION:${text(ev.description)}`, `URL:${location.origin}/#/events`, "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+    `DTSTART:${icsDate(ev.startsAt)}`, `DTEND:${icsDate(end)}`, `SUMMARY:${text(ev.title)}`, `DESCRIPTION:${text(ev.description)}`, `URL:${location.origin}/events`, "END:VEVENT", "END:VCALENDAR"].join("\r\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
   a.download = `${ev.title.replace(/[^\w]+/g, "-").slice(0, 60)}.ics`;
@@ -783,7 +850,7 @@ function viewAccount() {
   <div class="mgrid">
     <form class="mgroup glass account-form" id="nameForm"><h2>Your name</h2><label>Display name<input name="displayName" value="${esc(u.displayName)}" required minlength="2" maxlength="80" autocomplete="name"></label><p class="auth-message" aria-live="polite"></p><button class="btn btn-dark" type="submit">Save name</button></form>
     <form class="mgroup glass account-form" id="passwordForm"><h2>Password</h2><label>Current password<input name="currentPassword" type="password" required autocomplete="current-password"></label><label>New password <small>(12+ characters)</small><input name="newPassword" type="password" required minlength="12" autocomplete="new-password"></label><p class="auth-message" aria-live="polite"></p><button class="btn btn-dark" type="submit">Change password</button></form>
-    <div class="mgroup glass"><h2>Saved stories</h2><p class="muted">${saved.length} saved on this device.</p><a class="btn btn-light" href="#/saved">Open saved stories</a></div>
+    <div class="mgroup glass"><h2>Saved stories</h2><p class="muted">${saved.length} saved on this device.</p><a class="btn btn-light" href="/saved">Open saved stories</a></div>
     <div class="mgroup glass"><h2>Session</h2><p class="muted">Signing out ends this session on this device.</p><button class="btn btn-light" type="button" data-action="signout">Sign out</button>${["admin", "editor"].includes(u.role) ? ` <a class="btn btn-dark" href="/admin.html">Open the control room</a>` : ""}</div>
   </div></div>`;
   const wire = (id, fn) => $(id).addEventListener("submit", async e => {
@@ -832,6 +899,7 @@ async function loadMarkets() {
 async function loadCommunity() {
   try { state.community = (await fetch("/api/community/posts").then(r => r.json())).posts || []; } catch { state.community = []; }
   try { state.events = (await fetch("/api/events").then(r => r.json())).events || []; } catch { state.events = []; }
+  try { state.communityStats = await fetch("/api/community/stats").then(r => r.ok ? r.json() : null); } catch { /* optional */ }
   renderCommunity();
   if (parseRoute().page === "community") viewCommunity();
   if (parseRoute().page === "events") viewEvents();
@@ -845,6 +913,7 @@ function setAuthMode(mode) {
   authMode = mode;
   $("#modalTitle").textContent = mode === "login" ? "Welcome back." : "Make the world make sense.";
   $("#nameField").classList.toggle("hidden", mode === "login");
+  $("#authPerks").hidden = mode === "login";
   $("#nameField input").required = mode === "register";
   $("#authForm input[name=password]").autocomplete = mode === "login" ? "current-password" : "new-password";
   $("#authSubmit").textContent = mode === "login" ? "Sign in" : "Create free account";
@@ -857,12 +926,13 @@ function showUser() {
   const u = state.user;
   $("#guestActions").classList.toggle("hidden", !!u);
   $("#account").classList.toggle("hidden", !u);
+  renderJoin();
   if (!u) { toggleAccountMenu(false); return; }
   $("#avatarBtn").textContent = initials(u.displayName);
   $("#avatarBtn").setAttribute("aria-label", `Account: ${u.displayName}`);
   const staff = ["admin", "editor"].includes(u.role);
   $("#accountMenu").innerHTML = `<div class="account-head"><b>${esc(u.displayName)}</b><span class="meta">${esc(u.role)}</span></div>
-    <a role="menuitem" href="#/account">My account</a><a role="menuitem" href="#/saved">Saved stories</a>${staff ? `<a role="menuitem" href="/admin.html">Control room</a>` : ""}
+    <a role="menuitem" href="/account">My account</a><a role="menuitem" href="/saved">Saved stories</a>${staff ? `<a role="menuitem" href="/admin.html">Control room</a>` : ""}
     <a role="menuitem" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Newsletter on LinkedIn ↗</a>${isStandalone() ? "" : `<button role="menuitem" type="button" data-action="install">Install the app</button>`}
     <button role="menuitem" type="button" data-action="signout">Sign out</button>`;
 }
@@ -957,14 +1027,22 @@ if ("serviceWorker" in navigator) {
 
 /* ---------- Boot ---------- */
 const articlesReady = loadArticles();
+// The session is checked once at start; pages that depend on it wait for the answer.
+const userReady = fetch("/api/auth/me").then(r => r.json()).then(d => { state.user = d.user || null; }).catch(() => {});
 renderShell();
 watchScroll();
-window.addEventListener("hashchange", () => { document.title = "Raisina Wire — Ideas. Intelligence. Impact."; route(); });
+// Links from before clean URLs (#/edition/slug) still work.
+const fromHash = () => { if (location.hash.startsWith("#/")) { history.replaceState({ rw: true }, "", location.hash.slice(1) || "/"); return true; } return false; };
+fromHash();
+window.addEventListener("hashchange", () => { if (fromHash()) route(); });
+window.addEventListener("popstate", () => route());
+userReady.then(() => { if (state.user) showUser(); });
+document.addEventListener("click", interceptLinks);
 route();
 loadWire(); loadMarkets(); loadCommunity(); loadCoverage(); loadMedia();
 setInterval(() => { if (!document.hidden) loadCoverage(); }, 60e3);
 setInterval(() => { if (!document.hidden) loadArticles(); }, 5 * 60e3);
-fetch("/api/auth/me").then(r => r.json()).then(d => { if (d.user) { state.user = d.user; showUser(); } }).catch(() => {});
+
 fetch("/api/config").then(r => r.json()).then(c => { if (c.linkedinUrl) $("#linkedinLink").href = c.linkedinUrl; }).catch(() => {});
 setInterval(() => { if (!document.hidden) loadWire(); }, 120e3);
 setInterval(() => { if (!document.hidden) loadMarkets(); }, 60e3);

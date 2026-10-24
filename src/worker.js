@@ -3,6 +3,11 @@ import m0001 from "../migrations/0001_init.sql";
 import m0002 from "../migrations/0002_platform_modules.sql";
 import m0003 from "../migrations/0003_editorial_console.sql";
 import m0004 from "../migrations/0004_app_completion.sql";
+import m0005 from "../migrations/0005_editions_media_writers.sql";
+import { editions } from "./editions.js";
+import editionBodies from "./edition-bodies.json";
+import { ARTICLE_COLS, toArticle, listPublished, getBySlug, blocksToText, WRITERS, DEFAULT_WRITER } from "./store.js";
+import { renderPage, sitemap, newsSitemap, robots, feed, PAGE_PATTERN } from "./seo.js";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -46,7 +51,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -59,6 +64,23 @@ async function migrate(db) {
     if (applied.has(name)) continue;
     await db.batch([...sqlStatements(sql).map(q => db.prepare(q)), db.prepare("INSERT INTO d1_migrations (name) VALUES (?)").bind(name)]);
   }
+  await seedEditions(db, applied);
+}
+// The LinkedIn editions bundled with the site are copied into the articles table once, so the
+// CMS can edit them. Existing rows (same slug) are never overwritten.
+const EDITION_CATEGORY = { "shadow-war": "Security", "iron-dome-east": "Security", "dhaka-reset": "Diplomacy", "delhis-red-line": "Security", "deterrence-without-firing": "Security",
+  "naravane-midnight-call": "Security", "cia-invisible-front": "Analysis", "pakistan-1971-moment": "Geopolitics", "begging-bowls-terror-hubs": "Geopolitics",
+  "bangladesh-breaking-point": "Geopolitics", "silent-superpower": "India", "iran-500m-masterstroke": "Diplomacy", "himalayan-tunnel": "Security" };
+async function seedEditions(db, applied) {
+  const marker = `seed_editions_${editions.length}`;
+  if (applied.has(marker)) return;
+  const now = new Date().toISOString();
+  await db.batch([
+    ...editions.map(e => db.prepare(`INSERT OR IGNORE INTO articles (id,slug,kind,title,dek,topic,body,category,status,writer,published_at,image_url,source_url,created_at,updated_at)
+      VALUES (?,?,'edition',?,?,?,?,?,'published','ilmaz-syed',?,?,?,?,?)`).bind(`ed-${e.slug}`, e.slug, e.title, e.dek, e.topic, blocksToText(editionBodies[e.slug]?.blocks),
+      EDITION_CATEGORY[e.slug] || "Analysis", new Date(`${e.date}T09:00:00+05:30`).toISOString(), e.image, e.url, now, now)),
+    db.prepare("INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)").bind(marker)
+  ]);
 }
 function ensureSchema(env) {
   if (!schemaReady) schemaReady = migrate(env.DB).catch(e => { schemaReady = null; throw e; });
@@ -79,6 +101,9 @@ function slugify(s) { return s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9
 function allowedRoles(user, roles) { return user && roles.includes(user.role); }
 const isStaff = user => allowedRoles(user, ["admin", "editor"]);
 const httpsUrl = (v, max = 1500) => { const s = String(v || "").trim().slice(0, max); return /^https:\/\//i.test(s) ? s : ""; };
+// Images: an HTTPS URL, an uploaded image (/media/…) or bundled artwork (/editions/…).
+const imageRef = v => { const s = String(v || "").trim().slice(0, 1500); return /^\/(media|editions)\/[\w.-]+$/.test(s) ? s : httpsUrl(s); };
+const writerKey = v => WRITERS.some(w => w.key === v) ? v : DEFAULT_WRITER;
 // A slug that is free in `table`: "my-title", then "my-title-2", "my-title-3"…
 async function uniqueSlug(env, table, wanted, exceptId = null) {
   const base = slugify(wanted);
@@ -357,58 +382,95 @@ async function api(request, env) {
   }
 
   if (url.pathname === "/api/articles" && request.method === "GET") {
-    const rows = await env.DB.prepare("SELECT a.id,a.slug,a.title,a.dek,a.category,a.image_url AS imageUrl,a.source_url AS sourceUrl,a.published_at AS publishedAt,length(a.body) AS bodyLength,u.display_name AS author FROM articles a LEFT JOIN users u ON u.id=a.author_id WHERE a.status='published' ORDER BY a.published_at DESC LIMIT 100").all();
-    return json({ articles:rows.results });
+    const w = url.searchParams.get("writer");
+    return json({ articles: await listPublished(env, { writerKey: WRITERS.some(x => x.key === w) ? w : null, limit: 300 }) });
   }
   if (url.pathname.startsWith("/api/articles/") && request.method === "GET") {
-    const slug = decodeURIComponent(url.pathname.split("/").pop() || "");
-    const row = await env.DB.prepare("SELECT a.id,a.slug,a.title,a.dek,a.body,a.category,a.status,a.image_url AS imageUrl,a.source_url AS sourceUrl,a.published_at AS publishedAt,a.updated_at AS updatedAt,u.display_name AS author FROM articles a LEFT JOIN users u ON u.id=a.author_id WHERE a.slug=?").bind(slug).first();
-    if (!row) return err("Article not found.", 404);
-    if (row.status !== "published" && !isStaff(await currentUser(request, env))) return err("Article not found.", 404);
-    return json({ article: row }, 200, { "cache-control": row.status === "published" ? "no-cache" : "no-store" });
+    const a = await getBySlug(env, decodeURIComponent(url.pathname.split("/").pop() || ""));
+    if (!a) return err("Article not found.", 404);
+    if (a.status !== "published" && !isStaff(await currentUser(request, env))) return err("Article not found.", 404);
+    return json({ article: a }, 200, { "cache-control": a.status === "published" ? "no-cache" : "no-store" });
   }
 
   if (url.pathname === "/api/admin/articles" && request.method === "GET") {
     const user = await currentUser(request,env);
-    if (!allowedRoles(user,["admin","editor"])) return err("Editor access required.",403);
-    const rows = await env.DB.prepare("SELECT * FROM articles ORDER BY updated_at DESC LIMIT 100").all();
-    return json({ articles:rows.results },200,{"cache-control":"no-store"});
+    if (!isStaff(user)) return err("Editor access required.",403);
+    const rows = await env.DB.prepare(`SELECT ${ARTICLE_COLS},body FROM articles ORDER BY COALESCE(published_at,updated_at) DESC LIMIT 500`).all();
+    return json({ articles: rows.results.map(r => toArticle(r, { body: true })), writers: WRITERS.map(w => ({ key: w.key, name: w.name })) },200,{"cache-control":"no-store"});
   }
   if (url.pathname === "/api/admin/articles" && request.method === "POST") {
     const user = await currentUser(request,env);
-    if (!allowedRoles(user,["admin","editor"])) return err("Editor access required.",403);
-    const body = await request.json().catch(()=>({}));
-    const title = String(body.title||"").trim().slice(0,180), dek = String(body.dek||"").trim().slice(0,400), bodyText = String(body.body||"").slice(0,100000), category = String(body.category||"Analysis").slice(0,40);
+    if (!isStaff(user)) return err("Editor access required.",403);
+    const b = await request.json().catch(()=>({}));
+    const title = String(b.title||"").trim().slice(0,180);
     if (title.length < 8) return err("Title must be at least 8 characters.");
-    const id = randomId(), slug = await uniqueSlug(env, "articles", body.slug || title), status = body.status === "published" ? "published" : "draft";
-    const publishedAt = status === "published" ? (Date.parse(body.publishedAt) ? new Date(body.publishedAt).toISOString() : new Date().toISOString()) : null;
-    await env.DB.prepare("INSERT INTO articles (id,slug,title,dek,body,category,status,author_id,published_at,image_url,source_url) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(id,slug,title,dek,bodyText,category,status,user.id,publishedAt,httpsUrl(body.imageUrl),httpsUrl(body.sourceUrl)).run();
-    await env.DB.prepare("INSERT INTO audit_log (id,actor_id,action,target_type,target_id,details) VALUES (?,?,?,?,?,?)").bind(randomId(),user.id,"article.create","article",id,JSON.stringify({title,status})).run();
+    const id = randomId(), slug = await uniqueSlug(env, "articles", b.slug || title), status = b.status === "published" ? "published" : "draft";
+    const publishedAt = status === "published" ? (Date.parse(b.publishedAt) ? new Date(b.publishedAt).toISOString() : new Date().toISOString()) : null;
+    const category = String(b.category||"Analysis").slice(0,40);
+    await env.DB.prepare("INSERT INTO articles (id,slug,kind,title,dek,topic,body,category,status,author_id,writer,published_at,image_url,hero_url,hero_caption,source_url) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(
+      id, slug, b.kind === "edition" ? "edition" : "article", title, String(b.dek||"").trim().slice(0,400), String(b.topic||"").trim().slice(0,80), String(b.body||"").slice(0,100000),
+      category, status, user.id, writerKey(b.writer), publishedAt, imageRef(b.imageUrl), imageRef(b.heroUrl), String(b.heroCaption||"").trim().slice(0,300), httpsUrl(b.sourceUrl)).run();
+    await audit(env, user, "article.create", "article", id, { title, status });
     return json({ok:true,id,slug},201,{"cache-control":"no-store"});
   }
-
   if (url.pathname.startsWith("/api/admin/articles/") && request.method === "PUT") {
     const user = await currentUser(request,env);
     if (!isStaff(user)) return err("Editor access required.",403);
     const id = decodeURIComponent(url.pathname.split("/").pop());
-    const current = await env.DB.prepare("SELECT * FROM articles WHERE id=?").bind(id).first();
-    if (!current) return err("Article not found.",404);
+    const c = await env.DB.prepare("SELECT * FROM articles WHERE id=?").bind(id).first();
+    if (!c) return err("Article not found.",404);
     const b = await request.json().catch(()=>({}));
-    const title = b.title !== undefined ? String(b.title).trim().slice(0,180) : current.title;
+    const pick = (key, fn, cur) => b[key] !== undefined ? fn(b[key]) : cur;
+    const title = pick("title", v => String(v).trim().slice(0,180), c.title);
     if (title.length < 8) return err("Title must be at least 8 characters.");
-    const status = ["draft","published","archived"].includes(b.status) ? b.status : current.status;
-    const publishedAt = status === "published" ? (Date.parse(b.publishedAt) ? new Date(b.publishedAt).toISOString() : (current.published_at || new Date().toISOString())) : current.published_at;
-    await env.DB.prepare("UPDATE articles SET title=?,dek=?,body=?,category=?,status=?,published_at=?,image_url=?,source_url=?,updated_at=? WHERE id=?").bind(
+    const status = ["draft","published","archived"].includes(b.status) ? b.status : c.status;
+    const publishedAt = status === "published" ? (Date.parse(b.publishedAt) ? new Date(b.publishedAt).toISOString() : (c.published_at || new Date().toISOString())) : c.published_at;
+    await env.DB.prepare("UPDATE articles SET title=?,dek=?,topic=?,body=?,category=?,kind=?,writer=?,status=?,published_at=?,image_url=?,hero_url=?,hero_caption=?,source_url=?,updated_at=? WHERE id=?").bind(
       title,
-      b.dek !== undefined ? String(b.dek).trim().slice(0,400) : current.dek,
-      b.body !== undefined ? String(b.body).slice(0,100000) : current.body,
-      b.category !== undefined ? String(b.category).slice(0,40) : current.category,
+      pick("dek", v => String(v).trim().slice(0,400), c.dek),
+      pick("topic", v => String(v).trim().slice(0,80), c.topic),
+      pick("body", v => String(v).slice(0,100000), c.body),
+      pick("category", v => String(v).slice(0,40), c.category),
+      pick("kind", v => v === "edition" ? "edition" : "article", c.kind),
+      pick("writer", writerKey, c.writer),
       status, publishedAt,
-      b.imageUrl !== undefined ? httpsUrl(b.imageUrl) : current.image_url,
-      b.sourceUrl !== undefined ? httpsUrl(b.sourceUrl) : current.source_url,
+      pick("imageUrl", imageRef, c.image_url),
+      pick("heroUrl", imageRef, c.hero_url),
+      pick("heroCaption", v => String(v).trim().slice(0,300), c.hero_caption),
+      pick("sourceUrl", httpsUrl, c.source_url),
       new Date().toISOString(), id).run();
     await audit(env,user,"article.update","article",id,{title,status});
-    return json({ok:true,slug:current.slug},200,{"cache-control":"no-store"});
+    return json({ok:true,slug:c.slug},200,{"cache-control":"no-store"});
+  }
+
+  // Images uploaded by writers: stored in D1 (resized in the browser first) and served from /media/.
+  if (url.pathname === "/api/admin/images" && request.method === "POST") {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const bytes = new Uint8Array(await request.arrayBuffer());
+    const mime = imageMime(bytes);
+    if (!mime) return err("Upload a JPEG, PNG, WebP, AVIF or GIF image.");
+    if (bytes.length > MAX_IMAGE_BYTES) return err("That image is too large. Use one under 1.8 MB (the uploader resizes large photos automatically).", 413);
+    const id = randomId().replace(/-/g, "").slice(0, 20), ext = mime.split("/")[1].replace("jpeg", "jpg");
+    const dim = v => Math.max(0, Math.min(20000, parseInt(v, 10) || 0));
+    await env.DB.prepare("INSERT INTO images (id,mime,data,width,height,bytes,alt,uploaded_by) VALUES (?,?,?,?,?,?,?,?)").bind(id, mime, bytes.buffer, dim(request.headers.get("x-image-width")), dim(request.headers.get("x-image-height")), bytes.length, String(request.headers.get("x-image-alt") || "").slice(0, 300), user.id).run();
+    await audit(env, user, "image.upload", "image", id, { bytes: bytes.length, mime });
+    return json({ ok: true, id, url: `/media/${id}.${ext}` }, 201, { "cache-control": "no-store" });
+  }
+  if (url.pathname === "/api/admin/images" && request.method === "GET") {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const { results } = await env.DB.prepare("SELECT id,mime,width,height,bytes,alt,created_at AS createdAt FROM images ORDER BY created_at DESC LIMIT 60").all();
+    return json({ images: results.map(r => ({ ...r, url: `/media/${r.id}.${r.mime.split("/")[1].replace("jpeg", "jpg")}` })) }, 200, { "cache-control": "no-store" });
+  }
+
+  if (url.pathname === "/api/community/stats" && request.method === "GET") {
+    const [m, p, r] = await Promise.all([
+      env.DB.prepare("SELECT COUNT(*) AS n FROM users").first(),
+      env.DB.prepare("SELECT COUNT(*) AS n FROM community_posts WHERE status='published'").first(),
+      env.DB.prepare("SELECT COUNT(*) AS n FROM community_replies").first()
+    ]);
+    return json({ members: m.n, discussions: p.n, replies: r.n }, 200, { "cache-control": "public, max-age=300" });
   }
 
   if (url.pathname === "/api/admin/overview" && request.method === "GET") {
@@ -580,6 +642,30 @@ async function api(request, env) {
   return err("Not found.",404);
 }
 
+const MAX_IMAGE_BYTES = 1_800_000; // D1 stores up to 2 MB per value
+function imageMime(b) {
+  const at = (i, ...v) => v.every((x, j) => b[i + j] === x);
+  if (at(0, 0xff, 0xd8, 0xff)) return "image/jpeg";
+  if (at(0, 0x89, 0x50, 0x4e, 0x47)) return "image/png";
+  if (at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50)) return "image/webp";
+  if (at(4, 0x66, 0x74, 0x79, 0x70) && at(8, 0x61, 0x76, 0x69, 0x66)) return "image/avif";
+  if (at(0, 0x47, 0x49, 0x46, 0x38)) return "image/gif";
+  return null;
+}
+async function serveMedia(request, env, ctx) {
+  const cache = caches.default;
+  const hit = await cache.match(request);
+  if (hit) return hit;
+  const id = (new URL(request.url).pathname.split("/").pop() || "").split(".")[0];
+  if (!env.DB || !/^[a-f0-9]{8,32}$/.test(id)) return new Response("Not found", { status: 404 });
+  await ensureSchema(env);
+  const row = await env.DB.prepare("SELECT mime,data FROM images WHERE id=?").bind(id).first();
+  if (!row) return new Response("Not found", { status: 404 });
+  const res = new Response(new Uint8Array(row.data), { headers: { "content-type": row.mime, "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" } });
+  ctx.waitUntil(cache.put(request, res.clone()));
+  return res;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -587,6 +673,14 @@ export default {
       try { return await api(request,env); }
       catch (e) { return json({error:"Internal API error",detail:e.message},500,{"cache-control":"no-store"}); }
     }
+    try {
+      if (url.pathname.startsWith("/media/")) return await serveMedia(request, env, ctx);
+      if (url.pathname === "/robots.txt") return robots(request, env);
+      if (url.pathname === "/sitemap.xml" && env.DB) return await sitemap(request, env, ensureSchema);
+      if (url.pathname === "/news-sitemap.xml" && env.DB) return await newsSitemap(request, env, ensureSchema);
+      if ((url.pathname === "/feed.xml" || url.pathname === "/rss.xml") && env.DB) return await feed(request, env, ensureSchema);
+      if (env.ASSETS && request.method === "GET" && PAGE_PATTERN.test(url.pathname)) return await renderPage(request, env, ensureSchema);
+    } catch (e) { /* fall through to the static app */ }
     if (env.ASSETS) return env.ASSETS.fetch(request);
     return new Response("Raisina Wire assets are not built. Run npm run build.", { status: 503 });
   }
