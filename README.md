@@ -11,7 +11,7 @@ A premium, mobile-first editorial and geopolitical briefing platform with a live
 - **Live coverage (live blogs):** coverage opened in the control room's Live publishing view appears on the home page as a LIVE banner, in the top ticker and on its own page (`#/coverage/<slug>`), which refreshes every 30 seconds. Closed coverage stays readable, marked as ended.
 - **Editorial furniture:** headline ticker with world clocks, The Briefing (one top story per desk), From the Editor (a line from the latest edition), drop caps, pull quotes and an author box in editions.
 - **Accounts, community, events, contact form, admin control room** as before (D1 tables are created automatically on first use). The built-in admin is `ADMIN_EMAIL` with the `ADMIN_PASSWORD` secret.
-- **Installable PWA:** manifest, service worker and install prompt.
+- **Installable app (PWA):** installs to the home screen on Android, iPhone and desktop, with shortcuts (Live wire, Editions, Markets, Saved) and store-style screenshots. Works offline: the build precaches the app and every edition's text and artwork (`vite.config.js` fills the list into `sw.js`); the live wire, markets and coverage fall back to the last copy, labelled "Offline copy"; saved stories are kept for offline reading. New deploys show an "Update" bar instead of silently replacing the running version.
 
 ## Adding a new Raisina Wire edition
 
