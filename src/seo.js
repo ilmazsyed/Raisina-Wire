@@ -2,7 +2,7 @@
 // canonical URL, social card and schema.org data, plus the story text itself in the HTML,
 // so Google and link previews see real content before the app starts. Also: sitemaps,
 // a Google News sitemap, robots.txt and an RSS feed.
-import { listPublished, getBySlug, textBlocks, storyPath, WRITERS, writer } from "./store.js";
+import { listPublished, getBySlug, textBlocks, storyPath, isPublic, tagSlug, WRITERS, writer } from "./store.js";
 
 const SITE = "Raisina Wire";
 const TAGLINE = "India’s strategic briefing";
@@ -50,6 +50,12 @@ const ssrNav = `<nav class="ssr-nav" aria-label="Sections"><a href="/">Today</a>
 const ssrShell = inner => `<div class="ssr"><header><a class="ssr-brand" href="/">Raisina <span>Wire</span></a>${ssrNav}</header><main>${inner}</main></div>`;
 const storyList = stories => `<ul class="ssr-list">${stories.map(s => `<li><a href="${s.href}">${esc(s.title)}</a> <small>${esc(s.topic)} · ${esc(s.author)} · ${fmtDate(s.publishedAt)}</small>${s.dek ? `<p>${esc(s.dek)}</p>` : ""}</li>`).join("")}</ul>`;
 
+async function allTags(env) {
+  const seen = new Map();
+  for (const a of await listPublished(env, { limit: 1000 })) for (const t of a.tags) if (!seen.has(tagSlug(t))) seen.set(tagSlug(t), { name: t, slug: tagSlug(t) });
+  return [...seen.values()];
+}
+
 /* ---------- Page definitions ---------- */
 async function pageFor(path, url, env, o) {
   const parts = path.split("/").filter(Boolean).map(decodeURIComponent);
@@ -70,7 +76,7 @@ async function pageFor(path, url, env, o) {
 
   if ((section === "edition" || section === "article") && arg) {
     const a = await getBySlug(env, arg);
-    if (!a || a.status !== "published") return { status: 404, title: `Story not found · ${SITE}`, description: "This story may have been moved or unpublished.", noindex: true, body: `<h1>Story not found</h1><p><a href="/editions">See all Raisina Wire stories</a></p>` };
+    if (!isPublic(a)) return { status: 404, title: `Story not found · ${SITE}`, description: "This story may have been moved or unpublished.", noindex: true, body: `<h1>Story not found</h1><p><a href="/editions">See all Raisina Wire stories</a></p>` };
     if (a.href !== path) return { redirect: a.href };
     const w = writer(a.writer), image = abs(o, a.imageUrl || a.heroUrl || a.image);
     const blocks = textBlocks(a.body), words = blocks.reduce((n, b) => n + b.x.split(/\s+/).length, 0);
@@ -82,7 +88,7 @@ async function pageFor(path, url, env, o) {
       ld: [{ "@context": "https://schema.org", "@graph": [
         { "@type": a.kind === "edition" ? "AnalysisNewsArticle" : "NewsArticle", "@id": `${o}${a.href}#article`, mainEntityOfPage: `${o}${a.href}`, url: `${o}${a.href}`,
           headline: clip(a.title, 110), description, image: [image], datePublished: a.publishedAt, dateModified: a.updatedAt || a.publishedAt,
-          author: [personLd(o, w)], publisher: { "@id": `${o}/#organization` }, articleSection: a.category, keywords: [a.topic, a.category, "India"].filter(Boolean).join(", "),
+          author: [personLd(o, w)], publisher: { "@id": `${o}/#organization` }, articleSection: a.category, keywords: [...a.tags, a.category, "India"].filter(Boolean).join(", "),
           wordCount: words, inLanguage: "en-IN", isAccessibleForFree: true, ...(a.sourceUrl ? { isBasedOn: a.sourceUrl } : {}) },
         organization(o), breadcrumbs(o, [["Home", "/"], crumb, [a.title, a.href]])] }],
       body: `<article><p class="ssr-kicker">${esc(a.topic)}</p><h1>${esc(a.title)}</h1>${a.dek ? `<p class="ssr-dek">${esc(a.dek)}</p>` : ""}
@@ -98,6 +104,16 @@ async function pageFor(path, url, env, o) {
       ld: [{ "@context": "https://schema.org", "@graph": [{ "@type": "CollectionPage", url: `${o}/editions`, name: "Raisina Wire editions", isPartOf: { "@id": `${o}/#website` },
         mainEntity: { "@type": "ItemList", itemListElement: stories.map((s, i) => ({ "@type": "ListItem", position: i + 1, url: abs(o, s.href), name: s.title })) } }, breadcrumbs(o, [["Home", "/"], ["Editions", "/editions"]])] }],
       body: `<h1>Every Raisina Wire edition</h1>${storyList(stories)}` };
+  }
+
+  if (section === "tag" && arg) {
+    const tags = await allTags(env), t = tags.find(x => x.slug === arg);
+    if (!t) return { status: 404, title: `Topic not found · ${SITE}`, description: "", noindex: true, body: `<h1>Topic not found</h1><p><a href="/editions">See all stories</a></p>` };
+    const stories = await listPublished(env, { tag: t.name, limit: 200 });
+    return { title: `${t.name}: news and analysis · ${SITE}`, description: clip(`Raisina Wire stories on ${t.name}: ${stories.slice(0, 3).map(x => x.title).join("; ")}`, 160),
+      ld: [{ "@context": "https://schema.org", "@graph": [{ "@type": "CollectionPage", url: `${o}/tag/${t.slug}`, name: `${t.name} · ${SITE}`, isPartOf: { "@id": `${o}/#website` },
+        mainEntity: { "@type": "ItemList", itemListElement: stories.map((x, i) => ({ "@type": "ListItem", position: i + 1, url: abs(o, x.href), name: x.title })) } }, breadcrumbs(o, [["Home", "/"], ["Topics", "/editions"], [t.name, `/tag/${t.slug}`]])] }],
+      body: `<h1>${esc(t.name)}</h1>${storyList(stories)}` };
   }
 
   if (section === "author" && arg) {
@@ -220,6 +236,7 @@ export async function sitemap(request, env, ensureSchema) {
     ["/", newest, "hourly", "1.0"], ["/editions", newest, "daily", "0.9"], ["/live", "", "always", "0.8"], ["/markets", "", "always", "0.7"],
     ...LIVE_CATS.map(c => [`/live/${c}`, "", "always", "0.5"]), ["/community", "", "daily", "0.7"], ["/events", "", "daily", "0.6"], ["/watch", "", "weekly", "0.5"],
     ...WRITERS.map(w => [`/author/${w.key}`, newest, "weekly", "0.6"]),
+    ...(await allTags(env)).map(t => [`/tag/${t.slug}`, newest, "weekly", "0.5"]),
     ...stories.map(s => [s.href, s.updatedAt || s.publishedAt, "monthly", "0.8", s]),
     ...cover.map(c => [`/coverage/${encodeURIComponent(c.slug)}`, c.updated_at, "hourly", "0.6"]),
     ...posts.map(p => [`/discussion/${encodeURIComponent(p.id)}`, p.created_at, "weekly", "0.4"])
@@ -249,6 +266,7 @@ Disallow: /read
 Disallow: /search
 Disallow: /account
 Disallow: /saved
+Disallow: /my
 
 Sitemap: ${o}/sitemap.xml
 Sitemap: ${o}/news-sitemap.xml
@@ -267,4 +285,4 @@ ${stories.map(s => `<item><title>${xml(s.title)}</title><link>${o}${s.href}</lin
 }
 
 // Paths the Worker renders as HTML pages (the rest are app-only views or static files).
-export const PAGE_PATTERN = /^\/(?:$|editions\/?$|(?:edition|article|author|discussion|coverage)\/[^/]+\/?$|live(?:\/[^/]+)?\/?$|markets\/?$|community\/?$|events\/?$|watch\/?$)/;
+export const PAGE_PATTERN = /^\/(?:$|editions\/?$|(?:edition|article|author|tag|discussion|coverage)\/[^/]+\/?$|live(?:\/[^/]+)?\/?$|markets\/?$|community\/?$|events\/?$|watch\/?$)/;

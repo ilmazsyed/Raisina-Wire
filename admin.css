@@ -98,3 +98,68 @@ td small{display:block;color:var(--muted);margin-top:4px}
 .side-help{align-self:start;position:sticky;top:90px}
 @media(max-width:900px){.img-row{grid-template-columns:1fr}.side-help{position:static}}
 .lib-grid[hidden]{display:none}
+/* Stories CMS: autosave, preview, counters, alerts */
+.draft-notice{display:none;margin:0 0 14px;border-color:rgba(122,83,15,.25);background:rgba(233,189,120,.16);color:var(--ink-2)}
+.draft-notice.show{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.counter.over{color:var(--bad)}
+.field.check{flex-direction:row;align-items:center;gap:10px;font-weight:700}
+.field.check input{width:20px;height:20px;accent-color:#b8141f}
+.write-tabs{display:flex;align-items:center;gap:4px;margin-bottom:8px}
+.write-tabs button{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 14px;font-weight:800;font-size:13px;cursor:pointer}
+.write-tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.autosave{margin-left:auto;font-size:12px;font-weight:500}
+.story-preview{border:1px solid var(--line);border-radius:14px;background:#fff;padding:22px 24px;min-height:420px;font:400 18px/1.7 var(--serif);color:#1d222c}
+.story-preview[hidden]{display:none}
+.story-preview .kicker{font:500 11px var(--mono);letter-spacing:1.4px;text-transform:uppercase;color:#b8141f}
+.story-preview h1{font:500 34px/1.1 var(--serif);margin:8px 0}
+.story-preview .dek{font-size:20px;color:var(--ink-2)}
+.story-preview img{width:100%;border-radius:12px;aspect-ratio:16/9;object-fit:cover;margin:10px 0 4px}
+.story-preview small{display:block;color:var(--muted);font:500 13px Manrope}
+.story-preview h2{font:700 21px/1.3 Manrope;margin:26px 0 8px}
+.top-list{margin:0;padding:0 0 0 20px}
+.top-list li{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid var(--line)}
+.top-list a{font-weight:700}.top-list a:hover{color:#b8141f}
+.top-list b{font:500 13px var(--mono)}
+/* Phones */
+@media(max-width:700px){
+  header{height:58px}
+  .brand .brand-tag{display:none}
+  main{padding:16px 12px 90px}
+  .page-head{margin-bottom:16px}
+  .page-head h1{font-size:28px}
+  .page-head p{font-size:13px}
+  .panel,.metric-card{padding:16px;border-radius:16px}
+  .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .metric-card b{font-size:24px}
+  .sidebar{top:58px;padding:8px 10px;gap:6px;scrollbar-width:none}
+  .sidebar::-webkit-scrollbar{display:none}
+  .nav{padding:8px 12px;font-size:13px;border:1px solid var(--line);background:#fff}
+  .editor-split,.split{grid-template-columns:1fr;gap:12px}
+  .side-help{display:none}
+  .form-grid{gap:12px}
+  input,textarea,select{font-size:16px}
+  .img-row{grid-template-columns:96px minmax(0,1fr);gap:10px}
+  .img-preview{width:96px}
+  .img-controls .action{min-height:36px;padding:0 10px;font-size:12px}
+  .sticky-actions{position:sticky;bottom:0;z-index:4;margin:14px -16px -16px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:rgba(255,255,255,.94);backdrop-filter:blur(14px);border-top:1px solid var(--line);border-radius:0 0 16px 16px}
+  .sticky-actions .button{flex:1}
+  .list-head{flex-direction:column;align-items:stretch}
+  .list-tools{flex-direction:column;align-items:stretch}
+  .list-tools input{width:100%}
+  .seg{overflow-x:auto;scrollbar-width:none}
+  .seg button{flex-shrink:0}
+  table,thead,tbody,tr,td{display:block;min-width:0;width:100%}
+  table{min-width:0}
+  thead{display:none}
+  tbody tr{position:relative;margin-bottom:10px;padding:12px 12px 10px;border:1px solid var(--line);border-radius:14px;background:#fff}
+  td{border:0;padding:4px 0;font-size:13px}
+  td[data-label]:not([data-label=""]):not([data-label="Story"]):not([data-label="Actions"]):before{content:attr(data-label) ": ";font:500 10px var(--mono);letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+  td:first-child:has(.thumb-sm){position:absolute;right:12px;top:12px;width:auto;padding:0}
+  .story-table td:nth-child(2){padding-right:76px}
+  .row-actions{flex-wrap:wrap;margin-top:6px}
+  .row-actions .action{min-height:34px;padding:0 10px;font-size:12px}
+  .row-actions select{min-width:0;flex:1}
+  .write-tabs button{padding:7px 12px}
+  .story-preview{padding:16px;font-size:17px}
+  .story-preview h1{font-size:26px}
+}

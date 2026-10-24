@@ -4,9 +4,11 @@ import m0002 from "../migrations/0002_platform_modules.sql";
 import m0003 from "../migrations/0003_editorial_console.sql";
 import m0004 from "../migrations/0004_app_completion.sql";
 import m0005 from "../migrations/0005_editions_media_writers.sql";
+import m0006 from "../migrations/0006_tags_views_alerts.sql";
 import { editions } from "./editions.js";
 import editionBodies from "./edition-bodies.json";
-import { ARTICLE_COLS, toArticle, listPublished, getBySlug, blocksToText, WRITERS, DEFAULT_WRITER } from "./store.js";
+import { ARTICLE_COLS, toArticle, listPublished, getBySlug, blocksToText, splitTags, tagSlug, isPublic, WRITERS, DEFAULT_WRITER } from "./store.js";
+import { vapidKeys, createAlert, drainAlerts } from "./push.js";
 import { renderPage, sitemap, newsSitemap, robots, feed, PAGE_PATTERN } from "./seo.js";
 
 const JSON_HEADERS = {
@@ -51,7 +53,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -76,8 +78,8 @@ async function seedEditions(db, applied) {
   if (applied.has(marker)) return;
   const now = new Date().toISOString();
   await db.batch([
-    ...editions.map(e => db.prepare(`INSERT OR IGNORE INTO articles (id,slug,kind,title,dek,topic,body,category,status,writer,published_at,image_url,source_url,created_at,updated_at)
-      VALUES (?,?,'edition',?,?,?,?,?,'published','ilmaz-syed',?,?,?,?,?)`).bind(`ed-${e.slug}`, e.slug, e.title, e.dek, e.topic, blocksToText(editionBodies[e.slug]?.blocks),
+    ...editions.map(e => db.prepare(`INSERT OR IGNORE INTO articles (id,slug,kind,title,dek,topic,tags,body,category,status,writer,published_at,image_url,source_url,created_at,updated_at)
+      VALUES (?,?,'edition',?,?,?,?,?,?,'published','ilmaz-syed',?,?,?,?,?)`).bind(`ed-${e.slug}`, e.slug, e.title, e.dek, e.topic, splitTags(e.topic.replace(/ · /g, ",")).join(","), blocksToText(editionBodies[e.slug]?.blocks),
       EDITION_CATEGORY[e.slug] || "Analysis", new Date(`${e.date}T09:00:00+05:30`).toISOString(), e.image, e.url, now, now)),
     db.prepare("INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)").bind(marker)
   ]);
@@ -104,6 +106,27 @@ const httpsUrl = (v, max = 1500) => { const s = String(v || "").trim().slice(0, 
 // Images: an HTTPS URL, an uploaded image (/media/…) or bundled artwork (/editions/…).
 const imageRef = v => { const s = String(v || "").trim().slice(0, 1500); return /^\/(media|editions)\/[\w.-]+$/.test(s) ? s : httpsUrl(s); };
 const writerKey = v => WRITERS.some(w => w.key === v) ? v : DEFAULT_WRITER;
+const tagsValue = v => splitTags(Array.isArray(v) ? v.join(",") : v).map(t => t.slice(0, 40)).join(",");
+const truthy = v => v === true || v === "on" || v === "true" || v === "1";
+// A story alert goes out when the story is public; a scheduled story's alert waits for the cron.
+async function storyAlert(env, ctx, user, row) {
+  const live = row.status === "published" && row.published_at && row.published_at <= new Date().toISOString();
+  if (!live) { await env.DB.prepare("UPDATE articles SET alert_state='pending' WHERE id=?").bind(row.id).run(); return "pending"; }
+  await createAlert(env, ctx, { title: row.kind === "edition" ? "New Raisina Wire edition" : "Raisina Wire", body: row.title, url: `/${row.kind === "edition" ? "edition" : "article"}/${encodeURIComponent(row.slug)}`, userId: user?.id });
+  await env.DB.prepare("UPDATE articles SET alert_state='sent' WHERE id=?").bind(row.id).run();
+  return "sent";
+}
+// Push services the Worker may call (PUSH_ALLOW_HOSTS adds hosts for local testing).
+const PUSH_HOSTS = [/(^|\.)fcm\.googleapis\.com$/, /(^|\.)push\.services\.mozilla\.com$/, /(^|\.)push\.apple\.com$/, /(^|\.)notify\.windows\.com$/, /(^|\.)push\.api\.chrome\.google\.com$/];
+function pushEndpointOk(env, v) {
+  try {
+    const u = new URL(String(v));
+    const extra = String(env.PUSH_ALLOW_HOSTS || "").split(",").map(x => x.trim()).filter(Boolean);
+    if (extra.includes(u.hostname)) return true;
+    return u.protocol === "https:" && PUSH_HOSTS.some(r => r.test(u.hostname));
+  } catch { return false; }
+}
+const BOT_UA = /bot|crawl|spider|slurp|preview|facebookexternalhit|embedly|whatsapp|telegram|curl|wget|python|headless/i;
 // A slug that is free in `table`: "my-title", then "my-title-2", "my-title-3"…
 async function uniqueSlug(env, table, wanted, exceptId = null) {
   const base = slugify(wanted);
@@ -171,7 +194,7 @@ async function gdeltNews(url) {
   return { source: "GDELT DOC 2.0", updatedAt: new Date().toISOString(), query: safeQ, articles };
 }
 
-async function api(request, env) {
+async function api(request, env, ctx) {
   const url = new URL(request.url);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: JSON_HEADERS });
 
@@ -339,6 +362,7 @@ async function api(request, env) {
     const id=randomId(), slug=await uniqueSlug(env,"live_coverage",b.slug||title), status=b.status==="live"?"live":"draft";
     await env.DB.prepare("INSERT INTO live_coverage (id,slug,title,summary,status,author_id,started_at) VALUES (?,?,?,?,?,?,?)").bind(id,slug,title,String(b.summary||"").slice(0,500),status,user.id,status==="live"?new Date().toISOString():null).run();
     await audit(env,user,"live.create","live_coverage",id,{title,status});
+    if (status === "live" && truthy(b.notify)) await createAlert(env, ctx, { title: "LIVE · Raisina Wire", body: title, url: `/coverage/${encodeURIComponent(slug)}`, userId: user.id });
     return json({ok:true,id,slug},201,{"cache-control":"no-store"});
   }
   if (url.pathname.startsWith("/api/admin/live/") && !url.pathname.endsWith("/updates") && request.method === "PUT") {
@@ -352,6 +376,10 @@ async function api(request, env) {
       ended_at=CASE WHEN ?='ended' THEN ? ELSE NULL END, updated_at=? WHERE id=?`).bind(status,status,now,status,now,now,id).run();
     if(!res.meta.changes) return err("Live coverage not found.",404);
     await audit(env,user,"live.status","live_coverage",id,{status});
+    if (status === "live" && truthy(b.notify)) {
+      const row = await env.DB.prepare("SELECT slug,title FROM live_coverage WHERE id=?").bind(id).first();
+      await createAlert(env, ctx, { title: "LIVE · Raisina Wire", body: row.title, url: `/coverage/${encodeURIComponent(row.slug)}`, userId: user.id });
+    }
     return json({ok:true},200,{"cache-control":"no-store"});
   }
   if (url.pathname.startsWith("/api/admin/live/") && url.pathname.endsWith("/updates") && request.method === "POST") {
@@ -383,13 +411,18 @@ async function api(request, env) {
 
   if (url.pathname === "/api/articles" && request.method === "GET") {
     const w = url.searchParams.get("writer");
-    return json({ articles: await listPublished(env, { writerKey: WRITERS.some(x => x.key === w) ? w : null, limit: 300 }) });
+    return json({ articles: await listPublished(env, { writerKey: WRITERS.some(x => x.key === w) ? w : null, tag: url.searchParams.get("tag"), limit: 300 }) });
+  }
+  if (url.pathname === "/api/tags" && request.method === "GET") {
+    const counts = new Map();
+    for (const a of await listPublished(env, { limit: 1000 })) for (const t of a.tags) { const k = tagSlug(t); const c = counts.get(k) || { name: t, slug: k, count: 0 }; c.count++; counts.set(k, c); }
+    return json({ tags: [...counts.values()].sort((x, y) => y.count - x.count || x.name.localeCompare(y.name)) });
   }
   if (url.pathname.startsWith("/api/articles/") && request.method === "GET") {
     const a = await getBySlug(env, decodeURIComponent(url.pathname.split("/").pop() || ""));
     if (!a) return err("Article not found.", 404);
-    if (a.status !== "published" && !isStaff(await currentUser(request, env))) return err("Article not found.", 404);
-    return json({ article: a }, 200, { "cache-control": a.status === "published" ? "no-cache" : "no-store" });
+    if (!isPublic(a) && !isStaff(await currentUser(request, env))) return err("Article not found.", 404);
+    return json({ article: a }, 200, { "cache-control": isPublic(a) ? "no-cache" : "no-store" });
   }
 
   if (url.pathname === "/api/admin/articles" && request.method === "GET") {
@@ -407,11 +440,12 @@ async function api(request, env) {
     const id = randomId(), slug = await uniqueSlug(env, "articles", b.slug || title), status = b.status === "published" ? "published" : "draft";
     const publishedAt = status === "published" ? (Date.parse(b.publishedAt) ? new Date(b.publishedAt).toISOString() : new Date().toISOString()) : null;
     const category = String(b.category||"Analysis").slice(0,40);
-    await env.DB.prepare("INSERT INTO articles (id,slug,kind,title,dek,topic,body,category,status,author_id,writer,published_at,image_url,hero_url,hero_caption,source_url) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(
-      id, slug, b.kind === "edition" ? "edition" : "article", title, String(b.dek||"").trim().slice(0,400), String(b.topic||"").trim().slice(0,80), String(b.body||"").slice(0,100000),
+    await env.DB.prepare("INSERT INTO articles (id,slug,kind,title,dek,topic,tags,body,category,status,author_id,writer,published_at,image_url,hero_url,hero_caption,source_url) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(
+      id, slug, b.kind === "edition" ? "edition" : "article", title, String(b.dek||"").trim().slice(0,400), String(b.topic||"").trim().slice(0,80), tagsValue(b.tags), String(b.body||"").slice(0,100000),
       category, status, user.id, writerKey(b.writer), publishedAt, imageRef(b.imageUrl), imageRef(b.heroUrl), String(b.heroCaption||"").trim().slice(0,300), httpsUrl(b.sourceUrl)).run();
     await audit(env, user, "article.create", "article", id, { title, status });
-    return json({ok:true,id,slug},201,{"cache-control":"no-store"});
+    const alert = truthy(b.notify) && status === "published" ? await storyAlert(env, ctx, user, { id, slug, title, status, kind: b.kind === "edition" ? "edition" : "article", published_at: publishedAt }) : "";
+    return json({ok:true,id,slug,alert},201,{"cache-control":"no-store"});
   }
   if (url.pathname.startsWith("/api/admin/articles/") && request.method === "PUT") {
     const user = await currentUser(request,env);
@@ -425,10 +459,11 @@ async function api(request, env) {
     if (title.length < 8) return err("Title must be at least 8 characters.");
     const status = ["draft","published","archived"].includes(b.status) ? b.status : c.status;
     const publishedAt = status === "published" ? (Date.parse(b.publishedAt) ? new Date(b.publishedAt).toISOString() : (c.published_at || new Date().toISOString())) : c.published_at;
-    await env.DB.prepare("UPDATE articles SET title=?,dek=?,topic=?,body=?,category=?,kind=?,writer=?,status=?,published_at=?,image_url=?,hero_url=?,hero_caption=?,source_url=?,updated_at=? WHERE id=?").bind(
+    await env.DB.prepare("UPDATE articles SET title=?,dek=?,topic=?,tags=?,body=?,category=?,kind=?,writer=?,status=?,published_at=?,image_url=?,hero_url=?,hero_caption=?,source_url=?,updated_at=?,alert_state=CASE WHEN ?<>'published' AND alert_state='pending' THEN '' ELSE alert_state END WHERE id=?").bind(
       title,
       pick("dek", v => String(v).trim().slice(0,400), c.dek),
       pick("topic", v => String(v).trim().slice(0,80), c.topic),
+      pick("tags", tagsValue, c.tags),
       pick("body", v => String(v).slice(0,100000), c.body),
       pick("category", v => String(v).slice(0,40), c.category),
       pick("kind", v => v === "edition" ? "edition" : "article", c.kind),
@@ -438,9 +473,10 @@ async function api(request, env) {
       pick("heroUrl", imageRef, c.hero_url),
       pick("heroCaption", v => String(v).trim().slice(0,300), c.hero_caption),
       pick("sourceUrl", httpsUrl, c.source_url),
-      new Date().toISOString(), id).run();
+      new Date().toISOString(), status, id).run();
     await audit(env,user,"article.update","article",id,{title,status});
-    return json({ok:true,slug:c.slug},200,{"cache-control":"no-store"});
+    const alert = truthy(b.notify) && status === "published" && c.alert_state !== "sent" ? await storyAlert(env, ctx, user, { id, slug: c.slug, title, status, kind: b.kind === "edition" || (b.kind === undefined && c.kind === "edition") ? "edition" : "article", published_at: publishedAt }) : "";
+    return json({ok:true,slug:c.slug,alert},200,{"cache-control":"no-store"});
   }
 
   // Images uploaded by writers: stored in D1 (resized in the browser first) and served from /media/.
@@ -464,6 +500,90 @@ async function api(request, env) {
     return json({ images: results.map(r => ({ ...r, url: `/media/${r.id}.${r.mime.split("/")[1].replace("jpeg", "jpg")}` })) }, 200, { "cache-control": "no-store" });
   }
 
+  // ---- Story views (no cookies: one count per story per browser session, bots ignored)
+  if (/^\/api\/views\/[^/]+$/.test(url.pathname) && request.method === "POST") {
+    const slug = decodeURIComponent(url.pathname.split("/").pop());
+    if (BOT_UA.test(request.headers.get("user-agent") || "")) return json({ ok: true, counted: false }, 200, { "cache-control": "no-store" });
+    const exists = await env.DB.prepare("SELECT 1 FROM articles WHERE slug=? AND status='published'").bind(slug).first();
+    if (!exists) return err("Not found.", 404);
+    const day = new Date().toISOString().slice(0, 10);
+    await env.DB.prepare("INSERT INTO story_views (slug,day,views) VALUES (?,?,1) ON CONFLICT(slug,day) DO UPDATE SET views=views+1").bind(slug, day).run();
+    return json({ ok: true, counted: true }, 200, { "cache-control": "no-store" });
+  }
+  if (url.pathname === "/api/admin/stats" && request.method === "GET") {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const since = d => new Date(Date.now() - d * 864e5).toISOString().slice(0, 10);
+    const [top, per, week, today, subs] = await Promise.all([
+      env.DB.prepare("SELECT v.slug, SUM(v.views) AS views, a.title, a.kind FROM story_views v JOIN articles a ON a.slug=v.slug WHERE v.day>=? GROUP BY v.slug ORDER BY views DESC LIMIT 10").bind(since(6)).all(),
+      env.DB.prepare("SELECT slug, SUM(views) AS views FROM story_views WHERE day>=? GROUP BY slug").bind(since(29)).all(),
+      env.DB.prepare("SELECT COALESCE(SUM(views),0) AS n FROM story_views WHERE day>=?").bind(since(6)).first(),
+      env.DB.prepare("SELECT COALESCE(SUM(views),0) AS n FROM story_views WHERE day=?").bind(since(0)).first(),
+      env.DB.prepare("SELECT COUNT(*) AS n FROM push_subscriptions").first()
+    ]);
+    return json({ top: top.results, views30: Object.fromEntries(per.results.map(r => [r.slug, r.views])), week: week.n, today: today.n, subscribers: subs.n }, 200, { "cache-control": "no-store" });
+  }
+
+  // ---- Saved stories that follow the member across devices
+  if (url.pathname === "/api/me/saved") {
+    const user = await currentUser(request, env);
+    if (!user) return err("Sign in required.", 401);
+    if (request.method === "GET") {
+      const { results } = await env.DB.prepare("SELECT href,title,source,saved_at AS savedAt FROM saved_items WHERE user_id=? ORDER BY saved_at DESC LIMIT 500").bind(user.id).all();
+      return json({ items: results }, 200, { "cache-control": "no-store" });
+    }
+    if (request.method === "POST") {
+      const b = await request.json().catch(() => ({}));
+      const items = (Array.isArray(b.items) ? b.items : [b]).slice(0, 200).filter(x => typeof x?.href === "string" && x.href.startsWith("/") && !x.href.startsWith("//"));
+      if (!items.length) return err("Nothing to save.");
+      await env.DB.batch(items.map(x => env.DB.prepare("INSERT INTO saved_items (user_id,href,title,source,saved_at) VALUES (?,?,?,?,?) ON CONFLICT(user_id,href) DO NOTHING")
+        .bind(user.id, x.href.slice(0, 1500), String(x.title || x.href).slice(0, 300), String(x.source || "").slice(0, 80), Date.parse(x.savedAt) ? new Date(x.savedAt).toISOString() : new Date().toISOString())));
+      return json({ ok: true }, 200, { "cache-control": "no-store" });
+    }
+    if (request.method === "DELETE") {
+      await env.DB.prepare("DELETE FROM saved_items WHERE user_id=? AND href=?").bind(user.id, url.searchParams.get("href") || "").run();
+      return json({ ok: true }, 200, { "cache-control": "no-store" });
+    }
+  }
+
+  // ---- Breaking-news alerts
+  if (url.pathname === "/api/push/key" && request.method === "GET") {
+    return json({ publicKey: (await vapidKeys(env)).publicKey }, 200, { "cache-control": "public, max-age=3600" });
+  }
+  if (url.pathname === "/api/push/subscribe" && request.method === "POST") {
+    const b = await request.json().catch(() => ({}));
+    if (!pushEndpointOk(env, b.endpoint) || String(b.endpoint).length > 1000) return err("This browser’s push service isn’t supported.");
+    const user = await currentUser(request, env);
+    await env.DB.prepare("INSERT INTO push_subscriptions (endpoint,user_id) VALUES (?,?) ON CONFLICT(endpoint) DO UPDATE SET user_id=COALESCE(excluded.user_id,user_id)").bind(b.endpoint, user?.id || null).run();
+    return json({ ok: true }, 201, { "cache-control": "no-store" });
+  }
+  if (url.pathname === "/api/push/unsubscribe" && request.method === "POST") {
+    const b = await request.json().catch(() => ({}));
+    await env.DB.prepare("DELETE FROM push_subscriptions WHERE endpoint=?").bind(String(b.endpoint || "")).run();
+    return json({ ok: true }, 200, { "cache-control": "no-store" });
+  }
+  if (url.pathname === "/api/alerts/latest" && request.method === "GET") {
+    const a = await env.DB.prepare("SELECT title,body,url,created_at AS createdAt FROM alerts ORDER BY created_at DESC LIMIT 1").first();
+    return json({ alert: a || null }, 200, { "cache-control": "no-store" });
+  }
+  if (url.pathname === "/api/admin/alerts" && request.method === "GET") {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const [list, subs] = await Promise.all([env.DB.prepare("SELECT id,title,body,url,sent,done,created_at AS createdAt FROM alerts ORDER BY created_at DESC LIMIT 30").all(), env.DB.prepare("SELECT COUNT(*) AS n FROM push_subscriptions").first()]);
+    return json({ alerts: list.results, subscribers: subs.n }, 200, { "cache-control": "no-store" });
+  }
+  if (url.pathname === "/api/admin/alerts" && request.method === "POST") {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const b = await request.json().catch(() => ({}));
+    const title = String(b.title || "").trim(), path = String(b.url || "/").trim();
+    if (title.length < 3) return err("Write the alert headline.");
+    if (!path.startsWith("/") || path.startsWith("//")) return err("The link must be a page on this site, e.g. /live or /edition/…");
+    const id = await createAlert(env, ctx, { title, body: String(b.body || ""), url: path, userId: user.id });
+    await audit(env, user, "alert.send", "alert", id, { title });
+    return json({ ok: true, id }, 201, { "cache-control": "no-store" });
+  }
+
   if (url.pathname === "/api/community/stats" && request.method === "GET") {
     const [m, p, r] = await Promise.all([
       env.DB.prepare("SELECT COUNT(*) AS n FROM users").first(),
@@ -484,7 +604,8 @@ async function api(request, env) {
       env.DB.prepare("SELECT COUNT(*) AS n FROM community_posts WHERE status='published'").first(),
       env.DB.prepare("SELECT COUNT(*) AS n FROM events WHERE status='published'").first()
     ]);
-    return json({members:members.n,published:articles.n,drafts:drafts.n,leads:leads.n,discussions:discussions.n,events:events.n,generatedAt:new Date().toISOString()},200,{"cache-control":"no-store"});
+    const subscribers = await env.DB.prepare("SELECT COUNT(*) AS n FROM push_subscriptions").first();
+    return json({members:members.n,published:articles.n,drafts:drafts.n,leads:leads.n,discussions:discussions.n,events:events.n,subscribers:subscribers.n,generatedAt:new Date().toISOString()},200,{"cache-control":"no-store"});
   }
 
 
@@ -666,11 +787,21 @@ async function serveMedia(request, env, ctx) {
   return res;
 }
 
+// Every minute: alerts for scheduled stories that have just gone live, then the next batch of pushes.
+async function scheduled(env) {
+  if (!env.DB) return;
+  await ensureSchema(env);
+  const { results } = await env.DB.prepare(`SELECT id,slug,title,kind,status,published_at FROM articles WHERE alert_state='pending' AND status='published' AND published_at<=? LIMIT 5`).bind(new Date().toISOString()).all();
+  for (const row of results) await storyAlert(env, null, null, row);
+  await drainAlerts(env);
+}
+
 export default {
+  async scheduled(event, env, ctx) { ctx.waitUntil(scheduled(env)); },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/api/")) {
-      try { return await api(request,env); }
+      try { return await api(request,env,ctx); }
       catch (e) { return json({error:"Internal API error",detail:e.message},500,{"cache-control":"no-store"}); }
     }
     // One public address for search engines: page visits to the workers.dev copy go to SITE_URL.
