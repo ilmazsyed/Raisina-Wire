@@ -511,7 +511,7 @@ const ICON = {
 function readerBar({ badge, original, originalLabel, saveItem }) {
   return `<div class="reader-bar glass"><a class="btn btn-light btn-sm" href="/" data-action="back" aria-label="Back">${ICON.back}<span class="lbl">Back</span></a><span class="badge">${esc(badge)}</span><span class="grow"></span>
     <button class="btn btn-light btn-sm" type="button" data-action="text-smaller" aria-label="Smaller text">A−</button><button class="btn btn-light btn-sm" type="button" data-action="text-larger" aria-label="Larger text">A+</button>
-    ${"speechSynthesis" in window ? `<button class="btn btn-light btn-sm listen-btn" type="button" data-action="listen" aria-label="Listen to this story" aria-pressed="false">${ICON.listen}<span class="lbl">Listen</span></button>` : ""}
+    ${"speechSynthesis" in window || "Audio" in window ? `<button class="btn btn-light btn-sm listen-btn" type="button" data-action="listen" aria-label="Listen to this story" aria-pressed="false">${ICON.listen}<span class="lbl">Listen</span></button>` : ""}
     <button class="btn btn-light btn-sm" type="button" data-action="save" aria-label="Save" data-item='${esc(JSON.stringify(saveItem))}'>${ICON.save}<span class="lbl">Save</span></button><button class="btn btn-light btn-sm" type="button" data-action="share" aria-label="Share" data-title="${esc(saveItem.title)}">${ICON.share}<span class="lbl">Share</span></button>
     ${original ? `<a class="btn btn-dark btn-sm original-btn" href="${esc(original)}" target="_blank" rel="noreferrer"><span class="lbl">${esc(originalLabel)}</span><span class="lbl-short">Original</span> ↗</a>` : ""}</div>`;
 }
@@ -624,39 +624,114 @@ function quoteShare() {
   window.addEventListener("scroll", () => { if (!bubble.hidden) show(); }, { passive: true });
 }
 
-/* ---------- Listen: the phone's or computer's own voice reads the story ---------- */
-const speech = { queue: [], i: 0, active: false };
+/* ---------- Listen ----------
+   Raisina Wire stories are read by a natural Indian English woman's voice generated on the
+   server (paragraph by paragraph, with lock-screen controls). Elsewhere, or if that voice is
+   not set up, the device's own voice is used, choosing a female Indian English voice when the
+   device has one, read sentence by sentence with natural pauses. */
+const speech = { queue: [], i: 0, active: false, mode: null, audio: null, parts: null, slug: null, timer: null };
+let ttsStatus = null;
+const ttsAvailable = async () => (ttsStatus ??= fetch("/api/tts/status").then(r => r.ok ? r.json() : { enabled: false }).catch(() => ({ enabled: false }))).then(x => x.enabled);
+// Device voices: female Indian English first (names used by Edge, Windows, Android, iOS and macOS).
+const FEMALE_IN = /neerja|heera|veena|isha|kajal|ananya|aashi|swara|en-in-x-(ena|cxx|ahp)|female/i, MALE = /rishi|ravi|prabhat|male\b|kunal|aarav/i;
 function voice() {
-  const vs = speechSynthesis.getVoices();
-  return vs.find(v => v.lang === "en-IN") || vs.find(v => v.lang === "en-GB") || vs.find(v => v.lang?.startsWith("en")) || null;
+  const vs = speechSynthesis.getVoices(), en = vs.filter(v => /^en[-_]/i.test(v.lang));
+  const ind = en.filter(v => /en[-_]IN/i.test(v.lang));
+  const score = v => (/en[-_]IN/i.test(v.lang) ? 40 : /en[-_]GB/i.test(v.lang) ? 10 : 0) + (FEMALE_IN.test(v.name) ? 30 : 0) - (MALE.test(v.name) ? 50 : 0) + (/natural|online|enhanced|premium|neural/i.test(v.name) ? 20 : 0);
+  return [...(ind.length ? ind : en)].sort((x, y) => score(y) - score(x))[0] || null;
 }
 function setListenButton(state_) {
   const b = $(".listen-btn"); if (!b) return;
-  b.setAttribute("aria-pressed", String(state_ === "playing"));
-  b.innerHTML = `${state_ === "playing" ? ICON.pause : ICON.listen}<span class="lbl">${state_ === "playing" ? "Pause" : state_ === "paused" ? "Resume" : "Listen"}</span>`;
+  b.setAttribute("aria-pressed", String(state_ === "playing" || state_ === "loading"));
+  b.innerHTML = `${state_ === "playing" ? ICON.pause : ICON.listen}<span class="lbl">${state_ === "loading" ? "Loading…" : state_ === "playing" ? "Pause" : state_ === "paused" ? "Resume" : "Listen"}</span>`;
 }
+function highlight(el) {
+  $$(".speaking").forEach(x => x.classList.remove("speaking"));
+  if (!el) return;
+  el.classList.add("speaking");
+  const r = el.getBoundingClientRect();
+  if (r.top > innerHeight * 0.7 || r.bottom < 120) el.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+// Elements in reading order, matching the server's parts: headline, standfirst, then the text
+// (the pull quote repeats a sentence, so it is skipped).
+const readingElements = art => $$("h1, .dek, .prose > p, .prose > h2, .prose li", art).filter(el => el.innerText.trim());
+
+// Natural voice: one audio element plays each part in turn; the next part is fetched ahead.
+async function playNatural(slug, art) {
+  const r = await fetch(`/api/tts/${encodeURIComponent(slug)}`);
+  if (!r.ok) throw new Error("tts");
+  speech.parts = (await r.json()).parts; speech.slug = slug; speech.mode = "natural";
+  speech.queue = readingElements(art);
+  speech.audio ||= Object.assign(new Audio(), { preload: "auto" });
+  speech.audio.onended = () => { speech.i++; playPart(); };
+  speech.audio.onerror = () => { speech.i++; playPart(); };
+  if ("mediaSession" in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({ title: $("h1", art)?.innerText || "Raisina Wire", artist: "Raisina Wire", album: "Listen", artwork: [{ src: "/icon-512.png", sizes: "512x512", type: "image/png" }] });
+    navigator.mediaSession.setActionHandler("play", () => { speech.audio.play(); setListenButton("playing"); });
+    navigator.mediaSession.setActionHandler("pause", () => { speech.audio.pause(); setListenButton("paused"); });
+    navigator.mediaSession.setActionHandler("nexttrack", () => { speech.i++; playPart(); });
+    navigator.mediaSession.setActionHandler("previoustrack", () => { speech.i = Math.max(0, speech.i - 1); playPart(); });
+  }
+  speech.i = 0; await playPart();
+}
+const partUrl = n => `/api/tts/${encodeURIComponent(speech.slug)}/${n}.mp3?v=${speech.parts[n].v}`;
+async function playPart() {
+  if (!speech.active) return;
+  if (speech.i >= speech.parts.length) return stopListening();
+  highlight(speech.queue.length === speech.parts.length ? speech.queue[speech.i] : null);
+  speech.audio.src = partUrl(speech.i);
+  if (speech.parts[speech.i + 1]) fetch(partUrl(speech.i + 1)).catch(() => {}); // warm the next part
+  try { await speech.audio.play(); setListenButton("playing"); }
+  catch { setListenButton("paused"); } // autoplay blocked: the reader taps Resume
+}
+
+// Device voice: sentence by sentence, slightly slower, with pauses between paragraphs.
 function speakNext() {
-  $$(".speaking").forEach(el => el.classList.remove("speaking"));
   const el = speech.queue[speech.i];
   if (!el || !speech.active) { stopListening(); return; }
-  el.classList.add("speaking");
-  if (el.getBoundingClientRect().top > innerHeight * 0.7 || el.getBoundingClientRect().bottom < 0) el.scrollIntoView({ behavior: "smooth", block: "center" });
-  const u = new SpeechSynthesisUtterance(el.innerText);
-  const v = voice(); if (v) { u.voice = v; u.lang = v.lang; } else u.lang = "en-IN";
-  u.rate = 1; u.onend = () => { speech.i++; speakNext(); }; u.onerror = () => { speech.i++; speakNext(); };
-  speechSynthesis.speak(u);
+  highlight(el);
+  const sentences = el.innerText.match(/[^.!?…]+[.!?…]+["’”)]*|\S[^.!?…]*$/g) || [el.innerText];
+  const isHeading = el.matches("h1, h2");
+  const v = voice();
+  sentences.forEach((text, k) => {
+    const u = new SpeechSynthesisUtterance(text.trim());
+    if (v) { u.voice = v; u.lang = v.lang; } else u.lang = "en-IN";
+    u.rate = isHeading ? 0.9 : 0.94; u.pitch = isHeading ? 1.02 : 1.06;
+    if (/\?\s*$/.test(text)) u.pitch += 0.06;          // a lift for questions
+    if (k === sentences.length - 1) u.onend = () => { speech.timer = setTimeout(() => { speech.i++; speakNext(); }, isHeading ? 650 : 420); };
+    u.onerror = () => { if (k === sentences.length - 1) { speech.i++; speakNext(); } };
+    speechSynthesis.speak(u);
+  });
 }
-function toggleListening() {
-  if (speech.active && speechSynthesis.speaking && !speechSynthesis.paused) { speechSynthesis.pause(); setListenButton("paused"); return; }
-  if (speech.active && speechSynthesis.paused) { speechSynthesis.resume(); setListenButton("playing"); return; }
+async function toggleListening() {
+  if (speech.active && speech.mode === "natural") {
+    if (speech.audio.paused) { speech.audio.play(); setListenButton("playing"); } else { speech.audio.pause(); setListenButton("paused"); }
+    return;
+  }
+  if (speech.active && speech.mode === "device") {
+    if (speechSynthesis.speaking && !speechSynthesis.paused) { speechSynthesis.pause(); setListenButton("paused"); }
+    else { speechSynthesis.resume(); setListenButton("playing"); }
+    return;
+  }
   const art = $(".reader-article"); if (!art) return;
-  speech.queue = $$("h1, .dek, .prose > p, .prose > h2, .prose li, .prose blockquote", art).filter(el => el.innerText.trim());
-  speech.i = 0; speech.active = true; speechSynthesis.cancel(); setListenButton("playing"); speakNext();
+  speech.active = true; speech.i = 0;
+  const pg = parseRoute(), slug = ["edition", "article"].includes(pg.page) ? pg.arg : null;
+  if (slug && await ttsAvailable()) {
+    setListenButton("loading");
+    try { await playNatural(slug, art); return; } catch { /* fall back to the device voice */ }
+  }
+  if (!("speechSynthesis" in window)) { speech.active = false; setListenButton("idle"); toast("This device can’t read aloud."); return; }
+  speech.mode = "device"; speech.queue = readingElements(art);
+  speechSynthesis.cancel(); setListenButton("playing"); speakNext();
 }
 function stopListening() {
-  speech.active = false; if ("speechSynthesis" in window) speechSynthesis.cancel();
-  $$(".speaking").forEach(el => el.classList.remove("speaking")); setListenButton("idle");
+  speech.active = false; speech.mode = null; clearTimeout(speech.timer);
+  if (speech.audio) { speech.audio.pause(); speech.audio.removeAttribute("src"); }
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  highlight(null); setListenButton("idle");
 }
+// Some browsers load their voice list late.
+if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => {};
 
 /* ---------- Topics: tag pages and My Raisina ---------- */
 function allTagsFromStories() {
