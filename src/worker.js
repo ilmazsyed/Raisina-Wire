@@ -1,3 +1,7 @@
+import m0001 from "../migrations/0001_init.sql";
+import m0002 from "../migrations/0002_platform_modules.sql";
+import m0003 from "../migrations/0003_editorial_console.sql";
+
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "public, max-age=60, s-maxage=120",
@@ -32,8 +36,29 @@ function getCookie(request, name) {
   const match = all.split(";").map(x => x.trim()).find(x => x.startsWith(name + "="));
   return match ? match.slice(name.length + 1) : null;
 }
+// Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
+// Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003]];
+let schemaReady = null;
+function sqlStatements(sql) {
+  return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
+}
+async function migrate(db) {
+  await db.prepare("CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+  const { results } = await db.prepare("SELECT name FROM d1_migrations").all();
+  const applied = new Set(results.map(r => r.name));
+  for (const [name, sql] of MIGRATIONS) {
+    if (applied.has(name)) continue;
+    await db.batch([...sqlStatements(sql).map(q => db.prepare(q)), db.prepare("INSERT INTO d1_migrations (name) VALUES (?)").bind(name)]);
+  }
+}
+function ensureSchema(env) {
+  if (!schemaReady) schemaReady = migrate(env.DB).catch(e => { schemaReady = null; throw e; });
+  return schemaReady;
+}
 async function currentUser(request, env) {
   if (!env.DB) return null;
+  await ensureSchema(env);
   const token = getCookie(request, "rw_session");
   if (!token) return null;
   const tokenHash = await sha256(token);
@@ -171,6 +196,7 @@ async function api(request, env) {
   }
 
   if (!env.DB) return err("Database is not configured. Add a D1 binding before using account and publishing features.", 503);
+  try { await ensureSchema(env); } catch (e) { return err("The database could not be prepared. Try again shortly.", 503); }
 
   if (url.pathname === "/api/auth/register" && request.method === "POST") {
     const body = await request.json().catch(() => ({}));
