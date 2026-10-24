@@ -55,7 +55,9 @@ function saveForLater(item) {
   const saved = store.get("rw-saved", []);
   if (!saved.some(s => s.href === item.href)) saved.unshift({ ...item, savedAt: new Date().toISOString() });
   store.set("rw-saved", saved.slice(0, 100));
-  toast("Saved on this device.");
+  const target = new URLSearchParams(item.href.split("?")[1] || "").get("u");
+  if (target) navigator.serviceWorker?.controller?.postMessage({ type: "SAVE_ARTICLE", url: `/api/read?url=${encodeURIComponent(target)}` });
+  toast(target ? "Saved. It will be readable offline too." : "Saved. Raisina Wire editions are always available offline.");
 }
 function setTextScale(delta) {
   const scale = Math.min(1.3, Math.max(0.85, (store.get("rw-text", 1) + delta)));
@@ -105,7 +107,7 @@ function renderShell() {
   <main id="view" tabindex="-1"></main>
   <footer class="site-footer"><div class="wrap">
     <div class="footer-top"><a class="footer-brand" href="#/" aria-label="Raisina Wire home">${domeMark("dome-mark")}<span class="wordmark">${wordmark()}</span>${tribar()}</a>
-      <div class="footer-links"><a href="#/editions">All editions</a><a href="#/live">Live wire</a><a href="#/markets">Markets</a><a href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer" id="linkedinLink">Newsletter on LinkedIn ↗</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div></div>
+      <div class="footer-links"><a href="#/editions">All editions</a><a href="#/live">Live wire</a><a href="#/markets">Markets</a><a href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer" id="linkedinLink">Newsletter on LinkedIn ↗</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="#" data-action="install" class="install-link">Install the app</a></div></div>
     <form class="lead-form glass" id="leadForm"><span class="kicker">Briefings &amp; partnerships</span>
       <label class="sr-only" for="leadName">Your name</label><input id="leadName" name="name" placeholder="Your name" required minlength="2" autocomplete="name">
       <label class="sr-only" for="leadEmail">Work email</label><input id="leadEmail" name="email" type="email" placeholder="Work email" required autocomplete="email">
@@ -126,7 +128,15 @@ function renderShell() {
     <div class="auth-switch"><span id="authSwitchText">New to Raisina Wire?</span><button id="authSwitch" type="button">Create an account</button></div>
   </section></div>
   <div class="toast" id="toast" role="status"></div>
-  <button class="btn btn-gold install-pill hidden" id="installPill" type="button">Install Raisina Wire</button>`;
+  <div class="offline-bar" id="offlineBar" role="status" hidden>You’re offline. Editions and saved stories still open; live data shows the last copy.</div>
+  <div class="update-bar glass" id="updateBar" role="status" hidden><span>A new version of Raisina Wire is ready.</span><button class="btn btn-dark btn-sm" type="button" data-action="apply-update">Update</button></div>
+  <section class="install-sheet glass" id="installSheet" role="dialog" aria-labelledby="installTitle" hidden>
+    <button class="modal-close" type="button" data-action="install-dismiss" aria-label="Close">×</button>
+    <div class="install-head"><img src="/icon-192.png" alt="" width="56" height="56"><div><span class="kicker">The app</span><h2 id="installTitle">Get Raisina Wire on your home screen</h2></div></div>
+    <ul><li>Every edition readable offline</li><li>Live wire, markets and live coverage in one tap</li><li>Opens full screen, like any app</li></ul>
+    <div class="install-ios" hidden><p>On iPhone or iPad, tap <b>Share</b> <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="vertical-align:-3px"><path d="M4 12v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg> in Safari, then <b>Add to Home Screen</b>.</p></div>
+    <div class="install-actions"><button class="btn btn-dark" type="button" data-action="install">Install the app</button><button class="btn btn-light" type="button" data-action="install-dismiss">Not now</button></div>
+  </section>`;
 
   $("#today").textContent = new Date().toLocaleDateString("en-IN", { ...IST, weekday: "long", day: "numeric", month: "long", year: "numeric" });
   $("#signInBtn").addEventListener("click", () => openAuth("login"));
@@ -141,7 +151,7 @@ function renderShell() {
   $("#authSwitch").addEventListener("click", () => setAuthMode(authMode === "login" ? "register" : "login"));
   $("#authForm").addEventListener("submit", submitAuth);
   $("#leadForm").addEventListener("submit", submitLead);
-  $("#installPill").addEventListener("click", installPWA);
+  window.addEventListener("online", syncOnline); window.addEventListener("offline", syncOnline); syncOnline();
   // One delegated handler for every action button rendered by the views.
   document.addEventListener("click", onAction);
   // Hide images from feeds that fail to load rather than showing a broken icon.
@@ -293,7 +303,7 @@ function renderDock() {
   const host = $("#dock"); if (!host) return;
   if (!state.markets) { host.innerHTML = Array.from({ length: 8 }, () => `<div class="skeleton" style="height:78px"></div>`).join(""); $("#dockStatus").textContent = state.marketsError ? "Quotes unavailable · retrying" : "Loading quotes…"; return; }
   host.innerHTML = state.markets.overview.map(q => { const ch = quoteChange(q); return `<a class="tile" href="#/markets"><div class="tile-label">${esc(q.label)}</div><div class="tile-row"><span class="tile-value">${quoteValue(q)}</span><span class="tile-change ${ch.cls}">${ch.text}</span></div>${sparkline(q.spark, ch.cls)}</a>`; }).join("");
-  $("#dockStatus").textContent = `Delayed · updated ${clock(state.markets.updatedAt)} IST`;
+  $("#dockStatus").textContent = `${state.markets.offline ? "Offline copy" : "Delayed"} · updated ${clock(state.markets.updatedAt)} IST`;
 }
 function renderRail() {
   const host = $("#rail"); if (!host) return;
@@ -481,7 +491,7 @@ function renderBoard() {
 /* ---------- Saved & search ---------- */
 function viewSaved() {
   const saved = store.get("rw-saved", []);
-  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Saved</div><h1>Saved for later</h1><p>Stories you save are kept on this device.</p></div></div>
+  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Saved</div><h1>Saved for later</h1><p>Stories you save are kept on this device and can be read offline in the installed app. Raisina Wire editions are always available offline.</p></div></div>
   <div class="live-list">${saved.length ? saved.map(s => `<a class="live-item glass" href="${esc(s.href)}" style="grid-template-columns:88px minmax(0,1fr)"><span class="when">${ago(s.savedAt)}</span><span><b>${esc(s.title)}</b><span class="src">${esc(s.source)}</span></span></a>`).join("") : `<div class="empty">Nothing saved yet. Use Save in the reader to keep a story here.</div>`}</div></div>`;
 }
 function viewSearch(r) {
@@ -508,6 +518,9 @@ async function onAction(e) {
   }
   if (a === "home-group") { state.homeGroup = el.dataset.group; renderHomeMarkets(); }
   if (a === "search") { const q = prompt("Search Raisina Wire and the live wire"); if (q?.trim()) location.hash = `#/search?q=${encodeURIComponent(q.trim())}`; }
+  if (a === "install") { e.preventDefault(); installPWA(); }
+  if (a === "install-dismiss") { store.set("rw-install-dismissed", Date.now()); $("#installSheet").hidden = true; }
+  if (a === "apply-update") { waitingWorker?.postMessage({ type: "SKIP_WAITING" }); $("#updateBar").hidden = true; }
   if (a === "signout") { toggleAccountMenu(false); signOut(); }
   if (a === "discuss") { if (!state.user) { openAuth("register"); toast("Create a free account to start a discussion."); } else openDiscussionForm(); }
 }
@@ -577,7 +590,9 @@ async function loadWire() {
     const r = await fetch("/api/wire"); if (!r.ok) throw new Error();
     state.wire = await r.json(); state.wireError = false;
     state.wire.items.forEach(i => wireIndex.set(i.url, i));
-    $("#wireStatus").innerHTML = `<span class="dot-ok"></span>Live wire · ${state.wire.items.length} stories · updated ${clock(state.wire.updatedAt)} IST`;
+    $("#wireStatus").innerHTML = r.headers.get("x-rw-offline")
+      ? `<span class="dot-live"></span>Offline copy · live wire as of ${clock(state.wire.updatedAt)} IST`
+      : `<span class="dot-ok"></span>Live wire · ${state.wire.items.length} stories · updated ${clock(state.wire.updatedAt)} IST`;
   } catch {
     state.wireError = true;
     $("#wireStatus").innerHTML = `<span class="dot-live"></span>Live wire unavailable · retrying`;
@@ -585,7 +600,7 @@ async function loadWire() {
   renderRail(); renderTopicCols(); renderLiveList(); renderExtAside(); renderTicker(); renderBriefing();
 }
 async function loadMarkets() {
-  try { const r = await fetch("/api/markets"); if (!r.ok) throw new Error(); state.markets = await r.json(); state.marketsError = false; }
+  try { const r = await fetch("/api/markets"); if (!r.ok) throw new Error(); state.markets = await r.json(); state.markets.offline = !!r.headers.get("x-rw-offline"); state.marketsError = false; }
   catch { state.marketsError = true; }
   renderDock(); renderHomeMarkets(); renderBoard();
 }
@@ -621,7 +636,7 @@ function showUser() {
   const staff = ["admin", "editor"].includes(u.role);
   $("#accountMenu").innerHTML = `<div class="account-head"><b>${esc(u.displayName)}</b><span class="meta">${esc(u.role)}</span></div>
     <a role="menuitem" href="#/saved">Saved stories</a>${staff ? `<a role="menuitem" href="/admin.html">Control room</a>` : ""}
-    <a role="menuitem" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Newsletter on LinkedIn ↗</a>
+    <a role="menuitem" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Newsletter on LinkedIn ↗</a>${isStandalone() ? "" : `<button role="menuitem" type="button" data-action="install">Install the app</button>`}
     <button role="menuitem" type="button" data-action="signout">Sign out</button>`;
 }
 function toggleAccountMenu(force) {
@@ -668,12 +683,58 @@ async function submitLead(e) {
 function toast(message) { const t = $("#toast"); t.textContent = message; t.classList.add("show"); clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove("show"), 3200); }
 
 /* ---------- PWA ---------- */
-window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); state.installPrompt = e; $("#installPill")?.classList.remove("hidden"); });
-async function installPWA() {
-  if (!state.installPrompt) return toast("On iPhone: tap Share, then Add to Home Screen.");
-  state.installPrompt.prompt(); await state.installPrompt.userChoice; state.installPrompt = null; $("#installPill").classList.add("hidden");
+const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const recentlyDismissed = () => Date.now() - (store.get("rw-install-dismissed", 0) || 0) < 14 * 864e5;
+function showInstallSheet({ force = false } = {}) {
+  if (isStandalone() || (!force && recentlyDismissed())) return;
+  const ios = isIOS() && !state.installPrompt;
+  $(".install-ios").hidden = !ios;
+  $(".install-actions [data-action=install]").hidden = ios;
+  $("#installSheet").hidden = false;
 }
-window.addEventListener("appinstalled", () => toast("Raisina Wire installed."));
+async function installPWA() {
+  if (isStandalone()) return toast("Raisina Wire is already installed on this device.");
+  if (!state.installPrompt) {
+    if (!$("#installSheet").hidden && !isIOS()) return toast("Use your browser menu and choose “Install app” or “Add to Home screen”.");
+    return showInstallSheet({ force: true });
+  }
+  $("#installSheet").hidden = true;
+  state.installPrompt.prompt();
+  const { outcome } = await state.installPrompt.userChoice;
+  state.installPrompt = null;
+  if (outcome !== "accepted") store.set("rw-install-dismissed", Date.now());
+}
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); state.installPrompt = e; setTimeout(() => showInstallSheet(), 8000); });
+window.addEventListener("appinstalled", () => { $("#installSheet").hidden = true; toast("Raisina Wire is installed. Find it on your home screen."); });
+if (isIOS() && !isStandalone()) setTimeout(() => showInstallSheet(), 15000);
+document.documentElement.classList.toggle("standalone", isStandalone());
+
+function syncOnline(event) {
+  const off = !navigator.onLine;
+  document.body.classList.toggle("is-offline", off);
+  $("#offlineBar").hidden = !off;
+  if (event?.type === "online") { loadWire(); loadMarkets(); }
+}
+
+// Updates: a new service worker waits until the reader taps Update, then the page reloads once.
+let waitingWorker = null;
+function offerUpdate(worker) { waitingWorker = worker; $("#updateBar").hidden = false; }
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", async () => {
+    try {
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      if (reg.waiting && navigator.serviceWorker.controller) offerUpdate(reg.waiting);
+      reg.addEventListener("updatefound", () => {
+        const w = reg.installing;
+        w?.addEventListener("statechange", () => { if (w.state === "installed" && navigator.serviceWorker.controller) offerUpdate(w); });
+      });
+      setInterval(() => reg.update().catch(() => {}), 30 * 60e3);
+    } catch { /* unsupported or blocked */ }
+  });
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (waitingWorker && !reloading) { reloading = true; location.reload(); } });
+}
 
 /* ---------- Boot ---------- */
 renderShell();
@@ -687,5 +748,5 @@ fetch("/api/config").then(r => r.json()).then(c => { if (c.linkedinUrl) $("#link
 setInterval(() => { if (!document.hidden) loadWire(); }, 120e3);
 setInterval(() => { if (!document.hidden) loadMarkets(); }, 60e3);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { loadWire(); loadMarkets(); } });
-window.addEventListener("online", () => { loadWire(); loadMarkets(); });
-if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+
+
