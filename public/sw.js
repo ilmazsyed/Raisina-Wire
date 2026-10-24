@@ -1,5 +1,5 @@
-const CACHE = "raisina-wire-shell-v3";
-const SHELL = ["/", "/manifest.webmanifest", "/favicon.svg"];
+const CACHE = "raisina-wire-shell-v4";
+const SHELL = ["/", "/manifest.webmanifest", "/favicon.png"];
 self.addEventListener("install", event => event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL))));
 self.addEventListener("activate", event => event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))));
 self.addEventListener("fetch", event => {
