@@ -261,9 +261,13 @@ function parseRoute() {
   const [page = "", ...rest] = location.pathname.split("/").filter(Boolean);
   return { page: page || "home", arg: rest.length ? decodeURIComponent(rest.join("/")) : "", params: new URLSearchParams(location.search) };
 }
+// New pages open at the top; Back and Forward return to where the reader was.
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+const jump = y => window.scrollTo({ top: y, left: 0, behavior: "instant" });
 function navigate(href, { replace = false } = {}) {
-  if (href === location.pathname + location.search) return route({ keepScroll: false });
-  history[replace ? "replaceState" : "pushState"]({ rw: true }, "", href);
+  if (href === location.pathname + location.search) { jump(0); return route(); }
+  if (!replace) history.replaceState({ ...(history.state || {}), rw: true, y: scrollY }, "");
+  history[replace ? "replaceState" : "pushState"]({ rw: true, y: 0 }, "", href);
   route();
 }
 // Links inside the app change the view without a page load; files and other sites load normally.
@@ -278,21 +282,24 @@ function interceptLinks(e) {
 }
 const views = { about: viewAbout, ...Object.fromEntries(LEGAL_ORDER.map(([k]) => [k, viewLegal])), coverage: viewCoverage, home: viewHome, editions: viewEditions, edition: viewStory, article: viewStory, author: viewAuthor, tag: viewTag, my: viewMy, read: viewExternal, live: viewLive, markets: viewMarkets, community: viewCommunity, discussion: viewDiscussion, events: viewEvents, watch: viewWatch, account: viewAccount, saved: viewSaved, search: viewSearch };
 const DEFAULT_TITLE = "Raisina Wire — India’s strategic briefing on geopolitics, security and markets";
-async function route() {
-  const r = parseRoute();
+let routeSeq = 0;
+async function route({ restoreY = null } = {}) {
+  const r = parseRoute(), seq = ++routeSeq;
+  if (restoreY === null) jump(0);
   document.title = DEFAULT_TITLE;
   renderNav(r);
   const view = views[r.page] || viewNotFound;
   // Lists that mix in control-room articles wait briefly for them, so the lead story doesn't flash.
   stopListening();
   if (["home", "editions", "search", "author", "edition", "article", "tag", "my"].includes(r.page)) await Promise.race([articlesReady, new Promise(res => setTimeout(res, 1200))]);
-  if (["account", "discussion", "my", "saved", "tag"].includes(r.page)) await Promise.race([userReady, new Promise(res => setTimeout(res, 2500))]);
+  if (["account", "discussion", "community", "my", "saved", "tag"].includes(r.page)) await Promise.race([userReady, new Promise(res => setTimeout(res, 2500))]);
   document.body.classList.toggle("is-reading", ["edition", "article", "read"].includes(r.page));
   const main = $("#view");
   main.classList.remove("view-enter"); void main.offsetWidth; main.classList.add("view-enter");
   await view(r);
+  if (seq !== routeSeq) return; // a newer navigation took over
   updateProgress();
-  window.scrollTo(0, 0);
+  if (restoreY !== null) requestAnimationFrame(() => jump(restoreY)); else jump(0);
 }
 
 /* ---------- Scroll effects ---------- */
@@ -352,7 +359,7 @@ function viewHome() {
         <div class="hero-card glass">
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><span class="tag tag-dark">Raisina Wire · Latest</span><span class="kicker">${esc(lead.topic)}</span></div>
           <h1><a href="${edHref(lead)}">${esc(lead.title)}</a></h1><p>${esc(lead.dek)}</p>
-          <div class="hero-foot"><span class="byline"><img src="${writer(lead.writer).photo}" alt="" class="${writer(lead.writer).isDesk ? "desk" : ""}"><span><b>${esc(lead.author)}</b> <span class="muted">· ${editionDate(lead.date)} · ${lead.readMinutes} min read</span></span></span><a class="btn btn-dark" href="${edHref(lead)}">Read now</a></div>
+          <div class="hero-foot"><span class="byline"><img src="${writer(lead.writer).photo}" alt="" class="${writer(lead.writer).isDesk ? "desk" : ""}"><span><b>${esc(lead.author)}</b> <span class="muted">· ${editionDate(lead.date)} · ${lead.readMinutes} min read</span></span></span><a class="btn btn-red hero-read" href="${edHref(lead)}">Read now <span aria-hidden="true">→</span></a></div>
         </div>
       </article>
       <aside class="live-rail glass" aria-label="Live wire"><div class="live-title"><b><span class="dot-live"></span>Live wire</b><span class="muted" style="font-size:12px" id="railUpdated"></span></div><div id="rail"></div><a class="link-gold" href="/live" style="display:block;margin-top:16px;font-size:13px">All live updates →</a></aside>
@@ -1060,6 +1067,7 @@ async function onAction(e) {
   if (a === "listen") toggleListening();
   if (a === "copy-link" || a === "copy-quote") { e.preventDefault(); const text = a === "copy-link" ? el.dataset.url : el.closest(".quote-bubble")?.dataset.quote; try { await navigator.clipboard.writeText(text); toast(a === "copy-link" ? "Link copied." : "Quote copied with a link."); } catch { toast("Couldn’t copy. Select and copy instead."); } }
   if (a === "unsave") unsave(el.dataset.href);
+  if (a === "vote") { e.preventDefault(); vote(el.dataset.id, el); }
   if (a === "follow") toggleFollow(el.dataset.topic);
   if (a === "alerts") { e.stopPropagation(); toggleAccountMenu(false); toggleAlertsPanel(); }
   if (a === "alerts-close") toggleAlertsPanel(false);
@@ -1198,12 +1206,50 @@ function openDiscussionDialog(title = "") {
     { name: "body", label: "Your opening post", type: "textarea", rows: 7, required: true, minlength: 10 }
   ], onSubmit: async v => { const d = await apiJSON("/api/community/posts", v); toast("Discussion published."); await loadCommunity(); navigate(`/discussion/${d.id}`); } });
 }
-function viewCommunity() {
-  const posts = state.community;
-  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Community</div><h1>Ideas in conversation</h1><p>Moderated discussions on India’s strategic questions. Be specific, cite sources, and keep it civil.</p></div><button class="btn btn-dark" type="button" data-action="discuss">Start a discussion</button></div>
-  <div class="community-page"><div class="live-list">${posts === null ? `<div class="skeleton" style="height:240px"></div>` : posts.length ? posts.map(p => `<a class="live-item glass thread-row" href="/discussion/${encodeURIComponent(p.id)}"><span class="when">${ago(p.createdAt)}</span><span><b>${esc(p.title)}</b><p>${esc(p.body.length > 200 ? p.body.slice(0, 197) + "…" : p.body)}</p><span class="src"><span class="tag">${esc(p.topic)}</span>${esc(p.author)} · ${p.replies || 0} repl${p.replies === 1 ? "y" : "ies"}</span></span></a>`).join("") : `<div class="empty">No discussions yet. Start the first one.</div>`}</div>
-  <aside>${studioMiniAd("community_page")}<div class="aside-card glass"><div class="kicker">Upcoming</div><ol class="agenda" id="agenda"></ol><a class="link-gold" href="/events" style="display:block;margin-top:12px;font-size:13px">All events →</a></div></aside></div></div>`;
+// Avatars: initials on a colour picked from the name, so each member is recognisable.
+const AVATAR_COLOURS = ["#b8141f", "#0f5c8c", "#137a55", "#7a530f", "#6b3fa0", "#b4570e", "#1f6f78", "#8c2155"];
+const avatarColour = name => AVATAR_COLOURS[[...String(name)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % AVATAR_COLOURS.length];
+const avatar = (name, cls = "") => `<span class="av ${cls}" style="--av:${avatarColour(name)}" aria-hidden="true">${esc(initials(name))}</span>`;
+const TOPIC_COLOURS = { Geopolitics: "#0f5c8c", Security: "#b8141f", India: "#b4570e", Diplomacy: "#6b3fa0", Markets: "#137a55", Energy: "#7a530f", General: "#596173" };
+const topicChip = t => `<span class="topic-chip" style="--tc:${TOPIC_COLOURS[t] || "#596173"}">${esc(t)}</span>`;
+const sqlTime = d => new Date(String(d).replace(" ", "T") + (/[zZ+]/.test(String(d)) ? "" : "Z")).toISOString();
+function voteButton(p) {
+  return `<button class="vote${p.voted ? " on" : ""}" type="button" data-action="vote" data-id="${esc(p.id)}" aria-pressed="${!!p.voted}" aria-label="Useful (${p.votes || 0})"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 4l8 10h-5v6H9v-6H4z"/></svg><b>${p.votes || 0}</b></button>`;
+}
+function threadCard(p) {
+  const last = p.lastReplyAt ? `last reply ${ago(sqlTime(p.lastReplyAt))}` : `posted ${ago(sqlTime(p.createdAt))}`;
+  return `<article class="thread-card glass">${voteButton(p)}
+    <a class="thread-main" href="/discussion/${encodeURIComponent(p.id)}">
+      <span class="thread-top">${topicChip(p.topic)}${p.replies >= 3 || p.votes >= 3 ? `<span class="hot">Active</span>` : ""}</span>
+      <h3>${esc(p.title)}</h3>
+      <p>${esc(p.body.length > 220 ? p.body.slice(0, 217) + "…" : p.body)}</p>
+      <span class="thread-foot">${avatar(p.author, "sm")}<span class="who"><b>${esc(p.author)}</b> · ${last}</span>
+        <span class="talkers">${(p.repliers || []).slice(0, 3).map(n => avatar(n, "xs")).join("")}</span>
+        <span class="count"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16v10H9l-5 4z"/></svg>${p.replies || 0}</span></span>
+    </a></article>`;
+}
+async function viewCommunity(r = parseRoute()) {
+  const sort = r.params.get("sort") === "top" ? "top" : "latest", topic = TOPICS.includes(r.params.get("topic")) ? r.params.get("topic") : "";
+  const q = (o = {}) => { const p = new URLSearchParams(); const s_ = o.sort ?? sort, t = o.topic ?? topic; if (s_ === "top") p.set("sort", "top"); if (t) p.set("topic", t); const qs = p.toString(); return `/community${qs ? "?" + qs : ""}`; };
+  const st = state.communityStats;
+  $("#view").innerHTML = `<div class="wrap">
+    <section class="community-hero"><div><span class="join-eyebrow"><span class="pulse"></span>The Raisina Wire community</span><h1>Ideas in conversation</h1>
+      <p>Moderated discussions on India’s strategic questions. Be specific, cite sources and keep it civil. <a href="/community-guidelines">Guidelines</a></p>
+      ${st ? `<div class="community-stats"><span><b>${st.discussions}</b> discussions</span><span><b>${st.replies}</b> replies</span>${st.members >= 25 ? `<span><b>${st.members}</b> members</span>` : ""}</div>` : ""}</div>
+      <div class="hero-avatars" id="heroAvatars"></div></section>
+    <div class="community-page"><div>
+      <button class="composer glass" type="button" data-action="discuss">${state.user ? avatar(state.user.displayName) : `<span class="av" style="--av:#596173">+</span>`}<span>${state.user ? `What’s your take, ${esc(state.user.displayName.split(" ")[0])}? Start a discussion…` : "Join free to start a discussion…"}</span><span class="btn btn-red btn-sm">Post</span></button>
+      <div class="community-tools"><div class="pill-tabs" role="tablist"><a role="tab" href="${q({ sort: "latest" })}" aria-selected="${sort === "latest"}">Latest</a><a role="tab" href="${q({ sort: "top" })}" aria-selected="${sort === "top"}">Top</a></div>
+        <div class="chips topic-filter"><a class="chip" href="${q({ topic: "" })}" aria-pressed="${!topic}">All topics</a>${TOPICS.map(t => `<a class="chip" href="${q({ topic: t })}" aria-pressed="${t === topic}">${t}</a>`).join("")}</div></div>
+      <div class="thread-list" id="threadList">${Array.from({ length: 3 }, () => `<div class="skeleton" style="height:150px;border-radius:20px"></div>`).join("")}</div></div>
+    <aside>${studioMiniAd("community_page")}<div class="aside-card glass"><div class="kicker">Upcoming</div><ol class="agenda" id="agenda"></ol><a class="link-gold" href="/events" style="display:block;margin-top:12px;font-size:13px">All events →</a></div></aside></div></div>`;
   renderCommunity();
+  let posts = [];
+  try { posts = (await fetch(`/api/community/posts?${new URLSearchParams(Object.entries({ sort, topic }).filter(([, v]) => v && v !== "latest"))}`).then(x => x.json())).posts || []; } catch { /* offline */ }
+  if (parseRoute().page !== "community") return;
+  $("#threadList").innerHTML = posts.length ? posts.map(threadCard).join("") : `<div class="empty-state glass"><span class="empty-icon">${PERK_ICONS.talk}</span><b>${topic ? `No ${topic.toLowerCase()} discussions yet` : "No discussions yet"}</b><p>Start the first one. Ask a question, share a source, or challenge a story.</p><button class="btn btn-red" type="button" data-action="discuss">Start a discussion</button></div>`;
+  const people = [...new Set(posts.flatMap(p => [p.author, ...(p.repliers || [])]))].slice(0, 7);
+  if ($("#heroAvatars")) $("#heroAvatars").innerHTML = people.map(n => avatar(n)).join("") + (people.length ? `<small>${people.length === 7 ? "and more" : ""} recently active</small>` : "");
 }
 async function viewDiscussion(r) {
   const id = r.arg;
@@ -1213,21 +1259,33 @@ async function viewDiscussion(r) {
   if (parseRoute().arg !== id) return;
   if (!d) { $("#view").innerHTML = `<div class="wrap"><div class="blocked glass"><h1>Discussion not found</h1><p class="muted">It may have been removed by a moderator.</p><div class="blocked-actions"><a class="btn btn-dark" href="/community">Back to the community</a></div></div></div>`; return; }
   document.title = `${d.post.title} · Raisina Wire community`;
-  $("#view").innerHTML = `<div class="wrap"><div class="coverage">
-    <a class="link-gold" href="/community" style="font-size:13px">← All discussions</a>
-    <header class="coverage-head"><span class="tag" style="margin-top:16px">${esc(d.post.topic)}</span><h1>${esc(d.post.title)}</h1><div class="meta">${esc(d.post.author)} · ${ago(d.post.createdAt)}</div></header>
-    <div class="glass thread-post"><p>${esc(d.post.body)}</p></div>
-    <h2 class="thread-count">${d.replies.length} repl${d.replies.length === 1 ? "y" : "ies"}</h2>
-    <ol class="replies">${d.replies.map(x => `<li class="glass"><div class="reply-head"><span class="avatar avatar-sm" aria-hidden="true">${esc(initials(x.author))}</span><b>${esc(x.author)}</b><span class="meta">${ago(x.createdAt)}</span></div><p>${esc(x.body)}</p></li>`).join("")}</ol>
-    ${state.user ? `<form class="reply-form glass" id="replyForm"><label for="replyBody" class="kicker">Your reply</label><textarea id="replyBody" name="body" rows="4" required minlength="2" maxlength="5000" placeholder="Add to the discussion"></textarea><p class="auth-message" id="replyMessage" aria-live="polite"></p><button class="btn btn-dark" type="submit">Post reply</button></form>`
-      : `<div class="reply-form glass"><p style="margin:0">Sign in to join the discussion.</p><button class="btn btn-dark" type="button" data-action="signin">Sign in</button></div>`}
+  const p = d.post;
+  $("#view").innerHTML = `<div class="wrap"><div class="discussion">
+    <a class="back-link" href="/community">← All discussions</a>
+    <article class="thread-post glass">
+      <header>${topicChip(p.topic)}<h1>${esc(p.title)}</h1><div class="post-by">${avatar(p.author)}<span><b>${esc(p.author)}</b><small>${ago(sqlTime(p.createdAt))}</small></span></div></header>
+      <p class="post-body">${esc(p.body)}</p>
+      <footer>${voteButton(p)}<span class="muted">${d.replies.length} repl${d.replies.length === 1 ? "y" : "ies"}</span>${shareBlock(p.title, `/discussion/${encodeURIComponent(p.id)}`)}</footer>
+    </article>
+    <h2 class="thread-count">${d.replies.length ? `${d.replies.length} repl${d.replies.length === 1 ? "y" : "ies"}` : "No replies yet"}</h2>
+    <ol class="reply-list">${d.replies.map(x => `<li>${avatar(x.author)}<div class="bubble glass"><div class="reply-head"><b>${esc(x.author)}</b><span class="meta">${ago(sqlTime(x.createdAt))}</span></div><p>${esc(x.body)}</p></div></li>`).join("") || `<li class="no-replies">Be the first to reply. A source, a counter-argument or a question all move a discussion on.</li>`}</ol>
+    ${state.user ? `<form class="reply-composer glass" id="replyForm">${avatar(state.user.displayName)}<label for="replyBody" class="sr-only">Your reply</label><textarea id="replyBody" name="body" rows="2" required minlength="2" maxlength="5000" placeholder="Add your reply…"></textarea><button class="btn btn-red" type="submit">Reply</button><p class="auth-message" id="replyMessage" aria-live="polite"></p></form>`
+      : `<div class="reply-composer glass guest"><p>Join the conversation: it’s free.</p><button class="btn btn-red" type="button" data-action="join">Join free</button><button class="btn btn-light" type="button" data-action="signin">Sign in</button></div>`}
   </div></div>`;
+  $("#replyBody")?.addEventListener("input", e => { e.target.style.height = "auto"; e.target.style.height = Math.min(220, e.target.scrollHeight) + "px"; });
   $("#replyForm")?.addEventListener("submit", async e => {
     e.preventDefault();
     const btn = e.currentTarget.querySelector("button"); btn.disabled = true;
-    try { await apiJSON(`/api/community/posts/${encodeURIComponent(id)}/replies`, { body: $("#replyBody").value }); toast("Reply posted."); viewDiscussion(parseRoute()); loadCommunity(); }
+    try { await apiJSON(`/api/community/posts/${encodeURIComponent(id)}/replies`, { body: $("#replyBody").value }); toast("Reply posted."); await viewDiscussion(parseRoute()); jump(document.documentElement.scrollHeight); loadCommunity(); }
     catch (err) { $("#replyMessage").textContent = err.message; btn.disabled = false; }
   });
+}
+async function vote(id, el) {
+  if (!state.user) { openAuth("register"); toast("Join free to vote on discussions."); return; }
+  try {
+    const d = await apiJSON(`/api/community/posts/${encodeURIComponent(id)}/vote`, {});
+    $$(`[data-action=vote][data-id="${CSS.escape(id)}"]`).forEach(b => { b.classList.toggle("on", d.voted); b.setAttribute("aria-pressed", String(d.voted)); b.querySelector("b").textContent = d.votes; });
+  } catch (e) { toast(e.message); }
 }
 
 /* ---------- Events ---------- */
@@ -1335,7 +1393,7 @@ async function loadCommunity() {
   try { state.events = (await fetch("/api/events").then(r => r.json())).events || []; } catch { state.events = []; }
   try { state.communityStats = await fetch("/api/community/stats").then(r => r.ok ? r.json() : null); } catch { /* optional */ }
   renderCommunity();
-  if (parseRoute().page === "community") viewCommunity();
+  if (parseRoute().page === "community" && !$("#threadList")) viewCommunity();
   if (parseRoute().page === "events") viewEvents();
 }
 
@@ -1469,7 +1527,7 @@ watchScroll();
 const fromHash = () => { if (location.hash.startsWith("#/")) { history.replaceState({ rw: true }, "", location.hash.slice(1) || "/"); return true; } return false; };
 fromHash();
 window.addEventListener("hashchange", () => { if (fromHash()) route(); });
-window.addEventListener("popstate", () => route());
+window.addEventListener("popstate", e => route({ restoreY: e.state?.y ?? 0 }));
 userReady.then(() => { if (state.user) { showUser(); loadTopics().then(() => { const pg = parseRoute(); if (pg.page === "tag") viewTag(pg); }); } });
 quoteShare();
 navigator.serviceWorker?.ready.then(async () => { if (pushSupported() && Notification.permission === "granted" && !store.get("rw-alerts-optout", 0)) await enableAlerts({ silent: true }); else await syncAlertsButton(); maybeAskForAlerts(); }).catch(() => {});
