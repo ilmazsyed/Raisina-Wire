@@ -673,6 +673,11 @@ export default {
       try { return await api(request,env); }
       catch (e) { return json({error:"Internal API error",detail:e.message},500,{"cache-control":"no-store"}); }
     }
+    // One public address for search engines: page visits to the workers.dev copy go to SITE_URL.
+    if (env.SITE_URL && url.hostname.endsWith(".workers.dev") && ["GET", "HEAD"].includes(request.method)) {
+      const target = new URL(url.pathname + url.search, env.SITE_URL);
+      if (target.host !== url.host) return Response.redirect(target.toString(), 301);
+    }
     try {
       if (url.pathname.startsWith("/media/")) return await serveMedia(request, env, ctx);
       if (url.pathname === "/robots.txt") return robots(request, env);
