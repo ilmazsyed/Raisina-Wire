@@ -12,6 +12,8 @@ import m0010 from "../migrations/0010_community_language.sql";
 import { handleTts } from "./tts.js";
 import { editions } from "./editions.js";
 import editionBodies from "./edition-bodies.json";
+import seedHi from "./translations/hi.json";
+import seedBn from "./translations/bn.json";
 import { ARTICLE_COLS, toArticle, listPublished, getBySlug, blocksToText, splitTags, tagSlug, isPublic, textHash, WRITERS, DEFAULT_WRITER } from "./store.js";
 import { LANGS, isLang, localiseArticles, localisePage, PAGES, pageVer } from "./translate.js";
 import { vapidKeys, createAlert, drainAlerts } from "./push.js";
@@ -73,6 +75,40 @@ async function migrate(db) {
     await db.batch([...sqlStatements(sql).map(q => db.prepare(q)), db.prepare("INSERT INTO d1_migrations (name) VALUES (?)").bind(name)]);
   }
   await seedEditions(db, applied);
+  await backfillTextHashes(db);
+  await seedTranslations(db, applied);
+}
+// Stories saved before text fingerprints existed get one, so the control room can tell when the
+// English has changed since a translation was written.
+async function backfillTextHashes(db) {
+  const { results } = await db.prepare("SELECT id,title,dek,topic,hero_caption,tags,body FROM articles WHERE text_hash='' LIMIT 500").all();
+  if (results.length) await db.batch(await Promise.all(results.map(async r => db.prepare("UPDATE articles SET text_hash=? WHERE id=?").bind(await textHash(r), r.id))));
+}
+// Hindi and Bengali versions bundled with the site (src/translations/), written in a Claude
+// session for the existing editions and pages. Copied in once; versions saved in the control
+// room are never overwritten.
+async function seedTranslations(db, applied) {
+  const seeds = { hi: seedHi, bn: seedBn };
+  const count = Object.values(seeds).reduce((n, x) => n + Object.keys(x.articles || {}).length + Object.keys(x.pages || {}).length, 0);
+  const marker = `seed_translations_${count}`;
+  if (!count || applied.has(marker)) return;
+  const now = new Date().toISOString(), stmts = [];
+  const insert = (kind, ref, lang, ver, t, tags = "[]") => db.prepare(`INSERT OR IGNORE INTO translations (kind,ref,lang,src_ver,title,dek,topic,hero_caption,tags,body,status,model,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,'manual','claude-session',?)`)
+    .bind(kind, ref, lang, ver, t.title, t.dek || "", t.topic || "", t.heroCaption || "", tags, t.body ?? t.html ?? "", now);
+  for (const [lang, seed] of Object.entries(seeds)) {
+    for (const [slug, t] of Object.entries(seed.articles || {})) {
+      const e = editions.find(x => x.slug === slug), row = await db.prepare("SELECT id,tags FROM articles WHERE slug=?").bind(slug).first();
+      if (!e || !row) continue;
+      // The English these were translated from: the bundled edition.
+      const tags = splitTags(e.topic.replace(/ · /g, ",")).join(",");
+      const ver = await textHash({ title: e.title, dek: e.dek, topic: e.topic, hero_caption: "", tags, body: blocksToText(editionBodies[e.slug]?.blocks) });
+      const labels = splitTags(row.tags).map((x, i) => t.tags?.[i] || x);
+      stmts.push(insert("article", row.id, lang, ver, t, JSON.stringify(labels)));
+    }
+    for (const [key, t] of Object.entries(seed.pages || {})) if (PAGES[key]) stmts.push(insert("page", key, lang, await pageVer(key), t));
+  }
+  stmts.push(db.prepare("INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)").bind(marker));
+  await db.batch(stmts);
 }
 // The LinkedIn editions bundled with the site are copied into the articles table once, so the
 // CMS can edit them. Existing rows (same slug) are never overwritten.

@@ -106,12 +106,14 @@ async function render(view){
       <div class="panel"><h2>Quick actions</h2><div class="quicklinks"><a href="#" data-jump="editorial">Write a story<small>Edition or article</small></a><a href="#" data-jump="live">Go live<small>Live coverage</small></a><a href="#" data-jump="alerts">Send an alert<small>${Number(st.subscribers).toLocaleString("en-IN")} subscribers</small></a></div></div></div>`;
     $$("[data-jump]").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();setView(a.dataset.jump)}));
   }else if(view==="editorial"){
+    const seq=state.renderSeq=(state.renderSeq||0)+1; // a newer render (e.g. Edit clicked while loading) wins
     const [d,st]=await Promise.all([api("/api/admin/articles"),api("/api/admin/stats").catch(()=>({views30:{}}))]);
     const editing=state.editId?d.articles.find(a=>a.id===state.editId):null;
     const v=editing||{kind:"article",writer:d.writers[0]?.key,status:"draft",category:"Geopolitics",tags:[]};
     // The Hindi and Bengali versions written for this story (if any).
     const tr=Object.fromEntries(await Promise.all(LANGS.map(async l=>[l,editing?(await api(`/api/admin/translations/article/${encodeURIComponent(editing.id)}/${l}`).catch(()=>({}))).translation:null])));
     const tab=state.langTab||"en";state.langTab=null;
+    if(seq!==state.renderSeq)return;
     const opt=(list,cur)=>list.map(o=>Array.isArray(o)?`<option value="${esc(o[0])}" ${o[0]===cur?"selected":""}>${esc(o[1])}</option>`:`<option ${o===cur?"selected":""}>${esc(o)}</option>`).join("");
     const filter=state.articleFilter||"all", q=(state.articleQuery||"").toLowerCase();
     const shown=d.articles.filter(a=>(filter==="all"||(filter==="editions"&&a.kind==="edition")||(filter==="articles"&&a.kind!=="edition")||(filter==="drafts"&&a.status==="draft")||(filter==="scheduled"&&a.scheduled))&&(!q||`${a.title} ${a.topic} ${a.author} ${(a.tags||[]).join(" ")}`.toLowerCase().includes(q)));

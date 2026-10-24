@@ -59,12 +59,12 @@ Without the key, Listen uses the device's own voice, choosing a female Indian En
 The whole site is available in English, हिन्दी and বাংলা. Each language has its own addresses (`/hi/…`, `/bn/…`), so shared links open in the reader's language and Google indexes each version (with `hreflang` links and sitemap alternates). The globe button at the top, and the links at the foot of every page, switch language on the same page; the choice is remembered. Readers whose phone is set to Hindi or Bengali are offered their language once.
 
 - **Menus, buttons and messages** are translated by hand in `src/i18n/hi.js` and `src/i18n/bn.js` (the English text is the key; add an entry when you add English text to the site). Dates use Hindi and Bengali month names, and Bengali pages use Bengali digits.
-- **Stories, About and the legal pages** are translated automatically by Claude (`src/translate.js`): Hindi in the style of Sanmarg and Dainik Bhaskar, Bengali in the colloquial style of Anandabazar Patrika. The per-minute cron picks up every new or edited story within a minute; a long story takes a few minutes. Each translation is made once and kept in D1 (`translations`); a story is translated again only when its text changes (not for a new picture or status). Until a translation is ready, readers see the English with a note; translated stories link to the English original, and translated legal pages say the English version prevails.
-- **Control room → Translations** shows the status of every story and page in each language, lets an editor correct a translation side by side with the English (kept until the English changes), and re-translate on request.
+- **Stories** have a Hindi and a Bengali version written next to the English: in the story editor's **हिन्दी** and **বাংলা** tabs (saved with the story, with a free "Draft with Google Translate" button for a first draft), or by Claude when it publishes through the autopublisher (`translation` command, below). Readers who switch language see that version; where there is none they see the English with a note. Translated stories link to the English original. There is no paid translation service and no API key: nothing is translated per visit, each version is written once and kept in D1 (`translations`).
+- **The 13 existing editions, About and the legal pages** were translated in a Claude session (Hindi in the style of Sanmarg and Dainik Bhaskar, Bengali in Anandabazar Patrika's colloquial style) and are bundled in `src/translations/hi.json` and `bn.json`; the Worker copies them into D1 once and never overwrites a version saved in the control room. Translated legal pages say the English version prevails.
+- **Control room → Translations** shows which stories and pages have each language, flags versions whose English has changed since, and opens the editor. About and the legal pages are edited there.
+- **Discussions** can be started in English, हिन्दी or বাংলা; the community page filters by language.
 - **Listen** reads Hindi and Bengali stories in the same warm female voice in that language (`hi-IN-Chirp3-HD-Sulafat`, `bn-IN-Chirp3-HD-Sulafat`).
 - **Live wire**: Hindi and Bengali readers also get BBC News हिन्दी and BBC News বাংলা. Headlines from other publishers are shown as published, not translated.
-
-To switch on story translation, add a secret named `ANTHROPIC_API_KEY` (from console.anthropic.com → API keys) in Cloudflare (Worker → Settings → Variables and Secrets). The translator uses Claude Opus 5.5 with server-side fallback to another Claude model if a passage is declined; set `TRANSLATE_MODEL` to use another model. As a rough guide, a 1,000-word story costs about 15–25 US cents per language, once. Without the key the interface is still fully translated and stories show in English.
 
 ## Legal pages and how we use other publishers' work
 
@@ -89,7 +89,7 @@ To keep the live wire on the right side of copyright, the in-app reader shows on
 
 - `index.html`, `admin.html`, `privacy.html`, `terms.html` — Vite page entries (see `vite.config.js`)
 - `src/main.js`, `src/style.css` — public site; `src/worker.js` — Cloudflare Worker API
-- `src/i18n.js`, `src/i18n/` — languages and the Hindi and Bengali interface text; `src/translate.js` — story translation
+- `src/i18n.js`, `src/i18n/` — languages and the Hindi and Bengali interface text; `src/translate.js` — reading translations; `src/translations/` — bundled Hindi and Bengali versions
 - `admin.js`, `admin.css` — control room
 - `public/` — copied as-is into `dist/` (favicon, manifest, service worker, `_headers`)
 - `migrations/` — D1 schema migrations
