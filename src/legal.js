@@ -124,7 +124,7 @@ export const LEGAL = {
 <p>We may update these Terms. The date at the top shows the latest version. Material changes will be highlighted on the Service. Continuing to use the Service after changes take effect means you accept them.</p>
 
 <h2>18. Governing law and jurisdiction</h2>
-<p>These Terms and any dispute arising out of or in connection with them or the Service are governed by the laws of India. Subject to the grievance process below, the courts at New Delhi, India shall have exclusive jurisdiction.</p>
+<p>These Terms and any dispute arising out of or in connection with them or the Service are governed by the laws of India. Subject to the grievance process below, the courts at Kolkata, West Bengal, India shall have exclusive jurisdiction.</p>
 
 <h2>19. Grievances</h2>
 <p>Complaints about content, accounts or these Terms can be made to our Grievance Officer as set out in <a href="/grievance">Grievance redressal</a>.</p>
