@@ -8,11 +8,12 @@ import m0006 from "../migrations/0006_tags_views_alerts.sql";
 import m0007 from "../migrations/0007_tts_audio.sql";
 import m0008 from "../migrations/0008_community_votes.sql";
 import m0009 from "../migrations/0009_translations.sql";
+import m0010 from "../migrations/0010_community_language.sql";
 import { handleTts } from "./tts.js";
 import { editions } from "./editions.js";
 import editionBodies from "./edition-bodies.json";
 import { ARTICLE_COLS, toArticle, listPublished, getBySlug, blocksToText, splitTags, tagSlug, isPublic, textHash, WRITERS, DEFAULT_WRITER } from "./store.js";
-import { LANGS, isLang, translatorEnabled, translateNext, localiseArticles, localisePage, PAGES, pageVer } from "./translate.js";
+import { LANGS, isLang, localiseArticles, localisePage, PAGES, pageVer } from "./translate.js";
 import { vapidKeys, createAlert, drainAlerts } from "./push.js";
 import { renderPage, sitemap, newsSitemap, robots, feed, PAGE_PATTERN } from "./seo.js";
 
@@ -58,7 +59,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -479,52 +480,49 @@ async function api(request, env, ctx) {
     const p = await localisePage(env, url.searchParams.get("lang"), key);
     return json({ page: { key, title: p.title, html: p.html, lang: p.lang } });
   }
-  // Translations in the control room: status per story and language, corrections, re-translation.
+  // Translations in the control room: which stories and pages have Hindi and Bengali versions,
+  // written by the editor next to the English.
   if (url.pathname === "/api/admin/translations" && request.method === "GET") {
     if (!isStaff(await currentUser(request, env))) return err("Editor access required.", 403);
-    const { results: rows } = await env.DB.prepare("SELECT kind,ref,lang,src_ver,status,error,attempts,model,updated_at FROM translations").all();
+    const { results: rows } = await env.DB.prepare("SELECT kind,ref,lang,src_ver,updated_at FROM translations WHERE title<>''").all();
     const rowOf = new Map(rows.map(r => [`${r.kind}|${r.ref}|${r.lang}`, r]));
-    const state = (kind, ref, ver, live) => Object.fromEntries(LANGS.map(l => {
+    const state = (kind, ref, ver) => Object.fromEntries(LANGS.map(l => {
       const r = rowOf.get(`${kind}|${ref}|${l}`);
-      const current = !!r && r.src_ver === ver;
-      const status = !live ? "not published" : !r ? "queued" : r.status === "working" ? "translating" : r.status === "error" ? (r.attempts >= 3 || current ? "failed" : "retrying") : r.status === "pending" ? "queued" : current ? (r.status === "manual" ? "edited" : "ready") : "updating";
-      return [l, { status, current, error: r?.error || "", model: r?.model || "", updatedAt: r?.updated_at || "" }];
+      return [l, { status: !r ? "missing" : r.src_ver === ver ? "ready" : "English changed", exists: !!r, updatedAt: r?.updated_at || "" }];
     }));
-    const { results: arts } = await env.DB.prepare("SELECT id,slug,kind,title,status,published_at,text_hash FROM articles ORDER BY COALESCE(published_at,updated_at) DESC LIMIT 500").all();
-    const now = new Date().toISOString();
-    const items = arts.map(a => ({ kind: "article", ref: a.id, slug: a.slug, title: a.title, href: `/${a.kind === "edition" ? "edition" : "article"}/${a.slug}`, langs: state("article", a.id, a.text_hash, a.status === "published" && a.published_at <= now) }));
-    for (const key of Object.keys(PAGES)) items.push({ kind: "page", ref: key, title: PAGES[key].title, href: `/${key}`, langs: state("page", key, await pageVer(key), true) });
-    return json({ enabled: translatorEnabled(env), langs: LANGS, items }, 200, { "cache-control": "no-store" });
+    const { results: arts } = await env.DB.prepare("SELECT id,slug,kind,title,status,text_hash FROM articles ORDER BY COALESCE(published_at,updated_at) DESC LIMIT 500").all();
+    const items = arts.map(a => ({ kind: "article", ref: a.id, slug: a.slug, title: a.title, status: a.status, href: `/${a.kind === "edition" ? "edition" : "article"}/${a.slug}`, langs: state("article", a.id, a.text_hash) }));
+    for (const key of Object.keys(PAGES)) items.push({ kind: "page", ref: key, title: PAGES[key].title, href: `/${key}`, langs: state("page", key, await pageVer(key)) });
+    return json({ langs: LANGS, items }, 200, { "cache-control": "no-store" });
   }
-  const trMatch = url.pathname.match(/^\/api\/admin\/translations\/(article|page)\/([^/]+)\/(hi|bn)(\/retranslate)?$/);
+  const trMatch = url.pathname.match(/^\/api\/admin\/translations\/(article|page)\/([^/]+)\/(hi|bn)$/);
   if (trMatch) {
     const user = await currentUser(request, env);
     if (!isStaff(user)) return err("Editor access required.", 403);
-    const [, kind, ref, lang, again] = trMatch.map(x => x && decodeURIComponent(x));
+    const [, kind, ref, lang] = trMatch.map(x => x && decodeURIComponent(x));
     const src = kind === "page" ? (PAGES[ref] ? { title: PAGES[ref].title, body: PAGES[ref].html, ver: await pageVer(ref) } : null)
       : await env.DB.prepare("SELECT title,dek,topic,hero_caption,tags,body,text_hash AS ver FROM articles WHERE id=?").bind(ref).first();
     if (!src) return err("Not found.", 404);
-    if (again && request.method === "POST") {
-      await env.DB.prepare("INSERT INTO translations (kind,ref,lang,status,attempts,updated_at) VALUES (?,?,?,'pending',0,?) ON CONFLICT(kind,ref,lang) DO UPDATE SET status='pending', attempts=0, error='' WHERE translations.status<>'working'")
-        .bind(kind, ref, lang, new Date().toISOString()).run();
-      await audit(env, user, "translation.retranslate", kind, ref, { lang });
-      return json({ ok: true, queued: true }, 200, { "cache-control": "no-store" });
-    }
-    if (!again && request.method === "GET") {
-      const t = await env.DB.prepare("SELECT title,dek,topic,hero_caption,tags,body,status,src_ver,error FROM translations WHERE kind=? AND ref=? AND lang=?").bind(kind, ref, lang).first();
+    if (request.method === "GET") {
+      const t = await env.DB.prepare("SELECT title,dek,topic,hero_caption,tags,body,src_ver FROM translations WHERE kind=? AND ref=? AND lang=? AND title<>''").bind(kind, ref, lang).first();
       let tags = []; try { tags = JSON.parse(t?.tags || "[]"); } catch { /* none */ }
       return json({ source: { title: src.title, dek: src.dek || "", topic: src.topic || "", heroCaption: src.hero_caption || "", tags: splitTags(src.tags), body: src.body || "" },
-        translation: t ? { title: t.title, dek: t.dek, topic: t.topic, heroCaption: t.hero_caption, tags, body: t.body, status: t.status, current: t.src_ver === src.ver, error: t.error } : null }, 200, { "cache-control": "no-store" });
+        translation: t ? { title: t.title, dek: t.dek, topic: t.topic, heroCaption: t.hero_caption, tags, body: t.body, current: t.src_ver === src.ver } : null }, 200, { "cache-control": "no-store" });
     }
-    if (!again && request.method === "PUT") {
+    if (request.method === "PUT") {
       const b = await request.json().catch(() => ({}));
       const title = String(b.title || "").trim().slice(0, 300), body = String(b.body || "").slice(0, 200000);
-      if (!title || !body.trim()) return err("A translation needs a title and text.");
+      if (!title || !body.trim()) return err(`The ${lang === "hi" ? "Hindi" : "Bengali"} version needs a headline and text.`);
       const tags = JSON.stringify(splitTags(src.tags).map((t, i) => String(b.tags?.[i] || t).trim().slice(0, 60)));
-      await env.DB.prepare(`INSERT INTO translations (kind,ref,lang,src_ver,job_ver,title,dek,topic,hero_caption,tags,body,status,error,attempts,model,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,'manual','',0,'editor',?)
-        ON CONFLICT(kind,ref,lang) DO UPDATE SET src_ver=excluded.src_ver, job_ver=excluded.job_ver, title=excluded.title, dek=excluded.dek, topic=excluded.topic, hero_caption=excluded.hero_caption, tags=excluded.tags, body=excluded.body, status='manual', error='', attempts=0, model='editor', updated_at=excluded.updated_at`)
-        .bind(kind, ref, lang, src.ver, src.ver, title, String(b.dek || "").trim().slice(0, 600), String(b.topic || "").trim().slice(0, 120), String(b.heroCaption || "").trim().slice(0, 400), tags, body, new Date().toISOString()).run();
-      await audit(env, user, "translation.edit", kind, ref, { lang });
+      await env.DB.prepare(`INSERT INTO translations (kind,ref,lang,src_ver,title,dek,topic,hero_caption,tags,body,status,model,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,'manual','editor',?)
+        ON CONFLICT(kind,ref,lang) DO UPDATE SET src_ver=excluded.src_ver, title=excluded.title, dek=excluded.dek, topic=excluded.topic, hero_caption=excluded.hero_caption, tags=excluded.tags, body=excluded.body, status='manual', model='editor', updated_at=excluded.updated_at`)
+        .bind(kind, ref, lang, src.ver, title, String(b.dek || "").trim().slice(0, 600), String(b.topic || "").trim().slice(0, 120), String(b.heroCaption || "").trim().slice(0, 400), tags, body, new Date().toISOString()).run();
+      await audit(env, user, "translation.save", kind, ref, { lang });
+      return json({ ok: true }, 200, { "cache-control": "no-store" });
+    }
+    if (request.method === "DELETE") {
+      await env.DB.prepare("DELETE FROM translations WHERE kind=? AND ref=? AND lang=?").bind(kind, ref, lang).run();
+      await audit(env, user, "translation.delete", kind, ref, { lang });
       return json({ ok: true }, 200, { "cache-control": "no-store" });
     }
     return err("Method not allowed.", 405);
@@ -534,7 +532,9 @@ async function api(request, env, ctx) {
     const user = await currentUser(request,env);
     if (!isStaff(user)) return err("Editor access required.",403);
     const rows = await env.DB.prepare(`SELECT ${ARTICLE_COLS},body FROM articles ORDER BY COALESCE(published_at,updated_at) DESC LIMIT 500`).all();
-    return json({ articles: rows.results.map(r => toArticle(r, { body: true })), writers: WRITERS.map(w => ({ key: w.key, name: w.name })) },200,{"cache-control":"no-store"});
+    const { results: tr } = await env.DB.prepare("SELECT ref,lang FROM translations WHERE kind='article' AND title<>''").all();
+    const langsOf = id => tr.filter(t => t.ref === id).map(t => t.lang);
+    return json({ articles: rows.results.map(r => ({ ...toArticle(r, { body: true }), langs: langsOf(r.id) })), writers: WRITERS.map(w => ({ key: w.key, name: w.name })) },200,{"cache-control":"no-store"});
   }
   if (url.pathname === "/api/admin/articles" && request.method === "POST") {
     const user = await currentUser(request,env);
@@ -735,16 +735,17 @@ async function api(request, env, ctx) {
     const user = await currentUser(request, env).catch(() => null);
     const sort = url.searchParams.get("sort") === "top" ? "top" : "latest";
     const topic = String(url.searchParams.get("topic") || "").slice(0, 80);
-    const rows = await env.DB.prepare(`SELECT p.id,p.title,p.body,p.topic,p.created_at AS createdAt,u.display_name AS author,
+    const inLang = ["en", ...LANGS].includes(url.searchParams.get("lang")) ? url.searchParams.get("lang") : "";
+    const rows = await env.DB.prepare(`SELECT p.id,p.title,p.body,p.topic,p.lang,p.created_at AS createdAt,u.display_name AS author,
         (SELECT COUNT(*) FROM community_replies r WHERE r.post_id=p.id) AS replies,
         (SELECT COUNT(*) FROM community_votes v WHERE v.post_id=p.id) AS votes,
         (SELECT MAX(r.created_at) FROM community_replies r WHERE r.post_id=p.id) AS lastReplyAt,
         (SELECT group_concat(name, '|') FROM (SELECT DISTINCT u2.display_name AS name FROM community_replies r2 JOIN users u2 ON u2.id=r2.user_id WHERE r2.post_id=p.id ORDER BY r2.created_at DESC LIMIT 4)) AS repliers,
         ${user ? "EXISTS(SELECT 1 FROM community_votes v WHERE v.post_id=p.id AND v.user_id=?)" : "0"} AS voted
       FROM community_posts p JOIN users u ON u.id=p.user_id
-      WHERE p.status='published' ${topic ? "AND p.topic=?" : ""}
+      WHERE p.status='published' ${topic ? "AND p.topic=?" : ""} ${inLang ? "AND p.lang=?" : ""}
       ORDER BY ${sort === "top" ? "(votes*2 + replies) DESC, COALESCE(lastReplyAt, p.created_at) DESC" : "COALESCE(lastReplyAt, p.created_at) DESC"} LIMIT 60`)
-      .bind(...[user?.id, topic || undefined].filter(v => v !== undefined)).all();
+      .bind(...[user?.id, topic || undefined, inLang || undefined].filter(v => v !== undefined)).all();
     return json({ posts: rows.results.map(p => ({ ...p, voted: !!p.voted, repliers: p.repliers ? p.repliers.split("|") : [] })) }, 200, { "cache-control": "no-store" });
   }
   if (/^\/api\/community\/posts\/[^/]+\/vote$/.test(url.pathname) && request.method === "POST") {
@@ -765,16 +766,17 @@ async function api(request, env, ctx) {
     const title = String(body.title || "").trim().slice(0, 180);
     const content = String(body.body || "").trim().slice(0, 5000);
     const topic = String(body.topic || "General").trim().slice(0, 80);
+    const lang = ["en", ...LANGS].includes(body.lang) ? body.lang : "en";
     if (title.length < 5 || content.length < 10) return err("Add a clear title and a post of at least 10 characters.");
     const id = randomId();
-    await env.DB.prepare("INSERT INTO community_posts (id,user_id,title,body,topic) VALUES (?,?,?,?,?)").bind(id,user.id,title,content,topic).run();
+    await env.DB.prepare("INSERT INTO community_posts (id,user_id,title,body,topic,lang) VALUES (?,?,?,?,?,?)").bind(id,user.id,title,content,topic,lang).run();
     return json({ok:true,id},201,{"cache-control":"no-store"});
   }
 
   if (/^\/api\/community\/posts\/[^/]+$/.test(url.pathname) && request.method === "GET") {
     const id = decodeURIComponent(url.pathname.split("/").pop());
     const viewer = await currentUser(request, env).catch(() => null);
-    const post = await env.DB.prepare(`SELECT p.id,p.title,p.body,p.topic,p.created_at AS createdAt,u.display_name AS author,
+    const post = await env.DB.prepare(`SELECT p.id,p.title,p.body,p.topic,p.lang,p.created_at AS createdAt,u.display_name AS author,
       (SELECT COUNT(*) FROM community_votes v WHERE v.post_id=p.id) AS votes,
       ${viewer ? "EXISTS(SELECT 1 FROM community_votes v WHERE v.post_id=p.id AND v.user_id=?)" : "0"} AS voted
       FROM community_posts p JOIN users u ON u.id=p.user_id WHERE p.id=? AND p.status='published'`).bind(...(viewer ? [viewer.id, id] : [id])).first();
@@ -949,7 +951,6 @@ async function scheduled(env) {
   await step("scheduled stories", async () => { for (const row of results) await storyAlert(env, null, null, row); });
   await step("daily alerts", () => dailyAlerts(env, env.CRON_TEST_NOW ? new Date(env.CRON_TEST_NOW) : new Date())); // CRON_TEST_NOW: local tests only
   await step("push delivery", () => drainAlerts(env));
-  await step("translations", () => translateNext(env)); // last: a long story can take a few minutes
 }
 // 9 am and 9 pm India time, every day (unless switched off in the control room).
 // The settings row makes each one send exactly once, even if two cron runs overlap.
