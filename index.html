@@ -2,8 +2,10 @@
 <html lang="en-IN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0f1422" />
+  <script>document.documentElement.classList.add("js")</script>
+  <style>.js #app:has(>.ssr):after,.js #app>p:only-child{content:"";position:fixed;inset:0;margin:auto;width:64px;height:64px;border-radius:16px;background:#b8141f url(/icon-192.png) center/cover;box-shadow:0 18px 40px -12px rgba(184,20,31,.6);animation:rwboot 1.2s ease-in-out infinite;font-size:0;color:transparent}@keyframes rwboot{50%{transform:scale(.92);opacity:.7}}</style>
   <script>try{var p=JSON.parse(localStorage.getItem("rw-theme")||'"auto"');document.documentElement.dataset.theme=p==="dark"||(p==="auto"&&matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"}catch(e){}</script>
   <meta name="robots" content="index, follow, max-image-preview:large" />
   <meta name="mobile-web-app-capable" content="yes" />

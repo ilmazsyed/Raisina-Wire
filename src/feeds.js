@@ -179,30 +179,64 @@ export async function extractReadable(response) {
     byline: squash(decodeEntities(meta["author"] || meta["article:author"] || "")).replace(/^https?:\/\/\S+$/, ""),
     publishedAt: meta["article:published_time"] || meta["date"] || null,
     description: squash(decodeEntities(meta["og:description"] || meta["description"] || "")),
+    robots: [meta["robots"], meta["googlebot"]].filter(Boolean).join(","),
     blocks: blocks.slice(0, 150),
     paragraphChars: chars(blocks)
   };
 }
 
-export async function readArticle(raw) {
+const READER_UA = "Mozilla/5.0 (compatible; RaisinaWireReader/1.0; +https://raisinawire.calibrex.org/copyright)";
+// The reader shows an excerpt, never the whole article: the opening paragraphs up to about
+// 120 words, credited and linked, so readers go to the publisher for the full story.
+export const EXCERPT_WORDS = 120;
+export function excerptOf(blocks, maxWords, maxChars) {
+  const out = []; let words = 0, chars = 0;
+  for (const b of blocks.filter(x => x.t === "p")) {
+    const w = b.x.split(/\s+/).length;
+    if (words + w <= maxWords && chars + b.x.length <= maxChars) { out.push(b); words += w; chars += b.x.length; if (out.length >= 3) break; continue; }
+    // Trim the next paragraph at a sentence end inside the limit.
+    let text = "";
+    for (const sentence of b.x.match(/[^.!?]+[.!?]+["’”)]*\s*/g) || []) {
+      if ((words + (text + sentence).split(/\s+/).length) > maxWords || chars + (text + sentence).length > maxChars) break;
+      text += sentence;
+    }
+    if (text.trim()) out.push({ t: "p", x: text.trim() });
+    break;
+  }
+  return out;
+}
+// Publisher signals: nosnippet / noarchive / none mean no excerpt; max-snippet caps its length.
+export function snippetLimit(robots) {
+  const r = String(robots || "").toLowerCase();
+  if (/\b(nosnippet|noarchive|none)\b/.test(r)) return 0;
+  const m = r.match(/max-snippet\s*:\s*(-?\d+)/);
+  return m && Number(m[1]) >= 0 ? Number(m[1]) : Infinity;
+}
+
+export async function readArticle(raw, { optOut = [] } = {}) {
   const u = safeArticleUrl(raw);
   if (!u) return { ok: false, blocked: true, reason: "invalid-url" };
   let response;
   try {
     response = await fetch(u.toString(), {
       redirect: "follow", signal: AbortSignal.timeout(9000),
-      headers: { "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 RaisinaWireReader/1.0", accept: "text/html,application/xhtml+xml" }
+      // An honest user agent, so publishers can recognise and block the reader if they wish.
+      headers: { "user-agent": READER_UA, accept: "text/html,application/xhtml+xml" }
     });
   } catch (e) { return { ok: false, blocked: true, reason: "unreachable", url: u.toString() }; }
   const finalUrl = response.url || u.toString();
   if (!response.ok) return { ok: false, blocked: true, reason: `http-${response.status}`, url: finalUrl };
   if (!/text\/html|xhtml/i.test(response.headers.get("content-type") || "")) return { ok: false, blocked: true, reason: "not-html", url: finalUrl };
+  const host = new URL(finalUrl).hostname.replace(/^www\./, "");
   const page = await extractReadable(response);
-  const paragraphs = page.blocks.filter(b => b.t === "p").length;
-  if (page.paragraphChars < 500 || paragraphs < 3) {
-    return { ok: false, blocked: true, reason: "no-readable-text", url: finalUrl, title: page.title, site: page.site || new URL(finalUrl).hostname.replace(/^www\./, ""), image: page.image, description: page.description };
-  }
-  return { ok: true, url: finalUrl, ...page, site: page.site || new URL(finalUrl).hostname.replace(/^www\./, "") };
+  const site = page.site || host;
+  const limit = optOut.some(d => host === d || host.endsWith("." + d)) ? 0 : snippetLimit(page.robots);
+  const excerpt = limit === 0 ? [] : excerptOf(page.blocks, EXCERPT_WORDS, Math.min(limit, 900));
+  const totalWords = page.blocks.filter(b => b.t === "p").reduce((n, b) => n + b.x.split(/\s+/).length, 0);
+  // Never return more than the excerpt: the full text stays with the publisher.
+  const base = { url: finalUrl, title: page.title, site, image: page.image, byline: page.byline, publishedAt: page.publishedAt, description: page.description };
+  if (!excerpt.length) return { ok: false, blocked: true, reason: limit === 0 ? "publisher-limits" : "no-readable-text", ...base };
+  return { ok: true, excerpt: true, ...base, blocks: excerpt, totalWords, readMinutes: Math.max(1, Math.round(totalWords / 220)) };
 }
 
 /* ---------------- Markets ---------------- */

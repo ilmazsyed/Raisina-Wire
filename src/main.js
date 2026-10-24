@@ -2,6 +2,7 @@ import "./style.css";
 import { editions, NEWSLETTER_URL, AUTHOR } from "./editions.js";
 import { brandMark, skyline, tribar, wordmark } from "./brand.js";
 import { WRITERS, writer } from "./writers.js";
+import { ABOUT, LEGAL, LEGAL_ORDER, LEGAL_UPDATED } from "./legal.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -44,6 +45,8 @@ function sparkline(points = [], cls = "flat", w = 120, h = 26) {
   const color = cls === "up" ? "var(--up)" : cls === "down" ? "var(--down)" : "var(--muted)";
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${d}" fill="none" stroke="${color}" stroke-width="1.8" vector-effect="non-scaling-stroke"/></svg>`;
 }
+const ICON_X = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+const ICON_CHECK = `<svg class="ck" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>`;
 const ICON_LOCK = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold-ink)" stroke-width="2" aria-hidden="true" style="flex-shrink:0;margin-top:2px"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`;
 const ICON_INFO = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold-ink)" stroke-width="2" aria-hidden="true" style="flex-shrink:0;margin-top:2px"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>`;
 const img = (src, alt = "") => src ? `<img class="img-cover" src="${esc(src)}" alt="${esc(alt)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-hide-on-error>` : "";
@@ -152,7 +155,7 @@ function renderShell() {
   <main id="view" tabindex="-1"></main>
   <footer class="site-footer"><div class="wrap">
     <div class="footer-top"><a class="footer-brand" href="/" aria-label="Raisina Wire home">${brandMark()}<span class="wordmark">${wordmark()}</span></a>
-      <div class="footer-links"><a href="/editions">All editions</a><a href="/live">Live wire</a><a href="/markets">Markets</a><a href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer" id="linkedinLink">Newsletter on LinkedIn ↗</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="#" data-action="install" class="install-link">Install the app</a></div></div>
+      <div class="footer-links"><a href="/editions">All editions</a><a href="/live">Live wire</a><a href="/markets">Markets</a><a href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer" id="linkedinLink">Newsletter on LinkedIn ↗</a><a href="/about">About</a><a href="#" data-action="install" class="install-link">Install the app</a></div></div>
     <form class="lead-form glass" id="leadForm"><span class="kicker">Briefings &amp; partnerships</span>
       <label class="sr-only" for="leadName">Your name</label><input id="leadName" name="name" placeholder="Your name" required minlength="2" autocomplete="name">
       <label class="sr-only" for="leadEmail">Work email</label><input id="leadEmail" name="email" type="email" placeholder="Work email" required autocomplete="email">
@@ -160,8 +163,9 @@ function renderShell() {
       <label class="sr-only" for="leadInterest">Interest</label><select id="leadInterest" name="interest"><option>Daily briefing</option><option>Academy training</option><option>Calibrex enterprise enquiry</option><option>Speaking / partnership</option></select>
       <button class="btn btn-dark" type="submit">Request contact</button><small id="leadMessage" aria-live="polite"></small></form>
     ${studioAd()}
+    <nav class="legal-links" aria-label="Legal"><a href="/about">About Raisina Wire</a>${LEGAL_ORDER.map(([k, t]) => `<a href="/${k}">${t}</a>`).join("")}</nav>
     <div class="footer-base">${poweredByCalibrex()}</div>
-    <p class="copyright">© ${new Date().getFullYear()} Raisina Wire. Independent editorial platform. Live headlines and quotes come from the named publishers and public feeds.</p>
+    <p class="copyright">© ${new Date().getFullYear()} Raisina Wire. All rights reserved. An independent publication, not affiliated with the Government of India. Headlines and excerpts from other publishers are credited and linked, and remain their property. Market data is delayed and is not investment advice.</p>
   </div></footer>
   <div class="modal-backdrop hidden" id="modalBackdrop"><section class="modal glass" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <button class="modal-close" id="modalClose" type="button" aria-label="Close">×</button>
@@ -187,21 +191,34 @@ function renderShell() {
     <div id="searchResults" class="search-results"></div></dialog>
   <div class="toast" id="toast" role="status"></div>
   <div class="alert-banner glass" id="alertBanner" role="status" hidden></div>
-  <section class="install-sheet alerts-sheet glass" id="alertsSheet" role="dialog" aria-labelledby="alertsSheetTitle" hidden>
-    <button class="modal-close" type="button" data-action="alerts-later" aria-label="Close">×</button>
-    <div class="install-head"><span class="sheet-bell">${ICON_BELL}</span><div><span class="kicker">Alerts are on</span><h2 id="alertsSheetTitle">Get Raisina Wire alerts on this device</h2></div></div>
-    <ul>${ALERT_TYPES.map(t => `<li>${t}</li>`).join("")}</ul>
-    <div class="install-actions"><button class="btn btn-red" type="button" data-action="alerts-allow">Allow alerts</button><button class="btn btn-light" type="button" data-action="alerts-later">Not now</button></div>
-    <p class="muted" style="margin:10px 0 0;font-size:12px">Your browser will ask you to confirm. You can turn them off any time from the bell.</p>
+  <section class="sheet" id="alertsSheet" role="dialog" aria-labelledby="alertsSheetTitle" hidden>
+    <span class="sheet-grip" aria-hidden="true"></span>
+    <button class="sheet-x" type="button" data-action="alerts-later" aria-label="Close">${ICON_X}</button>
+    <div class="sheet-hero alerts"><span class="sheet-icon bell">${ICON_BELL}</span><span class="sheet-ping" aria-hidden="true"></span></div>
+    <span class="kicker">Breaking news, as it happens</span><h2 id="alertsSheetTitle">Turn on Raisina Wire alerts</h2>
+    <ul class="sheet-list">${ALERT_TYPES.map(t => `<li>${ICON_CHECK}<span>${t}</span></li>`).join("")}</ul>
+    <div class="sheet-actions"><button class="btn btn-red sheet-primary" type="button" data-action="alerts-allow">Allow alerts</button><button class="sheet-secondary" type="button" data-action="alerts-later">Not now</button></div>
+    <p class="sheet-note">Your browser asks you to confirm once. Turn them off any time from the bell.</p>
   </section>
-  <div class="offline-bar" id="offlineBar" role="status" hidden>You’re offline. Editions and saved stories still open; live data shows the last copy.</div>
-  <div class="update-bar glass" id="updateBar" role="status" hidden><span>A new version of Raisina Wire is ready.</span><button class="btn btn-dark btn-sm" type="button" data-action="apply-update">Update</button></div>
-  <section class="install-sheet glass" id="installSheet" role="dialog" aria-labelledby="installTitle" hidden>
-    <button class="modal-close" type="button" data-action="install-dismiss" aria-label="Close">×</button>
-    <div class="install-head"><img src="/icon-192.png" alt="" width="56" height="56"><div><span class="kicker">The app</span><h2 id="installTitle">Get Raisina Wire on your home screen</h2></div></div>
-    <ul><li>Every edition readable offline</li><li>Live wire, markets and live coverage in one tap</li><li>Opens full screen, like any app</li></ul>
-    <div class="install-ios" hidden><p>On iPhone or iPad, tap <b>Share</b> <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="vertical-align:-3px"><path d="M4 12v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg> in Safari, then <b>Add to Home Screen</b>.</p></div>
-    <div class="install-actions"><button class="btn btn-dark" type="button" data-action="install">Install the app</button><button class="btn btn-light" type="button" data-action="install-dismiss">Not now</button></div>
+  <div class="offline-bar" id="offlineBar" role="status" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 4.2-2.6M10.7 5.1A15 15 0 0 1 22 8.8M5 12.9a10 10 0 0 1 5.2-2.7M19 12.9a10 10 0 0 0-2.3-1.6M8.5 16.4a5 5 0 0 1 7 0M12 20h.01M3 3l18 18"/></svg><span>You’re offline. Editions and saved stories still open; live data shows the last copy.</span></div>
+  <div class="update-bar" id="updateBar" role="status" hidden>
+    <span class="ub-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></svg></span>
+    <span class="ub-text"><b>A new version is ready</b><small>Update for the latest stories and fixes.</small></span>
+    <button class="btn btn-red btn-sm" type="button" data-action="apply-update">Update</button>
+    <button class="ub-close" type="button" data-action="update-later" aria-label="Later">${ICON_X}</button>
+  </div>
+  <section class="sheet install-sheet" id="installSheet" role="dialog" aria-labelledby="installTitle" hidden>
+    <span class="sheet-grip" aria-hidden="true"></span>
+    <button class="sheet-x" type="button" data-action="install-dismiss" aria-label="Close">${ICON_X}</button>
+    <div class="sheet-hero install"><img class="sheet-app" src="/icon-192.png" alt="" width="72" height="72"></div>
+    <span class="kicker">The Raisina Wire app</span><h2 id="installTitle">Add Raisina Wire to your home screen</h2>
+    <ul class="sheet-list"><li>${ICON_CHECK}<span>Every edition readable offline</span></li><li>${ICON_CHECK}<span>Live wire, markets and live coverage in one tap</span></li><li>${ICON_CHECK}<span>Alerts and full-screen reading, like any app</span></li></ul>
+    <ol class="install-ios" hidden>
+      <li><span class="step">1</span><span>Tap <b>Share</b> <svg class="ios-share" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg> in Safari’s toolbar</span></li>
+      <li><span class="step">2</span><span>Choose <b>Add to Home Screen</b> <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span></li>
+      <li><span class="step">3</span><span>Open Raisina Wire from your home screen</span></li>
+    </ol>
+    <div class="sheet-actions install-actions"><button class="btn btn-red sheet-primary" type="button" data-action="install">Install the app</button><button class="sheet-secondary" type="button" data-action="install-dismiss">Not now</button></div>
   </section>`;
 
   $("#today").textContent = new Date().toLocaleDateString("en-IN", { ...IST, weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -244,9 +261,13 @@ function parseRoute() {
   const [page = "", ...rest] = location.pathname.split("/").filter(Boolean);
   return { page: page || "home", arg: rest.length ? decodeURIComponent(rest.join("/")) : "", params: new URLSearchParams(location.search) };
 }
+// New pages open at the top; Back and Forward return to where the reader was.
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+const jump = y => window.scrollTo({ top: y, left: 0, behavior: "instant" });
 function navigate(href, { replace = false } = {}) {
-  if (href === location.pathname + location.search) return route({ keepScroll: false });
-  history[replace ? "replaceState" : "pushState"]({ rw: true }, "", href);
+  if (href === location.pathname + location.search) { jump(0); return route(); }
+  if (!replace) history.replaceState({ ...(history.state || {}), rw: true, y: scrollY }, "");
+  history[replace ? "replaceState" : "pushState"]({ rw: true, y: 0 }, "", href);
   route();
 }
 // Links inside the app change the view without a page load; files and other sites load normally.
@@ -259,23 +280,26 @@ function interceptLinks(e) {
   a.closest("dialog")?.close();
   navigate(href);
 }
-const views = { coverage: viewCoverage, home: viewHome, editions: viewEditions, edition: viewStory, article: viewStory, author: viewAuthor, tag: viewTag, my: viewMy, read: viewExternal, live: viewLive, markets: viewMarkets, community: viewCommunity, discussion: viewDiscussion, events: viewEvents, watch: viewWatch, account: viewAccount, saved: viewSaved, search: viewSearch };
+const views = { about: viewAbout, ...Object.fromEntries(LEGAL_ORDER.map(([k]) => [k, viewLegal])), coverage: viewCoverage, home: viewHome, editions: viewEditions, edition: viewStory, article: viewStory, author: viewAuthor, tag: viewTag, my: viewMy, read: viewExternal, live: viewLive, markets: viewMarkets, community: viewCommunity, discussion: viewDiscussion, events: viewEvents, watch: viewWatch, account: viewAccount, saved: viewSaved, search: viewSearch };
 const DEFAULT_TITLE = "Raisina Wire — India’s strategic briefing on geopolitics, security and markets";
-async function route() {
-  const r = parseRoute();
+let routeSeq = 0;
+async function route({ restoreY = null } = {}) {
+  const r = parseRoute(), seq = ++routeSeq;
+  if (restoreY === null) jump(0);
   document.title = DEFAULT_TITLE;
   renderNav(r);
   const view = views[r.page] || viewNotFound;
   // Lists that mix in control-room articles wait briefly for them, so the lead story doesn't flash.
   stopListening();
   if (["home", "editions", "search", "author", "edition", "article", "tag", "my"].includes(r.page)) await Promise.race([articlesReady, new Promise(res => setTimeout(res, 1200))]);
-  if (["account", "discussion", "my", "saved", "tag"].includes(r.page)) await Promise.race([userReady, new Promise(res => setTimeout(res, 2500))]);
+  if (["account", "discussion", "community", "my", "saved", "tag"].includes(r.page)) await Promise.race([userReady, new Promise(res => setTimeout(res, 2500))]);
   document.body.classList.toggle("is-reading", ["edition", "article", "read"].includes(r.page));
   const main = $("#view");
   main.classList.remove("view-enter"); void main.offsetWidth; main.classList.add("view-enter");
   await view(r);
+  if (seq !== routeSeq) return; // a newer navigation took over
   updateProgress();
-  window.scrollTo(0, 0);
+  if (restoreY !== null) requestAnimationFrame(() => jump(restoreY)); else jump(0);
 }
 
 /* ---------- Scroll effects ---------- */
@@ -335,7 +359,7 @@ function viewHome() {
         <div class="hero-card glass">
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><span class="tag tag-dark">Raisina Wire · Latest</span><span class="kicker">${esc(lead.topic)}</span></div>
           <h1><a href="${edHref(lead)}">${esc(lead.title)}</a></h1><p>${esc(lead.dek)}</p>
-          <div class="hero-foot"><span class="byline"><img src="${writer(lead.writer).photo}" alt="" class="${writer(lead.writer).isDesk ? "desk" : ""}"><span><b>${esc(lead.author)}</b> <span class="muted">· ${editionDate(lead.date)} · ${lead.readMinutes} min read</span></span></span><a class="btn btn-dark" href="${edHref(lead)}">Read now</a></div>
+          <div class="hero-foot"><span class="byline"><img src="${writer(lead.writer).photo}" alt="" class="${writer(lead.writer).isDesk ? "desk" : ""}"><span><b>${esc(lead.author)}</b> <span class="muted">· ${editionDate(lead.date)} · ${lead.readMinutes} min read</span></span></span><a class="btn btn-red hero-read" href="${edHref(lead)}">Read now <span aria-hidden="true">→</span></a></div>
         </div>
       </article>
       <aside class="live-rail glass" aria-label="Live wire"><div class="live-title"><b><span class="dot-live"></span>Live wire</b><span class="muted" style="font-size:12px" id="railUpdated"></span></div><div id="rail"></div><a class="link-gold" href="/live" style="display:block;margin-top:16px;font-size:13px">All live updates →</a></aside>
@@ -871,6 +895,22 @@ function maybeAskForAlerts() {
     $("#alertsSheet").hidden = false; store.set("rw-alerts-asked", Date.now());
   }, 5000);
 }
+/* ---------- About and legal pages ---------- */
+function docPage({ kicker, title, html, nav, updated }) {
+  return `<div class="wrap"><div class="doc-layout">${nav ? `<aside class="doc-nav glass"><span class="kicker">Legal</span>${nav}</aside>` : ""}
+    <article class="doc glass"><span class="kicker">${kicker}</span><h1>${title}</h1>${updated ? `<p class="meta">Last updated ${updated}</p>` : ""}${html}</article></div></div>`;
+}
+function viewAbout() {
+  document.title = `${ABOUT.title} · Raisina Wire`;
+  $("#view").innerHTML = docPage({ kicker: "About", title: ABOUT.title, html: ABOUT.html });
+}
+function viewLegal(r) {
+  const doc = LEGAL[r.page];
+  document.title = `${doc.title} · Raisina Wire`;
+  const nav = LEGAL_ORDER.map(([k, t]) => `<a href="/${k}"${k === r.page ? ' aria-current="page"' : ""}>${t}</a>`).join("") + `<a href="/about">About Raisina Wire</a>`;
+  $("#view").innerHTML = docPage({ kicker: "Raisina Wire", title: doc.title, html: doc.html, nav, updated: LEGAL_UPDATED });
+}
+
 /* ---------- Writers ---------- */
 function viewAuthor(r) {
   const w = WRITERS.find(x => x.key === r.arg);
@@ -909,20 +949,20 @@ async function viewExternal(r) {
       <div class="byline"><span class="tag tag-dark">${esc(site)}</span><span class="meta">${known.publishedAt ? `${clock(known.publishedAt)} IST · ` : ""}${esc(known.category || "")}</span></div>
       <h1 id="blockedTitle">${esc(title)}</h1>
       ${(known.summary || data.description) ? `<p style="margin:14px 0 0;font-size:16px;line-height:1.65;color:var(--ink-2)">${esc(known.summary || data.description)}</p>` : ""}
-      <div class="notice">${ICON_LOCK}<span>${esc(site)} doesn’t allow its full story to be shown inside Raisina Wire. You can read it on their site.</span></div>
+      <div class="notice">${ICON_LOCK}<span>${data.reason === "publisher-limits" ? `${esc(site)} asks that its stories are not excerpted, so here is the headline and summary.` : `An excerpt of this story isn’t available.`} Read the full story on ${esc(site)}.</span></div>
       <div class="blocked-actions"><a class="btn btn-dark" href="${esc(url)}" target="_blank" rel="noreferrer">Read original on ${esc(site)} ↗</a><button class="btn btn-light" type="button" data-action="save" data-item='${esc(JSON.stringify(saveItem))}'>Save for later</button><a class="btn btn-light" href="/" data-action="back">Back</a></div>
     </section></div>`;
     return;
   }
-  $(".reader-bar .badge").textContent = `${site} · Reader view`;
+  $(".reader-bar .badge").textContent = `${site} · Excerpt`;
   $(".reader-bar .original-btn .lbl").textContent = `Original on ${site}`;
   $("#extArticle").innerHTML = `<div class="kicker">${esc(known.category || site)}</div><h1>${esc(title)}</h1>
     ${data.description ? `<p class="dek">${esc(data.description)}</p>` : ""}
     <div class="reader-byline"><div><b>${esc(data.byline || site)}</b><div class="muted" style="font-size:13px">${esc(site)}</div></div><span class="grow"></span><span class="meta">${data.publishedAt ? new Date(data.publishedAt).toLocaleString("en-IN", { ...IST, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : known.publishedAt ? `${clock(known.publishedAt)} IST` : ""}</span></div>
-    <div class="notice">${ICON_INFO}<span>Reader view of an article from ${esc(site)}. The text belongs to the publisher. <a href="${esc(data.url || url)}" target="_blank" rel="noreferrer" style="color:var(--gold-ink);font-weight:800">Read the original ↗</a></span></div>
-    ${data.image ? `<div class="reader-hero">${img(data.image)}</div>` : ""}
-    <div class="prose">${proseHTML(data.blocks || [])}</div>
-    <div class="reader-end glass"><div><b style="font-size:16px">Continue on ${esc(site)}</b><div class="muted" style="font-size:14px;margin-top:4px">Pictures, video and comments are on the original page.</div></div><a class="btn btn-dark" href="${esc(data.url || url)}" target="_blank" rel="noreferrer">Open original ↗</a></div>`;
+    <div class="notice">${ICON_INFO}<span>An excerpt from ${esc(site)}, shown with credit for news reporting. The story and its copyright belong to ${esc(site)}. <a href="/copyright">How we use other publishers’ work</a></span></div>
+    ${data.image ? `<figure class="reader-hero">${img(data.image)}<figcaption>Image: ${esc(site)}</figcaption></figure>` : ""}
+    <div class="prose excerpt">${proseHTML(data.blocks || [])}<p class="excerpt-fade" aria-hidden="true"></p></div>
+    <a class="continue-card" href="${esc(data.url || url)}" target="_blank" rel="noopener"><span><span class="kicker">Continue reading</span><b>The full story is on ${esc(site)}</b><small>${data.readMinutes ? `${data.readMinutes} min read · ` : ""}Opens the publisher’s site</small></span><span class="btn btn-red">Read on ${esc(site)} ↗</span></a>`;
 }
 function renderExtAside() {
   const host = $("#extAside"); if (!host) return;
@@ -1019,6 +1059,7 @@ async function onAction(e) {
   if (a === "ics") downloadIcs(el.dataset.event);
   if (a === "install") { e.preventDefault(); installPWA(); }
   if (a === "install-dismiss") { store.set("rw-install-dismissed", Date.now()); $("#installSheet").hidden = true; }
+  if (a === "update-later") $("#updateBar").hidden = true;
   if (a === "apply-update") { waitingWorker?.postMessage({ type: "SKIP_WAITING" }); $("#updateBar").hidden = true; }
   if (a === "signin") openAuth("login");
   if (a === "join") openAuth("register");
@@ -1026,6 +1067,7 @@ async function onAction(e) {
   if (a === "listen") toggleListening();
   if (a === "copy-link" || a === "copy-quote") { e.preventDefault(); const text = a === "copy-link" ? el.dataset.url : el.closest(".quote-bubble")?.dataset.quote; try { await navigator.clipboard.writeText(text); toast(a === "copy-link" ? "Link copied." : "Quote copied with a link."); } catch { toast("Couldn’t copy. Select and copy instead."); } }
   if (a === "unsave") unsave(el.dataset.href);
+  if (a === "vote") { e.preventDefault(); vote(el.dataset.id, el); }
   if (a === "follow") toggleFollow(el.dataset.topic);
   if (a === "alerts") { e.stopPropagation(); toggleAccountMenu(false); toggleAlertsPanel(); }
   if (a === "alerts-close") toggleAlertsPanel(false);
@@ -1164,12 +1206,50 @@ function openDiscussionDialog(title = "") {
     { name: "body", label: "Your opening post", type: "textarea", rows: 7, required: true, minlength: 10 }
   ], onSubmit: async v => { const d = await apiJSON("/api/community/posts", v); toast("Discussion published."); await loadCommunity(); navigate(`/discussion/${d.id}`); } });
 }
-function viewCommunity() {
-  const posts = state.community;
-  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Community</div><h1>Ideas in conversation</h1><p>Moderated discussions on India’s strategic questions. Be specific, cite sources, and keep it civil.</p></div><button class="btn btn-dark" type="button" data-action="discuss">Start a discussion</button></div>
-  <div class="community-page"><div class="live-list">${posts === null ? `<div class="skeleton" style="height:240px"></div>` : posts.length ? posts.map(p => `<a class="live-item glass thread-row" href="/discussion/${encodeURIComponent(p.id)}"><span class="when">${ago(p.createdAt)}</span><span><b>${esc(p.title)}</b><p>${esc(p.body.length > 200 ? p.body.slice(0, 197) + "…" : p.body)}</p><span class="src"><span class="tag">${esc(p.topic)}</span>${esc(p.author)} · ${p.replies || 0} repl${p.replies === 1 ? "y" : "ies"}</span></span></a>`).join("") : `<div class="empty">No discussions yet. Start the first one.</div>`}</div>
-  <aside>${studioMiniAd("community_page")}<div class="aside-card glass"><div class="kicker">Upcoming</div><ol class="agenda" id="agenda"></ol><a class="link-gold" href="/events" style="display:block;margin-top:12px;font-size:13px">All events →</a></div></aside></div></div>`;
+// Avatars: initials on a colour picked from the name, so each member is recognisable.
+const AVATAR_COLOURS = ["#b8141f", "#0f5c8c", "#137a55", "#7a530f", "#6b3fa0", "#b4570e", "#1f6f78", "#8c2155"];
+const avatarColour = name => AVATAR_COLOURS[[...String(name)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % AVATAR_COLOURS.length];
+const avatar = (name, cls = "") => `<span class="av ${cls}" style="--av:${avatarColour(name)}" aria-hidden="true">${esc(initials(name))}</span>`;
+const TOPIC_COLOURS = { Geopolitics: "#0f5c8c", Security: "#b8141f", India: "#b4570e", Diplomacy: "#6b3fa0", Markets: "#137a55", Energy: "#7a530f", General: "#596173" };
+const topicChip = t => `<span class="topic-chip" style="--tc:${TOPIC_COLOURS[t] || "#596173"}">${esc(t)}</span>`;
+const sqlTime = d => new Date(String(d).replace(" ", "T") + (/[zZ+]/.test(String(d)) ? "" : "Z")).toISOString();
+function voteButton(p) {
+  return `<button class="vote${p.voted ? " on" : ""}" type="button" data-action="vote" data-id="${esc(p.id)}" aria-pressed="${!!p.voted}" aria-label="Useful (${p.votes || 0})"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 4l8 10h-5v6H9v-6H4z"/></svg><b>${p.votes || 0}</b></button>`;
+}
+function threadCard(p) {
+  const last = p.lastReplyAt ? `last reply ${ago(sqlTime(p.lastReplyAt))}` : `posted ${ago(sqlTime(p.createdAt))}`;
+  return `<article class="thread-card glass">${voteButton(p)}
+    <a class="thread-main" href="/discussion/${encodeURIComponent(p.id)}">
+      <span class="thread-top">${topicChip(p.topic)}${p.replies >= 3 || p.votes >= 3 ? `<span class="hot">Active</span>` : ""}</span>
+      <h3>${esc(p.title)}</h3>
+      <p>${esc(p.body.length > 220 ? p.body.slice(0, 217) + "…" : p.body)}</p>
+      <span class="thread-foot">${avatar(p.author, "sm")}<span class="who"><b>${esc(p.author)}</b> · ${last}</span>
+        <span class="talkers">${(p.repliers || []).slice(0, 3).map(n => avatar(n, "xs")).join("")}</span>
+        <span class="count"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16v10H9l-5 4z"/></svg>${p.replies || 0}</span></span>
+    </a></article>`;
+}
+async function viewCommunity(r = parseRoute()) {
+  const sort = r.params.get("sort") === "top" ? "top" : "latest", topic = TOPICS.includes(r.params.get("topic")) ? r.params.get("topic") : "";
+  const q = (o = {}) => { const p = new URLSearchParams(); const s_ = o.sort ?? sort, t = o.topic ?? topic; if (s_ === "top") p.set("sort", "top"); if (t) p.set("topic", t); const qs = p.toString(); return `/community${qs ? "?" + qs : ""}`; };
+  const st = state.communityStats;
+  $("#view").innerHTML = `<div class="wrap">
+    <section class="community-hero"><div><span class="join-eyebrow"><span class="pulse"></span>The Raisina Wire community</span><h1>Ideas in conversation</h1>
+      <p>Moderated discussions on India’s strategic questions. Be specific, cite sources and keep it civil. <a href="/community-guidelines">Guidelines</a></p>
+      ${st ? `<div class="community-stats"><span><b>${st.discussions}</b> discussions</span><span><b>${st.replies}</b> replies</span>${st.members >= 25 ? `<span><b>${st.members}</b> members</span>` : ""}</div>` : ""}</div>
+      <div class="hero-avatars" id="heroAvatars"></div></section>
+    <div class="community-page"><div>
+      <button class="composer glass" type="button" data-action="discuss">${state.user ? avatar(state.user.displayName) : `<span class="av" style="--av:#596173">+</span>`}<span>${state.user ? `What’s your take, ${esc(state.user.displayName.split(" ")[0])}? Start a discussion…` : "Join free to start a discussion…"}</span><span class="btn btn-red btn-sm">Post</span></button>
+      <div class="community-tools"><div class="pill-tabs" role="tablist"><a role="tab" href="${q({ sort: "latest" })}" aria-selected="${sort === "latest"}">Latest</a><a role="tab" href="${q({ sort: "top" })}" aria-selected="${sort === "top"}">Top</a></div>
+        <div class="chips topic-filter"><a class="chip" href="${q({ topic: "" })}" aria-pressed="${!topic}">All topics</a>${TOPICS.map(t => `<a class="chip" href="${q({ topic: t })}" aria-pressed="${t === topic}">${t}</a>`).join("")}</div></div>
+      <div class="thread-list" id="threadList">${Array.from({ length: 3 }, () => `<div class="skeleton" style="height:150px;border-radius:20px"></div>`).join("")}</div></div>
+    <aside>${studioMiniAd("community_page")}<div class="aside-card glass"><div class="kicker">Upcoming</div><ol class="agenda" id="agenda"></ol><a class="link-gold" href="/events" style="display:block;margin-top:12px;font-size:13px">All events →</a></div></aside></div></div>`;
   renderCommunity();
+  let posts = [];
+  try { posts = (await fetch(`/api/community/posts?${new URLSearchParams(Object.entries({ sort, topic }).filter(([, v]) => v && v !== "latest"))}`).then(x => x.json())).posts || []; } catch { /* offline */ }
+  if (parseRoute().page !== "community") return;
+  $("#threadList").innerHTML = posts.length ? posts.map(threadCard).join("") : `<div class="empty-state glass"><span class="empty-icon">${PERK_ICONS.talk}</span><b>${topic ? `No ${topic.toLowerCase()} discussions yet` : "No discussions yet"}</b><p>Start the first one. Ask a question, share a source, or challenge a story.</p><button class="btn btn-red" type="button" data-action="discuss">Start a discussion</button></div>`;
+  const people = [...new Set(posts.flatMap(p => [p.author, ...(p.repliers || [])]))].slice(0, 7);
+  if ($("#heroAvatars")) $("#heroAvatars").innerHTML = people.map(n => avatar(n)).join("") + (people.length ? `<small>${people.length === 7 ? "and more" : ""} recently active</small>` : "");
 }
 async function viewDiscussion(r) {
   const id = r.arg;
@@ -1179,21 +1259,33 @@ async function viewDiscussion(r) {
   if (parseRoute().arg !== id) return;
   if (!d) { $("#view").innerHTML = `<div class="wrap"><div class="blocked glass"><h1>Discussion not found</h1><p class="muted">It may have been removed by a moderator.</p><div class="blocked-actions"><a class="btn btn-dark" href="/community">Back to the community</a></div></div></div>`; return; }
   document.title = `${d.post.title} · Raisina Wire community`;
-  $("#view").innerHTML = `<div class="wrap"><div class="coverage">
-    <a class="link-gold" href="/community" style="font-size:13px">← All discussions</a>
-    <header class="coverage-head"><span class="tag" style="margin-top:16px">${esc(d.post.topic)}</span><h1>${esc(d.post.title)}</h1><div class="meta">${esc(d.post.author)} · ${ago(d.post.createdAt)}</div></header>
-    <div class="glass thread-post"><p>${esc(d.post.body)}</p></div>
-    <h2 class="thread-count">${d.replies.length} repl${d.replies.length === 1 ? "y" : "ies"}</h2>
-    <ol class="replies">${d.replies.map(x => `<li class="glass"><div class="reply-head"><span class="avatar avatar-sm" aria-hidden="true">${esc(initials(x.author))}</span><b>${esc(x.author)}</b><span class="meta">${ago(x.createdAt)}</span></div><p>${esc(x.body)}</p></li>`).join("")}</ol>
-    ${state.user ? `<form class="reply-form glass" id="replyForm"><label for="replyBody" class="kicker">Your reply</label><textarea id="replyBody" name="body" rows="4" required minlength="2" maxlength="5000" placeholder="Add to the discussion"></textarea><p class="auth-message" id="replyMessage" aria-live="polite"></p><button class="btn btn-dark" type="submit">Post reply</button></form>`
-      : `<div class="reply-form glass"><p style="margin:0">Sign in to join the discussion.</p><button class="btn btn-dark" type="button" data-action="signin">Sign in</button></div>`}
+  const p = d.post;
+  $("#view").innerHTML = `<div class="wrap"><div class="discussion">
+    <a class="back-link" href="/community">← All discussions</a>
+    <article class="thread-post glass">
+      <header>${topicChip(p.topic)}<h1>${esc(p.title)}</h1><div class="post-by">${avatar(p.author)}<span><b>${esc(p.author)}</b><small>${ago(sqlTime(p.createdAt))}</small></span></div></header>
+      <p class="post-body">${esc(p.body)}</p>
+      <footer>${voteButton(p)}<span class="muted">${d.replies.length} repl${d.replies.length === 1 ? "y" : "ies"}</span>${shareBlock(p.title, `/discussion/${encodeURIComponent(p.id)}`)}</footer>
+    </article>
+    <h2 class="thread-count">${d.replies.length ? `${d.replies.length} repl${d.replies.length === 1 ? "y" : "ies"}` : "No replies yet"}</h2>
+    <ol class="reply-list">${d.replies.map(x => `<li>${avatar(x.author)}<div class="bubble glass"><div class="reply-head"><b>${esc(x.author)}</b><span class="meta">${ago(sqlTime(x.createdAt))}</span></div><p>${esc(x.body)}</p></div></li>`).join("") || `<li class="no-replies">Be the first to reply. A source, a counter-argument or a question all move a discussion on.</li>`}</ol>
+    ${state.user ? `<form class="reply-composer glass" id="replyForm">${avatar(state.user.displayName)}<label for="replyBody" class="sr-only">Your reply</label><textarea id="replyBody" name="body" rows="2" required minlength="2" maxlength="5000" placeholder="Add your reply…"></textarea><button class="btn btn-red" type="submit">Reply</button><p class="auth-message" id="replyMessage" aria-live="polite"></p></form>`
+      : `<div class="reply-composer glass guest"><p>Join the conversation: it’s free.</p><button class="btn btn-red" type="button" data-action="join">Join free</button><button class="btn btn-light" type="button" data-action="signin">Sign in</button></div>`}
   </div></div>`;
+  $("#replyBody")?.addEventListener("input", e => { e.target.style.height = "auto"; e.target.style.height = Math.min(220, e.target.scrollHeight) + "px"; });
   $("#replyForm")?.addEventListener("submit", async e => {
     e.preventDefault();
     const btn = e.currentTarget.querySelector("button"); btn.disabled = true;
-    try { await apiJSON(`/api/community/posts/${encodeURIComponent(id)}/replies`, { body: $("#replyBody").value }); toast("Reply posted."); viewDiscussion(parseRoute()); loadCommunity(); }
+    try { await apiJSON(`/api/community/posts/${encodeURIComponent(id)}/replies`, { body: $("#replyBody").value }); toast("Reply posted."); await viewDiscussion(parseRoute()); jump(document.documentElement.scrollHeight); loadCommunity(); }
     catch (err) { $("#replyMessage").textContent = err.message; btn.disabled = false; }
   });
+}
+async function vote(id, el) {
+  if (!state.user) { openAuth("register"); toast("Join free to vote on discussions."); return; }
+  try {
+    const d = await apiJSON(`/api/community/posts/${encodeURIComponent(id)}/vote`, {});
+    $$(`[data-action=vote][data-id="${CSS.escape(id)}"]`).forEach(b => { b.classList.toggle("on", d.voted); b.setAttribute("aria-pressed", String(d.voted)); b.querySelector("b").textContent = d.votes; });
+  } catch (e) { toast(e.message); }
 }
 
 /* ---------- Events ---------- */
@@ -1250,6 +1342,7 @@ function viewAccount() {
     <form class="mgroup glass account-form" id="passwordForm"><h2>Password</h2><label>Current password<input name="currentPassword" type="password" required autocomplete="current-password"></label><label>New password <small>(12+ characters)</small><input name="newPassword" type="password" required minlength="12" autocomplete="new-password"></label><p class="auth-message" aria-live="polite"></p><button class="btn btn-dark" type="submit">Change password</button></form>
     <div class="mgroup glass"><h2>Saved stories</h2><p class="muted">${saved.length} saved on this device.</p><a class="btn btn-light" href="/saved">Open saved stories</a></div>
     <div class="mgroup glass"><h2>Session</h2><p class="muted">Signing out ends this session on this device.</p><button class="btn btn-light" type="button" data-action="signout">Sign out</button>${["admin", "editor"].includes(u.role) ? ` <a class="btn btn-dark" href="/admin.html">Open the control room</a>` : ""}</div>
+    <form class="mgroup glass account-form danger-zone" id="deleteForm"><h2>Delete account</h2><p class="muted">Erases your account, saved stories, followed topics, discussions and replies. This can’t be undone. See our <a href="/privacy">Privacy Policy</a>.</p><label>Type DELETE to confirm<input name="confirm" required pattern="DELETE" autocomplete="off"></label><p class="auth-message" aria-live="polite"></p><button class="btn btn-light" type="submit">Delete my account</button></form>
   </div></div>`;
   const wire = (id, fn) => $(id).addEventListener("submit", async e => {
     e.preventDefault(); const f = e.currentTarget, msg = f.querySelector(".auth-message"), btn = f.querySelector("button");
@@ -1259,6 +1352,7 @@ function viewAccount() {
     finally { btn.disabled = false; }
   });
   wire("#nameForm", async v => { const d = await apiJSON("/api/auth/me", v, "PUT"); state.user = { ...state.user, displayName: d.user.displayName }; showUser(); toast("Name updated."); viewAccount(); });
+  wire("#deleteForm", async v => { if (v.confirm !== "DELETE") throw new Error("Type DELETE to confirm."); await apiJSON("/api/auth/me", {}, "DELETE"); store.set("rw-saved", []); state.user = null; state.topics = []; showUser(); toast("Your account has been deleted."); navigate("/"); });
   wire("#passwordForm", async v => { await apiJSON("/api/auth/password", v); toast("Password changed. Other devices have been signed out."); $("#passwordForm").reset(); });
 }
 
@@ -1299,7 +1393,7 @@ async function loadCommunity() {
   try { state.events = (await fetch("/api/events").then(r => r.json())).events || []; } catch { state.events = []; }
   try { state.communityStats = await fetch("/api/community/stats").then(r => r.ok ? r.json() : null); } catch { /* optional */ }
   renderCommunity();
-  if (parseRoute().page === "community") viewCommunity();
+  if (parseRoute().page === "community" && !$("#threadList")) viewCommunity();
   if (parseRoute().page === "events") viewEvents();
 }
 
@@ -1433,7 +1527,7 @@ watchScroll();
 const fromHash = () => { if (location.hash.startsWith("#/")) { history.replaceState({ rw: true }, "", location.hash.slice(1) || "/"); return true; } return false; };
 fromHash();
 window.addEventListener("hashchange", () => { if (fromHash()) route(); });
-window.addEventListener("popstate", () => route());
+window.addEventListener("popstate", e => route({ restoreY: e.state?.y ?? 0 }));
 userReady.then(() => { if (state.user) { showUser(); loadTopics().then(() => { const pg = parseRoute(); if (pg.page === "tag") viewTag(pg); }); } });
 quoteShare();
 navigator.serviceWorker?.ready.then(async () => { if (pushSupported() && Notification.permission === "granted" && !store.get("rw-alerts-optout", 0)) await enableAlerts({ silent: true }); else await syncAlertsButton(); maybeAskForAlerts(); }).catch(() => {});

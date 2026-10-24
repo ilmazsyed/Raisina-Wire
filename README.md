@@ -19,11 +19,12 @@ A premium, mobile-first editorial and geopolitical briefing platform with a live
 - **Live coverage (live blogs):** coverage opened in the control room's Live publishing view appears on the home page as a LIVE banner, in the top ticker and on its own page (`/coverage/<slug>`), which refreshes every 30 seconds. Closed coverage stays readable, marked as ended.
 - **Editorial furniture:** a rolling headline ticker (with a pause button; it keeps moving even when the device asks for reduced motion) with world clocks, blinking live markers, The Briefing (one top story per desk), From the Editor (a line from the latest edition), drop caps, pull quotes and an author box in editions.
 - **Articles from the control room:** articles published in the control room (Editorial) appear with the editions, newest first, on the home page lead, The Briefing, the archive and search. Each has its own page (`/article/<slug>`), an optional image (otherwise category artwork) and an optional original link. Articles can be edited, unpublished or archived. Body formatting: a blank line starts a new paragraph, `## ` starts a heading, `- ` a bullet, `1. ` a numbered point.
-- **Community:** the front page has a "Join the community" section with the member perks and the latest discussions and briefings; every story ends with "Discuss this story". Members register and sign in, start discussions and reply in threads (`/community`, `/discussion/<id>`). Moderators hide, restore or remove posts and replies in the control room.
+- **Community:** the front page has a "Join the community" section with the member perks and the latest discussions and briefings; every story ends with "Discuss this story". Members register and sign in, start discussions and reply in threads (`/community`, `/discussion/<id>`). The boards show topic colours, upvotes, reply counts, who has joined each thread and when it was last active, with Latest/Top sorting and topic filters. Moderators hide, restore or remove posts and replies in the control room.
 - **Events:** published events are listed at `/events` with an "Add to calendar" (.ics) download. Times are entered in local time and stored in UTC.
 - **Watch:** published multimedia (YouTube, audio, video, images) plays inside the app at `/watch`.
 - **Account:** members change their display name and password at `/account`; a password change signs out other devices. Sign-in is throttled after repeated failures (HTTP 429).
 - **Search:** the search button searches editions, articles and the live wire.
+- **Mobile behaviour:** form fields are 16px on touch screens, so iOS no longer zooms while typing; each new page opens at the top (back restores where you were), and the server-rendered page is hidden behind a short splash until the app takes over, so there is no flash of the footer.
 - **Admin control room** (`/admin.html`): overview, editorial, live coverage (open, update, end, resume), multimedia, community moderation, events, leads from the contact form, and users. The built-in admin is `ADMIN_EMAIL` with the `ADMIN_PASSWORD` secret. D1 tables and later migrations are applied automatically on first use.
 - **Installable app (PWA):** installs to the home screen on Android, iPhone and desktop, with shortcuts (Live wire, Editions, Markets, Saved) and store-style screenshots. Works offline: the build precaches the app and every edition's text and artwork (`vite.config.js` fills the list into `sw.js`); the live wire, markets and coverage fall back to the last copy, labelled "Offline copy"; saved stories are kept for offline reading. New deploys show an "Update" bar instead of silently replacing the running version.
 
@@ -52,6 +53,12 @@ To switch it on:
 3. In Cloudflare (Worker → Settings → Variables and Secrets), add a secret named `GOOGLE_TTS_API_KEY` with that key.
 
 Without the key, Listen uses the device's own voice, choosing a female Indian English voice when the device has one, read sentence by sentence with pauses. Wire stories from other publishers always use the device voice.
+
+## Legal pages and how we use other publishers' work
+
+The About page (`/about`) and the legal pages (`/terms`, `/privacy`, `/disclaimer`, `/copyright`, `/community-guidelines`, `/grievance`) are in `src/legal.js`, shown in the app and rendered by the Worker for search engines. They were drafted with care for Indian law (Copyright Act 1957 s.52 and Copyright Rules 2013 r.75; IT Act 2000 s.79 and IT Rules 2021; DPDP Act 2023; SEBI rules on investment advice; the Emblems and State Emblem Acts) but **should be reviewed by an Indian lawyer** before you rely on them.
+
+To keep the live wire on the right side of copyright, the in-app reader shows only an **excerpt** of other publishers' stories (at most about 120 words, the opening paragraphs, credited and labelled) with a prominent link to read the full story on the publisher's site. It never returns the full text. It identifies itself honestly as `RaisinaWireReader`, shows no excerpt where a page's robots meta says `nosnippet`, `noarchive` or `none`, and applies `max-snippet`. Publishers who ask to opt out are added to `PUBLISHER_OPT_OUT` in `wrangler.toml` (comma-separated domains). Members can delete their own account from My account.
 
 ## Getting found on Google
 
