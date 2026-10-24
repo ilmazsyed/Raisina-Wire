@@ -170,3 +170,10 @@ td small{display:block;color:var(--muted);margin-top:4px}
 /* The menu row keeps its own height; the page below takes the rest. */
 @media(max-width:900px){.layout{grid-template-rows:auto 1fr;align-content:start}.sidebar{align-items:center;align-self:start}.nav{align-self:center}}
 @media(pointer:coarse){input,select,textarea{font-size:16px!important}}
+/* Translations */
+.tr-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:10px}
+.tr-row textarea[readonly],.tr-row input[readonly]{background:rgba(15,20,34,.035);color:var(--ink-2)}
+.tr-row [lang=hi],.tr-row [lang=bn]{font-family:"Tiro Devanagari Hindi","Tiro Bangla",Mukta,"Hind Siliguri",var(--sans,system-ui);font-size:16px;line-height:1.6}
+.tr-err{display:block;color:var(--bad);margin-top:4px}
+td .row-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+@media(max-width:760px){.tr-row{grid-template-columns:1fr}}

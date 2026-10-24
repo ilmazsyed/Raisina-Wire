@@ -7,10 +7,12 @@ import m0005 from "../migrations/0005_editions_media_writers.sql";
 import m0006 from "../migrations/0006_tags_views_alerts.sql";
 import m0007 from "../migrations/0007_tts_audio.sql";
 import m0008 from "../migrations/0008_community_votes.sql";
+import m0009 from "../migrations/0009_translations.sql";
 import { handleTts } from "./tts.js";
 import { editions } from "./editions.js";
 import editionBodies from "./edition-bodies.json";
-import { ARTICLE_COLS, toArticle, listPublished, getBySlug, blocksToText, splitTags, tagSlug, isPublic, WRITERS, DEFAULT_WRITER } from "./store.js";
+import { ARTICLE_COLS, toArticle, listPublished, getBySlug, blocksToText, splitTags, tagSlug, isPublic, textHash, WRITERS, DEFAULT_WRITER } from "./store.js";
+import { LANGS, isLang, translatorEnabled, translateNext, localiseArticles, localisePage, PAGES, pageVer } from "./translate.js";
 import { vapidKeys, createAlert, drainAlerts } from "./push.js";
 import { renderPage, sitemap, newsSitemap, robots, feed, PAGE_PATTERN } from "./seo.js";
 
@@ -56,7 +58,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -213,7 +215,8 @@ async function api(request, env, ctx) {
     return json(await cached("markets", 45e3, marketBoard), 200, { "cache-control":"public, max-age=45, s-maxage=60" });
   }
   if (url.pathname === "/api/wire") {
-    return json(await cached("wire", 90e3, liveWire), 200, { "cache-control":"public, max-age=60, s-maxage=90" });
+    const lang = isLang(url.searchParams.get("lang")) ? url.searchParams.get("lang") : "";
+    return json(await cached(`wire${lang}`, 90e3, () => liveWire(lang)), 200, { "cache-control":"public, max-age=60, s-maxage=90" });
   }
   if (url.pathname === "/api/read") {
     const target = url.searchParams.get("url") || "";
@@ -439,7 +442,8 @@ async function api(request, env, ctx) {
 
   if (url.pathname === "/api/articles" && request.method === "GET") {
     const w = url.searchParams.get("writer");
-    return json({ articles: await listPublished(env, { writerKey: WRITERS.some(x => x.key === w) ? w : null, tag: url.searchParams.get("tag"), limit: 300 }) });
+    const list = await listPublished(env, { writerKey: WRITERS.some(x => x.key === w) ? w : null, tag: url.searchParams.get("tag"), limit: 300 });
+    return json({ articles: await localiseArticles(env, url.searchParams.get("lang"), list) });
   }
   if (url.pathname === "/api/tags" && request.method === "GET") {
     const counts = new Map();
@@ -450,7 +454,66 @@ async function api(request, env, ctx) {
     const a = await getBySlug(env, decodeURIComponent(url.pathname.split("/").pop() || ""));
     if (!a) return err("Article not found.", 404);
     if (!isPublic(a) && !isStaff(await currentUser(request, env))) return err("Article not found.", 404);
-    return json({ article: a }, 200, { "cache-control": isPublic(a) ? "no-cache" : "no-store" });
+    const [localised] = await localiseArticles(env, url.searchParams.get("lang"), [a]);
+    return json({ article: localised }, 200, { "cache-control": isPublic(a) ? "no-cache" : "no-store" });
+  }
+
+  // About and the legal pages in Hindi or Bengali (English when no current translation exists).
+  if (/^\/api\/pages\/[\w-]+$/.test(url.pathname) && request.method === "GET") {
+    const key = url.pathname.split("/").pop();
+    if (!PAGES[key]) return err("Page not found.", 404);
+    const p = await localisePage(env, url.searchParams.get("lang"), key);
+    return json({ page: { key, title: p.title, html: p.html, lang: p.lang } });
+  }
+  // Translations in the control room: status per story and language, corrections, re-translation.
+  if (url.pathname === "/api/admin/translations" && request.method === "GET") {
+    if (!isStaff(await currentUser(request, env))) return err("Editor access required.", 403);
+    const { results: rows } = await env.DB.prepare("SELECT kind,ref,lang,src_ver,status,error,attempts,model,updated_at FROM translations").all();
+    const rowOf = new Map(rows.map(r => [`${r.kind}|${r.ref}|${r.lang}`, r]));
+    const state = (kind, ref, ver, live) => Object.fromEntries(LANGS.map(l => {
+      const r = rowOf.get(`${kind}|${ref}|${l}`);
+      const current = !!r && r.src_ver === ver;
+      const status = !live ? "not published" : !r ? "queued" : r.status === "working" ? "translating" : r.status === "error" ? (r.attempts >= 3 || current ? "failed" : "retrying") : r.status === "pending" ? "queued" : current ? (r.status === "manual" ? "edited" : "ready") : "updating";
+      return [l, { status, current, error: r?.error || "", model: r?.model || "", updatedAt: r?.updated_at || "" }];
+    }));
+    const { results: arts } = await env.DB.prepare("SELECT id,slug,kind,title,status,published_at,text_hash FROM articles ORDER BY COALESCE(published_at,updated_at) DESC LIMIT 500").all();
+    const now = new Date().toISOString();
+    const items = arts.map(a => ({ kind: "article", ref: a.id, slug: a.slug, title: a.title, href: `/${a.kind === "edition" ? "edition" : "article"}/${a.slug}`, langs: state("article", a.id, a.text_hash, a.status === "published" && a.published_at <= now) }));
+    for (const key of Object.keys(PAGES)) items.push({ kind: "page", ref: key, title: PAGES[key].title, href: `/${key}`, langs: state("page", key, await pageVer(key), true) });
+    return json({ enabled: translatorEnabled(env), langs: LANGS, items }, 200, { "cache-control": "no-store" });
+  }
+  const trMatch = url.pathname.match(/^\/api\/admin\/translations\/(article|page)\/([^/]+)\/(hi|bn)(\/retranslate)?$/);
+  if (trMatch) {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const [, kind, ref, lang, again] = trMatch.map(x => x && decodeURIComponent(x));
+    const src = kind === "page" ? (PAGES[ref] ? { title: PAGES[ref].title, body: PAGES[ref].html, ver: await pageVer(ref) } : null)
+      : await env.DB.prepare("SELECT title,dek,topic,hero_caption,tags,body,text_hash AS ver FROM articles WHERE id=?").bind(ref).first();
+    if (!src) return err("Not found.", 404);
+    if (again && request.method === "POST") {
+      await env.DB.prepare("INSERT INTO translations (kind,ref,lang,status,attempts,updated_at) VALUES (?,?,?,'pending',0,?) ON CONFLICT(kind,ref,lang) DO UPDATE SET status='pending', attempts=0, error='' WHERE translations.status<>'working'")
+        .bind(kind, ref, lang, new Date().toISOString()).run();
+      await audit(env, user, "translation.retranslate", kind, ref, { lang });
+      return json({ ok: true, queued: true }, 200, { "cache-control": "no-store" });
+    }
+    if (!again && request.method === "GET") {
+      const t = await env.DB.prepare("SELECT title,dek,topic,hero_caption,tags,body,status,src_ver,error FROM translations WHERE kind=? AND ref=? AND lang=?").bind(kind, ref, lang).first();
+      let tags = []; try { tags = JSON.parse(t?.tags || "[]"); } catch { /* none */ }
+      return json({ source: { title: src.title, dek: src.dek || "", topic: src.topic || "", heroCaption: src.hero_caption || "", tags: splitTags(src.tags), body: src.body || "" },
+        translation: t ? { title: t.title, dek: t.dek, topic: t.topic, heroCaption: t.hero_caption, tags, body: t.body, status: t.status, current: t.src_ver === src.ver, error: t.error } : null }, 200, { "cache-control": "no-store" });
+    }
+    if (!again && request.method === "PUT") {
+      const b = await request.json().catch(() => ({}));
+      const title = String(b.title || "").trim().slice(0, 300), body = String(b.body || "").slice(0, 200000);
+      if (!title || !body.trim()) return err("A translation needs a title and text.");
+      const tags = JSON.stringify(splitTags(src.tags).map((t, i) => String(b.tags?.[i] || t).trim().slice(0, 60)));
+      await env.DB.prepare(`INSERT INTO translations (kind,ref,lang,src_ver,job_ver,title,dek,topic,hero_caption,tags,body,status,error,attempts,model,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,'manual','',0,'editor',?)
+        ON CONFLICT(kind,ref,lang) DO UPDATE SET src_ver=excluded.src_ver, job_ver=excluded.job_ver, title=excluded.title, dek=excluded.dek, topic=excluded.topic, hero_caption=excluded.hero_caption, tags=excluded.tags, body=excluded.body, status='manual', error='', attempts=0, model='editor', updated_at=excluded.updated_at`)
+        .bind(kind, ref, lang, src.ver, src.ver, title, String(b.dek || "").trim().slice(0, 600), String(b.topic || "").trim().slice(0, 120), String(b.heroCaption || "").trim().slice(0, 400), tags, body, new Date().toISOString()).run();
+      await audit(env, user, "translation.edit", kind, ref, { lang });
+      return json({ ok: true }, 200, { "cache-control": "no-store" });
+    }
+    return err("Method not allowed.", 405);
   }
 
   if (url.pathname === "/api/admin/articles" && request.method === "GET") {
@@ -468,9 +531,10 @@ async function api(request, env, ctx) {
     const id = randomId(), slug = await uniqueSlug(env, "articles", b.slug || title), status = b.status === "published" ? "published" : "draft";
     const publishedAt = status === "published" ? (Date.parse(b.publishedAt) ? new Date(b.publishedAt).toISOString() : new Date().toISOString()) : null;
     const category = String(b.category||"Analysis").slice(0,40);
-    await env.DB.prepare("INSERT INTO articles (id,slug,kind,title,dek,topic,tags,body,category,status,author_id,writer,published_at,image_url,hero_url,hero_caption,source_url) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(
-      id, slug, b.kind === "edition" ? "edition" : "article", title, String(b.dek||"").trim().slice(0,400), String(b.topic||"").trim().slice(0,80), tagsValue(b.tags), String(b.body||"").slice(0,100000),
-      category, status, user.id, writerKey(b.writer), publishedAt, imageRef(b.imageUrl), imageRef(b.heroUrl), String(b.heroCaption||"").trim().slice(0,300), httpsUrl(b.sourceUrl)).run();
+    const text = { title, dek: String(b.dek||"").trim().slice(0,400), topic: String(b.topic||"").trim().slice(0,80), tags: tagsValue(b.tags), body: String(b.body||"").slice(0,100000), hero_caption: String(b.heroCaption||"").trim().slice(0,300) };
+    await env.DB.prepare("INSERT INTO articles (id,slug,kind,title,dek,topic,tags,body,category,status,author_id,writer,published_at,image_url,hero_url,hero_caption,source_url,text_hash) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(
+      id, slug, b.kind === "edition" ? "edition" : "article", title, text.dek, text.topic, text.tags, text.body,
+      category, status, user.id, writerKey(b.writer), publishedAt, imageRef(b.imageUrl), imageRef(b.heroUrl), text.hero_caption, httpsUrl(b.sourceUrl), await textHash(text)).run();
     await audit(env, user, "article.create", "article", id, { title, status });
     const alert = wantsAlert(b.notify) && status === "published" ? await storyAlert(env, ctx, user, { id, slug, title, status, kind: b.kind === "edition" ? "edition" : "article", published_at: publishedAt }) : "";
     return json({ok:true,id,slug,alert},201,{"cache-control":"no-store"});
@@ -487,21 +551,19 @@ async function api(request, env, ctx) {
     if (title.length < 8) return err("Title must be at least 8 characters.");
     const status = ["draft","published","archived"].includes(b.status) ? b.status : c.status;
     const publishedAt = status === "published" ? (Date.parse(b.publishedAt) ? new Date(b.publishedAt).toISOString() : (c.published_at || new Date().toISOString())) : c.published_at;
-    await env.DB.prepare("UPDATE articles SET title=?,dek=?,topic=?,tags=?,body=?,category=?,kind=?,writer=?,status=?,published_at=?,image_url=?,hero_url=?,hero_caption=?,source_url=?,updated_at=?,alert_state=CASE WHEN ?<>'published' AND alert_state='pending' THEN '' ELSE alert_state END WHERE id=?").bind(
-      title,
-      pick("dek", v => String(v).trim().slice(0,400), c.dek),
-      pick("topic", v => String(v).trim().slice(0,80), c.topic),
-      pick("tags", tagsValue, c.tags),
-      pick("body", v => String(v).slice(0,100000), c.body),
+    const text = { title, dek: pick("dek", v => String(v).trim().slice(0,400), c.dek), topic: pick("topic", v => String(v).trim().slice(0,80), c.topic),
+      tags: pick("tags", tagsValue, c.tags), body: pick("body", v => String(v).slice(0,100000), c.body), hero_caption: pick("heroCaption", v => String(v).trim().slice(0,300), c.hero_caption) };
+    await env.DB.prepare("UPDATE articles SET title=?,dek=?,topic=?,tags=?,body=?,category=?,kind=?,writer=?,status=?,published_at=?,image_url=?,hero_url=?,hero_caption=?,source_url=?,updated_at=?,text_hash=?,alert_state=CASE WHEN ?<>'published' AND alert_state='pending' THEN '' ELSE alert_state END WHERE id=?").bind(
+      title, text.dek, text.topic, text.tags, text.body,
       pick("category", v => String(v).slice(0,40), c.category),
       pick("kind", v => v === "edition" ? "edition" : "article", c.kind),
       pick("writer", writerKey, c.writer),
       status, publishedAt,
       pick("imageUrl", imageRef, c.image_url),
       pick("heroUrl", imageRef, c.hero_url),
-      pick("heroCaption", v => String(v).trim().slice(0,300), c.hero_caption),
+      text.hero_caption,
       pick("sourceUrl", httpsUrl, c.source_url),
-      new Date().toISOString(), status, id).run();
+      new Date().toISOString(), await textHash(text), status, id).run();
     await audit(env,user,"article.update","article",id,{title,status});
     // First publication of a story sends its alert (unless switched off); later edits never re-send.
     const firstPublish = c.status !== "published" || c.alert_state === "pending";
@@ -873,6 +935,7 @@ async function scheduled(env) {
   await step("scheduled stories", async () => { for (const row of results) await storyAlert(env, null, null, row); });
   await step("daily alerts", () => dailyAlerts(env, env.CRON_TEST_NOW ? new Date(env.CRON_TEST_NOW) : new Date())); // CRON_TEST_NOW: local tests only
   await step("push delivery", () => drainAlerts(env));
+  await step("translations", () => translateNext(env)); // last: a long story can take a few minutes
 }
 // 9 am and 9 pm India time, every day (unless switched off in the control room).
 // The settings row makes each one send exactly once, even if two cron runs overlap.
@@ -917,7 +980,7 @@ export default {
       if (url.pathname === "/sitemap.xml" && env.DB) return await sitemap(request, env, ensureSchema);
       if (url.pathname === "/news-sitemap.xml" && env.DB) return await newsSitemap(request, env, ensureSchema);
       if ((url.pathname === "/feed.xml" || url.pathname === "/rss.xml") && env.DB) return await feed(request, env, ensureSchema);
-      if (env.ASSETS && request.method === "GET" && PAGE_PATTERN.test(url.pathname)) return await renderPage(request, env, ensureSchema);
+      if (env.ASSETS && request.method === "GET" && PAGE_PATTERN.test(url.pathname.replace(/^\/(hi|bn)(?=\/|$)/, "") || "/")) return await renderPage(request, env, ensureSchema);
     } catch (e) { /* fall through to the static app */ }
     if (env.ASSETS) return env.ASSETS.fetch(request);
     return new Response("Raisina Wire assets are not built. Run npm run build.", { status: 503 });

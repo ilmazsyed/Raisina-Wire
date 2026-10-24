@@ -1,7 +1,7 @@
 // Articles and editions as stored in D1, shared by the API (worker.js) and the HTML pages (seo.js).
 import { WRITERS, DEFAULT_WRITER, writer } from "./writers.js";
 
-export const ARTICLE_COLS = "id,slug,kind,title,dek,topic,category,status,image_url,hero_url,hero_caption,source_url,published_at,updated_at,writer,tags,alert_state,length(body) AS body_length";
+export const ARTICLE_COLS = "id,slug,kind,title,dek,topic,category,status,image_url,hero_url,hero_caption,source_url,published_at,updated_at,writer,tags,alert_state,text_hash,length(body) AS body_length";
 export const storyPath = row => `/${row.kind === "edition" ? "edition" : "article"}/${encodeURIComponent(row.slug)}`;
 export const readMinutes = chars => Math.max(2, Math.round((chars || 0) / 1300));
 
@@ -17,12 +17,19 @@ export function toArticle(row, { body = false } = {}) {
     imageUrl: row.image_url || "", heroUrl: row.hero_url || "", heroCaption: row.hero_caption || "",
     image: row.image_url || row.hero_url || genericImage(row.category),
     sourceUrl: row.source_url || "", publishedAt: row.published_at, updatedAt: row.updated_at,
-    writer: w.key, author: w.name, status: row.status, tags: splitTags(row.tags), alertState: row.alert_state || "",
+    writer: w.key, author: w.name, status: row.status, tags: splitTags(row.tags), alertState: row.alert_state || "", textHash: row.text_hash || "",
     scheduled: row.status === "published" && !!row.published_at && row.published_at > new Date().toISOString(),
     bodyLength: row.body_length ?? (row.body || "").length, readMinutes: readMinutes(row.body_length ?? (row.body || "").length)
   };
   if (body) out.body = row.body || "";
   return out;
+}
+
+// Fingerprint of the text a translation is made from (title, standfirst, topic, caption, tags, body).
+export async function textHash(row) {
+  const src = JSON.stringify([row.title, row.dek, row.topic, row.hero_caption, row.tags, row.body].map(v => String(v ?? "")));
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(src));
+  return [...new Uint8Array(d)].slice(0, 10).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 export function splitTags(v) {

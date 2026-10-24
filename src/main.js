@@ -3,6 +3,7 @@ import { editions, NEWSLETTER_URL, AUTHOR } from "./editions.js";
 import { brandMark, skyline, tribar, wordmark } from "./brand.js";
 import { WRITERS, writer } from "./writers.js";
 import { ABOUT, LEGAL, LEGAL_ORDER, LEGAL_UPDATED } from "./legal.js";
+import { lang, LOCALE, LANGUAGES, stripLang, withLang, tr, ago, digits, loadLanguage, startTranslator, languageLinks } from "./i18n.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -14,17 +15,9 @@ const wireIndex = new Map(); // url -> wire item, so the reader can show a headl
 
 /* ---------- Formatting ---------- */
 const toDate = d => new Date(String(d).length === 10 ? `${d}T00:00:00+05:30` : d);
-const editionDate = d => toDate(d).toLocaleDateString("en-IN", { ...IST, day: "numeric", month: "short", year: "numeric" });
-const shortDate = d => toDate(d).toLocaleDateString("en-IN", { ...IST, day: "numeric", month: "short" });
-const clock = iso => iso ? new Date(iso).toLocaleTimeString("en-IN", { ...IST, hour: "2-digit", minute: "2-digit", hour12: false }) : "";
-function ago(iso) {
-  if (!iso) return "";
-  const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000));
-  if (m < 1) return "just now";
-  if (m < 60) return `${m} min ago`;
-  if (m < 1440) return `${Math.floor(m / 60)} h ago`;
-  return new Date(iso).toLocaleDateString("en-IN", { ...IST, day: "numeric", month: "short" });
-}
+const editionDate = d => toDate(d).toLocaleDateString(LOCALE, { ...IST, day: "numeric", month: "short", year: "numeric" });
+const shortDate = d => toDate(d).toLocaleDateString(LOCALE, { ...IST, day: "numeric", month: "short" });
+const clock = iso => iso ? new Date(iso).toLocaleTimeString(LOCALE, { ...IST, hour: "2-digit", minute: "2-digit", hour12: false }) : "";
 const num = (v, d = 2) => Number(v).toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d });
 const isYield = q => /^\^(TNX|FVX|TYX)$/.test(q?.symbol || "");
 function quoteValue(q) {
@@ -136,6 +129,8 @@ function renderShell() {
     <div class="utility">
       <div class="utility-left"><span id="today"></span><span id="wireStatus"><span class="dot-ok"></span>Connecting to the live wire…</span></div>
       <div class="utility-right">
+        <details class="lang-menu" id="langMenu"><summary class="icon-btn lang-btn" aria-label="Language" title="Language">${ICON_GLOBE}<span lang="${lang}">${LANGUAGES[lang].short}</span></summary>
+          <div class="lang-pop glass" id="langPop" data-no-tr role="menu">${languageLinks()}</div></details>
         <button class="icon-btn" type="button" data-action="theme" aria-label="Switch between light and dark" title="Light or dark"><svg class="i-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg><svg class="i-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
         <span class="alerts-wrap"><button class="icon-btn" type="button" data-action="alerts" aria-label="Alerts" aria-haspopup="dialog" aria-controls="alertsPanel">${ICON_BELL}</button>
           <div class="alerts-panel glass" id="alertsPanel" role="dialog" aria-label="Alerts" hidden></div></span>
@@ -163,6 +158,7 @@ function renderShell() {
       <label class="sr-only" for="leadInterest">Interest</label><select id="leadInterest" name="interest"><option>Daily briefing</option><option>Academy training</option><option>Calibrex enterprise enquiry</option><option>Speaking / partnership</option></select>
       <button class="btn btn-dark" type="submit">Request contact</button><small id="leadMessage" aria-live="polite"></small></form>
     ${studioAd()}
+    <nav class="lang-foot" id="langFoot" data-no-tr aria-label="Language">${languageLinks()}</nav>
     <nav class="legal-links" aria-label="Legal"><a href="/about">About Raisina Wire</a>${LEGAL_ORDER.map(([k, t]) => `<a href="/${k}">${t}</a>`).join("")}</nav>
     <div class="footer-base">${poweredByCalibrex()}</div>
     <p class="copyright">© ${new Date().getFullYear()} Raisina Wire. All rights reserved. An independent publication, not affiliated with the Government of India. Headlines and excerpts from other publishers are credited and linked, and remain their property. Market data is delayed and is not investment advice.</p>
@@ -201,6 +197,7 @@ function renderShell() {
     <p class="sheet-note">Your browser asks you to confirm once. Turn them off any time from the bell.</p>
   </section>
   <div class="offline-bar" id="offlineBar" role="status" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 4.2-2.6M10.7 5.1A15 15 0 0 1 22 8.8M5 12.9a10 10 0 0 1 5.2-2.7M19 12.9a10 10 0 0 0-2.3-1.6M8.5 16.4a5 5 0 0 1 7 0M12 20h.01M3 3l18 18"/></svg><span>You’re offline. Editions and saved stories still open; live data shows the last copy.</span></div>
+  <div class="update-bar lang-suggest" id="langSuggest" role="status" hidden></div>
   <div class="update-bar" id="updateBar" role="status" hidden>
     <span class="ub-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></svg></span>
     <span class="ub-text"><b>A new version is ready</b><small>Update for the latest stories and fixes.</small></span>
@@ -221,11 +218,11 @@ function renderShell() {
     <div class="sheet-actions install-actions"><button class="btn btn-red sheet-primary" type="button" data-action="install">Install the app</button><button class="sheet-secondary" type="button" data-action="install-dismiss">Not now</button></div>
   </section>`;
 
-  $("#today").textContent = new Date().toLocaleDateString("en-IN", { ...IST, weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  $("#today").textContent = new Date().toLocaleDateString(LOCALE, { ...IST, weekday: "long", day: "numeric", month: "long", year: "numeric" });
   $("#signInBtn").addEventListener("click", () => openAuth("login"));
   $("#joinBtn").addEventListener("click", () => openAuth("register"));
   $("#avatarBtn").addEventListener("click", () => toggleAccountMenu());
-  document.addEventListener("click", e => { if (!e.target.closest("#account")) toggleAccountMenu(false); if (!e.target.closest(".alerts-wrap") && $("#alertsPanel") && !$("#alertsPanel").hidden) toggleAlertsPanel(false); });
+  document.addEventListener("click", e => { if (!e.target.closest("#langMenu")) $("#langMenu").open = false; if (!e.target.closest("#account")) toggleAccountMenu(false); if (!e.target.closest(".alerts-wrap") && $("#alertsPanel") && !$("#alertsPanel").hidden) toggleAlertsPanel(false); });
   document.addEventListener("keydown", e => { if (e.key === "Escape") toggleAccountMenu(false); });
   renderClocks(); setInterval(renderClocks, 20e3);
   $("#modalClose").addEventListener("click", closeAuth);
@@ -258,13 +255,14 @@ function renderNav(route) {
 /* ---------- Router ---------- */
 // Clean URLs (/edition/slug, /live/India …) so every page can be indexed and shared.
 function parseRoute() {
-  const [page = "", ...rest] = location.pathname.split("/").filter(Boolean);
+  const [page = "", ...rest] = stripLang(location.pathname).split("/").filter(Boolean);
   return { page: page || "home", arg: rest.length ? decodeURIComponent(rest.join("/")) : "", params: new URLSearchParams(location.search) };
 }
 // New pages open at the top; Back and Forward return to where the reader was.
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 const jump = y => window.scrollTo({ top: y, left: 0, behavior: "instant" });
 function navigate(href, { replace = false } = {}) {
+  href = withLang(href); // stay in the reader's language
   if (href === location.pathname + location.search) { jump(0); return route(); }
   if (!replace) history.replaceState({ ...(history.state || {}), rw: true, y: scrollY }, "");
   history[replace ? "replaceState" : "pushState"]({ rw: true, y: 0 }, "", href);
@@ -274,6 +272,7 @@ function navigate(href, { replace = false } = {}) {
 function interceptLinks(e) {
   if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   const a = e.target.closest("a[href]"); if (!a || a.target || a.hasAttribute("download")) return;
+  if (a.dataset.lang) { setLanguagePreference(a.dataset.lang); return; } // other language: full page load
   const href = a.getAttribute("href");
   if (!href.startsWith("/") || href.startsWith("//") || /^\/(api|admin|media)\b|\.(html|xml|txt|json|webmanifest|jpg|png|webp|pdf)$/i.test(href.split("?")[0])) return;
   e.preventDefault();
@@ -288,6 +287,7 @@ async function route({ restoreY = null } = {}) {
   if (restoreY === null) jump(0);
   document.title = DEFAULT_TITLE;
   renderNav(r);
+  $("#langPop").innerHTML = languageLinks(); $("#langFoot").innerHTML = languageLinks(); $("#langMenu").open = false; // same page, other language
   const view = views[r.page] || viewNotFound;
   // Lists that mix in control-room articles wait briefly for them, so the lead story doesn't flash.
   stopListening();
@@ -365,7 +365,7 @@ function viewHome() {
       <aside class="live-rail glass" aria-label="Live wire"><div class="live-title"><b><span class="dot-live"></span>Live wire</b><span class="muted" style="font-size:12px" id="railUpdated"></span></div><div id="rail"></div><a class="link-gold" href="/live" style="display:block;margin-top:16px;font-size:13px">All live updates →</a></aside>
     </div>
 
-    <section class="briefing glass band" aria-labelledby="briefingTitle"><div class="briefing-head"><span class="kicker">The Briefing</span><h2 id="briefingTitle">What you need to know</h2><span class="meta">${new Date().toLocaleDateString("en-IN", { ...IST, weekday: "long", day: "numeric", month: "long" })} · From the live wire</span></div><ol class="briefing-list" id="briefingList"></ol></section>
+    <section class="briefing glass band" aria-labelledby="briefingTitle"><div class="briefing-head"><span class="kicker">The Briefing</span><h2 id="briefingTitle">What you need to know</h2><span class="meta">${new Date().toLocaleDateString(LOCALE, { ...IST, weekday: "long", day: "numeric", month: "long" })} · From the live wire</span></div><ol class="briefing-list" id="briefingList"></ol></section>
 
     <section class="band"><div class="section-head"><h2>From the Raisina Wire desk</h2><a class="link-gold" href="/editions">All stories →</a></div>
       <div class="card-grid">${rest.slice(3, 7).map(e => edCard(e)).join("")}</div></section>
@@ -475,13 +475,13 @@ function renderJoin() {
     ? `<button class="btn btn-red" type="button" data-action="discuss">Start a discussion</button><a class="btn btn-ghost" href="/community">Open the community</a><span class="join-note">Signed in as ${esc(state.user.displayName)}</span>`
     : `<button class="btn btn-red" type="button" data-action="join">Create a free account</button><button class="btn btn-ghost" type="button" data-action="signin">Sign in</button><span class="join-note">Free · No card · Leave any time</span>`;
   const st = state.communityStats, stats = $("#joinStats");
-  if (stats && st && st.members >= 25) { stats.hidden = false; stats.textContent = `${st.members.toLocaleString("en-IN")} members · ${st.discussions.toLocaleString("en-IN")} discussions · ${st.replies.toLocaleString("en-IN")} replies`; }
+  if (stats && st && st.members >= 25) { stats.hidden = false; stats.textContent = `${st.members.toLocaleString(LOCALE)} members · ${st.discussions.toLocaleString(LOCALE)} discussions · ${st.replies.toLocaleString(LOCALE)} replies`; }
 }
 function renderCommunity() {
   renderJoin();
   const agenda = $("#agenda"), talk = $("#discussions"); if (!agenda) return;
   const upcoming = (state.events || []).filter(e => !e.startsAt || new Date(e.startsAt) > Date.now() - 6 * 3600e3).slice(0, 3);
-  agenda.innerHTML = upcoming.length ? upcoming.map(e => { const d = new Date(e.startsAt); return `<li><span class="date"><b>${d.toLocaleDateString("en-IN", { ...IST, day: "2-digit" })}</b><small>${d.toLocaleDateString("en-IN", { ...IST, month: "short" })}</small></span><span><b>${esc(e.title)}</b><span class="meta">${esc(e.eventType)} · ${d.toLocaleTimeString("en-IN", { ...IST, hour: "2-digit", minute: "2-digit" })} IST · ${esc(e.access)}</span></span></li>`; }).join("")
+  agenda.innerHTML = upcoming.length ? upcoming.map(e => { const d = new Date(e.startsAt); return `<li><span class="date"><b>${d.toLocaleDateString(LOCALE, { ...IST, day: "2-digit" })}</b><small>${d.toLocaleDateString(LOCALE, { ...IST, month: "short" })}</small></span><span><b>${esc(e.title)}</b><span class="meta">${esc(e.eventType)} · ${d.toLocaleTimeString(LOCALE, { ...IST, hour: "2-digit", minute: "2-digit" })} IST · ${esc(e.access)}</span></span></li>`; }).join("")
     : `<li class="agenda-empty"><span class="date"><b>—</b><small>Soon</small></span><span><b>Expert briefings and debates</b><span class="meta">New events are announced here first</span></span></li>`;
   const posts = (state.community || []).slice(0, 3);
   if (talk) talk.innerHTML = posts.length ? posts.map(p => `<a class="talk" href="/discussion/${encodeURIComponent(p.id)}"><span class="avatar avatar-sm" aria-hidden="true">${esc(initials(p.author))}</span><span><b>${esc(p.title)}</b><span class="meta">${esc(p.topic)} · ${esc(p.author)} · ${p.replies || 0} repl${p.replies === 1 ? "y" : "ies"} · ${ago(p.createdAt)}</span></span></a>`).join("")
@@ -554,7 +554,8 @@ async function viewStory(r) {
   const slug = r.arg;
   $("#view").innerHTML = `<div class="wrap"><div class="reader-layout"><article class="reader-article"><div class="skeleton" style="height:60px"></div><div class="skeleton" style="height:420px;margin-top:20px"></div></article></div></div>`;
   let a = null, reachable = true;
-  try { const res = await fetch(`/api/articles/${encodeURIComponent(slug)}`); if (res.ok) a = (await res.json()).article; else if (res.status !== 404) reachable = false; }
+  const original = r.params.has("orig"); // ?orig: the English original of a translated story
+  try { const res = await fetch(`/api/articles/${encodeURIComponent(slug)}${lang !== "en" && !original ? `?lang=${lang}` : ""}`); if (res.ok) a = (await res.json()).article; else if (res.status !== 404) reachable = false; }
   catch { reachable = false; }
   if (parseRoute().arg !== slug) return;
   if (!a && !reachable) {
@@ -562,7 +563,7 @@ async function viewStory(r) {
     if (e) a = bundledStory(e, (await loadBodies().catch(() => ({})))[slug]);
   }
   if (!a) return storyNotFound();
-  if (a.href && a.href !== location.pathname) history.replaceState({ rw: true }, "", a.href);
+  if (a.href && withLang(a.href) !== location.pathname) history.replaceState({ rw: true }, "", withLang(a.href) + location.search);
   const w = writer(a.writer), blocks = a.blocks || articleBlocks(a.body);
   const words = blocks.reduce((n, b) => n + b.x.split(/\s+/).length, 0);
   const list = stories(), i = list.findIndex(x => x.slug === a.slug), newer = list[i - 1], older = i >= 0 ? list[i + 1] : null;
@@ -570,12 +571,12 @@ async function viewStory(r) {
   const hero = a.heroUrl || a.imageUrl || genericImage(a.category);
   document.title = `${a.title} · Raisina Wire`;
   $("#view").innerHTML = `<div class="wrap">${readerBar({ badge: a.status === "published" ? (edition ? "Raisina Wire · Edition" : `Raisina Wire · ${a.category}`) : `Preview · ${a.status}`, original: a.sourceUrl, originalLabel: linkedin ? "Original on LinkedIn" : "Original", saveItem: { href: a.href, title: a.title, source: "Raisina Wire" } })}
-  <div class="reader-layout"><article class="reader-article">
-    <div class="kicker">${esc(a.topic || a.category)}</div><h1>${esc(a.title)}</h1>${a.dek ? `<p class="dek">${esc(a.dek)}</p>` : ""}
+  <div class="reader-layout"><article class="reader-article" data-lang="${a.lang || "en"}"${lang !== "en" && (a.lang || "en") === "en" ? ' lang="en"' : ""}>
+    <div class="kicker">${esc(a.topic || a.category)}</div><h1>${esc(a.title)}</h1>${a.dek ? `<p class="dek">${esc(a.dek)}</p>` : ""}${translationNote(a, original)}
     <div class="reader-byline"><a href="/author/${w.key}" class="byline-link"><img src="${w.photo}" alt="" class="${w.isDesk ? "desk" : ""}"><span><b>${esc(w.name)}</b><span class="muted" style="display:block;font-size:13px">${esc(w.role)}</span></span></a><span class="grow"></span><span class="meta">${a.publishedAt ? editionDate(a.publishedAt) : "Not yet published"} · ${Math.max(1, Math.round(words / 220))} min read</span></div>
     <figure class="reader-hero">${img(hero, a.heroCaption || "")}${a.heroCaption ? `<figcaption>${esc(a.heroCaption)}</figcaption>` : ""}</figure>
     <div class="prose dropcap">${blocks.length ? proseHTML(blocks, { pull: pullQuote(blocks) }) : `<p>This story could not be loaded.${a.sourceUrl ? ` <a href="${esc(a.sourceUrl)}" target="_blank" rel="noreferrer">Read the original ↗</a>` : ""}</p>`}</div>
-    ${(a.tags || []).length ? `<div class="story-tags"><span class="meta">Topics</span>${a.tags.map(t => `<a class="tag-chip" href="/tag/${tagSlug(t)}">${esc(t)}</a>`).join("")}</div>` : ""}
+    ${(a.tags || []).length ? `<div class="story-tags"><span class="meta">Topics</span>${a.tags.map((t, i) => `<a class="tag-chip" href="/tag/${tagSlug(t)}">${esc(a.tagLabels?.[i] || t)}</a>`).join("")}</div>` : ""}
     ${shareBlock(a.title, a.href)}
     <div class="author-box"><img src="${w.photo}" alt="" class="${w.isDesk ? "desk" : ""}"><div><span class="kicker">${w.isDesk ? "From the desk" : "About the author"}</span><b><a href="/author/${w.key}">${esc(w.name)}</a></b><p>${esc(w.bio)}</p><a class="link-gold" href="/author/${w.key}" style="font-size:13px">More from ${esc(w.name)} →</a></div></div>
     <div class="reader-end glass discuss-end"><div><span class="kicker">Community</span><b style="display:block;font-size:17px;margin-top:4px">What do you make of this?</b><div class="muted" style="font-size:14px;margin-top:4px">Members discuss every story in moderated threads. Free to join.</div></div><button class="btn btn-dark" type="button" data-action="discuss" data-title="${esc(a.title)}">Discuss this story</button></div>
@@ -587,6 +588,14 @@ async function viewStory(r) {
     ${list.filter(x => x.slug !== a.slug).slice(0, 5).map(x => `<a class="aside-link" href="${edHref(x)}"><span class="thumb">${img(x.image)}</span><span><b>${esc(x.title)}</b><span class="meta" style="display:block;margin-top:5px;font-size:10px">${shortDate(x.date)}</span></span></a>`).join("")}
   </div></aside></div></div>`;
   countView(a);
+}
+// In Hindi or Bengali: says whether the story is translated, with a link to the other version.
+function translationNote(a, original) {
+  if (lang === "en") return "";
+  const here = withLang(a.href || location.pathname);
+  if (original) return `<p class="tr-note" lang="${LOCALE}">${tr("You are reading the English original.")} <a href="${here}">${tr(lang === "hi" ? "Read this story in Hindi" : "Read this story in Bengali")}</a></p>`;
+  if (a.lang === lang) return `<p class="tr-note" lang="${LOCALE}">${tr("Translated from English")} · <a href="${here}?orig=1">${tr("Read the English original")}</a></p>`;
+  return `<p class="tr-note" lang="${LOCALE}">${tr(lang === "hi" ? "The Hindi translation of this story is on its way. Here it is in English for now." : "The Bengali translation of this story is on its way. Here it is in English for now.")}</p>`;
 }
 // One view per story per browser session; nothing is stored about the reader.
 function countView(a) {
@@ -619,7 +628,7 @@ function shareLinks(text, url) {
     ["telegram", "Telegram", `https://t.me/share/url?url=${u}&text=${t}`], ["mail", "Email", `mailto:?subject=${t}&body=${tu}`]];
 }
 function shareBlock(title, href) {
-  const url = location.origin + href;
+  const url = location.origin + withLang(href);
   return `<div class="share-row"><span class="meta">Share</span>${shareLinks(title, url).map(([k, label, link]) => `<a class="share-btn share-${k}" href="${link}" target="_blank" rel="noopener" aria-label="Share on ${label}">${SHARE_ICONS[k]}</a>`).join("")}<button class="share-btn" type="button" data-action="copy-link" data-url="${esc(url)}" aria-label="Copy link">${SHARE_ICONS.link}</button></div>`;
 }
 // Select text in a story to share it as a quote, with a link that jumps to that passage.
@@ -653,13 +662,18 @@ function quoteShare() {
    server (paragraph by paragraph, with lock-screen controls). Elsewhere, or if that voice is
    not set up, the device's own voice is used, choosing a female Indian English voice when the
    device has one, read sentence by sentence with natural pauses. */
-const speech = { queue: [], i: 0, active: false, mode: null, audio: null, parts: null, slug: null, timer: null };
+const speech = { queue: [], i: 0, active: false, mode: null, audio: null, parts: null, slug: null, timer: null, lang: "en" };
 let ttsStatus = null;
 const ttsAvailable = async () => (ttsStatus ??= fetch("/api/tts/status").then(r => r.ok ? r.json() : { enabled: false }).catch(() => ({ enabled: false }))).then(x => x.enabled);
 // Device voices: female Indian English first (names used by Edge, Windows, Android, iOS and macOS).
 const FEMALE_IN = /neerja|heera|veena|isha|kajal|ananya|aashi|swara|en-in-x-(ena|cxx|ahp)|female/i, MALE = /rishi|ravi|prabhat|male\b|kunal|aarav/i;
 function voice() {
-  const vs = speechSynthesis.getVoices(), en = vs.filter(v => /^en[-_]/i.test(v.lang));
+  const vs = speechSynthesis.getVoices();
+  if (speech.lang !== "en") { // Hindi or Bengali: the device's voice for that language, female first
+    const own = vs.filter(v => new RegExp(`^${speech.lang}[-_]`, "i").test(v.lang));
+    return own.sort((x, y) => (FEMALE_IN.test(y.name) || /lekha|kalpana|swara|tanishaa|female/i.test(y.name) ? 1 : 0) - (FEMALE_IN.test(x.name) || /lekha|kalpana|swara|tanishaa|female/i.test(x.name) ? 1 : 0))[0] || null;
+  }
+  const en = vs.filter(v => /^en[-_]/i.test(v.lang));
   const ind = en.filter(v => /en[-_]IN/i.test(v.lang));
   const score = v => (/en[-_]IN/i.test(v.lang) ? 40 : /en[-_]GB/i.test(v.lang) ? 10 : 0) + (FEMALE_IN.test(v.name) ? 30 : 0) - (MALE.test(v.name) ? 50 : 0) + (/natural|online|enhanced|premium|neural/i.test(v.name) ? 20 : 0);
   return [...(ind.length ? ind : en)].sort((x, y) => score(y) - score(x))[0] || null;
@@ -682,7 +696,7 @@ const readingElements = art => $$("h1, .dek, .prose > p, .prose > h2, .prose li"
 
 // Natural voice: one audio element plays each part in turn; the next part is fetched ahead.
 async function playNatural(slug, art) {
-  const r = await fetch(`/api/tts/${encodeURIComponent(slug)}`);
+  const r = await fetch(`/api/tts/${encodeURIComponent(slug)}${speech.lang !== "en" ? `?lang=${speech.lang}` : ""}`);
   if (!r.ok) throw new Error("tts");
   speech.parts = (await r.json()).parts; speech.slug = slug; speech.mode = "natural";
   speech.queue = readingElements(art);
@@ -698,7 +712,7 @@ async function playNatural(slug, art) {
   }
   speech.i = 0; await playPart();
 }
-const partUrl = n => `/api/tts/${encodeURIComponent(speech.slug)}/${n}.mp3?v=${speech.parts[n].v}`;
+const partUrl = n => `/api/tts/${encodeURIComponent(speech.slug)}/${n}.mp3?v=${speech.parts[n].v}${speech.lang !== "en" ? `&lang=${speech.lang}` : ""}`;
 async function playPart() {
   if (!speech.active) return;
   if (speech.i >= speech.parts.length) return stopListening();
@@ -714,12 +728,12 @@ function speakNext() {
   const el = speech.queue[speech.i];
   if (!el || !speech.active) { stopListening(); return; }
   highlight(el);
-  const sentences = el.innerText.match(/[^.!?…]+[.!?…]+["’”)]*|\S[^.!?…]*$/g) || [el.innerText];
+  const sentences = el.innerText.match(/[^.!?…।]+[.!?…।]+["’”)]*|\S[^.!?…।]*$/g) || [el.innerText];
   const isHeading = el.matches("h1, h2");
   const v = voice();
   sentences.forEach((text, k) => {
     const u = new SpeechSynthesisUtterance(text.trim());
-    if (v) { u.voice = v; u.lang = v.lang; } else u.lang = "en-IN";
+    if (v) { u.voice = v; u.lang = v.lang; } else u.lang = LANGUAGES[speech.lang]?.locale || "en-IN";
     u.rate = isHeading ? 0.9 : 0.94; u.pitch = isHeading ? 1.02 : 1.06;
     if (/\?\s*$/.test(text)) u.pitch += 0.06;          // a lift for questions
     if (k === sentences.length - 1) u.onend = () => { speech.timer = setTimeout(() => { speech.i++; speakNext(); }, isHeading ? 650 : 420); };
@@ -738,7 +752,7 @@ async function toggleListening() {
     return;
   }
   const art = $(".reader-article"); if (!art) return;
-  speech.active = true; speech.i = 0;
+  speech.active = true; speech.i = 0; speech.lang = art.dataset.lang || "en"; // the language the story is shown in
   const pg = parseRoute(), slug = ["edition", "article"].includes(pg.page) ? pg.arg : null;
   if (slug && await ttsAvailable()) {
     setListenButton("loading");
@@ -809,6 +823,7 @@ async function viewMy() {
 }
 
 /* ---------- Breaking-news alerts (Web Push) ---------- */
+const ICON_GLOBE = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.8 3.8 5.8 3.8 9s-1.2 6.2-3.8 9c-2.6-2.8-3.8-5.8-3.8-9S9.4 5.8 12 3Z"/></svg>`;
 const ICON_BELL = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>`;
 const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 const b64ToBytes = s => { const b = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)); return Uint8Array.from(b, c => c.charCodeAt(0)); };
@@ -900,15 +915,32 @@ function docPage({ kicker, title, html, nav, updated }) {
   return `<div class="wrap"><div class="doc-layout">${nav ? `<aside class="doc-nav glass"><span class="kicker">Legal</span>${nav}</aside>` : ""}
     <article class="doc glass"><span class="kicker">${kicker}</span><h1>${title}</h1>${updated ? `<p class="meta">Last updated ${updated}</p>` : ""}${html}</article></div></div>`;
 }
-function viewAbout() {
-  document.title = `${ABOUT.title} · Raisina Wire`;
-  $("#view").innerHTML = docPage({ kicker: "About", title: ABOUT.title, html: ABOUT.html });
+// In Hindi or Bengali the page comes translated from the server (English until it is ready).
+async function localPage(key, fallback) {
+  if (lang === "en") return { ...fallback, lang: "en" };
+  try { const r = await fetch(`/api/pages/${key}?lang=${lang}`); if (r.ok) return (await r.json()).page; } catch { /* offline: English */ }
+  return { ...fallback, lang: "en" };
 }
-function viewLegal(r) {
+function pageNote(p, legal) {
+  if (lang === "en") return "";
+  if (p.lang !== lang) return `<p class="tr-note">${tr(lang === "hi" ? "This page is being translated into Hindi. Here it is in English for now." : "This page is being translated into Bengali. Here it is in English for now.")}</p>`;
+  return legal ? `<p class="tr-note">${tr("This is a translation for your convenience. If it differs from the English version, the English version prevails.")}</p>` : "";
+}
+async function viewAbout() {
+  document.title = `${ABOUT.title} · Raisina Wire`;
+  const p = await localPage("about", ABOUT);
+  if (parseRoute().page !== "about") return;
+  document.title = `${p.title} · Raisina Wire`;
+  $("#view").innerHTML = docPage({ kicker: "About", title: `<span data-no-tr>${esc(p.title)}</span>`, html: pageNote(p) + `<div data-no-tr${p.lang === "en" ? ' lang="en"' : ""}>${p.html}</div>` });
+}
+async function viewLegal(r) {
   const doc = LEGAL[r.page];
   document.title = `${doc.title} · Raisina Wire`;
+  const p = await localPage(r.page, doc);
+  if (parseRoute().page !== r.page) return;
+  document.title = `${p.title} · Raisina Wire`;
   const nav = LEGAL_ORDER.map(([k, t]) => `<a href="/${k}"${k === r.page ? ' aria-current="page"' : ""}>${t}</a>`).join("") + `<a href="/about">About Raisina Wire</a>`;
-  $("#view").innerHTML = docPage({ kicker: "Raisina Wire", title: doc.title, html: doc.html, nav, updated: LEGAL_UPDATED });
+  $("#view").innerHTML = docPage({ kicker: "Raisina Wire", title: `<span data-no-tr>${esc(p.title)}</span>`, html: pageNote(p, true) + `<div data-no-tr${p.lang === "en" ? ' lang="en"' : ""}>${p.html}</div>`, nav, updated: LEGAL_UPDATED });
 }
 
 /* ---------- Writers ---------- */
@@ -958,7 +990,7 @@ async function viewExternal(r) {
   $(".reader-bar .original-btn .lbl").textContent = `Original on ${site}`;
   $("#extArticle").innerHTML = `<div class="kicker">${esc(known.category || site)}</div><h1>${esc(title)}</h1>
     ${data.description ? `<p class="dek">${esc(data.description)}</p>` : ""}
-    <div class="reader-byline"><div><b>${esc(data.byline || site)}</b><div class="muted" style="font-size:13px">${esc(site)}</div></div><span class="grow"></span><span class="meta">${data.publishedAt ? new Date(data.publishedAt).toLocaleString("en-IN", { ...IST, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : known.publishedAt ? `${clock(known.publishedAt)} IST` : ""}</span></div>
+    <div class="reader-byline"><div><b>${esc(data.byline || site)}</b><div class="muted" style="font-size:13px">${esc(site)}</div></div><span class="grow"></span><span class="meta">${data.publishedAt ? new Date(data.publishedAt).toLocaleString(LOCALE, { ...IST, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : known.publishedAt ? `${clock(known.publishedAt)} IST` : ""}</span></div>
     <div class="notice">${ICON_INFO}<span>An excerpt from ${esc(site)}, shown with credit for news reporting. The story and its copyright belong to ${esc(site)}. <a href="/copyright">How we use other publishers’ work</a></span></div>
     ${data.image ? `<figure class="reader-hero">${img(data.image)}<figcaption>Image: ${esc(site)}</figcaption></figure>` : ""}
     <div class="prose excerpt">${proseHTML(data.blocks || [])}<p class="excerpt-fade" aria-hidden="true"></p></div>
@@ -1060,6 +1092,7 @@ async function onAction(e) {
   if (a === "install") { e.preventDefault(); installPWA(); }
   if (a === "install-dismiss") { store.set("rw-install-dismissed", Date.now()); $("#installSheet").hidden = true; }
   if (a === "update-later") $("#updateBar").hidden = true;
+  if (a === "lang-later") { $("#langSuggest").hidden = true; setLanguagePreference("en"); }
   if (a === "apply-update") { waitingWorker?.postMessage({ type: "SKIP_WAITING" }); $("#updateBar").hidden = true; }
   if (a === "signin") openAuth("login");
   if (a === "join") openAuth("register");
@@ -1129,7 +1162,7 @@ async function viewCoverage(r) {
     $("#view").innerHTML = `<div class="wrap"><div class="coverage">
       <header class="coverage-head">${isLive ? `<span class="live-badge"><span class="pulse"></span>Live</span>` : `<span class="tag">Coverage ended</span>`}
         <h1>${esc(d.item.title)}</h1>${d.item.summary ? `<p class="dek">${esc(d.item.summary)}</p>` : ""}
-        <div class="meta">Started ${new Date(d.item.startedAt).toLocaleString("en-IN", { ...IST, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })} IST · ${d.updates.length} update${d.updates.length === 1 ? "" : "s"}${isLive ? " · refreshes every 30 seconds" : ""}</div></header>
+        <div class="meta">Started ${new Date(d.item.startedAt).toLocaleString(LOCALE, { ...IST, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })} IST · ${d.updates.length} update${d.updates.length === 1 ? "" : "s"}${isLive ? " · refreshes every 30 seconds" : ""}</div></header>
       <ol class="coverage-feed">${d.updates.map((u, i) => `<li class="${i === 0 && isLive ? "latest" : ""}"><time datetime="${esc(u.createdAt)}"><b>${clock(u.createdAt)}</b><span>${ago(u.createdAt)}</span></time>
         <div class="glass">${i === 0 && isLive ? `<span class="tag tag-live">Latest</span>` : ""}<p>${esc(u.body)}</p>${u.mediaUrl && /^https?:/.test(u.mediaUrl) ? `<div class="reader-hero">${img(u.mediaUrl)}</div>` : ""}${u.sourceUrl && /^https?:/.test(u.sourceUrl) ? `<a class="link-gold" href="${esc(u.sourceUrl)}" target="_blank" rel="noreferrer">Source ↗</a>` : ""}</div></li>`).join("") || `<li><div class="glass"><p class="muted">The first update will appear here shortly.</p></div></li>`}</ol>
     </div></div>`;
@@ -1149,7 +1182,7 @@ function stories() {
 }
 let articlesSettled = false;
 async function loadArticles() {
-  try { const r = await fetch("/api/articles"); if (r.ok) state.articles = (await r.json()).articles || []; } catch { /* keep what we have */ }
+  try { const r = await fetch(`/api/articles${lang !== "en" ? `?lang=${lang}` : ""}`); if (r.ok) state.articles = (await r.json()).articles || []; } catch { /* keep what we have */ }
   const first = !articlesSettled; articlesSettled = true;
   if (first) return; // the first load is awaited by route() instead
   const page = parseRoute().page; // refresh lists that show stories, without moving the reader
@@ -1304,8 +1337,8 @@ function downloadIcs(id) {
 function viewEvents() {
   const evs = state.events;
   $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Events &amp; briefings</div><h1>Upcoming</h1><p>Expert briefings, debates and workshops. Times are shown in India Standard Time.</p></div></div>
-  <div class="live-list">${evs === null ? `<div class="skeleton" style="height:200px"></div>` : evs.length ? evs.map(e => { const d = new Date(e.startsAt); return `<article class="live-item glass event-item"><span class="date-block"><b>${d.toLocaleDateString("en-IN", { ...IST, day: "2-digit" })}</b><small>${d.toLocaleDateString("en-IN", { ...IST, month: "short" })}</small></span>
-    <span><b>${esc(e.title)}</b>${e.description ? `<p>${esc(e.description)}</p>` : ""}<span class="src"><span class="tag">${esc(e.eventType)}</span>${d.toLocaleString("en-IN", { ...IST, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })} IST · ${esc(e.access === "public" ? "Open to all" : e.access === "member" ? "Members" : "Premium members")}</span></span>
+  <div class="live-list">${evs === null ? `<div class="skeleton" style="height:200px"></div>` : evs.length ? evs.map(e => { const d = new Date(e.startsAt); return `<article class="live-item glass event-item"><span class="date-block"><b>${d.toLocaleDateString(LOCALE, { ...IST, day: "2-digit" })}</b><small>${d.toLocaleDateString(LOCALE, { ...IST, month: "short" })}</small></span>
+    <span><b>${esc(e.title)}</b>${e.description ? `<p>${esc(e.description)}</p>` : ""}<span class="src"><span class="tag">${esc(e.eventType)}</span>${d.toLocaleString(LOCALE, { ...IST, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })} IST · ${esc(e.access === "public" ? "Open to all" : e.access === "member" ? "Members" : "Premium members")}</span></span>
     <button class="btn btn-light btn-sm" type="button" data-action="ics" data-event="${esc(e.id)}">Add to calendar</button></article>`; }).join("") : `<div class="empty">No events are scheduled right now. New briefings are announced here first.</div>`}</div></div>`;
 }
 
@@ -1371,7 +1404,7 @@ function renderSearchResults() {
 /* ---------- Data loading ---------- */
 async function loadWire() {
   try {
-    const r = await fetch("/api/wire"); if (!r.ok) throw new Error();
+    const r = await fetch(`/api/wire${lang !== "en" ? `?lang=${lang}` : ""}`); if (!r.ok) throw new Error();
     state.wire = await r.json(); state.wireError = false;
     state.wire.items.forEach(i => wireIndex.set(i.url, i));
     $("#wireStatus").innerHTML = r.headers.get("x-rw-offline")
@@ -1517,12 +1550,36 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => { if (waitingWorker && !reloading) { reloading = true; location.reload(); } });
 }
 
+/* ---------- Language ---------- */
+function setLanguagePreference(l) { store.set("rw-lang", l); }
+// Readers whose device is set to Hindi or Bengali are offered the site in that language once.
+function maybeSuggestLanguage() {
+  if (lang !== "en" || store.get("rw-lang", null)) return;
+  const want = (navigator.languages || [navigator.language]).map(x => String(x).slice(0, 2).toLowerCase()).find(x => x === "hi" || x === "bn");
+  if (!want) return;
+  const box = $("#langSuggest"), here = stripLang(location.pathname) + location.search;
+  box.innerHTML = want === "hi"
+    ? `<span lang="hi-IN"><b>रायसीना वायर अब हिन्दी में</b><small>पूरी साइट और सभी लेख हिन्दी में पढ़ें।</small></span><a class="btn btn-red btn-sm lang-link" href="${withLang(here, "hi")}" data-lang="hi" lang="hi-IN">हिन्दी में पढ़ें</a>`
+    : `<span lang="bn-IN"><b>রাইসিনা ওয়্যার এখন বাংলায়</b><small>গোটা সাইট আর সব লেখা বাংলায় পড়ুন।</small></span><a class="btn btn-red btn-sm lang-link" href="${withLang(here, "bn")}" data-lang="bn" lang="bn-IN">বাংলায় পড়ুন</a>`;
+  box.insertAdjacentHTML("beforeend", `<button class="ub-close" type="button" data-action="lang-later" aria-label="Close">${ICON_X}</button>`);
+  setTimeout(() => { box.hidden = false; }, 2500);
+}
+
 /* ---------- Boot ---------- */
-const articlesReady = loadArticles();
+// Readers who chose Hindi or Bengali get it on every visit, also from English links.
+const langPref = store.get("rw-lang", null);
+const langTarget = lang === "en" && LANGUAGES[langPref] && langPref !== "en" && !new URLSearchParams(location.search).has("orig") ? withLang(location.pathname, langPref) : null;
+if (langTarget && langTarget !== location.pathname) location.replace(langTarget + location.search + location.hash);
+else loadLanguage().catch(() => {}).then(boot);
+let articlesReady, userReady;
+function boot() {
+articlesReady = loadArticles();
 // The session is checked once at start; pages that depend on it wait for the answer.
-const userReady = fetch("/api/auth/me").then(r => r.json()).then(async d => { state.user = d.user || null; if (state.user) await loadTopics(); }).catch(() => {});
+userReady = fetch("/api/auth/me").then(r => r.json()).then(async d => { state.user = d.user || null; if (state.user) await loadTopics(); }).catch(() => {});
 renderShell();
+startTranslator(document.body); // draws the interface in Hindi or Bengali
 watchScroll();
+maybeSuggestLanguage();
 // Links from before clean URLs (#/edition/slug) still work.
 const fromHash = () => { if (location.hash.startsWith("#/")) { history.replaceState({ rw: true }, "", location.hash.slice(1) || "/"); return true; } return false; };
 fromHash();
@@ -1542,5 +1599,4 @@ fetch("/api/config").then(r => r.json()).then(c => { if (c.linkedinUrl) $("#link
 setInterval(() => { if (!document.hidden) loadWire(); }, 120e3);
 setInterval(() => { if (!document.hidden) loadMarkets(); }, 60e3);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { loadWire(); loadMarkets(); } });
-
-
+}
