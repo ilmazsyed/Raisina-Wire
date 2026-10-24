@@ -5,6 +5,8 @@ import m0003 from "../migrations/0003_editorial_console.sql";
 import m0004 from "../migrations/0004_app_completion.sql";
 import m0005 from "../migrations/0005_editions_media_writers.sql";
 import m0006 from "../migrations/0006_tags_views_alerts.sql";
+import m0007 from "../migrations/0007_tts_audio.sql";
+import { handleTts } from "./tts.js";
 import { editions } from "./editions.js";
 import editionBodies from "./edition-bodies.json";
 import { ARTICLE_COLS, toArticle, listPublished, getBySlug, blocksToText, splitTags, tagSlug, isPublic, WRITERS, DEFAULT_WRITER } from "./store.js";
@@ -53,7 +55,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -604,6 +606,8 @@ async function api(request, env, ctx) {
     await audit(env, user, "alert.send", "alert", id, { title });
     return json({ ok: true, id }, 201, { "cache-control": "no-store" });
   }
+
+  if (url.pathname.startsWith("/api/tts/") && request.method === "GET") return handleTts(request, env, url, json, err);
 
   if (url.pathname === "/api/community/stats" && request.method === "GET") {
     const [m, p, r] = await Promise.all([

@@ -34,5 +34,9 @@ ADMIN_EMAIL = "ilmazsyed@gmail.com"
 # The site's public address, used in canonical links, sitemaps, the RSS feed and social
 # cards. Page visits to the workers.dev address are redirected here.
 SITE_URL = "https://raisinawire.calibrex.org"
+# "Listen" voice: a natural Indian English woman's voice from Google Cloud Text-to-Speech.
+# Needs the GOOGLE_TTS_API_KEY secret (see README). Other female en-IN voices: Aoede, Kore,
+# Leda, Achernar, Vindemiatrix, Despina (en-IN-Chirp3-HD-<name>).
+TTS_VOICE = "en-IN-Chirp3-HD-Sulafat"
 
 # Market pulse uses keyless public feeds; no market-data secret is required.

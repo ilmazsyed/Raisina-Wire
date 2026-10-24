@@ -31,6 +31,17 @@ A premium, mobile-first editorial and geopolitical briefing platform with a live
 
 In the control room, open **Stories & editions**, choose **Type: Raisina Wire edition**, paste the text, upload a cover (and optionally a hero) image, add the LinkedIn link as the original, and publish.
 
+## Listen: the natural Indian English voice
+
+Stories are read aloud by a natural Indian English woman's voice (Google Cloud Text-to-Speech, Chirp 3 HD, `TTS_VOICE` in `wrangler.toml`, default `en-IN-Chirp3-HD-Sulafat`; other female options: Aoede, Kore, Leda, Achernar, Vindemiatrix, Despina). Each paragraph is generated once, stored in D1 (`tts_audio`) and reused for every listener, so the cost follows what you publish, not how many people listen. Google's free allowance for these voices is 1 million characters a month (the 13 editions are about 60,000). Playback goes paragraph by paragraph with the text highlighted, and keeps going with the screen locked, with lock-screen controls.
+
+To switch it on:
+1. In Google Cloud (console.cloud.google.com), create or pick a project, enable **Cloud Text-to-Speech API**, and make sure billing is enabled (required by Google even inside the free allowance).
+2. Under **APIs & Services → Credentials**, create an **API key** and restrict it to the Cloud Text-to-Speech API.
+3. In Cloudflare (Worker → Settings → Variables and Secrets), add a secret named `GOOGLE_TTS_API_KEY` with that key.
+
+Without the key, Listen uses the device's own voice, choosing a female Indian English voice when the device has one, read sentence by sentence with pauses. Wire stories from other publishers always use the device voice.
+
 ## Getting found on Google
 
 1. The live address is `https://raisinawire.calibrex.org`, set as `SITE_URL` in `wrangler.toml`. Canonical links, sitemaps, the feed and social cards use it, and page visits to the `workers.dev` address are redirected to it (the API keeps working on both).
