@@ -64,9 +64,10 @@ function saveForLater(item) {
   toast(target ? "Saved. It will be readable offline too." : "Saved. Raisina Wire editions are always available offline.");
 }
 function setTextScale(delta) {
-  const scale = Math.min(1.3, Math.max(0.85, (store.get("rw-text", 1) + delta)));
-  store.set("rw-text", Math.round(scale * 100) / 100);
+  const scale = Math.round(Math.min(1.5, Math.max(0.8, (Number(store.get("rw-text", 1)) || 1) + delta)) * 100) / 100;
+  store.set("rw-text", scale);
   document.documentElement.style.setProperty("--text-scale", scale);
+  toast(`Text size ${Math.round(scale * 100)}%`);
 }
 document.documentElement.style.setProperty("--text-scale", store.get("rw-text", 1));
 // Light or dark: follows the device until the reader picks one (index.html applies it before paint).
@@ -930,8 +931,8 @@ async function onAction(e) {
   const el = e.target.closest("[data-action]"); if (!el) return;
   const a = el.dataset.action;
   if (a === "back") { e.preventDefault(); history.state?.rw ? history.back() : navigate("/"); }
-  if (a === "text-smaller") setTextScale(-0.08);
-  if (a === "text-larger") setTextScale(0.08);
+  if (a === "text-smaller") setTextScale(-0.1);
+  if (a === "text-larger") setTextScale(0.1);
   if (a === "save") { try { saveForLater(JSON.parse(el.dataset.item)); } catch { /* malformed */ } }
   if (a === "share") {
     const data = { title: el.dataset.title, url: location.href };

@@ -167,3 +167,5 @@ td small{display:block;color:var(--muted);margin-top:4px}
 .powered-cx .cx-word{font:400 11px Michroma,Manrope,sans-serif;letter-spacing:2px;color:var(--ink)}
 .powered-cx .cx-word span{color:#e8741a}
 .auto-list{margin:6px 0 12px;padding-left:18px;color:var(--ink-2);font-size:14px;line-height:1.8}
+/* The menu row keeps its own height; the page below takes the rest. */
+@media(max-width:900px){.layout{grid-template-rows:auto 1fr;align-content:start}.sidebar{align-items:center;align-self:start}.nav{align-self:center}}
