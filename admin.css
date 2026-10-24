@@ -163,3 +163,7 @@ td small{display:block;color:var(--muted);margin-top:4px}
   .story-preview{padding:16px;font-size:17px}
   .story-preview h1{font-size:26px}
 }
+.powered-cx{display:flex;align-items:center;gap:7px;margin-top:12px;color:var(--muted);font-size:12px}
+.powered-cx .cx-word{font:400 11px Michroma,Manrope,sans-serif;letter-spacing:2px;color:var(--ink)}
+.powered-cx .cx-word span{color:#e8741a}
+.auto-list{margin:6px 0 12px;padding-left:18px;color:var(--ink-2);font-size:14px;line-height:1.8}
