@@ -4,8 +4,8 @@
   "description": "Ideas. Intelligence. Impact.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#071019",
-  "theme_color": "#071019",
+  "background_color": "#070a12",
+  "theme_color": "#070a12",
   "icons": [
     {
       "src": "/favicon.svg",

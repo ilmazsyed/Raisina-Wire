@@ -151,7 +151,7 @@ function renderStories(){
   if(!list.length){$("#storyGrid").innerHTML=`<div class="feed-error">No current results for this topic. Choose another topic or refresh the feed.</div>`;return;}
   $("#storyGrid").innerHTML=list.map((a,i)=>{
     const category=categoryFor(a), image=imgFor(a)||fallbackImage;
-    return `<article class="story-card ${i===0?"featured-story":""}"><a class="story-image" href="${esc(a.url)}" target="_blank" rel="noreferrer" style="background-image:linear-gradient(0deg,rgba(3,9,14,.65),transparent 55%),url('${esc(image)}')"><span class="story-category">${esc(category.toUpperCase())}</span><span class="story-image-arrow">↗</span></a><div class="story-content"><a href="${esc(a.url)}" target="_blank" rel="noreferrer" class="story-title">${esc(a.title)}</a><p>${esc(a.domain||"Source publisher")} · Current global coverage</p><div class="story-meta"><span>${dateAgo(a.publishedAt)}</span><button class="save-topic" data-save="${esc(category)}" title="Follow this topic">＋ Follow ${esc(category)}</button></div></div></article>`;
+    return `<article class="story-card ${i===0?"featured-story":""}"><a class="story-image" href="${esc(a.url)}" target="_blank" rel="noreferrer" style="background-image:linear-gradient(0deg,rgba(7,10,18,.7),transparent 55%),url('${esc(image)}')"><span class="story-category">${esc(category.toUpperCase())}</span><span class="story-image-arrow">↗</span></a><div class="story-content"><a href="${esc(a.url)}" target="_blank" rel="noreferrer" class="story-title">${esc(a.title)}</a><p>${esc(a.domain||"Source publisher")} · Current global coverage</p><div class="story-meta"><span>${dateAgo(a.publishedAt)}</span><button class="save-topic" data-save="${esc(category)}" title="Follow this topic">＋ Follow ${esc(category)}</button></div></div></article>`;
   }).join("");
   $$(".save-topic").forEach(b=>b.addEventListener("click",()=>saveTopic(b.dataset.save)));
 }
@@ -226,16 +226,16 @@ function initGlobe(){
     ctx.setTransform(dpr,0,0,dpr,0,0);
     const w=rect.width,h=rect.height,cx=w*.51,cy=h*.51,r=Math.min(w*.43,h*.47);
     ctx.clearRect(0,0,w,h);
-    const bg=ctx.createRadialGradient(cx-r*.2,cy-r*.4,2,cx,cy,r*1.5);bg.addColorStop(0,"rgba(23,64,86,.32)");bg.addColorStop(1,"rgba(4,12,20,0)");
+    const bg=ctx.createRadialGradient(cx-r*.2,cy-r*.4,2,cx,cy,r*1.5);bg.addColorStop(0,"rgba(35,66,120,.3)");bg.addColorStop(1,"rgba(7,10,18,0)");
     ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
     ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.clip();
-    const ocean=ctx.createRadialGradient(cx-r*.3,cy-r*.4,5,cx,cy,r*1.2);ocean.addColorStop(0,"#123b50");ocean.addColorStop(.58,"#0a2434");ocean.addColorStop(1,"#020a12");ctx.fillStyle=ocean;ctx.fillRect(cx-r,cy-r,2*r,2*r);
+    const ocean=ctx.createRadialGradient(cx-r*.3,cy-r*.4,5,cx,cy,r*1.2);ocean.addColorStop(0,"#1a2a4d");ocean.addColorStop(.58,"#0d1630");ocean.addColorStop(1,"#05070f");ctx.fillStyle=ocean;ctx.fillRect(cx-r,cy-r,2*r,2*r);
     // Latitude/longitude lines
-    ctx.strokeStyle="rgba(130,174,190,.14)";ctx.lineWidth=.7;
+    ctx.strokeStyle="rgba(157,189,242,.12)";ctx.lineWidth=.7;
     for(let i=-3;i<=3;i++){ctx.beginPath();ctx.ellipse(cx,cy+i*r*.22,r,Math.max(2,r*Math.sqrt(Math.max(.02,1-(i*.22)**2))*.17),0,0,Math.PI*2);ctx.stroke();}
     for(let i=-2;i<=2;i++){ctx.beginPath();ctx.ellipse(cx,cy,r*Math.max(.08,Math.cos(i*.42)),r,0,0,Math.PI*2);ctx.stroke();}
     // Stylised landmass contours, intentionally not presented as a precise GIS map
-    ctx.fillStyle="rgba(93,139,137,.36)";
+    ctx.fillStyle="rgba(157,189,242,.16)";
     const land=(pts)=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(cx+p[0]*r,cy+p[1]*r):ctx.moveTo(cx+p[0]*r,cy+p[1]*r));ctx.closePath();ctx.fill();};
     land([[-.76,-.47],[-.58,-.65],[-.37,-.62],[-.23,-.48],[-.26,-.27],[-.43,-.12],[-.52,.08],[-.68,-.03],[-.8,-.24]]);
     land([[-.32,.03],[-.18,.08],[-.12,.28],[-.22,.62],[-.37,.48],[-.43,.22]]);
@@ -243,9 +243,9 @@ function initGlobe(){
     land([[.04,-.06],[.19,-.01],[.25,.18],[.17,.43],[.06,.35],[-.03,.12]]);
     land([[.38,.16],[.59,.1],[.76,.22],[.73,.38],[.52,.36],[.4,.27]]);
     // City light network
-    for(let i=0;i<95;i++){const x=cx+(Math.sin(i*127.1)*.82)*r,y=cy+(Math.cos(i*72.7)*.72)*r;if((x-cx)**2+(y-cy)**2<r*r){ctx.fillStyle=i%4===0?"rgba(240,190,104,.85)":"rgba(98,175,207,.45)";ctx.beginPath();ctx.arc(x,y,i%7===0?1.5:.65,0,Math.PI*2);ctx.fill();}}
+    for(let i=0;i<95;i++){const x=cx+(Math.sin(i*127.1)*.82)*r,y=cy+(Math.cos(i*72.7)*.72)*r;if((x-cx)**2+(y-cy)**2<r*r){ctx.fillStyle=i%4===0?"rgba(233,189,120,.9)":"rgba(136,186,255,.45)";ctx.beginPath();ctx.arc(x,y,i%7===0?1.5:.65,0,Math.PI*2);ctx.fill();}}
     // moving orbital arcs
-    ctx.strokeStyle="rgba(218,178,103,.5)";ctx.lineWidth=.8;
+    ctx.strokeStyle="rgba(233,189,120,.5)";ctx.lineWidth=.8;
     for(let i=0;i<3;i++){ctx.beginPath();ctx.ellipse(cx,cy,r*(.62+i*.1),r*(.2+i*.07),-.35+i*.4,Math.PI*.12+globeFrame*.001*(i+1),Math.PI*1.22+globeFrame*.001*(i+1));ctx.stroke();}
     ctx.restore();
     // live topic coverage markers. Coordinates are thematic coverage clusters, not exact event coordinates.
@@ -262,14 +262,14 @@ function initGlobe(){
       {x:.08,y:.38,label:"INDIAN OCEAN",kind:"blue",weight:(counts.India||0)+(counts.Markets||0)},
       {x:.45,y:.22,label:"PACIFIC",kind:"gold",weight:(counts.Diplomacy||0)+(counts.Markets||0)}
     ];
-    const palette={red:"#e45e55",gold:"#d7b36b",blue:"#68b7d7"};
+    const palette={red:"#ff7a6e",gold:"#e9bd78",blue:"#88baff"};
     marks.forEach((m,i)=>{
       if(globeLayer==="security"&&m.kind==="blue")return;if(globeLayer==="markets"&&m.kind==="red")return;
       const x=cx+m.x*r,y=cy+m.y*r,p=palette[m.kind],pulse=(Math.sin(globeFrame*.045+i)+1)/2;
       const intensity = Math.min(1, (m.weight || 0) / 8);
       ctx.beginPath();ctx.arc(x,y,4+pulse*4+intensity*3,0,Math.PI*2);ctx.strokeStyle=p;ctx.globalAlpha=.15+pulse*.18+intensity*.18;ctx.stroke();ctx.globalAlpha=1;
       ctx.beginPath();ctx.arc(x,y,2.2+intensity*1.4,0,Math.PI*2);ctx.fillStyle=p;ctx.fill();
-      ctx.fillStyle="rgba(231,238,240,.84)";ctx.font="9px DM Sans, sans-serif";ctx.fillText(m.label,x+8,y-8);
+      ctx.fillStyle="rgba(242,245,251,.85)";ctx.font="500 10px 'DM Mono', monospace";ctx.fillText(m.label,x+8,y-8);
     });
     globeFrame++;globeRAF=requestAnimationFrame(draw);
   };draw();
