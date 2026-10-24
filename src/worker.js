@@ -1,3 +1,4 @@
+import { cached, liveWire, readArticle, marketBoard } from "./feeds.js";
 import m0001 from "../migrations/0001_init.sql";
 import m0002 from "../migrations/0002_platform_modules.sql";
 import m0003 from "../migrations/0003_editorial_console.sql";
@@ -110,80 +111,6 @@ async function gdeltNews(url) {
   return { source: "GDELT DOC 2.0", updatedAt: new Date().toISOString(), query: safeQ, articles };
 }
 
-const MARKET_WATCHLIST = [
-  { label: "S&P 500", symbol: "^GSPC", category: "Indices", currency: "USD" },
-  { label: "Apple", symbol: "AAPL", category: "Stocks", currency: "USD" },
-  { label: "Reliance Industries", symbol: "RELIANCE.NS", category: "India equities", currency: "INR" },
-  { label: "TCS", symbol: "TCS.NS", category: "India equities", currency: "INR" },
-  { label: "USD/INR", symbol: "USDINR=X", category: "Currencies", currency: "INR" },
-  { label: "EUR/USD", symbol: "EURUSD=X", category: "Currencies", currency: "USD" },
-  { label: "Gold futures", symbol: "GC=F", category: "Commodities", currency: "USD" },
-  { label: "WTI crude futures", symbol: "CL=F", category: "Commodities", currency: "USD" }
-];
-
-async function yahooQuote(item) {
-  const encoded = encodeURIComponent(item.symbol);
-  const urls = [
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?range=5d&interval=1d`,
-    `https://query2.finance.yahoo.com/v8/finance/chart/${encoded}?range=5d&interval=1d`
-  ];
-  let lastError = "Quote unavailable";
-  for (const endpoint of urls) {
-    try {
-      const response = await fetch(endpoint, {
-        headers: { "user-agent": "Mozilla/5.0 (compatible; RaisinaWire/1.0; +https://raisinawire.com)" },
-        cf: { cacheTtl: 60, cacheEverything: true }
-      });
-      if (!response.ok) throw new Error(`Source returned ${response.status}`);
-      const payload = await response.json();
-      const result = payload?.chart?.result?.[0];
-      if (!result) throw new Error(payload?.chart?.error?.description || "No chart data");
-      const meta = result.meta || {};
-      const quotes = result.indicators?.quote?.[0] || {};
-      const closes = (quotes.close || []).filter(v => Number.isFinite(Number(v))).map(Number);
-      const value = Number(meta.regularMarketPrice ?? closes.at(-1));
-      if (!Number.isFinite(value)) throw new Error("No valid price");
-      const previous = Number(meta.chartPreviousClose ?? meta.previousClose ?? closes.at(-2));
-      const change = Number.isFinite(previous) ? value - previous : null;
-      const changePct = Number.isFinite(previous) && previous !== 0 ? change / previous * 100 : null;
-      const stamp = Number(meta.regularMarketTime || result.timestamp?.at(-1));
-      return {
-        label: item.label, symbol: item.symbol, category: item.category,
-        currency: meta.currency || item.currency, value, change, changePct,
-        date: Number.isFinite(stamp) ? new Date(stamp * 1000).toISOString() : null,
-        isMarketOpen: typeof meta.marketState === "string" ? meta.marketState === "REGULAR" : null,
-        status: "keyless-quote", source: "Yahoo Finance", dataType: "latest available quote; delay varies by instrument"
-      };
-    } catch (e) { lastError = String(e.message || "Unavailable"); }
-  }
-  return { label:item.label, symbol:item.symbol, category:item.category, currency:item.currency,
-    value:null, change:null, changePct:null, date:null, isMarketOpen:null, status:"unavailable",
-    source:"Yahoo Finance", dataType:"quote unavailable", detail:lastError.slice(0,120) };
-}
-
-async function fxFallback() {
-  try {
-    const response = await fetch("https://api.frankfurter.dev/v2/rate/usd/inr", { cf: { cacheTtl: 3600, cacheEverything: true } });
-    if (!response.ok) return null;
-    const data = await response.json();
-    if (!Number.isFinite(Number(data.rate))) return null;
-    return { label:"USD/INR reference", symbol:"USD/INR", category:"Currencies", currency:"INR", value:Number(data.rate),
-      change:null, changePct:null, date:data.date || null, isMarketOpen:null, status:"daily-reference", source:"Frankfurter",
-      dataType:"daily central-bank reference rate" };
-  } catch { return null; }
-}
-
-async function markets() {
-  const now = new Date().toISOString();
-  const items = await Promise.all(MARKET_WATCHLIST.map(yahooQuote));
-  const hasFxQuote = items.some(item => item.symbol === "USDINR=X" && item.value !== null);
-  const fx = hasFxQuote ? null : await fxFallback();
-  return {
-    updatedAt: now, mode:"keyless", items, fx,
-    note:"No API key or account is required. Quotes are from public Yahoo Finance endpoints; timing, availability and exchange delays vary by instrument. USD/INR may fall back to a daily central-bank reference rate. If a source fails, the affected quote is marked unavailable rather than fabricated. Public-feed uptime and licensing are not guaranteed."
-  };
-}
-
 async function api(request, env) {
   const url = new URL(request.url);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: JSON_HEADERS });
@@ -195,7 +122,15 @@ async function api(request, env) {
     catch (e) { return json({ source: "GDELT DOC 2.0", updatedAt: null, articles: [], error: "Live news feed temporarily unavailable", detail: e.message }, 502); }
   }
   if (url.pathname === "/api/markets") {
-    return json(await markets(), 200, { "cache-control":"public, max-age=45, s-maxage=60" });
+    return json(await cached("markets", 45e3, marketBoard), 200, { "cache-control":"public, max-age=45, s-maxage=60" });
+  }
+  if (url.pathname === "/api/wire") {
+    return json(await cached("wire", 90e3, liveWire), 200, { "cache-control":"public, max-age=60, s-maxage=90" });
+  }
+  if (url.pathname === "/api/read") {
+    const target = url.searchParams.get("url") || "";
+    const result = await cached(`read:${target}`, 10 * 60e3, () => readArticle(target));
+    return json(result, 200, { "cache-control":"public, max-age=600, s-maxage=600" });
   }
   if (url.pathname === "/api/config") {
     return json({ appName: env.APP_NAME || "Raisina Wire", linkedinUrl: env.LINKEDIN_URL || "", registrationEnabled: Boolean(env.DB), marketProviderConfigured: true, marketProvider: "keyless public feeds", marketRefreshSeconds: 60 });
