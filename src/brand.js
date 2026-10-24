@@ -1,4 +1,4 @@
-// Raisina Wire brand marks: the Raisina Hill skyline as line art, and the tricolour as plain bars.
+// Raisina Wire brand marks: the crimson dome tile, the Raisina Hill skyline as line art, and the tricolour as plain bars.
 // The skyline is architecture only (central dome, colonnade, North and South Block domes);
 // no seal, emblem or Ashoka Chakra is used anywhere.
 
@@ -26,8 +26,17 @@ const SKYLINE = '<path d="M0 112H600"/>' + sideBlock(36, 150) + sideBlock(450, 5
 const svg = (viewBox, cls, strokeWidth) =>
   `<svg class="${cls}" viewBox="${viewBox}" preserveAspectRatio="xMidYMax meet" fill="none" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SKYLINE}</svg>`;
 
-// The central dome alone, used as the compact mark.
-export const domeMark = (cls = "dome-mark") => svg("196 2 208 114", cls, 3.4);
+// The app mark: Rashtrapati Bhavan's dome as bold line art on a crimson tile, tricolour bars beneath.
+// Drawn on its own 100-unit grid so it stays legible down to favicon size.
+const cols2 = (x0, x1, step, y0, y1) => { let d = ""; for (let x = x0; x <= x1 + 0.01; x += step) d += `M${+x.toFixed(1)} ${y0}V${y1}`; return d; };
+export const MARK_DOME = '<path d="M50 12V22M47 12H53"/>'
+  + '<path d="M27 46A23 22 0 0 1 73 46"/><path d="M33 37H67" stroke-width="2.2"/>'
+  + `<path d="M24 46H76M26 51H74"/><path d="${cols2(31, 69, 6.3, 51, 61)}" stroke-width="2.4"/><path d="M23 61H77"/>`
+  + '<path d="M14 66A5 4.5 0 0 1 24 66M76 66A5 4.5 0 0 1 86 66M12 66H26M74 66H88"/>'
+  + `<path d="M8 70H92"/><path d="${cols2(14, 86, 6, 70, 81)}" stroke-width="2.4"/><path d="M6 81H94M4 86H96"/>`;
+export const markDome = (cls = "mark-dome", strokeWidth = 3.6) =>
+  `<svg class="${cls}" viewBox="1 7 98 82" fill="none" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${MARK_DOME}</svg>`;
+export const brandMark = (cls = "brand-mark") => `<span class="${cls}" aria-hidden="true">${markDome()}<span class="mark-tri"><i></i><i></i><i></i></span></span>`;
 // The full skyline; `band` crops to the lower half for a horizon line under the masthead.
 export const skyline = (cls = "skyline", band = false) => svg(band ? "0 60 600 54" : "0 0 600 120", cls, band ? 0.7 : 1.2);
 export const tribar = (cls = "tribar") => `<span class="${cls}" aria-hidden="true"><i></i><i></i><i></i></span>`;
