@@ -3,7 +3,11 @@
 // To add an edition: put its entry at the top here, its text in edition-bodies.json
 // under the same slug, and its artwork at public/editions/<slug>.webp.
 export const NEWSLETTER_URL = "https://www.linkedin.com/newsletters/raisina-wire-7418787153549238272";
-export const AUTHOR = { name: "Ilmaz Syed", role: "Founder and Editor", photo: "/editions/ilmaz-syed.jpg" };
+export const AUTHOR = {
+  name: "Ilmaz Syed", role: "Founder and Editor",
+  photo: "/editions/ilmaz-syed.jpg", portrait: "/editions/ilmaz-syed-portrait.jpg",
+  bio: "Founder and editor of Raisina Wire and founder of Calibrex. An OSINT expert, defence investigative journalist and geopolitical analyst with more than fifteen years in Indian news."
+};
 
 export const editions = [
   {

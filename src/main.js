@@ -6,7 +6,7 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const esc = (s = "") => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const IST = { timeZone: "Asia/Kolkata" };
 
-const state = { user: null, wire: null, wireError: false, markets: null, marketsError: false, community: null, events: null, installPrompt: null, homeGroup: "india" };
+const state = { coverage: [], coverageLead: null, user: null, wire: null, wireError: false, markets: null, marketsError: false, community: null, events: null, installPrompt: null, homeGroup: "india" };
 const wireIndex = new Map(); // url -> wire item, so the reader can show a headline while it loads
 
 /* ---------- Formatting ---------- */
@@ -79,10 +79,19 @@ const NAV = [
 function renderShell() {
   document.body.insertAdjacentHTML("afterbegin", `<a class="skip-link" href="#view">Skip to content</a>`);
   $("#app").innerHTML = `
+  <div class="ticker" role="region" aria-label="Latest headlines"><div class="wrap ticker-in">
+    <span class="ticker-label"><span class="pulse"></span>Live</span>
+    <div class="ticker-track"><div class="ticker-move" id="tickerMove"><span class="ticker-item muted">Connecting to the live wire…</span></div></div>
+    <div class="clocks" id="clocks" aria-label="World clocks"></div>
+  </div></div>
   <header class="wrap">
     <div class="utility">
       <div class="utility-left"><span id="today"></span><span id="wireStatus"><span class="dot-ok"></span>Connecting to the live wire…</span></div>
-      <div class="utility-right"><button class="text-btn" type="button" id="signInBtn">Sign in</button><button class="btn btn-gold btn-sm" type="button" id="joinBtn">Join free</button></div>
+      <div class="utility-right">
+        <span class="guest" id="guestActions"><button class="text-btn" type="button" id="signInBtn">Sign in</button><button class="btn btn-dark btn-sm" type="button" id="joinBtn">Subscribe</button></span>
+        <div class="account hidden" id="account"><button class="avatar" type="button" id="avatarBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu"></button>
+          <div class="account-menu glass" id="accountMenu" role="menu" hidden></div></div>
+      </div>
     </div>
     <div class="masthead" id="masthead"><a href="#/" aria-label="Raisina Wire home">Raisina <i>Wire</i></a><div class="meta">An Indian perspective on a changing world</div></div>
   </header>
@@ -115,8 +124,12 @@ function renderShell() {
   <button class="btn btn-gold install-pill hidden" id="installPill" type="button">Install Raisina Wire</button>`;
 
   $("#today").textContent = new Date().toLocaleDateString("en-IN", { ...IST, weekday: "long", day: "numeric", month: "long", year: "numeric" });
-  $("#signInBtn").addEventListener("click", () => state.user ? signOut() : openAuth("login"));
-  $("#joinBtn").addEventListener("click", () => state.user ? (location.hash = "#/saved") : openAuth("register"));
+  $("#signInBtn").addEventListener("click", () => openAuth("login"));
+  $("#joinBtn").addEventListener("click", () => openAuth("register"));
+  $("#avatarBtn").addEventListener("click", () => toggleAccountMenu());
+  document.addEventListener("click", e => { if (!e.target.closest("#account")) toggleAccountMenu(false); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") toggleAccountMenu(false); });
+  renderClocks(); setInterval(renderClocks, 20e3);
   $("#modalClose").addEventListener("click", closeAuth);
   $("#modalBackdrop").addEventListener("click", e => { if (e.target.id === "modalBackdrop") closeAuth(); });
   document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#modalBackdrop").classList.contains("hidden")) closeAuth(); });
@@ -134,7 +147,7 @@ function renderShell() {
 }
 
 function renderNav(route) {
-  $("#siteNav").innerHTML = `<a class="nav-brand" href="#/" aria-label="Raisina Wire home" tabindex="-1">Raisina <i>Wire</i></a>` + NAV.map(([label, href, active]) => `<a href="${href}"${active(route) ? ' aria-current="page"' : ""}>${label}</a>`).join("")
+  $("#siteNav").innerHTML = `<a class="nav-brand" href="#/" aria-label="Raisina Wire home" tabindex="-1">Raisina <i>Wire</i></a>` + NAV.map(([label, href, active]) => `<a href="${href}"${active(route) ? ' aria-current="page"' : ""}>${label === "Live" && state.coverage.length ? `<span class="nav-live" aria-label="Live coverage running"></span>` : ""}${label}</a>`).join("")
     + `<button class="search-btn" type="button" data-action="search" aria-label="Search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>`;
   $("#siteNav").dispatchEvent(new Event("scroll"));
 }
@@ -146,7 +159,7 @@ function parseRoute() {
   const [page = "", ...rest] = path.split("/").filter(Boolean);
   return { page: page || "home", arg: rest.length ? decodeURIComponent(rest.join("/")) : "", params: new URLSearchParams(query) };
 }
-const views = { home: viewHome, editions: viewEditions, edition: viewEdition, read: viewExternal, live: viewLive, markets: viewMarkets, community: viewHome, saved: viewSaved, search: viewSearch };
+const views = { coverage: viewCoverage, home: viewHome, editions: viewEditions, edition: viewEdition, read: viewExternal, live: viewLive, markets: viewMarkets, community: viewHome, saved: viewSaved, search: viewSearch };
 async function route() {
   const r = parseRoute();
   renderNav(r);
@@ -207,6 +220,8 @@ function viewHome() {
   <div class="wrap">
     <section class="dock glass" aria-label="Market pulse"><div class="dock-head"><b>Market pulse</b><span class="muted" id="dockStatus" style="font-size:12px">Loading quotes…</span><a class="link-gold" href="#/markets" style="font-size:13px">All markets →</a></div><div class="dock-grid" id="dock"></div></section>
 
+    <section id="liveBanner" class="band-tight" aria-label="Live coverage" hidden></section>
+
     <div class="lead-grid">
       <section class="side-stack" aria-label="More from Raisina Wire"><div class="kicker">Raisina Wire · Newest</div>
         ${rest.slice(0, 3).map(e => `<a class="side-item" href="${edHref(e)}"><div class="thumb">${img(e.image)}</div><span class="kicker">${esc(e.topic)}</span><h3>${esc(e.title)}</h3><span class="meta">${esc(AUTHOR.name)} · ${shortDate(e.date)}</span></a>`).join("")}
@@ -221,8 +236,19 @@ function viewHome() {
       <aside class="live-rail glass" aria-label="Live wire"><div class="live-title"><b><span class="dot-live"></span>Live wire</b><span class="muted" style="font-size:12px" id="railUpdated"></span></div><div id="rail"></div><a class="link-gold" href="#/live" style="display:block;margin-top:16px;font-size:13px">All live updates →</a></aside>
     </div>
 
+    <section class="briefing glass band" aria-labelledby="briefingTitle"><div class="briefing-head"><span class="kicker">The Briefing</span><h2 id="briefingTitle">What you need to know</h2><span class="meta">${new Date().toLocaleDateString("en-IN", { ...IST, weekday: "long", day: "numeric", month: "long" })} · From the live wire</span></div><ol class="briefing-list" id="briefingList"></ol></section>
+
     <section class="band"><div class="section-head"><h2>From the Raisina Wire desk</h2><a class="link-gold" href="#/editions">All ${editions.length} editions →</a></div>
       <div class="card-grid">${rest.slice(3, 7).map(e => edCard(e)).join("")}</div></section>
+
+    <section class="band editor" aria-labelledby="editorTitle">
+      <div class="editor-portrait"><img src="${AUTHOR.portrait}" alt="Portrait of ${esc(AUTHOR.name)}" loading="lazy"></div>
+      <div class="editor-body"><span class="kicker" id="editorTitle">From the Editor</span>
+        <blockquote id="editorQuote">“${esc(lead.dek)}”</blockquote><span class="meta" id="editorQuoteSource">From “${esc(lead.title)}”</span>
+        <div class="signature"><span>${esc(AUTHOR.name)}</span><small>${esc(AUTHOR.role)}, Raisina Wire</small></div>
+        <div class="editor-actions"><a class="btn btn-dark" href="${edHref(lead)}">Read the latest edition</a><a class="btn btn-light" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Subscribe on LinkedIn ↗</a></div></div>
+      <div class="editor-picks"><span class="kicker">Start here</span><ol>${EDITOR_PICKS.map(slug => editions.find(x => x.slug === slug)).filter(Boolean).map(x => `<li><a href="${edHref(x)}"><span class="kicker">${esc(x.topic)}</span><b>${esc(x.title)}</b></a></li>`).join("")}</ol></div>
+    </section>
 
     <section class="band split">
       <div><div class="section-head"><h2>India &amp; the World</h2></div>
@@ -239,10 +265,23 @@ function viewHome() {
     <section class="band" id="community"><div class="community glass">
       <div><div class="kicker">Community</div><h2>Ideas in conversation.</h2><p class="muted" style="margin:10px 0 0;font-size:15px;line-height:1.7">Moderated discussions, expert briefings and research missions.</p>
         <button class="btn btn-dark" type="button" data-action="discuss" style="margin-top:16px">Start a discussion</button></div>
-      <div class="community-cards" id="communityCards"></div>
+      <div class="community-cols"><div class="mini-card"><div class="kicker">Events &amp; briefings</div><ol class="agenda" id="agenda"></ol></div><div class="mini-card"><div class="kicker">Discussions</div><div id="discussions"></div><a class="link-gold" href="https://calibrex.org/academy/" target="_blank" rel="noreferrer" style="display:block;margin-top:14px;font-size:13px">Learn OSINT with Calibrex Academy ↗</a></div></div>
     </div></section>
   </div>`;
-  renderDock(); renderRail(); renderHomeMarkets(); renderTopicCols(); renderCommunity();
+  renderDock(); renderRail(); renderHomeMarkets(); renderTopicCols(); renderCommunity(); renderLiveBanner(); renderBriefing();
+  loadBodies().then(bodies => { const q = pullQuote(bodies[lead.slug]?.blocks || []); if (q && $("#editorQuote")) $("#editorQuote").textContent = `“${q}”`; }).catch(() => {});
+}
+const EDITOR_PICKS = ["iran-500m-masterstroke", "himalayan-tunnel", "cia-invisible-front"];
+function renderBriefing() {
+  const host = $("#briefingList"); if (!host) return;
+  const used = new Set(), picks = [];
+  for (const cat of ["India", "Security", "Diplomacy", "Markets", "World", "Energy"]) {
+    const item = wireItems().find(i => i.category === cat && !used.has(i.url));
+    if (item) { used.add(item.url); picks.push(item); }
+    if (picks.length === 5) break;
+  }
+  host.innerHTML = picks.length ? picks.map(i => `<li><a href="${wireHref(i)}"><span class="kicker">${esc(i.category)}</span><b>${esc(i.title)}</b><span class="meta">${clock(i.publishedAt)} · ${esc(i.source)}</span></a></li>`).join("")
+    : Array.from({ length: 5 }, () => `<li><div class="skeleton" style="height:96px"></div></li>`).join("");
 }
 
 function renderDock() {
@@ -274,14 +313,13 @@ function renderTopicCols() {
   }).join("");
 }
 function renderCommunity() {
-  const host = $("#communityCards"); if (!host) return;
-  const posts = (state.community || []).slice(0, 2).map(p => `<div class="mini-card"><div class="kicker" style="font-size:10px">Discussion · ${esc(p.topic)}</div><b>${esc(p.title)}</b><span class="muted">${esc(p.author)} · ${ago(p.createdAt)}</span></div>`);
-  const ev = (state.events || [])[0];
-  const cards = [...posts];
-  cards.push(ev ? `<div class="mini-card"><div class="kicker" style="font-size:10px">Event · ${esc(ev.eventType)}</div><b>${esc(ev.title)}</b><span class="muted">${new Date(ev.startsAt).toLocaleDateString("en-IN", { ...IST, day: "numeric", month: "short" })} · ${esc(ev.access)}</span></div>` : `<div class="mini-card"><div class="kicker" style="font-size:10px">Events</div><b>Expert briefings and debates</b><span class="muted">New events are announced here.</span></div>`);
-  cards.push(`<a class="mini-card" href="https://calibrex.org/academy/" target="_blank" rel="noreferrer"><div class="kicker" style="font-size:10px">Academy</div><b>OSINT for strategic professionals</b><span class="muted">With Calibrex Academy ↗</span></a>`);
-  if (!posts.length) cards.unshift(`<div class="mini-card"><div class="kicker" style="font-size:10px">Discussion</div><b>Be the first to start a conversation</b><span class="muted">Members can open a discussion on any edition.</span></div>`);
-  host.innerHTML = cards.slice(0, 3).join("");
+  const agenda = $("#agenda"), talk = $("#discussions"); if (!agenda) return;
+  const upcoming = (state.events || []).filter(e => !e.startsAt || new Date(e.startsAt) > Date.now() - 6 * 3600e3).slice(0, 3);
+  agenda.innerHTML = upcoming.length ? upcoming.map(e => { const d = new Date(e.startsAt); return `<li><span class="date"><b>${d.toLocaleDateString("en-IN", { ...IST, day: "2-digit" })}</b><small>${d.toLocaleDateString("en-IN", { ...IST, month: "short" })}</small></span><span><b>${esc(e.title)}</b><span class="meta">${esc(e.eventType)} · ${d.toLocaleTimeString("en-IN", { ...IST, hour: "2-digit", minute: "2-digit" })} IST · ${esc(e.access)}</span></span></li>`; }).join("")
+    : `<li class="agenda-empty"><span class="date"><b>—</b><small>Soon</small></span><span><b>Expert briefings and debates</b><span class="meta">New events are announced here first</span></span></li>`;
+  const posts = (state.community || []).slice(0, 3);
+  talk.innerHTML = posts.length ? posts.map(p => `<div class="talk"><b>${esc(p.title)}</b><span class="meta">${esc(p.topic)} · ${esc(p.author)} · ${ago(p.createdAt)}</span></div>`).join("")
+    : `<div class="talk"><b>Be the first to start a conversation</b><span class="meta">Members can open a discussion on any edition</span></div>`;
 }
 
 /* ---------- Editions ---------- */
@@ -292,16 +330,34 @@ function viewEditions() {
 
 let bodiesPromise;
 const loadBodies = () => (bodiesPromise ||= import("./edition-bodies.json").then(m => m.default));
-function proseHTML(blocks) {
-  let html = "", list = [];
-  const flush = () => { if (list.length) { html += `<ul>${list.join("")}</ul>`; list = []; } };
+// "Hard-Kill: The DRDO …" -> <b>Hard-Kill:</b> The DRDO …, as print sets list lead-ins.
+const leadIn = x => { const m = x.match(/^([^:]{2,34}):\s+(.+)$/); return m ? `<b>${esc(m[1])}:</b> ${esc(m[2])}` : esc(x); };
+function proseHTML(blocks, { pull } = {}) {
+  let html = "", list = [], paragraphs = 0;
+  const pullAt = Math.max(3, Math.floor(blocks.filter(b => b.t === "p").length * 0.45));
+  const flush = () => {
+    if (!list.length) return;
+    const numbered = list.every(x => /^\d+\.\s/.test(x));
+    const items = list.map(x => `<li>${leadIn(numbered ? x.replace(/^\d+\.\s+/, "") : x)}</li>`).join("");
+    html += numbered ? `<ol>${items}</ol>` : `<ul>${items}</ul>`; list = [];
+  };
   for (const b of blocks) {
-    if (b.t === "li") { list.push(`<li>${esc(b.x)}</li>`); continue; }
+    if (b.t === "li") { list.push(b.x); continue; }
     flush();
     html += b.t === "h" ? `<h2>${esc(b.x)}</h2>` : `<p>${esc(b.x)}</p>`;
+    if (b.t === "p" && ++paragraphs === pullAt && pull) html += `<blockquote class="pull">${esc(pull)}</blockquote>`;
   }
   flush();
   return html;
+}
+// A short, quotable sentence from the closing paragraphs, used as the pull quote.
+function pullQuote(blocks) {
+  const paras = blocks.filter(b => b.t === "p").map(b => b.x);
+  for (const p of paras.slice(-3).reverse()) {
+    const first = (p.match(/^[^.!?]+[.!?]/) || [])[0]?.trim();
+    if (first && first.length >= 40 && first.length <= 190) return first;
+  }
+  return "";
 }
 const ICON = {
   back: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>`,
@@ -324,14 +380,15 @@ async function viewEdition(r) {
     <div class="kicker">${esc(e.topic)}</div><h1>${esc(e.title)}</h1><p class="dek">${esc(e.dek)}</p>
     <div class="reader-byline"><img src="${AUTHOR.photo}" alt=""><div><b>${esc(AUTHOR.name)}</b><div class="muted" style="font-size:13px">${esc(AUTHOR.role)}, Raisina Wire</div></div><span class="grow"></span><span class="meta">${editionDate(e.date)} · ${e.readMinutes} min read</span></div>
     <div class="reader-hero">${img(e.image, "")}</div>
-    <div class="prose" id="prose"><div class="skeleton" style="height:420px"></div></div>
+    <div class="prose dropcap" id="prose"><div class="skeleton" style="height:420px"></div></div>
+    <div class="author-box"><img src="${AUTHOR.photo}" alt=""><div><span class="kicker">About the author</span><b>${esc(AUTHOR.name)}</b><p>${esc(AUTHOR.bio)}</p></div></div>
     <div class="reader-end glass"><div><b style="font-size:16px">Follow Raisina Wire</b><div class="muted" style="font-size:14px;margin-top:4px">First published in the Raisina Wire newsletter on LinkedIn.</div></div><a class="btn btn-dark" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Subscribe ↗</a></div>
     <div class="prev-next">${newer ? `<a class="glass" href="${edHref(newer)}"><span class="meta">Newer edition</span><b>${esc(newer.title)}</b></a>` : "<span></span>"}${older ? `<a class="glass" href="${edHref(older)}"><span class="meta">Older edition</span><b>${esc(older.title)}</b></a>` : ""}</div>
   </article>
   <aside class="reader-aside"><div class="aside-card glass"><div class="kicker">More from Raisina Wire</div>
     ${editions.filter(x => x !== e).slice(0, 5).map(x => `<a class="aside-link" href="${edHref(x)}"><span class="thumb">${img(x.image)}</span><span><b>${esc(x.title)}</b><span class="meta" style="display:block;margin-top:5px;font-size:10px">${shortDate(x.date)}</span></span></a>`).join("")}
   </div></aside></div></div>`;
-  try { const bodies = await loadBodies(); if (parseRoute().arg === e.slug) $("#prose").innerHTML = proseHTML(bodies[e.slug]?.blocks || []); }
+  try { const bodies = await loadBodies(); if (parseRoute().arg === e.slug) { const blocks = bodies[e.slug]?.blocks || []; $("#prose").innerHTML = proseHTML(blocks, { pull: pullQuote(blocks) }); } }
   catch { $("#prose").innerHTML = `<p>This edition could not be loaded. <a href="${esc(e.url)}" target="_blank" rel="noreferrer">Read it on LinkedIn ↗</a></p>`; }
 }
 
@@ -446,7 +503,67 @@ async function onAction(e) {
   }
   if (a === "home-group") { state.homeGroup = el.dataset.group; renderHomeMarkets(); }
   if (a === "search") { const q = prompt("Search Raisina Wire and the live wire"); if (q?.trim()) location.hash = `#/search?q=${encodeURIComponent(q.trim())}`; }
+  if (a === "signout") { toggleAccountMenu(false); signOut(); }
   if (a === "discuss") { if (!state.user) { openAuth("register"); toast("Create a free account to start a discussion."); } else openDiscussionForm(); }
+}
+
+/* ---------- Ticker, clocks, live coverage ---------- */
+const CLOCKS = [["New Delhi", "Asia/Kolkata"], ["Washington", "America/New_York"], ["London", "Europe/London"], ["Beijing", "Asia/Shanghai"], ["Moscow", "Europe/Moscow"]];
+function renderClocks() {
+  const host = $("#clocks"); if (!host) return;
+  host.innerHTML = CLOCKS.map(([city, tz]) => `<span><b>${city}</b> ${new Date().toLocaleTimeString("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit" })}</span>`).join("");
+}
+function renderTicker() {
+  const host = $("#tickerMove"); if (!host) return;
+  const live = state.coverage.slice(0, 2).map(c => `<a class="ticker-item is-live" href="#/coverage/${encodeURIComponent(c.slug)}"><b>Live</b>${esc(c.title)}</a>`);
+  const wire = wireItems().slice(0, 12).map(i => `<a class="ticker-item" href="${wireHref(i)}"><time>${clock(i.publishedAt)}</time>${esc(i.title)}<span class="src">${esc(i.source)}</span></a>`);
+  const items = [...live, ...wire];
+  if (!items.length) { host.innerHTML = `<span class="ticker-item muted">${state.wireError ? "Live wire unavailable · retrying" : "Connecting to the live wire…"}</span>`; host.classList.remove("moving"); return; }
+  // Two copies make the loop seamless; the second is hidden from assistive tech.
+  host.innerHTML = `<div class="ticker-set">${items.join("")}</div><div class="ticker-set" aria-hidden="true">${items.join("").replaceAll("<a ", '<a tabindex="-1" ')}</div>`;
+  host.style.setProperty("--ticker-duration", `${Math.max(40, items.length * 7)}s`);
+  host.classList.add("moving");
+}
+async function loadCoverage() {
+  try {
+    const d = await fetch("/api/live").then(r => r.ok ? r.json() : { items: [] });
+    state.coverage = d.items || [];
+    state.coverageLead = state.coverage[0] ? await fetch(`/api/live/${encodeURIComponent(state.coverage[0].slug)}`).then(r => r.ok ? r.json() : null) : null;
+  } catch { state.coverage = []; state.coverageLead = null; }
+  renderTicker(); renderLiveBanner(); renderNav(parseRoute());
+}
+function renderLiveBanner() {
+  const host = $("#liveBanner"); if (!host) return;
+  const lead = state.coverageLead;
+  if (!lead?.item) { host.innerHTML = ""; host.hidden = true; return; }
+  host.hidden = false;
+  const href = `#/coverage/${encodeURIComponent(lead.item.slug)}`;
+  host.innerHTML = `<div class="live-banner glass"><div class="lb-main"><span class="live-badge"><span class="pulse"></span>Live</span>
+      <h2><a href="${href}">${esc(lead.item.title)}</a></h2>${lead.item.summary ? `<p>${esc(lead.item.summary)}</p>` : ""}
+      <a class="btn btn-dark btn-sm" href="${href}">Follow live coverage</a><span class="meta" style="margin-left:12px">Since ${clock(lead.item.startedAt)} IST · ${lead.updates.length} update${lead.updates.length === 1 ? "" : "s"}</span></div>
+    <ol class="lb-updates">${lead.updates.slice(0, 3).map(u => `<li><time>${clock(u.createdAt)}</time><span>${esc(u.body.length > 180 ? u.body.slice(0, 177) + "…" : u.body)}</span></li>`).join("") || `<li><span class="muted">Updates will appear here as they are posted.</span></li>`}</ol></div>`;
+}
+let coverageTimer;
+async function viewCoverage(r) {
+  clearInterval(coverageTimer);
+  const slug = r.arg;
+  const render = async (first) => {
+    let d;
+    try { const res = await fetch(`/api/live/${encodeURIComponent(slug)}`); d = res.ok ? await res.json() : null; } catch { d = null; }
+    if (parseRoute().page !== "coverage" || parseRoute().arg !== slug) return clearInterval(coverageTimer);
+    if (!d) { if (first) $("#view").innerHTML = `<div class="wrap"><div class="blocked glass"><h1>This live coverage isn’t available</h1><p class="muted">It may have ended or been removed.</p><div class="blocked-actions"><a class="btn btn-dark" href="#/live">Go to the live wire</a></div></div></div>`; return; }
+    const isLive = d.item.status === "live";
+    document.title = `${isLive ? "LIVE: " : ""}${d.item.title} · Raisina Wire`;
+    $("#view").innerHTML = `<div class="wrap"><div class="coverage">
+      <header class="coverage-head">${isLive ? `<span class="live-badge"><span class="pulse"></span>Live</span>` : `<span class="tag">Coverage ended</span>`}
+        <h1>${esc(d.item.title)}</h1>${d.item.summary ? `<p class="dek">${esc(d.item.summary)}</p>` : ""}
+        <div class="meta">Started ${new Date(d.item.startedAt).toLocaleString("en-IN", { ...IST, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })} IST · ${d.updates.length} update${d.updates.length === 1 ? "" : "s"}${isLive ? " · refreshes every 30 seconds" : ""}</div></header>
+      <ol class="coverage-feed">${d.updates.map((u, i) => `<li class="${i === 0 && isLive ? "latest" : ""}"><time datetime="${esc(u.createdAt)}"><b>${clock(u.createdAt)}</b><span>${ago(u.createdAt)}</span></time>
+        <div class="glass">${i === 0 && isLive ? `<span class="tag tag-live">Latest</span>` : ""}<p>${esc(u.body)}</p>${u.mediaUrl && /^https?:/.test(u.mediaUrl) ? `<div class="reader-hero">${img(u.mediaUrl)}</div>` : ""}${u.sourceUrl && /^https?:/.test(u.sourceUrl) ? `<a class="link-gold" href="${esc(u.sourceUrl)}" target="_blank" rel="noreferrer">Source ↗</a>` : ""}</div></li>`).join("") || `<li><div class="glass"><p class="muted">The first update will appear here shortly.</p></div></li>`}</ol>
+    </div></div>`;
+  };
+  await render(true);
+  coverageTimer = setInterval(() => { if (!document.hidden) render(false); }, 30e3);
 }
 
 /* ---------- Data loading ---------- */
@@ -460,7 +577,7 @@ async function loadWire() {
     state.wireError = true;
     $("#wireStatus").innerHTML = `<span class="dot-live"></span>Live wire unavailable · retrying`;
   }
-  renderRail(); renderTopicCols(); renderLiveList(); renderExtAside();
+  renderRail(); renderTopicCols(); renderLiveList(); renderExtAside(); renderTicker(); renderBriefing();
 }
 async function loadMarkets() {
   try { const r = await fetch("/api/markets"); if (!r.ok) throw new Error(); state.markets = await r.json(); state.marketsError = false; }
@@ -488,12 +605,24 @@ function setAuthMode(mode) {
   $("#authSwitch").textContent = mode === "login" ? "Create an account" : "Sign in instead";
   $("#authMessage").textContent = "";
 }
+const initials = name => (name || "").trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() || "").join("") || "RW";
 function showUser() {
-  $("#signInBtn").textContent = state.user ? "Sign out" : "Sign in";
-  $("#joinBtn").textContent = state.user ? state.user.displayName.split(" ")[0] : "Join free";
-  if (state.user && ["admin", "editor"].includes(state.user.role) && !$("#adminLink")) {
-    $(".utility-right").insertAdjacentHTML("afterbegin", `<a id="adminLink" class="text-btn" href="/admin.html" style="font-weight:700;padding:10px 6px">Control room</a>`);
-  }
+  const u = state.user;
+  $("#guestActions").classList.toggle("hidden", !!u);
+  $("#account").classList.toggle("hidden", !u);
+  if (!u) { toggleAccountMenu(false); return; }
+  $("#avatarBtn").textContent = initials(u.displayName);
+  $("#avatarBtn").setAttribute("aria-label", `Account: ${u.displayName}`);
+  const staff = ["admin", "editor"].includes(u.role);
+  $("#accountMenu").innerHTML = `<div class="account-head"><b>${esc(u.displayName)}</b><span class="meta">${esc(u.role)}</span></div>
+    <a role="menuitem" href="#/saved">Saved stories</a>${staff ? `<a role="menuitem" href="/admin.html">Control room</a>` : ""}
+    <a role="menuitem" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Newsletter on LinkedIn ↗</a>
+    <button role="menuitem" type="button" data-action="signout">Sign out</button>`;
+}
+function toggleAccountMenu(force) {
+  const menu = $("#accountMenu"), btn = $("#avatarBtn"); if (!menu) return;
+  const open = force ?? menu.hidden;
+  menu.hidden = !open; btn.setAttribute("aria-expanded", String(open));
 }
 async function submitAuth(e) {
   e.preventDefault();
@@ -511,7 +640,7 @@ async function submitAuth(e) {
 }
 async function signOut() {
   try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* offline */ }
-  state.user = null; $("#adminLink")?.remove(); showUser(); toast("Signed out.");
+  state.user = null; showUser(); toast("Signed out.");
 }
 function openDiscussionForm() {
   const title = prompt("Discussion title (at least 5 characters)"); if (!title) return;
@@ -546,7 +675,8 @@ renderShell();
 watchScroll();
 window.addEventListener("hashchange", () => { document.title = "Raisina Wire — Ideas. Intelligence. Impact."; route(); });
 route();
-loadWire(); loadMarkets(); loadCommunity();
+loadWire(); loadMarkets(); loadCommunity(); loadCoverage();
+setInterval(() => { if (!document.hidden) loadCoverage(); }, 60e3);
 fetch("/api/auth/me").then(r => r.json()).then(d => { if (d.user) { state.user = d.user; showUser(); } }).catch(() => {});
 fetch("/api/config").then(r => r.json()).then(c => { if (c.linkedinUrl) $("#linkedinLink").href = c.linkedinUrl; }).catch(() => {});
 setInterval(() => { if (!document.hidden) loadWire(); }, 120e3);
