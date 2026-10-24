@@ -12,6 +12,7 @@ not_found_handling = "single-page-application"
 run_worker_first = [
   "/api/*", "/media/*", "/", "/editions", "/edition/*", "/article/*", "/author/*", "/tag/*",
   "/live", "/live/*", "/markets", "/community", "/discussion/*", "/events", "/coverage/*", "/watch",
+  "/about", "/terms", "/privacy", "/disclaimer", "/copyright", "/community-guidelines", "/grievance", "/privacy.html", "/terms.html",
   "/sitemap.xml", "/news-sitemap.xml", "/robots.txt", "/feed.xml", "/rss.xml"
 ]
 
@@ -38,5 +39,7 @@ SITE_URL = "https://raisinawire.calibrex.org"
 # Needs the GOOGLE_TTS_API_KEY secret (see README). Other female en-IN voices: Aoede, Kore,
 # Leda, Achernar, Vindemiatrix, Despina (en-IN-Chirp3-HD-<name>).
 TTS_VOICE = "en-IN-Chirp3-HD-Sulafat"
+# Publishers who asked not to be excerpted (comma-separated domains): headline, summary and link only.
+PUBLISHER_OPT_OUT = ""
 
 # Market pulse uses keyless public feeds; no market-data secret is required.

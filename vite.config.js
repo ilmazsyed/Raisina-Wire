@@ -38,9 +38,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(import.meta.dirname, "index.html"),
-        admin: resolve(import.meta.dirname, "admin.html"),
-        privacy: resolve(import.meta.dirname, "privacy.html"),
-        terms: resolve(import.meta.dirname, "terms.html")
+        admin: resolve(import.meta.dirname, "admin.html")
       }
     }
   }

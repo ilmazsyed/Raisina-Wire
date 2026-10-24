@@ -2,6 +2,7 @@
 // canonical URL, social card and schema.org data, plus the story text itself in the HTML,
 // so Google and link previews see real content before the app starts. Also: sitemaps,
 // a Google News sitemap, robots.txt and an RSS feed.
+import { ABOUT, LEGAL, LEGAL_ORDER, LEGAL_UPDATED } from "./legal.js";
 import { listPublished, getBySlug, textBlocks, storyPath, isPublic, tagSlug, WRITERS, writer } from "./store.js";
 
 const SITE = "Raisina Wire";
@@ -136,6 +137,17 @@ async function pageFor(path, url, env, o) {
       description: "A live market board for India: Nifty 50, Sensex, Bank Nifty, Indian defence stocks, the rupee, crude oil, gold, US bond yields and crypto, with intraday charts.",
       body: `<h1>Market board</h1><p>India and global indices, Indian stocks including defence, currencies, commodities, bond yields and crypto.</p>` };
   }
+  if (section === "about" && !arg) {
+    return { title: `${ABOUT.title} — independent analysis on India’s security, diplomacy and markets`, description: ABOUT.description,
+      ld: [{ "@context": "https://schema.org", "@graph": [{ "@type": "AboutPage", url: `${o}/about`, name: ABOUT.title, about: { "@id": `${o}/#organization` } }, organization(o), personLd(o, writer("ilmaz-syed")), breadcrumbs(o, [["Home", "/"], ["About", "/about"]])] }],
+      body: `<article><h1>${ABOUT.title}</h1>${ABOUT.html}</article>` };
+  }
+  if (LEGAL[section] && !arg) {
+    const d = LEGAL[section];
+    return { title: `${d.title} · ${SITE}`, description: d.description,
+      ld: [{ "@context": "https://schema.org", "@type": "WebPage", url: `${o}/${section}`, name: d.title, dateModified: new Date(LEGAL_UPDATED).toISOString(), isPartOf: { "@id": `${o}/#website` } }],
+      body: `<article><h1>${d.title}</h1><p>Last updated ${LEGAL_UPDATED}</p>${d.html}</article>` };
+  }
   if (section === "watch") return { title: `Watch and listen: video and audio briefings · ${SITE}`, description: "Video, audio and image briefings from the Raisina Wire desk.", body: `<h1>Watch and listen</h1>` };
 
   if (section === "community") {
@@ -234,7 +246,7 @@ export async function sitemap(request, env, ensureSchema) {
   const newest = stories[0]?.publishedAt;
   const urls = [
     ["/", newest, "hourly", "1.0"], ["/editions", newest, "daily", "0.9"], ["/live", "", "always", "0.8"], ["/markets", "", "always", "0.7"],
-    ...LIVE_CATS.map(c => [`/live/${c}`, "", "always", "0.5"]), ["/community", "", "daily", "0.7"], ["/events", "", "daily", "0.6"], ["/watch", "", "weekly", "0.5"],
+    ...LIVE_CATS.map(c => [`/live/${c}`, "", "always", "0.5"]), ["/community", "", "daily", "0.7"], ["/events", "", "daily", "0.6"], ["/watch", "", "weekly", "0.5"], ["/about", "", "monthly", "0.5"], ...LEGAL_ORDER.map(([k]) => [`/${k}`, "", "yearly", "0.2"]),
     ...WRITERS.map(w => [`/author/${w.key}`, newest, "weekly", "0.6"]),
     ...(await allTags(env)).map(t => [`/tag/${t.slug}`, newest, "weekly", "0.5"]),
     ...stories.map(s => [s.href, s.updatedAt || s.publishedAt, "monthly", "0.8", s]),
@@ -285,4 +297,4 @@ ${stories.map(s => `<item><title>${xml(s.title)}</title><link>${o}${s.href}</lin
 }
 
 // Paths the Worker renders as HTML pages (the rest are app-only views or static files).
-export const PAGE_PATTERN = /^\/(?:$|editions\/?$|(?:edition|article|author|tag|discussion|coverage)\/[^/]+\/?$|live(?:\/[^/]+)?\/?$|markets\/?$|community\/?$|events\/?$|watch\/?$)/;
+export const PAGE_PATTERN = /^\/(?:$|editions\/?$|(?:edition|article|author|tag|discussion|coverage)\/[^/]+\/?$|live(?:\/[^/]+)?\/?$|markets\/?$|community\/?$|events\/?$|watch\/?$|(?:about|terms|privacy|disclaimer|copyright|community-guidelines|grievance)\/?$)/;
