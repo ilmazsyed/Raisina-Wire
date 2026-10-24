@@ -32,6 +32,28 @@ self.addEventListener("message", event => {
   }
 });
 
+// Breaking-news alerts: pushes carry no payload; show the latest alert from the server.
+self.addEventListener("push", event => {
+  event.waitUntil((async () => {
+    let alert = null;
+    try { alert = (await fetch("/api/alerts/latest", { cache: "no-store" }).then(r => r.json())).alert; } catch { /* offline */ }
+    await self.registration.showNotification(alert?.title || "Raisina Wire", {
+      body: alert?.body || "New on Raisina Wire", icon: "/icon-192.png", badge: "/favicon.png", tag: "rw-alert", renotify: true,
+      data: { url: alert?.url || "/" }
+    });
+  })());
+});
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const win = wins.find(w => new URL(w.url).origin === self.location.origin);
+    if (win) { await win.focus(); return win.navigate(url).catch(() => self.clients.openWindow(url)); }
+    return self.clients.openWindow(url);
+  })());
+});
+
 const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms));
 
 async function trim(cacheName, max) {

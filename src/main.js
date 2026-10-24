@@ -8,7 +8,7 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const esc = (s = "") => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const IST = { timeZone: "Asia/Kolkata" };
 
-const state = { articles: [], media: null, coverage: [], coverageLead: null, user: null, wire: null, wireError: false, markets: null, marketsError: false, community: null, events: null, installPrompt: null, homeGroup: "india" };
+const state = { articles: [], media: null, coverage: [], coverageLead: null, user: null, wire: null, wireError: false, markets: null, marketsError: false, community: null, events: null, installPrompt: null, homeGroup: "india", topics: [] };
 const wireIndex = new Map(); // url -> wire item, so the reader can show a headline while it loads
 
 /* ---------- Formatting ---------- */
@@ -57,6 +57,8 @@ function saveForLater(item) {
   const saved = store.get("rw-saved", []);
   if (!saved.some(s => s.href === item.href)) saved.unshift({ ...item, savedAt: new Date().toISOString() });
   store.set("rw-saved", saved.slice(0, 100));
+  // Members: the save follows them to every device.
+  if (state.user) fetch("/api/me/saved", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(item) }).catch(() => {});
   const target = new URLSearchParams(item.href.split("?")[1] || "").get("u");
   if (target) navigator.serviceWorker?.controller?.postMessage({ type: "SAVE_ARTICLE", url: `/api/read?url=${encodeURIComponent(target)}` });
   toast(target ? "Saved. It will be readable offline too." : "Saved. Raisina Wire editions are always available offline.");
@@ -67,6 +69,17 @@ function setTextScale(delta) {
   document.documentElement.style.setProperty("--text-scale", scale);
 }
 document.documentElement.style.setProperty("--text-scale", store.get("rw-text", 1));
+// Light or dark: follows the device until the reader picks one (index.html applies it before paint).
+const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+function applyTheme() {
+  const pref = store.get("rw-theme", "auto");
+  document.documentElement.dataset.theme = pref === "dark" || (pref === "auto" && darkQuery.matches) ? "dark" : "light";
+}
+function toggleTheme() {
+  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  store.set("rw-theme", next === (darkQuery.matches ? "dark" : "light") ? "auto" : next); applyTheme();
+}
+darkQuery.addEventListener?.("change", applyTheme); applyTheme();
 
 /* ---------- Shell ---------- */
 const NAV = [
@@ -95,6 +108,8 @@ function renderShell() {
     <div class="utility">
       <div class="utility-left"><span id="today"></span><span id="wireStatus"><span class="dot-ok"></span>Connecting to the live wire…</span></div>
       <div class="utility-right">
+        <button class="icon-btn" type="button" data-action="theme" aria-label="Switch between light and dark" title="Light or dark"><svg class="i-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg><svg class="i-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+        <button class="icon-btn" type="button" data-action="alerts" aria-label="Breaking-news alerts" aria-pressed="false">${ICON_BELL}</button>
         <span class="guest" id="guestActions"><button class="text-btn" type="button" id="signInBtn">Sign in</button><button class="btn btn-red btn-sm" type="button" id="joinBtn">Join free</button></span>
         <div class="account hidden" id="account"><button class="avatar" type="button" id="avatarBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu"></button>
           <div class="account-menu glass" id="accountMenu" role="menu" hidden></div></div>
@@ -208,7 +223,7 @@ function interceptLinks(e) {
   a.closest("dialog")?.close();
   navigate(href);
 }
-const views = { coverage: viewCoverage, home: viewHome, editions: viewEditions, edition: viewStory, article: viewStory, author: viewAuthor, read: viewExternal, live: viewLive, markets: viewMarkets, community: viewCommunity, discussion: viewDiscussion, events: viewEvents, watch: viewWatch, account: viewAccount, saved: viewSaved, search: viewSearch };
+const views = { coverage: viewCoverage, home: viewHome, editions: viewEditions, edition: viewStory, article: viewStory, author: viewAuthor, tag: viewTag, my: viewMy, read: viewExternal, live: viewLive, markets: viewMarkets, community: viewCommunity, discussion: viewDiscussion, events: viewEvents, watch: viewWatch, account: viewAccount, saved: viewSaved, search: viewSearch };
 const DEFAULT_TITLE = "Raisina Wire — India’s strategic briefing on geopolitics, security and markets";
 async function route() {
   const r = parseRoute();
@@ -216,8 +231,9 @@ async function route() {
   renderNav(r);
   const view = views[r.page] || viewNotFound;
   // Lists that mix in control-room articles wait briefly for them, so the lead story doesn't flash.
-  if (["home", "editions", "search", "author", "edition", "article"].includes(r.page)) await Promise.race([articlesReady, new Promise(res => setTimeout(res, 1200))]);
-  if (["account", "discussion"].includes(r.page)) await Promise.race([userReady, new Promise(res => setTimeout(res, 2500))]);
+  stopListening();
+  if (["home", "editions", "search", "author", "edition", "article", "tag", "my"].includes(r.page)) await Promise.race([articlesReady, new Promise(res => setTimeout(res, 1200))]);
+  if (["account", "discussion", "my", "saved", "tag"].includes(r.page)) await Promise.race([userReady, new Promise(res => setTimeout(res, 2500))]);
   document.body.classList.toggle("is-reading", ["edition", "article", "read"].includes(r.page));
   const main = $("#view");
   main.classList.remove("view-enter"); void main.offsetWidth; main.classList.add("view-enter");
@@ -291,7 +307,7 @@ function viewHome() {
 
     <section class="briefing glass band" aria-labelledby="briefingTitle"><div class="briefing-head"><span class="kicker">The Briefing</span><h2 id="briefingTitle">What you need to know</h2><span class="meta">${new Date().toLocaleDateString("en-IN", { ...IST, weekday: "long", day: "numeric", month: "long" })} · From the live wire</span></div><ol class="briefing-list" id="briefingList"></ol></section>
 
-    <section class="band"><div class="section-head"><h2>From the Raisina Wire desk</h2><a class="link-gold" href="/editions">All ${stories().length} stories →</a></div>
+    <section class="band"><div class="section-head"><h2>From the Raisina Wire desk</h2><a class="link-gold" href="/editions">All stories →</a></div>
       <div class="card-grid">${rest.slice(3, 7).map(e => edCard(e)).join("")}</div></section>
 
     ${joinBand()}
@@ -449,6 +465,8 @@ function pullQuote(blocks) {
   return "";
 }
 const ICON = {
+  listen: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/></svg>`,
+  pause: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`,
   back: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>`,
   save: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg>`,
   share: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg>`
@@ -456,6 +474,7 @@ const ICON = {
 function readerBar({ badge, original, originalLabel, saveItem }) {
   return `<div class="reader-bar glass"><a class="btn btn-light btn-sm" href="/" data-action="back" aria-label="Back">${ICON.back}<span class="lbl">Back</span></a><span class="badge">${esc(badge)}</span><span class="grow"></span>
     <button class="btn btn-light btn-sm" type="button" data-action="text-smaller" aria-label="Smaller text">A−</button><button class="btn btn-light btn-sm" type="button" data-action="text-larger" aria-label="Larger text">A+</button>
+    ${"speechSynthesis" in window ? `<button class="btn btn-light btn-sm listen-btn" type="button" data-action="listen" aria-label="Listen to this story" aria-pressed="false">${ICON.listen}<span class="lbl">Listen</span></button>` : ""}
     <button class="btn btn-light btn-sm" type="button" data-action="save" aria-label="Save" data-item='${esc(JSON.stringify(saveItem))}'>${ICON.save}<span class="lbl">Save</span></button><button class="btn btn-light btn-sm" type="button" data-action="share" aria-label="Share" data-title="${esc(saveItem.title)}">${ICON.share}<span class="lbl">Share</span></button>
     ${original ? `<a class="btn btn-dark btn-sm original-btn" href="${esc(original)}" target="_blank" rel="noreferrer"><span class="lbl">${esc(originalLabel)}</span><span class="lbl-short">Original</span> ↗</a>` : ""}</div>`;
 }
@@ -495,14 +514,197 @@ async function viewStory(r) {
     <div class="reader-byline"><a href="/author/${w.key}" class="byline-link"><img src="${w.photo}" alt="" class="${w.isDesk ? "desk" : ""}"><span><b>${esc(w.name)}</b><span class="muted" style="display:block;font-size:13px">${esc(w.role)}</span></span></a><span class="grow"></span><span class="meta">${a.publishedAt ? editionDate(a.publishedAt) : "Not yet published"} · ${Math.max(1, Math.round(words / 220))} min read</span></div>
     <figure class="reader-hero">${img(hero, a.heroCaption || "")}${a.heroCaption ? `<figcaption>${esc(a.heroCaption)}</figcaption>` : ""}</figure>
     <div class="prose dropcap">${blocks.length ? proseHTML(blocks, { pull: pullQuote(blocks) }) : `<p>This story could not be loaded.${a.sourceUrl ? ` <a href="${esc(a.sourceUrl)}" target="_blank" rel="noreferrer">Read the original ↗</a>` : ""}</p>`}</div>
+    ${(a.tags || []).length ? `<div class="story-tags"><span class="meta">Topics</span>${a.tags.map(t => `<a class="tag-chip" href="/tag/${tagSlug(t)}">${esc(t)}</a>`).join("")}</div>` : ""}
+    ${shareBlock(a.title, a.href)}
     <div class="author-box"><img src="${w.photo}" alt="" class="${w.isDesk ? "desk" : ""}"><div><span class="kicker">${w.isDesk ? "From the desk" : "About the author"}</span><b><a href="/author/${w.key}">${esc(w.name)}</a></b><p>${esc(w.bio)}</p><a class="link-gold" href="/author/${w.key}" style="font-size:13px">More from ${esc(w.name)} →</a></div></div>
     <div class="reader-end glass discuss-end"><div><span class="kicker">Community</span><b style="display:block;font-size:17px;margin-top:4px">What do you make of this?</b><div class="muted" style="font-size:14px;margin-top:4px">Members discuss every story in moderated threads. Free to join.</div></div><button class="btn btn-dark" type="button" data-action="discuss" data-title="${esc(a.title)}">Discuss this story</button></div>
     ${linkedin ? `<div class="reader-end glass"><div><b style="font-size:16px">Follow Raisina Wire on LinkedIn</b><div class="muted" style="font-size:14px;margin-top:4px">${edition ? "First published in the Raisina Wire newsletter." : "New editions every week."}</div></div><a class="btn btn-light" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Subscribe ↗</a></div>` : ""}
+    ${relatedBlock(a, list)}
     <div class="prev-next">${newer ? `<a class="glass" href="${edHref(newer)}"><span class="meta">Newer</span><b>${esc(newer.title)}</b></a>` : "<span></span>"}${older ? `<a class="glass" href="${edHref(older)}"><span class="meta">Older</span><b>${esc(older.title)}</b></a>` : ""}</div>
   </article>
   <aside class="reader-aside">${communityAside()}<div class="aside-card glass"><div class="kicker">More from Raisina Wire</div>
     ${list.filter(x => x.slug !== a.slug).slice(0, 5).map(x => `<a class="aside-link" href="${edHref(x)}"><span class="thumb">${img(x.image)}</span><span><b>${esc(x.title)}</b><span class="meta" style="display:block;margin-top:5px;font-size:10px">${shortDate(x.date)}</span></span></a>`).join("")}
   </div></aside></div></div>`;
+  countView(a);
+}
+// One view per story per browser session; nothing is stored about the reader.
+function countView(a) {
+  if (a.status !== "published" || a.scheduled) return;
+  try { const k = `rw-v:${a.slug}`; if (sessionStorage.getItem(k)) return; sessionStorage.setItem(k, "1"); } catch { /* storage off: still count */ }
+  fetch(`/api/views/${encodeURIComponent(a.slug)}`, { method: "POST", keepalive: true }).catch(() => {});
+}
+const tagSlug = t => String(t).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+// Related: shared topics count most, then the same category, then recency.
+function relatedBlock(a, list) {
+  const tags = new Set((a.tags || []).map(t => t.toLowerCase()));
+  const scored = list.filter(x => x.slug !== a.slug).map((x, i) => ({ x, score: (x.tags || []).filter(t => tags.has(t.toLowerCase())).length * 3 + (x.category === a.category ? 1 : 0) - i * 0.001 }))
+    .filter(r => r.score > 0).sort((p, q) => q.score - p.score).slice(0, 3).map(r => r.x);
+  if (!scored.length) return "";
+  return `<section class="related"><div class="kicker">Related stories</div><div class="related-grid">${scored.map(x => `<a class="related-card glass" href="${edHref(x)}"><span class="thumb">${img(x.image)}</span><span class="body"><span class="kicker">${esc(x.topic)}</span><b>${esc(x.title)}</b><span class="meta">${esc(x.author)} · ${shortDate(x.date)}</span></span></a>`).join("")}</div></section>`;
+}
+
+/* ---------- Sharing ---------- */
+const SHARE_ICONS = {
+  whatsapp: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.5-3.9-4.7-4.1-.1-.2-1.1-1.5-1.1-2.8s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.4.6c-.2.2-.3.4-.1.7.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.4 2.4 1.5.3.2.5.1.6-.1l.9-1.1c.2-.3.4-.2.6-.1l2 .9c.3.2.5.2.5.3.1.2.1.7-.1 1.2Z"/></svg>`,
+  x: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.8 3h3.1l-6.8 7.8L22 21h-6.2l-4.9-6.4L5.3 21H2.2l7.3-8.3L2 3h6.3l4.4 5.9L17.8 3Zm-1.1 16.2h1.7L7.4 4.7H5.6l11.1 14.5Z"/></svg>`,
+  linkedin: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM3 9.75h4v11H3v-11Zm6.5 0h3.8v1.5h.1c.5-1 1.8-1.9 3.7-1.9 4 0 4.7 2.6 4.7 6v5.4h-4v-4.8c0-1.2 0-2.6-1.6-2.6s-1.8 1.2-1.8 2.5v4.9h-4v-11Z"/></svg>`,
+  telegram: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21.9 4.3 18.7 19.5c-.2 1-.9 1.3-1.7.8l-4.8-3.5-2.3 2.2c-.3.3-.5.5-1 .5l.3-4.9 8.9-8c.4-.3-.1-.5-.6-.2L6.5 13.3 1.8 11.8c-1-.3-1-1 .2-1.5L20.5 3.2c.9-.3 1.6.2 1.4 1.1Z"/></svg>`,
+  mail: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>`,
+  link: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>`
+};
+function shareLinks(text, url) {
+  const t = encodeURIComponent(text), u = encodeURIComponent(url), tu = encodeURIComponent(`${text} ${url}`);
+  return [["whatsapp", "WhatsApp", `https://wa.me/?text=${tu}`], ["x", "X", `https://twitter.com/intent/tweet?text=${t}&url=${u}`], ["linkedin", "LinkedIn", `https://www.linkedin.com/sharing/share-offsite/?url=${u}`],
+    ["telegram", "Telegram", `https://t.me/share/url?url=${u}&text=${t}`], ["mail", "Email", `mailto:?subject=${t}&body=${tu}`]];
+}
+function shareBlock(title, href) {
+  const url = location.origin + href;
+  return `<div class="share-row"><span class="meta">Share</span>${shareLinks(title, url).map(([k, label, link]) => `<a class="share-btn share-${k}" href="${link}" target="_blank" rel="noopener" aria-label="Share on ${label}">${SHARE_ICONS[k]}</a>`).join("")}<button class="share-btn" type="button" data-action="copy-link" data-url="${esc(url)}" aria-label="Copy link">${SHARE_ICONS.link}</button></div>`;
+}
+// Select text in a story to share it as a quote, with a link that jumps to that passage.
+function quoteShare() {
+  const bubble = document.createElement("div");
+  bubble.className = "quote-bubble glass"; bubble.hidden = true; bubble.setAttribute("role", "toolbar"); bubble.setAttribute("aria-label", "Share this quote");
+  document.body.append(bubble);
+  const hide = () => { bubble.hidden = true; };
+  const show = () => {
+    const sel = getSelection(); if (!sel || sel.isCollapsed) return hide();
+    const prose = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement)?.closest(".reader-article .prose");
+    const text = sel.toString().replace(/\s+/g, " ").trim();
+    if (!prose || text.length < 12 || text.length > 400) return hide();
+    const title = $(".reader-article h1")?.textContent || "Raisina Wire";
+    const words = text.split(" "), frag = words.length > 8 ? `${encodeURIComponent(words.slice(0, 4).join(" "))},${encodeURIComponent(words.slice(-4).join(" "))}` : encodeURIComponent(text);
+    const url = `${location.origin}${location.pathname}#:~:text=${frag}`, quote = `“${text.length > 240 ? text.slice(0, 237) + "…" : text}” — ${title}`;
+    bubble.innerHTML = `<span class="meta">Share quote</span>${shareLinks(quote, url).filter(([k]) => k !== "mail").map(([k, label, link]) => `<a class="share-btn share-${k}" href="${link}" target="_blank" rel="noopener" aria-label="Share quote on ${label}">${SHARE_ICONS[k]}</a>`).join("")}<button class="share-btn" type="button" data-action="copy-quote" aria-label="Copy quote">${SHARE_ICONS.link}</button>`;
+    bubble.dataset.quote = `${quote} ${url}`;
+    const r = sel.getRangeAt(0).getBoundingClientRect();
+    bubble.hidden = false;
+    const w = bubble.offsetWidth, below = matchMedia("(pointer: coarse)").matches;
+    bubble.style.left = `${Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + scrollX}px`;
+    bubble.style.top = `${(below ? r.bottom + 12 : r.top - bubble.offsetHeight - 10) + scrollY}px`;
+  };
+  let t; document.addEventListener("selectionchange", () => { clearTimeout(t); t = setTimeout(show, 250); });
+  window.addEventListener("scroll", () => { if (!bubble.hidden) show(); }, { passive: true });
+}
+
+/* ---------- Listen: the phone's or computer's own voice reads the story ---------- */
+const speech = { queue: [], i: 0, active: false };
+function voice() {
+  const vs = speechSynthesis.getVoices();
+  return vs.find(v => v.lang === "en-IN") || vs.find(v => v.lang === "en-GB") || vs.find(v => v.lang?.startsWith("en")) || null;
+}
+function setListenButton(state_) {
+  const b = $(".listen-btn"); if (!b) return;
+  b.setAttribute("aria-pressed", String(state_ === "playing"));
+  b.innerHTML = `${state_ === "playing" ? ICON.pause : ICON.listen}<span class="lbl">${state_ === "playing" ? "Pause" : state_ === "paused" ? "Resume" : "Listen"}</span>`;
+}
+function speakNext() {
+  $$(".speaking").forEach(el => el.classList.remove("speaking"));
+  const el = speech.queue[speech.i];
+  if (!el || !speech.active) { stopListening(); return; }
+  el.classList.add("speaking");
+  if (el.getBoundingClientRect().top > innerHeight * 0.7 || el.getBoundingClientRect().bottom < 0) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  const u = new SpeechSynthesisUtterance(el.innerText);
+  const v = voice(); if (v) { u.voice = v; u.lang = v.lang; } else u.lang = "en-IN";
+  u.rate = 1; u.onend = () => { speech.i++; speakNext(); }; u.onerror = () => { speech.i++; speakNext(); };
+  speechSynthesis.speak(u);
+}
+function toggleListening() {
+  if (speech.active && speechSynthesis.speaking && !speechSynthesis.paused) { speechSynthesis.pause(); setListenButton("paused"); return; }
+  if (speech.active && speechSynthesis.paused) { speechSynthesis.resume(); setListenButton("playing"); return; }
+  const art = $(".reader-article"); if (!art) return;
+  speech.queue = $$("h1, .dek, .prose > p, .prose > h2, .prose li, .prose blockquote", art).filter(el => el.innerText.trim());
+  speech.i = 0; speech.active = true; speechSynthesis.cancel(); setListenButton("playing"); speakNext();
+}
+function stopListening() {
+  speech.active = false; if ("speechSynthesis" in window) speechSynthesis.cancel();
+  $$(".speaking").forEach(el => el.classList.remove("speaking")); setListenButton("idle");
+}
+
+/* ---------- Topics: tag pages and My Raisina ---------- */
+function allTagsFromStories() {
+  const m = new Map();
+  for (const x of stories()) for (const t of x.tags || []) { const k = tagSlug(t); const c = m.get(k) || { name: t, slug: k, count: 0 }; c.count++; m.set(k, c); }
+  return [...m.values()].sort((p, q) => q.count - p.count || p.name.localeCompare(q.name));
+}
+const CATEGORY_TOPICS = ["India", "Security", "Diplomacy", "Geopolitics", "Markets", "Energy", "Analysis"];
+const followBtn = name => `<button class="btn btn-sm ${state.topics?.includes(name) ? "btn-dark" : "btn-light"} follow-btn" type="button" data-action="follow" data-topic="${esc(name)}" aria-pressed="${!!state.topics?.includes(name)}">${state.topics?.includes(name) ? "Following" : "+ Follow"}</button>`;
+function viewTag(r) {
+  const t = allTagsFromStories().find(x => x.slug === r.arg) || (CATEGORY_TOPICS.find(c => tagSlug(c) === r.arg) && { name: CATEGORY_TOPICS.find(c => tagSlug(c) === r.arg), slug: r.arg });
+  if (!t) return viewNotFound();
+  const list = stories().filter(x => (x.tags || []).some(y => tagSlug(y) === t.slug) || tagSlug(x.category || "") === t.slug);
+  document.title = `${t.name} · Raisina Wire`;
+  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Topic</div><h1>${esc(t.name)}</h1><p>${list.length} Raisina Wire stor${list.length === 1 ? "y" : "ies"}, newest first. Follow the topic to see it on your own front page, My Raisina.</p></div>${followBtn(t.name)}</div>
+    <div class="archive-grid">${list.map(e => edCard(e, { dek: true })).join("") || `<div class="empty">No stories on this topic yet.</div>`}</div></div>`;
+}
+async function loadTopics() {
+  if (!state.user) { state.topics = []; return; }
+  try { state.topics = (await fetch("/api/topics").then(r => r.json())).topics || []; } catch { state.topics = []; }
+}
+async function toggleFollow(name) {
+  if (!state.user) { openAuth("register"); toast("Create a free account to follow topics."); return; }
+  const on = state.topics.includes(name);
+  try {
+    const r = await fetch(on ? `/api/topics/${encodeURIComponent(name)}` : "/api/topics", { method: on ? "DELETE" : "POST", headers: { "content-type": "application/json" }, body: on ? undefined : JSON.stringify({ topic: name }) });
+    if (!r.ok) throw new Error();
+    state.topics = on ? state.topics.filter(x => x !== name) : [...state.topics, name].sort();
+    toast(on ? `Stopped following ${name}.` : `Following ${name}. It’s on My Raisina.`);
+    const pg = parseRoute(); if (pg.page === "tag") viewTag(pg); else if (pg.page === "my") viewMy();
+  } catch { toast("That didn’t save. Try again."); }
+}
+async function viewMy() {
+  document.title = "My Raisina · Raisina Wire";
+  if (!state.user) {
+    $("#view").innerHTML = `<div class="wrap"><section class="join-panel my-invite"><div class="join-copy"><span class="join-eyebrow"><span class="pulse"></span>My Raisina</span><h2>Your own front page.</h2><p class="join-lede">Follow the topics you care about, from Pakistan to the Navy to markets, and keep your saved stories on every device. Free for members.</p><div class="join-actions"><button class="btn btn-red" type="button" data-action="join">Create a free account</button><button class="btn btn-ghost" type="button" data-action="signin">Sign in</button></div></div></section></div>`;
+    return;
+  }
+  const followed = state.topics || [], fl = new Set(followed.map(x => x.toLowerCase()));
+  const mine = stories().filter(x => fl.has(String(x.category).toLowerCase()) || (x.tags || []).some(t => fl.has(t.toLowerCase())));
+  const wire = wireItems().filter(i => fl.has(String(i.category).toLowerCase())).slice(0, 8);
+  const suggest = [...CATEGORY_TOPICS.map(name => ({ name })), ...allTagsFromStories().slice(0, 18)].filter((x, i, arr) => arr.findIndex(y => y.name.toLowerCase() === x.name.toLowerCase()) === i);
+  const saved = await savedItems();
+  if (parseRoute().page !== "my") return;
+  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">My Raisina</div><h1>${esc(state.user.displayName.split(" ")[0])}’s front page</h1><p>Stories on the topics you follow, newest first, and your saved stories. Synced to your account.</p></div><button class="btn btn-light" type="button" data-action="alerts">${ICON_BELL} Breaking-news alerts</button></div>
+    <section class="my-topics glass"><div class="kicker">Topics you follow</div><div class="chips">${suggest.map(x => `<button type="button" class="chip" data-action="follow" data-topic="${esc(x.name)}" aria-pressed="${fl.has(x.name.toLowerCase())}">${fl.has(x.name.toLowerCase()) ? "✓ " : "+ "}${esc(x.name)}</button>`).join("")}</div></section>
+    ${followed.length ? `<section class="band"><div class="section-head"><h2>For you</h2></div><div class="archive-grid">${mine.slice(0, 12).map(e => edCard(e, { dek: true })).join("") || `<div class="empty">Nothing new on your topics yet.</div>`}</div></section>
+      ${wire.length ? `<section class="band"><div class="section-head"><h2>On the wire for you</h2><a class="link-gold" href="/live">Live wire →</a></div><div class="live-list">${wire.map(i => `<a class="live-item glass" href="${wireHref(i)}" style="grid-template-columns:88px minmax(0,1fr)"><span class="when">${clock(i.publishedAt)}</span><span><b>${esc(i.title)}</b><span class="src"><span class="tag">${esc(i.category)}</span>${esc(i.source)}</span></span></a>`).join("")}</div></section>` : ""}`
+      : `<div class="empty" style="margin-top:22px">Pick a few topics above and your stories will appear here.</div>`}
+    <section class="band"><div class="section-head"><h2>Saved stories</h2><a class="link-gold" href="/saved">All saved →</a></div><div class="live-list">${saved.slice(0, 6).map(x => `<a class="live-item glass" href="${esc(x.href)}" style="grid-template-columns:88px minmax(0,1fr)"><span class="when">${ago(x.savedAt)}</span><span><b>${esc(x.title)}</b><span class="src">${esc(x.source)}</span></span></a>`).join("") || `<div class="empty">Nothing saved yet.</div>`}</div></section></div>`;
+}
+
+/* ---------- Breaking-news alerts (Web Push) ---------- */
+const ICON_BELL = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>`;
+const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const b64ToBytes = s => { const b = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)); return Uint8Array.from(b, c => c.charCodeAt(0)); };
+async function currentPush() { try { const reg = await navigator.serviceWorker.ready; return await reg.pushManager.getSubscription(); } catch { return null; } }
+async function syncAlertsButton() {
+  const on = pushSupported() && Notification.permission === "granted" && !!(await currentPush());
+  $$("[data-action=alerts]").forEach(b => { b.setAttribute("aria-pressed", String(on)); b.classList.toggle("is-on", on); b.title = on ? "Breaking-news alerts are on" : "Get breaking-news alerts"; });
+  return on;
+}
+async function toggleAlerts() {
+  if (!pushSupported()) {
+    if (isIOS() && !isStandalone()) { showInstallSheet({ force: true }); toast("On iPhone, add Raisina Wire to your Home Screen first, then turn on alerts from the app."); }
+    else toast("This browser can’t receive alerts. Try Chrome, Edge, Firefox or Safari.");
+    return;
+  }
+  const existing = await currentPush();
+  if (existing && Notification.permission === "granted") {
+    await fetch("/api/push/unsubscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint: existing.endpoint }) }).catch(() => {});
+    await existing.unsubscribe().catch(() => {});
+    toast("Breaking-news alerts are off."); syncAlertsButton(); return;
+  }
+  if (Notification.permission === "denied") { toast("Alerts are blocked for this site. Allow notifications in your browser settings, then try again."); return; }
+  if (await Notification.requestPermission() !== "granted") { toast("Alerts weren’t turned on."); return; }
+  try {
+    const { publicKey } = await fetch("/api/push/key").then(r => r.json());
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(publicKey) });
+    const r = await fetch("/api/push/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error);
+    toast("Alerts are on. You’ll hear when live coverage starts or a new edition is out.");
+  } catch (e) { toast(e.message || "Alerts couldn’t be turned on. Try again."); }
+  syncAlertsButton();
 }
 
 /* ---------- Writers ---------- */
@@ -599,10 +801,31 @@ function renderBoard() {
 }
 
 /* ---------- Saved & search ---------- */
-function viewSaved() {
-  const saved = store.get("rw-saved", []);
-  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Saved</div><h1>Saved for later</h1><p>Stories you save are kept on this device and can be read offline in the installed app. Raisina Wire editions are always available offline.</p></div></div>
-  <div class="live-list">${saved.length ? saved.map(s => `<a class="live-item glass" href="${esc(s.href)}" style="grid-template-columns:88px minmax(0,1fr)"><span class="when">${ago(s.savedAt)}</span><span><b>${esc(s.title)}</b><span class="src">${esc(s.source)}</span></span></a>`).join("") : `<div class="empty">Nothing saved yet. Use Save in the reader to keep a story here.</div>`}</div></div>`;
+// Saved stories: this device's list, merged with the member's synced list when signed in.
+async function savedItems() {
+  const local = store.get("rw-saved", []);
+  if (!state.user) return local;
+  try {
+    const r = await fetch("/api/me/saved"); if (!r.ok) return local;
+    const remote = (await r.json()).items || [], seen = new Set(remote.map(x => x.href));
+    return [...remote, ...local.filter(x => !seen.has(x.href))].sort((x, y) => new Date(y.savedAt) - new Date(x.savedAt));
+  } catch { return local; }
+}
+async function viewSaved() {
+  const saved = await savedItems();
+  if (parseRoute().page !== "saved") return;
+  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Saved</div><h1>Saved for later</h1><p>${state.user ? "Your saved stories, on every device where you’re signed in." : "Stories you save are kept on this device. <a href=\"#\" data-action=\"join\">Join free</a> to have them on all your devices."} Raisina Wire editions are always available offline in the app.</p></div></div>
+  <div class="live-list">${saved.length ? saved.map(s => `<div class="live-item glass saved-row" style="grid-template-columns:88px minmax(0,1fr) auto"><span class="when">${ago(s.savedAt)}</span><a href="${esc(s.href)}"><b>${esc(s.title)}</b><span class="src">${esc(s.source)}</span></a><button class="btn btn-light btn-sm" type="button" data-action="unsave" data-href="${esc(s.href)}">Remove</button></div>`).join("") : `<div class="empty">Nothing saved yet. Use Save in the reader to keep a story here.</div>`}</div></div>`;
+}
+async function unsave(href) {
+  store.set("rw-saved", store.get("rw-saved", []).filter(x => x.href !== href));
+  if (state.user) await fetch(`/api/me/saved?href=${encodeURIComponent(href)}`, { method: "DELETE" }).catch(() => {});
+  toast("Removed from saved."); viewSaved();
+}
+// On sign-in, this device's saves join the member's synced list.
+function mergeLocalSaves() {
+  const local = store.get("rw-saved", []).filter(x => x.href?.startsWith("/"));
+  if (state.user && local.length) fetch("/api/me/saved", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ items: local }) }).catch(() => {});
 }
 function viewSearch(r) {
   const q = (r.params.get("q") || "").trim(), ql = q.toLowerCase();
@@ -636,6 +859,12 @@ async function onAction(e) {
   if (a === "signin") openAuth("login");
   if (a === "join") openAuth("register");
   if (a === "signout") { toggleAccountMenu(false); signOut(); }
+  if (a === "listen") toggleListening();
+  if (a === "copy-link" || a === "copy-quote") { e.preventDefault(); const text = a === "copy-link" ? el.dataset.url : el.closest(".quote-bubble")?.dataset.quote; try { await navigator.clipboard.writeText(text); toast(a === "copy-link" ? "Link copied." : "Quote copied with a link."); } catch { toast("Couldn’t copy. Select and copy instead."); } }
+  if (a === "unsave") unsave(el.dataset.href);
+  if (a === "follow") toggleFollow(el.dataset.topic);
+  if (a === "alerts") { toggleAccountMenu(false); toggleAlerts(); }
+  if (a === "theme") toggleTheme();
   if (a === "discuss") { if (!state.user) { openAuth("register"); toast("Create a free account to start a discussion."); } else openDiscussionDialog(el.dataset.title ? `On “${el.dataset.title}”` : ""); }
 }
 
@@ -932,7 +1161,7 @@ function showUser() {
   $("#avatarBtn").setAttribute("aria-label", `Account: ${u.displayName}`);
   const staff = ["admin", "editor"].includes(u.role);
   $("#accountMenu").innerHTML = `<div class="account-head"><b>${esc(u.displayName)}</b><span class="meta">${esc(u.role)}</span></div>
-    <a role="menuitem" href="/account">My account</a><a role="menuitem" href="/saved">Saved stories</a>${staff ? `<a role="menuitem" href="/admin.html">Control room</a>` : ""}
+    <a role="menuitem" href="/my">My Raisina</a><a role="menuitem" href="/saved">Saved stories</a><a role="menuitem" href="/account">My account</a><button role="menuitem" type="button" data-action="alerts">Breaking-news alerts</button>${staff ? `<a role="menuitem" href="/admin.html">Control room</a>` : ""}
     <a role="menuitem" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Newsletter on LinkedIn ↗</a>${isStandalone() ? "" : `<button role="menuitem" type="button" data-action="install">Install the app</button>`}
     <button role="menuitem" type="button" data-action="signout">Sign out</button>`;
 }
@@ -951,13 +1180,13 @@ async function submitAuth(e) {
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || "Request failed.");
     if (authMode === "register") { setAuthMode("login"); $("#authMessage").textContent = "Account created. Sign in to continue."; }
-    else { state.user = d.user; showUser(); toast(`Welcome, ${d.user.displayName}.`); closeAuth(); }
+    else { state.user = d.user; showUser(); mergeLocalSaves(); loadTopics(); toast(`Welcome, ${d.user.displayName}.`); closeAuth(); const pg = parseRoute().page; if (["my", "saved", "tag"].includes(pg)) route(); }
   } catch (err) { $("#authMessage").textContent = err.message; }
   finally { $("#authSubmit").disabled = false; }
 }
 async function signOut() {
   try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* offline */ }
-  state.user = null; showUser(); toast("Signed out.");
+  state.user = null; state.topics = []; showUser(); toast("Signed out.");
 }
 async function submitLead(e) {
   e.preventDefault();
@@ -1028,7 +1257,7 @@ if ("serviceWorker" in navigator) {
 /* ---------- Boot ---------- */
 const articlesReady = loadArticles();
 // The session is checked once at start; pages that depend on it wait for the answer.
-const userReady = fetch("/api/auth/me").then(r => r.json()).then(d => { state.user = d.user || null; }).catch(() => {});
+const userReady = fetch("/api/auth/me").then(r => r.json()).then(async d => { state.user = d.user || null; if (state.user) await loadTopics(); }).catch(() => {});
 renderShell();
 watchScroll();
 // Links from before clean URLs (#/edition/slug) still work.
@@ -1036,7 +1265,9 @@ const fromHash = () => { if (location.hash.startsWith("#/")) { history.replaceSt
 fromHash();
 window.addEventListener("hashchange", () => { if (fromHash()) route(); });
 window.addEventListener("popstate", () => route());
-userReady.then(() => { if (state.user) showUser(); });
+userReady.then(() => { if (state.user) { showUser(); loadTopics().then(() => { const pg = parseRoute(); if (pg.page === "tag") viewTag(pg); }); } });
+quoteShare();
+navigator.serviceWorker?.ready.then(syncAlertsButton).catch(() => {});
 document.addEventListener("click", interceptLinks);
 route();
 loadWire(); loadMarkets(); loadCommunity(); loadCoverage(); loadMedia();

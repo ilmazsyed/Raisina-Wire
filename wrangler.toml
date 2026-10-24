@@ -10,10 +10,15 @@ not_found_handling = "single-page-application"
 # search engines), uploaded images, sitemaps, robots.txt and the RSS feed. Everything else
 # is served straight from the built files.
 run_worker_first = [
-  "/api/*", "/media/*", "/", "/editions", "/edition/*", "/article/*", "/author/*",
+  "/api/*", "/media/*", "/", "/editions", "/edition/*", "/article/*", "/author/*", "/tag/*",
   "/live", "/live/*", "/markets", "/community", "/discussion/*", "/events", "/coverage/*", "/watch",
   "/sitemap.xml", "/news-sitemap.xml", "/robots.txt", "/feed.xml", "/rss.xml"
 ]
+
+# Every minute: send alerts for scheduled stories that have gone live, and the next batch
+# of breaking-news pushes.
+[triggers]
+crons = ["* * * * *"]
 
 [[d1_databases]]
 binding = "DB"
