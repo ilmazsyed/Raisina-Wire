@@ -39,6 +39,10 @@ export function categorize(text = "") {
   if (/\b(oil|crude|gas|lng|energy|power|coal|solar|refin)\w*/.test(t)) return "Energy";
   if (/\b(minister|summit|talks|diplomat|embassy|treaty|bilateral|foreign policy|un |united nations|g20|brics|quad|sco)\b/.test(t)) return "Diplomacy";
   if (/\b(india|indian|delhi|mumbai|kolkata|modi|lok sabha|parliament|state government)\b/.test(t)) return "India";
+  // Hindi and Bengali headlines
+  if (/सेना|सैन्य|मिसाइल|ड्रोन|आतंक|सीमा|हमला|युद्ध|সেনা|জঙ্গি|সীমান্ত|হামলা|ড্রোন|যুদ্ধ|ক্ষেপণাস্ত্র/.test(t)) return "Security";
+  if (/सेंसेक्स|निफ्टी|शेयर|बाजार|रुपया|महंगाई|सেনসেক্স|শেয়ার|বাজার|টাকা|মূল্যবৃদ্ধি/.test(t)) return "Markets";
+  if (/भारत|दिल्ली|मोदी|संसद|ভারত|দিল্লি|মোদী|কলকাতা|সংসদ/.test(t)) return "India";
   return "World";
 }
 
@@ -91,7 +95,7 @@ export function parseFeed(xml, sourceName) {
 export function mergeWire(lists, now = Date.now()) {
   const seen = new Set(), items = [];
   for (const item of lists.flat()) {
-    const key = item.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 90);
+    const key = item.title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim().slice(0, 90) || item.url;
     if (seen.has(key) || seen.has(item.url)) continue;
     seen.add(key); seen.add(item.url);
     const t = item.publishedAt ? Date.parse(item.publishedAt) : NaN;
@@ -103,8 +107,14 @@ export function mergeWire(lists, now = Date.now()) {
   return items.slice(0, 120);
 }
 
-export async function liveWire() {
-  const results = await Promise.all(WIRE_FEEDS.map(async f => {
+// Hindi and Bengali readers also get the news from publishers in their language.
+export const LANG_FEEDS = {
+  hi: [{ name: "BBC News हिन्दी", url: "https://feeds.bbci.co.uk/hindi/rss.xml" }],
+  bn: [{ name: "BBC News বাংলা", url: "https://feeds.bbci.co.uk/bengali/rss.xml" }]
+};
+
+export async function liveWire(lang = "") {
+  const results = await Promise.all([...(LANG_FEEDS[lang] || []), ...WIRE_FEEDS].map(async f => {
     try {
       const r = await fetch(f.url, { headers: { "user-agent": UA, accept: "application/rss+xml, application/xml, text/xml, */*" }, signal: AbortSignal.timeout(8000), cf: { cacheTtl: 120, cacheEverything: true } });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);

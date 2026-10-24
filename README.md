@@ -54,6 +54,18 @@ To switch it on:
 
 Without the key, Listen uses the device's own voice, choosing a female Indian English voice when the device has one, read sentence by sentence with pauses. Wire stories from other publishers always use the device voice.
 
+## English, Hindi and Bengali
+
+The whole site is available in English, हिन्दी and বাংলা. Each language has its own addresses (`/hi/…`, `/bn/…`), so shared links open in the reader's language and Google indexes each version (with `hreflang` links and sitemap alternates). The globe button at the top, and the links at the foot of every page, switch language on the same page; the choice is remembered. Readers whose phone is set to Hindi or Bengali are offered their language once.
+
+- **Menus, buttons and messages** are translated by hand in `src/i18n/hi.js` and `src/i18n/bn.js` (the English text is the key; add an entry when you add English text to the site). Dates use Hindi and Bengali month names, and Bengali pages use Bengali digits.
+- **Stories, About and the legal pages** are translated automatically by Claude (`src/translate.js`): Hindi in the style of Sanmarg and Dainik Bhaskar, Bengali in the colloquial style of Anandabazar Patrika. The per-minute cron picks up every new or edited story within a minute; a long story takes a few minutes. Each translation is made once and kept in D1 (`translations`); a story is translated again only when its text changes (not for a new picture or status). Until a translation is ready, readers see the English with a note; translated stories link to the English original, and translated legal pages say the English version prevails.
+- **Control room → Translations** shows the status of every story and page in each language, lets an editor correct a translation side by side with the English (kept until the English changes), and re-translate on request.
+- **Listen** reads Hindi and Bengali stories in the same warm female voice in that language (`hi-IN-Chirp3-HD-Sulafat`, `bn-IN-Chirp3-HD-Sulafat`).
+- **Live wire**: Hindi and Bengali readers also get BBC News हिन्दी and BBC News বাংলা. Headlines from other publishers are shown as published, not translated.
+
+To switch on story translation, add a secret named `ANTHROPIC_API_KEY` (from console.anthropic.com → API keys) in Cloudflare (Worker → Settings → Variables and Secrets). The translator uses Claude Opus 5.5 with server-side fallback to another Claude model if a passage is declined; set `TRANSLATE_MODEL` to use another model. As a rough guide, a 1,000-word story costs about 15–25 US cents per language, once. Without the key the interface is still fully translated and stories show in English.
+
 ## Legal pages and how we use other publishers' work
 
 The About page (`/about`) and the legal pages (`/terms`, `/privacy`, `/disclaimer`, `/copyright`, `/community-guidelines`, `/grievance`) are in `src/legal.js`, shown in the app and rendered by the Worker for search engines. They were drafted with care for Indian law (Copyright Act 1957 s.52 and Copyright Rules 2013 r.75; IT Act 2000 s.79 and IT Rules 2021; DPDP Act 2023; SEBI rules on investment advice; the Emblems and State Emblem Acts) but **should be reviewed by an Indian lawyer** before you rely on them.
@@ -77,6 +89,7 @@ To keep the live wire on the right side of copyright, the in-app reader shows on
 
 - `index.html`, `admin.html`, `privacy.html`, `terms.html` — Vite page entries (see `vite.config.js`)
 - `src/main.js`, `src/style.css` — public site; `src/worker.js` — Cloudflare Worker API
+- `src/i18n.js`, `src/i18n/` — languages and the Hindi and Bengali interface text; `src/translate.js` — story translation
 - `admin.js`, `admin.css` — control room
 - `public/` — copied as-is into `dist/` (favicon, manifest, service worker, `_headers`)
 - `migrations/` — D1 schema migrations
