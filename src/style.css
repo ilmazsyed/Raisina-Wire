@@ -806,3 +806,22 @@ img.desk{border-radius:22%!important}
 :root[data-theme=dark] .alerts-panel,:root[data-theme=dark] .alert-banner{background:rgba(20,25,38,.96)}
 :root[data-theme=dark] .ap-list a:hover,:root[data-theme=dark] .powered-cx:hover{background:rgba(255,255,255,.06)}
 :root[data-theme=dark] .studio-ad,:root[data-theme=dark] .studio-mini{box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+
+/* ---------- Phone fixes ---------- */
+/* Grid children must be allowed to shrink, or a scrolling tab row widens the whole page. */
+.split>*,.lead-grid>*,.markets-panel,.pill-tabs{min-width:0}
+/* Text size buttons scale the whole article, not only the body text. */
+.reader-article .dek{font-size:calc(22px * var(--text-scale))}
+.reader-article h1{font-size:calc(clamp(34px,4vw,52px) * var(--text-scale))}
+@media(max-width:760px){
+  .reader-article .dek{font-size:calc(19px * var(--text-scale))}
+  .reader-article h1{font-size:calc(34px * var(--text-scale))}
+  .reader-bar{gap:5px;padding:6px}
+  .reader-bar .btn-sm{min-height:36px;min-width:36px;padding:0 8px;border-radius:9px}
+  .reader-bar .original-btn{padding:0 10px}
+  /* Front-page lead: picture on top, card below, so neither hides the other. */
+  .hero{display:block;min-height:0;padding:0;overflow:visible;border-radius:0;background:none}
+  .hero>img{position:relative;display:block;height:230px;border-radius:22px}
+  .hero-card{margin:-46px 10px 0;width:auto;padding:18px}
+  .hero-card h1{font-size:30px}
+}
