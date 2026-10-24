@@ -15,5 +15,8 @@ migrations_dir = "migrations"
 
 [vars]
 APP_NAME = "Raisina Wire"
+# Built-in admin account. Its password is the ADMIN_PASSWORD secret, set in the
+# Cloudflare dashboard (Worker → Settings → Variables and Secrets), never here.
+ADMIN_EMAIL = "ilmazsyed@gmail.com"
 
 # Market pulse uses keyless public feeds; no market-data secret is required.

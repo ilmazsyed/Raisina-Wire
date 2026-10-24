@@ -44,6 +44,12 @@ async function currentUser(request, env) {
 }
 function slugify(s) { return s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,90) || randomId(); }
 function allowedRoles(user, roles) { return user && roles.includes(user.role); }
+// Built-in admin: ADMIN_EMAIL is a plain var, ADMIN_PASSWORD a Worker secret (never in the repo).
+function adminEmail(env) { return String(env.ADMIN_EMAIL || "").trim().toLowerCase(); }
+async function isAdminLogin(env, email, password) {
+  if (!env.ADMIN_PASSWORD || !adminEmail(env) || email !== adminEmail(env)) return false;
+  return (await sha256(password)) === (await sha256(env.ADMIN_PASSWORD));
+}
 
 async function gdeltNews(url) {
   const q = url.searchParams.get("q") || "(geopolitics OR diplomacy OR security OR conflict)";
@@ -174,6 +180,7 @@ async function api(request, env) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || displayName.length < 2 || password.length < 12) {
       return err("Enter a valid email, a name, and a password of at least 12 characters.");
     }
+    if (email === adminEmail(env)) return err("This email is reserved. Sign in instead.", 409);
     const existing = await env.DB.prepare("SELECT id FROM users WHERE email=?").bind(email).first();
     if (existing) return err("An account with this email already exists.", 409);
     const id = randomId(), salt = b64(crypto.getRandomValues(new Uint8Array(16)));
@@ -185,8 +192,14 @@ async function api(request, env) {
   if (url.pathname === "/api/auth/login" && request.method === "POST") {
     const body = await request.json().catch(() => ({}));
     const email = String(body.email || "").trim().toLowerCase(), password = String(body.password || "");
-    const row = await env.DB.prepare("SELECT id,email,display_name,role,password_hash FROM users WHERE email=?").bind(email).first();
-    if (!row || !(await verifyPassword(password, row.password_hash))) return err("Email or password is incorrect.", 401);
+    let row = await env.DB.prepare("SELECT id,email,display_name,role,password_hash FROM users WHERE email=?").bind(email).first();
+    if (await isAdminLogin(env, email, password)) {
+      // The secret is the source of truth: create the admin account on first sign-in, keep it admin afterwards.
+      const hash = await passwordHash(password, b64(crypto.getRandomValues(new Uint8Array(16))));
+      if (row) await env.DB.prepare("UPDATE users SET role='admin', password_hash=? WHERE id=?").bind(hash,row.id).run();
+      else await env.DB.prepare("INSERT INTO users (id,email,display_name,password_hash,role) VALUES (?,?,?,?,'admin')").bind(randomId(),email,"Ilmaz Syed",hash).run();
+      row = await env.DB.prepare("SELECT id,email,display_name,role,password_hash FROM users WHERE email=?").bind(email).first();
+    } else if (!row || !(await verifyPassword(password, row.password_hash))) return err("Email or password is incorrect.", 401);
     const token = b64(crypto.getRandomValues(new Uint8Array(32))).replace(/[+/=]/g, c => ({"+":"-","/":"_","=":""}[c]));
     const tokenHash = await sha256(token), expires = Math.floor(Date.now()/1000) + 60*60*24*14;
     await env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)").bind(tokenHash,row.id,expires).run();
