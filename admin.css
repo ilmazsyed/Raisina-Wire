@@ -7,9 +7,9 @@ a{color:inherit;text-decoration:none}
 :focus-visible{outline:2px solid var(--gold-ink);outline-offset:2px;border-radius:6px}
 header{height:68px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 26px;background:rgba(255,255,255,.72);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);position:sticky;top:0;z-index:5}
 .brand{display:flex;align-items:center;gap:10px}
-.brand span{font:500 11px var(--mono);letter-spacing:1.4px;color:#fff;background:var(--ink);padding:4px 7px;border-radius:5px;align-self:center}
-.brand b{font:800 26px/1 "Bodoni Moda",Didot,Georgia,serif;font-variation-settings:"opsz" 11;letter-spacing:-.035em}
-.brand b i{font-style:italic;font-weight:600;color:#b8141f}
+.brand .brand-tag{font:500 11px var(--mono);letter-spacing:1.4px;color:#fff;background:var(--ink);padding:4px 7px;border-radius:5px;align-self:center}
+.brand b{font:900 30px/1 "Noto Serif Display",Georgia,serif;font-stretch:66%;letter-spacing:-.01em}
+.brand b i{font-style:normal;color:#b8141f}
 .brand-mark{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:.06em;width:1em;height:1em;font-size:34px;border-radius:3px;color:#fff;background:radial-gradient(circle at 30% 20%,#d21c28,#b8141f 45%,#8f0d16)}
 .brand-mark .mark-dome{display:block;width:.62em}
 .brand-mark .mark-tri{display:flex;width:.36em;height:2px;box-shadow:0 0 0 1px rgba(255,255,255,.85)}
@@ -73,3 +73,28 @@ td small{display:block;color:var(--muted);margin-top:4px}
 .login-required a{color:var(--gold-ink);font-weight:800}
 @media(max-width:900px){.layout{grid-template-columns:1fr}.sidebar{position:sticky;top:68px;z-index:4;flex-direction:row;overflow:auto;border-right:0;border-bottom:1px solid var(--line);padding:8px;white-space:nowrap;background:rgba(255,255,255,.8);backdrop-filter:blur(16px)}.side-label,.sidebar-note{display:none}.nav{white-space:nowrap}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}main{padding:22px 16px}.split,.form-grid,.quicklinks{grid-template-columns:1fr}}
 @media(max-width:520px){header{padding:0 14px}.brand b{font-size:22px}.header-right{gap:10px}.header-right #sessionLabel{display:none}.page-head{align-items:flex-start;flex-direction:column}.page-head h1{font-size:32px}.cards{gap:10px}.metric-card{padding:14px}.metric-card b{font-size:28px}}
+/* Stories CMS: image fields, filters, thumbnails */
+.pill.red{background:rgba(184,20,31,.1);color:#b8141f}
+.field .hint{font-weight:500;color:var(--muted);font-size:12px}
+.img-field>span{display:block}
+.img-row{display:grid;grid-template-columns:150px minmax(0,1fr);gap:14px;align-items:start}
+.img-preview{display:grid;place-items:center;width:150px;aspect-ratio:16/10;border-radius:12px;border:1px dashed rgba(15,20,34,.2);background:#f1f2f5 center/cover no-repeat;color:var(--muted);font-size:12px;font-weight:600}
+.img-controls{display:flex;flex-direction:column;gap:8px;min-width:0}
+.img-controls .row-actions{flex-wrap:wrap}
+.upload-btn{cursor:pointer}
+.upload-status{font-weight:600;color:var(--good);font-size:12px;min-height:1px}
+.lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:#fff;font-weight:500;color:var(--muted)}
+.lib-item{aspect-ratio:16/10;border:1px solid var(--line);border-radius:8px;background:#eee center/cover no-repeat;padding:0}
+.lib-item:hover{outline:2px solid #b8141f}
+.list-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.list-head h2{margin:0}
+.list-tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.list-tools input{width:220px;padding:8px 12px}
+.seg{display:inline-flex;padding:3px;border-radius:10px;background:rgba(15,20,34,.06)}
+.seg button{border:0;background:none;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;color:var(--ink-2);cursor:pointer}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(15,20,34,.12)}
+.thumb-sm{display:block;width:64px;height:40px;border-radius:6px;background:#eee center/cover no-repeat}
+.editor-split{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}
+.side-help{align-self:start;position:sticky;top:90px}
+@media(max-width:900px){.img-row{grid-template-columns:1fr}.side-help{position:static}}
+.lib-grid[hidden]{display:none}

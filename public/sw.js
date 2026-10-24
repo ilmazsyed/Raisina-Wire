@@ -75,7 +75,7 @@ async function staleWhileRevalidate(request, cacheName) {
   return cached || network;
 }
 
-const LIVE_DATA = ["/api/wire", "/api/markets", "/api/live", "/api/events", "/api/community/posts", "/api/config"];
+const LIVE_DATA = ["/api/wire", "/api/markets", "/api/live", "/api/events", "/api/community/posts", "/api/community/stats", "/api/config", "/api/articles", "/api/media"];
 
 self.addEventListener("fetch", event => {
   const { request } = event;
@@ -90,7 +90,7 @@ self.addEventListener("fetch", event => {
 
   if (url.pathname.startsWith("/api/")) {
     if (url.pathname === "/api/read") event.respondWith(networkFirst(request, READ_CACHE, { wait: 10000, max: 60 }));
-    else if (LIVE_DATA.includes(url.pathname) || url.pathname.startsWith("/api/live/")) event.respondWith(networkFirst(request, DATA_CACHE, { wait: 6000, max: 40 }));
+    else if (LIVE_DATA.includes(url.pathname) || url.pathname.startsWith("/api/live/") || url.pathname.startsWith("/api/articles/")) event.respondWith(networkFirst(request, DATA_CACHE, { wait: 6000, max: 40 }));
     return; // accounts and admin always go to the network
   }
 

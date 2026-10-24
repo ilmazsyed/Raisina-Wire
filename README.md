@@ -4,26 +4,34 @@ A premium, mobile-first editorial and geopolitical briefing platform with a live
 
 ## What is live now
 
-- **Raisina Wire editions, in the app:** all published editions of the LinkedIn newsletter, with full text, read inside the site (newest first on the home page, in the archive and in "More from Raisina Wire"). Each links to its original on LinkedIn. Data: `src/editions.js` (metadata) and `src/edition-bodies.json` (text, loaded only when an edition is opened). Artwork: `public/editions/<slug>.webp`.
+- **Stories CMS (editions and articles):** every story lives in D1 and is edited in the control room (Stories & editions). The 13 LinkedIn editions bundled in `src/editions.js` / `src/edition-bodies.json` are copied into D1 once, on first use, as `kind='edition'`, and are then edited like any article; the bundled copy stays in the app for offline reading. Each story has a type (edition or article), a writer, a kicker, a category, a publication date, a cover image, an optional hero image with caption, an optional original link, and the text. Editions live at `/edition/<slug>`, articles at `/article/<slug>`.
+- **Writers:** Ilmaz Syed and the Raisina Wire desk (app icon as its picture), defined in `src/writers.js`. Each has a page at `/author/<key>` listing their stories; bylines link to it.
+- **Images uploaded by writers:** the CMS uploads JPEG, PNG, WebP, AVIF or GIF, resized to at most 2000 px and compressed to WebP in the browser, stored in D1 (`images` table, up to 1.8 MB each) and served from `/media/<id>.webp` with year-long caching. Uploads can be reused from "Choose from uploads"; any `https://` image link also works.
+- **Search engines (SEO):** clean URLs. The Worker renders every public page with its own title, description, canonical link, Open Graph/Twitter card, and schema.org data (NewsArticle/AnalysisNewsArticle, ProfilePage, DiscussionForumPosting, LiveBlogPosting, Event, BreadcrumbList, WebSite with search, NewsMediaOrganization). The story text is in the HTML. Also served: `/sitemap.xml` (with images), `/news-sitemap.xml` (Google News, last 48 hours), `/robots.txt`, and an RSS feed at `/feed.xml`. Missing stories return HTTP 404. Old `#/…` links redirect to the clean URLs in the browser.
 - **Live wire:** `/api/wire` merges public RSS feeds from The Hindu, Indian Express, NDTV, Mint, BBC News, Al Jazeera and The Diplomat, newest first, de-duplicated and tagged India / Security / Diplomacy / Markets / Energy / World. Items older than 72 hours are dropped. A feed that fails is listed as unavailable; the others still show.
 - **Reader view:** `/api/read?url=` fetches a story and extracts its headline, byline and paragraphs for in-app reading, with the publisher credited and a link to the original. Paywalled, script-only or blocked pages fall back to a "Read original" screen with the feed summary.
 - **Markets:** `/api/markets` returns 39 instruments in eight groups (India indices, India stocks, defence stocks, global indices, currencies, commodities, US bond yields, crypto) with intraday sparklines, from public Yahoo Finance chart data. Delayed or last available; failed quotes are shown as unavailable, never estimated.
-- **Live coverage (live blogs):** coverage opened in the control room's Live publishing view appears on the home page as a LIVE banner, in the top ticker and on its own page (`#/coverage/<slug>`), which refreshes every 30 seconds. Closed coverage stays readable, marked as ended.
-- **Editorial furniture:** headline ticker with world clocks, The Briefing (one top story per desk), From the Editor (a line from the latest edition), drop caps, pull quotes and an author box in editions.
-- **Articles from the control room:** articles published in the control room (Editorial) appear with the editions, newest first, on the home page lead, The Briefing, the archive and search. Each has its own page (`#/article/<slug>`), an optional image URL (otherwise category artwork) and an optional original link. Articles can be edited, unpublished or archived. Body formatting: a blank line starts a new paragraph, `## ` starts a heading, `- ` a bullet, `1. ` a numbered point.
-- **Community:** members register and sign in, start discussions and reply in threads (`#/community`, `#/discussion/<id>`). Moderators hide, restore or remove posts and replies in the control room.
-- **Events:** published events are listed at `#/events` with an "Add to calendar" (.ics) download. Times are entered in local time and stored in UTC.
-- **Watch:** published multimedia (YouTube, audio, video, images) plays inside the app at `#/watch`.
-- **Account:** members change their display name and password at `#/account`; a password change signs out other devices. Sign-in is throttled after repeated failures (HTTP 429).
+- **Live coverage (live blogs):** coverage opened in the control room's Live publishing view appears on the home page as a LIVE banner, in the top ticker and on its own page (`/coverage/<slug>`), which refreshes every 30 seconds. Closed coverage stays readable, marked as ended.
+- **Editorial furniture:** a rolling headline ticker (with a pause button; it keeps moving even when the device asks for reduced motion) with world clocks, blinking live markers, The Briefing (one top story per desk), From the Editor (a line from the latest edition), drop caps, pull quotes and an author box in editions.
+- **Articles from the control room:** articles published in the control room (Editorial) appear with the editions, newest first, on the home page lead, The Briefing, the archive and search. Each has its own page (`/article/<slug>`), an optional image (otherwise category artwork) and an optional original link. Articles can be edited, unpublished or archived. Body formatting: a blank line starts a new paragraph, `## ` starts a heading, `- ` a bullet, `1. ` a numbered point.
+- **Community:** the front page has a "Join the community" section with the member perks and the latest discussions and briefings; every story ends with "Discuss this story". Members register and sign in, start discussions and reply in threads (`/community`, `/discussion/<id>`). Moderators hide, restore or remove posts and replies in the control room.
+- **Events:** published events are listed at `/events` with an "Add to calendar" (.ics) download. Times are entered in local time and stored in UTC.
+- **Watch:** published multimedia (YouTube, audio, video, images) plays inside the app at `/watch`.
+- **Account:** members change their display name and password at `/account`; a password change signs out other devices. Sign-in is throttled after repeated failures (HTTP 429).
 - **Search:** the search button searches editions, articles and the live wire.
 - **Admin control room** (`/admin.html`): overview, editorial, live coverage (open, update, end, resume), multimedia, community moderation, events, leads from the contact form, and users. The built-in admin is `ADMIN_EMAIL` with the `ADMIN_PASSWORD` secret. D1 tables and later migrations are applied automatically on first use.
 - **Installable app (PWA):** installs to the home screen on Android, iPhone and desktop, with shortcuts (Live wire, Editions, Markets, Saved) and store-style screenshots. Works offline: the build precaches the app and every edition's text and artwork (`vite.config.js` fills the list into `sw.js`); the live wire, markets and coverage fall back to the last copy, labelled "Offline copy"; saved stories are kept for offline reading. New deploys show an "Update" bar instead of silently replacing the running version.
 
 ## Adding a new Raisina Wire edition
 
-1. Add its entry at the top of `src/editions.js` (slug, date, topic, title, dek, LinkedIn URL, image path, read minutes).
-2. Add its text to `src/edition-bodies.json` under the same slug, as blocks of `{"t":"p"|"h"|"li","x":"text"}`.
-3. Add artwork at `public/editions/<slug>.webp` (1600×1000).
+In the control room, open **Stories & editions**, choose **Type: Raisina Wire edition**, paste the text, upload a cover (and optionally a hero) image, add the LinkedIn link as the original, and publish.
+
+## Getting found on Google
+
+1. Once the custom domain is live, set `SITE_URL` in `wrangler.toml` (for example `https://raisinawire.com`) so canonical links and sitemaps use it.
+2. In Google Search Console, add the domain as a property, verify it with the DNS record Search Console gives you (in Cloudflare DNS), and submit `https://<domain>/sitemap.xml` and `https://<domain>/news-sitemap.xml`.
+3. For Google News, apply in the Google News Publisher Center with the same domain.
+4. Bing Webmaster Tools can import the property from Search Console.
 
 ## Data-source notes
 

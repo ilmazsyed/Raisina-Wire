@@ -1,7 +1,7 @@
-// Published Raisina Wire editions (LinkedIn newsletter by Ilmaz Syed), newest first.
-// Full text is in edition-bodies.json, loaded only when an edition is opened.
-// To add an edition: put its entry at the top here, its text in edition-bodies.json
-// under the same slug, and its artwork at public/editions/<slug>.webp.
+// The first Raisina Wire editions (LinkedIn newsletter by Ilmaz Syed), newest first.
+// The Worker copies them into D1 once, where they are edited in the CMS; this copy and
+// edition-bodies.json stay in the app for offline reading. New editions are written in
+// the control room (Stories & editions), not here.
 export const NEWSLETTER_URL = "https://www.linkedin.com/newsletters/raisina-wire-7418787153549238272";
 export const AUTHOR = {
   name: "Ilmaz Syed", role: "Founder and Editor",

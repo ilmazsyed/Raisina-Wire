@@ -1,0 +1,270 @@
+// Search-engine pages. The Worker serves every public page with its own title, description,
+// canonical URL, social card and schema.org data, plus the story text itself in the HTML,
+// so Google and link previews see real content before the app starts. Also: sitemaps,
+// a Google News sitemap, robots.txt and an RSS feed.
+import { listPublished, getBySlug, textBlocks, storyPath, WRITERS, writer } from "./store.js";
+
+const SITE = "Raisina Wire";
+const TAGLINE = "India’s strategic briefing";
+const SITE_DESCRIPTION = "Raisina Wire is an independent Indian news and analysis platform on geopolitics, national security, diplomacy and markets: original editions by Ilmaz Syed, a live news wire, a market board and a members’ community.";
+const NEWSLETTER = "https://www.linkedin.com/newsletters/raisina-wire-7418787153549238272";
+const LIVE_CATS = ["India", "Security", "Diplomacy", "Markets", "Energy", "World"];
+
+const esc = (s = "") => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const xml = esc;
+const clip = (s, n) => { s = String(s || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, "") + "…" : s; };
+const abs = (origin, path) => !path ? "" : /^https?:\/\//.test(path) ? path : origin + (path.startsWith("/") ? path : "/" + path);
+// JSON inside <script> must not be able to close the tag.
+const ld = data => `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>`;
+const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "long", year: "numeric" }) : "";
+
+export const origin = (request, env) => String(env.SITE_URL || new URL(request.url).origin).replace(/\/+$/, "");
+
+function organization(o) {
+  return { "@type": "NewsMediaOrganization", "@id": `${o}/#organization`, name: SITE, url: `${o}/`,
+    logo: { "@type": "ImageObject", url: `${o}/icon-512.png`, width: 512, height: 512 }, sameAs: [NEWSLETTER],
+    founder: { "@type": "Person", "@id": `${o}/author/ilmaz-syed#person`, name: "Ilmaz Syed" } };
+}
+function personLd(o, w) {
+  return w.isDesk
+    ? { "@type": "Organization", "@id": `${o}/author/${w.key}#desk`, name: w.name, url: `${o}/author/${w.key}`, logo: `${o}${w.portrait}` }
+    : { "@type": "Person", "@id": `${o}/author/${w.key}#person`, name: w.name, jobTitle: w.role, url: `${o}/author/${w.key}`, image: `${o}${w.portrait}`, description: w.bio, worksFor: { "@id": `${o}/#organization` }, ...(w.sameAs?.length ? { sameAs: w.sameAs } : {}) };
+}
+function breadcrumbs(o, items) {
+  return { "@type": "BreadcrumbList", itemListElement: items.map(([name, path], i) => ({ "@type": "ListItem", position: i + 1, name, item: abs(o, path) })) };
+}
+
+/* ---------- Server-rendered content (replaced by the app once it starts) ---------- */
+function blocksHTML(blocks) {
+  let html = "", list = [];
+  const flush = () => { if (list.length) { html += `<ul>${list.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`; list = []; } };
+  for (const b of blocks) {
+    if (b.t === "li") { list.push(b.x); continue; }
+    flush();
+    html += b.t === "h" ? `<h2>${esc(b.x)}</h2>` : `<p>${esc(b.x)}</p>`;
+  }
+  flush();
+  return html;
+}
+const ssrNav = `<nav class="ssr-nav" aria-label="Sections"><a href="/">Today</a> <a href="/editions">Raisina Wire</a> <a href="/live">Live wire</a> <a href="/markets">Markets</a> <a href="/community">Community</a> <a href="/events">Events</a></nav>`;
+const ssrShell = inner => `<div class="ssr"><header><a class="ssr-brand" href="/">Raisina <span>Wire</span></a>${ssrNav}</header><main>${inner}</main></div>`;
+const storyList = stories => `<ul class="ssr-list">${stories.map(s => `<li><a href="${s.href}">${esc(s.title)}</a> <small>${esc(s.topic)} · ${esc(s.author)} · ${fmtDate(s.publishedAt)}</small>${s.dek ? `<p>${esc(s.dek)}</p>` : ""}</li>`).join("")}</ul>`;
+
+/* ---------- Page definitions ---------- */
+async function pageFor(path, url, env, o) {
+  const parts = path.split("/").filter(Boolean).map(decodeURIComponent);
+  const [section, arg] = parts;
+
+  if (!section) {
+    const stories = await listPublished(env, { limit: 30 });
+    return {
+      title: `${SITE} — ${TAGLINE} on geopolitics, security and markets`,
+      description: SITE_DESCRIPTION,
+      ld: [{ "@context": "https://schema.org", "@graph": [organization(o),
+        { "@type": "WebSite", "@id": `${o}/#website`, url: `${o}/`, name: SITE, description: SITE_DESCRIPTION, inLanguage: "en-IN", publisher: { "@id": `${o}/#organization` },
+          potentialAction: { "@type": "SearchAction", target: { "@type": "EntryPoint", urlTemplate: `${o}/search?q={search_term_string}` }, "query-input": "required name=search_term_string" } },
+        { "@type": "ItemList", itemListElement: stories.slice(0, 10).map((s, i) => ({ "@type": "ListItem", position: i + 1, url: abs(o, s.href) })) }] }],
+      body: `<h1>${SITE}: ${TAGLINE}</h1><p>${esc(SITE_DESCRIPTION)}</p><h2>Latest from Raisina Wire</h2>${storyList(stories)}`
+    };
+  }
+
+  if ((section === "edition" || section === "article") && arg) {
+    const a = await getBySlug(env, arg);
+    if (!a || a.status !== "published") return { status: 404, title: `Story not found · ${SITE}`, description: "This story may have been moved or unpublished.", noindex: true, body: `<h1>Story not found</h1><p><a href="/editions">See all Raisina Wire stories</a></p>` };
+    if (a.href !== path) return { redirect: a.href };
+    const w = writer(a.writer), image = abs(o, a.imageUrl || a.heroUrl || a.image);
+    const blocks = textBlocks(a.body), words = blocks.reduce((n, b) => n + b.x.split(/\s+/).length, 0);
+    const description = clip(a.dek || blocks.find(b => b.t === "p")?.x || a.title, 160);
+    const crumb = a.kind === "edition" ? ["Editions", "/editions"] : [a.category, `/editions`];
+    return {
+      title: `${a.title} · ${SITE}`, ogTitle: a.title, description, image, type: "article",
+      article: { published: a.publishedAt, modified: a.updatedAt || a.publishedAt, section: a.category, author: w.name, tags: [a.topic, a.category].filter(Boolean) },
+      ld: [{ "@context": "https://schema.org", "@graph": [
+        { "@type": a.kind === "edition" ? "AnalysisNewsArticle" : "NewsArticle", "@id": `${o}${a.href}#article`, mainEntityOfPage: `${o}${a.href}`, url: `${o}${a.href}`,
+          headline: clip(a.title, 110), description, image: [image], datePublished: a.publishedAt, dateModified: a.updatedAt || a.publishedAt,
+          author: [personLd(o, w)], publisher: { "@id": `${o}/#organization` }, articleSection: a.category, keywords: [a.topic, a.category, "India"].filter(Boolean).join(", "),
+          wordCount: words, inLanguage: "en-IN", isAccessibleForFree: true, ...(a.sourceUrl ? { isBasedOn: a.sourceUrl } : {}) },
+        organization(o), breadcrumbs(o, [["Home", "/"], crumb, [a.title, a.href]])] }],
+      body: `<article><p class="ssr-kicker">${esc(a.topic)}</p><h1>${esc(a.title)}</h1>${a.dek ? `<p class="ssr-dek">${esc(a.dek)}</p>` : ""}
+        <p class="ssr-byline">By <a href="/author/${w.key}">${esc(w.name)}</a> · <time datetime="${esc(a.publishedAt)}">${fmtDate(a.publishedAt)}</time> · ${a.readMinutes} min read</p>
+        <img src="${esc(a.heroUrl || a.image)}" alt="" width="1600" height="1000">${blocksHTML(blocks)}
+        ${a.sourceUrl ? `<p><a href="${esc(a.sourceUrl)}" rel="noopener">Read the original</a></p>` : ""}</article>`
+    };
+  }
+
+  if (section === "editions") {
+    const stories = await listPublished(env, { limit: 300 });
+    return { title: `All Raisina Wire editions and analysis · ${SITE}`, description: `Every Raisina Wire edition and article, newest first: ${stories.length} stories on India’s security, diplomacy, neighbourhood and markets.`,
+      ld: [{ "@context": "https://schema.org", "@graph": [{ "@type": "CollectionPage", url: `${o}/editions`, name: "Raisina Wire editions", isPartOf: { "@id": `${o}/#website` },
+        mainEntity: { "@type": "ItemList", itemListElement: stories.map((s, i) => ({ "@type": "ListItem", position: i + 1, url: abs(o, s.href), name: s.title })) } }, breadcrumbs(o, [["Home", "/"], ["Editions", "/editions"]])] }],
+      body: `<h1>Every Raisina Wire edition</h1>${storyList(stories)}` };
+  }
+
+  if (section === "author" && arg) {
+    const w = WRITERS.find(x => x.key === arg);
+    if (!w) return { status: 404, title: `Writer not found · ${SITE}`, description: "", noindex: true, body: `<h1>Writer not found</h1>` };
+    const stories = await listPublished(env, { writerKey: w.key, limit: 200 });
+    return { title: w.isDesk ? "The Raisina Wire desk: news, explainers and briefings from New Delhi" : `${w.name} — ${w.role} · ${SITE}`, description: clip(w.bio, 160), image: abs(o, w.portrait), type: "profile",
+      ld: [{ "@context": "https://schema.org", "@graph": [{ "@type": "ProfilePage", url: `${o}/author/${w.key}`, mainEntity: personLd(o, w) }, organization(o), breadcrumbs(o, [["Home", "/"], [w.name, `/author/${w.key}`]])] }],
+      body: `<h1>${esc(w.name)}</h1><p>${esc(w.role)}</p><p>${esc(w.bio)}</p><h2>Stories</h2>${storyList(stories)}` };
+  }
+
+  if (section === "live") {
+    const cat = LIVE_CATS.includes(arg) ? arg : "";
+    return { title: `${cat ? `${cat} news live` : "Live news wire"}: latest headlines · ${SITE}`,
+      description: `${cat ? `Latest ${cat.toLowerCase()} headlines` : "The latest headlines on India, security, diplomacy, markets and energy"} from named publishers, updated every two minutes, with an in-app reader and links to the original.`,
+      body: `<h1>${cat ? `${cat} news live` : "Live news wire"}</h1><p>Headlines from The Hindu, Indian Express, NDTV, Mint, BBC News, Al Jazeera and The Diplomat, newest first.</p>` };
+  }
+  if (section === "markets") {
+    return { title: `Markets today: Nifty, Sensex, rupee, crude, gold and defence stocks · ${SITE}`,
+      description: "A live market board for India: Nifty 50, Sensex, Bank Nifty, Indian defence stocks, the rupee, crude oil, gold, US bond yields and crypto, with intraday charts.",
+      body: `<h1>Market board</h1><p>India and global indices, Indian stocks including defence, currencies, commodities, bond yields and crypto.</p>` };
+  }
+  if (section === "watch") return { title: `Watch and listen: video and audio briefings · ${SITE}`, description: "Video, audio and image briefings from the Raisina Wire desk.", body: `<h1>Watch and listen</h1>` };
+
+  if (section === "community") {
+    const { results } = await env.DB.prepare("SELECT p.id,p.title,p.topic,p.created_at AS createdAt,u.display_name AS author FROM community_posts p JOIN users u ON u.id=p.user_id WHERE p.status='published' ORDER BY p.created_at DESC LIMIT 50").all();
+    return { title: `Community: discussions on India’s strategic questions · ${SITE}`,
+      description: "Join the Raisina Wire community: moderated discussions on geopolitics, security and markets, invitations to expert briefings, and members’ events. Free to join.",
+      body: `<h1>Raisina Wire community</h1><p>Moderated discussions on India’s strategic questions. Free to join.</p><ul class="ssr-list">${results.map(p => `<li><a href="/discussion/${encodeURIComponent(p.id)}">${esc(p.title)}</a> <small>${esc(p.topic)} · ${esc(p.author)}</small></li>`).join("")}</ul>` };
+  }
+  if (section === "discussion" && arg) {
+    const post = await env.DB.prepare("SELECT p.id,p.title,p.body,p.topic,p.created_at AS createdAt,u.display_name AS author FROM community_posts p JOIN users u ON u.id=p.user_id WHERE p.id=? AND p.status='published'").bind(arg).first();
+    if (!post) return { status: 404, title: `Discussion not found · ${SITE}`, description: "", noindex: true, body: `<h1>Discussion not found</h1><p><a href="/community">Back to the community</a></p>` };
+    const { results: replies } = await env.DB.prepare("SELECT r.body,r.created_at AS createdAt,u.display_name AS author FROM community_replies r JOIN users u ON u.id=r.user_id WHERE r.post_id=? ORDER BY r.created_at LIMIT 200").bind(arg).all();
+    const href = `/discussion/${encodeURIComponent(post.id)}`, iso = d => new Date(String(d).replace(" ", "T") + (String(d).includes("Z") ? "" : "Z")).toISOString();
+    return { title: `${post.title} · ${SITE} community`, ogTitle: post.title, description: clip(post.body, 160),
+      ld: [{ "@context": "https://schema.org", "@type": "DiscussionForumPosting", url: `${o}${href}`, headline: clip(post.title, 110), text: clip(post.body, 2000), datePublished: iso(post.createdAt),
+        author: { "@type": "Person", name: post.author }, interactionStatistic: { "@type": "InteractionCounter", interactionType: "https://schema.org/CommentAction", userInteractionCount: replies.length },
+        comment: replies.slice(0, 50).map(r => ({ "@type": "Comment", text: clip(r.body, 1000), datePublished: iso(r.createdAt), author: { "@type": "Person", name: r.author } })) }],
+      body: `<article><p class="ssr-kicker">${esc(post.topic)}</p><h1>${esc(post.title)}</h1><p class="ssr-byline">${esc(post.author)}</p><p>${esc(post.body)}</p><h2>${replies.length} replies</h2>${replies.map(r => `<p><b>${esc(r.author)}</b>: ${esc(r.body)}</p>`).join("")}</article>` };
+  }
+  if (section === "events") {
+    const { results } = await env.DB.prepare("SELECT id,title,description,event_type AS eventType,starts_at AS startsAt,access FROM events WHERE status='published' AND starts_at>=? ORDER BY starts_at LIMIT 30").bind(new Date().toISOString()).all();
+    return { title: `Events and expert briefings · ${SITE}`, description: "Upcoming Raisina Wire briefings, debates and workshops on geopolitics, security and markets. Times in India Standard Time.",
+      ld: results.map(e => ({ "@context": "https://schema.org", "@type": "Event", name: e.title, description: clip(e.description || e.title, 300), startDate: e.startsAt,
+        endDate: new Date(new Date(e.startsAt).getTime() + 3600e3).toISOString(), eventStatus: "https://schema.org/EventScheduled",
+        eventAttendanceMode: "https://schema.org/OnlineEventAttendanceMode", location: { "@type": "VirtualLocation", url: `${o}/events` },
+        organizer: { "@type": "Organization", name: SITE, url: `${o}/` }, isAccessibleForFree: true, image: [`${o}/og-image.jpg`] })),
+      body: `<h1>Events and briefings</h1><ul class="ssr-list">${results.map(e => `<li>${esc(e.title)} <small>${esc(e.eventType)} · ${fmtDate(e.startsAt)}</small></li>`).join("")}</ul>` };
+  }
+  if (section === "coverage" && arg) {
+    const item = await env.DB.prepare("SELECT id,slug,title,summary,status,started_at AS startedAt,ended_at AS endedAt,updated_at AS updatedAt FROM live_coverage WHERE slug=? AND status IN ('live','ended')").bind(arg).first();
+    if (!item) return { status: 404, title: `Live coverage not found · ${SITE}`, description: "", noindex: true, body: `<h1>Live coverage not found</h1>` };
+    const { results: ups } = await env.DB.prepare("SELECT body,created_at AS createdAt FROM live_updates WHERE coverage_id=? ORDER BY created_at DESC LIMIT 50").bind(item.id).all();
+    const iso = d => new Date(String(d).replace(" ", "T") + (String(d).includes("Z") || String(d).includes("+") ? "" : "Z")).toISOString();
+    const href = `/coverage/${encodeURIComponent(item.slug)}`;
+    return { title: `${item.status === "live" ? "LIVE: " : ""}${item.title} · ${SITE}`, ogTitle: item.title, description: clip(item.summary || ups[0]?.body || item.title, 160),
+      ld: [{ "@context": "https://schema.org", "@type": "LiveBlogPosting", url: `${o}${href}`, headline: clip(item.title, 110), description: clip(item.summary || item.title, 300),
+        coverageStartTime: item.startedAt, ...(item.endedAt ? { coverageEndTime: item.endedAt } : {}), datePublished: item.startedAt, dateModified: ups[0] ? iso(ups[0].createdAt) : item.startedAt,
+        publisher: organization(o), author: { "@type": "Organization", name: SITE, url: `${o}/` },
+        liveBlogUpdate: ups.map(u => ({ "@type": "BlogPosting", headline: clip(u.body, 110), articleBody: u.body, datePublished: iso(u.createdAt) })) }],
+      body: `<article><h1>${esc(item.title)}</h1>${item.summary ? `<p>${esc(item.summary)}</p>` : ""}${ups.map(u => `<p><time datetime="${iso(u.createdAt)}"></time>${esc(u.body)}</p>`).join("")}</article>` };
+  }
+  return null; // not a page this module renders
+}
+
+/* ---------- HTML ---------- */
+export async function renderPage(request, env, ensureSchema) {
+  const url = new URL(request.url), o = origin(request, env);
+  const path = url.pathname.replace(/\/+$/, "") || "/";
+  let page = null;
+  if (env.DB) { try { await ensureSchema(env); page = await pageFor(path, url, env, o); } catch { page = null; } }
+  if (page?.redirect) return Response.redirect(o + page.redirect + url.search, 301);
+  const shell = await env.ASSETS.fetch(new Request(new URL("/", request.url), { headers: request.headers }));
+  if (!page) return shell;
+  const canonical = path === "/" ? `${o}/` : `${o}${path}`;
+  const image = page.image || `${o}/og-image.jpg`;
+  const head = [
+    `<link rel="canonical" href="${esc(canonical)}">`,
+    `<meta property="og:url" content="${esc(canonical)}">`,
+    `<meta name="twitter:title" content="${esc(page.ogTitle || page.title)}">`,
+    `<meta name="twitter:description" content="${esc(page.description)}">`,
+    ...(page.article ? [`<meta property="article:published_time" content="${esc(page.article.published)}">`, `<meta property="article:modified_time" content="${esc(page.article.modified)}">`,
+      `<meta property="article:section" content="${esc(page.article.section)}">`, `<meta property="article:author" content="${esc(page.article.author)}">`, `<meta name="author" content="${esc(page.article.author)}">`,
+      ...page.article.tags.map(t => `<meta property="article:tag" content="${esc(t)}">`)] : []),
+    ...(page.ld || []).map(ld)
+  ].join("\n");
+  const set = (attr, value) => ({ element(el) { el.setAttribute(attr, value); } });
+  const res = new HTMLRewriter()
+    .on("title", { element(el) { el.setInnerContent(page.title); } })
+    .on('meta[name="description"]', set("content", page.description))
+    .on('meta[property="og:title"]', set("content", page.ogTitle || page.title))
+    .on('meta[property="og:description"]', set("content", page.description))
+    .on('meta[property="og:type"]', set("content", page.type || "website"))
+    .on('meta[property="og:image"]', set("content", image))
+    .on('meta[name="twitter:image"]', set("content", image))
+    .on('meta[name="robots"]', set("content", page.noindex ? "noindex" : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"))
+    .on("head", { element(el) { el.append(head, { html: true }); } })
+    .on("#app", { element(el) { el.setInnerContent(ssrShell(page.body), { html: true }); } })
+    .transform(shell);
+  const headers = new Headers(res.headers);
+  headers.set("content-type", "text/html; charset=utf-8");
+  headers.set("cache-control", "public, max-age=0, must-revalidate");
+  headers.delete("etag"); headers.delete("content-length");
+  return new Response(res.body, { status: page.status || 200, headers });
+}
+
+/* ---------- Sitemaps, robots, feed ---------- */
+const lastmod = d => { const t = Date.parse(String(d || "").replace(" ", "T") + (/[zZ+]/.test(String(d)) ? "" : "Z")); return Number.isNaN(t) ? "" : new Date(t).toISOString(); };
+const xmlResponse = (body, type = "application/xml") => new Response(`<?xml version="1.0" encoding="UTF-8"?>\n${body}`, { headers: { "content-type": `${type}; charset=utf-8`, "cache-control": "public, max-age=900" } });
+
+export async function sitemap(request, env, ensureSchema) {
+  const o = origin(request, env);
+  await ensureSchema(env);
+  const stories = await listPublished(env, { limit: 5000 });
+  const { results: posts } = await env.DB.prepare("SELECT id,created_at FROM community_posts WHERE status='published' ORDER BY created_at DESC LIMIT 1000").all();
+  const { results: cover } = await env.DB.prepare("SELECT slug,updated_at FROM live_coverage WHERE status IN ('live','ended') ORDER BY updated_at DESC LIMIT 500").all();
+  const newest = stories[0]?.publishedAt;
+  const urls = [
+    ["/", newest, "hourly", "1.0"], ["/editions", newest, "daily", "0.9"], ["/live", "", "always", "0.8"], ["/markets", "", "always", "0.7"],
+    ...LIVE_CATS.map(c => [`/live/${c}`, "", "always", "0.5"]), ["/community", "", "daily", "0.7"], ["/events", "", "daily", "0.6"], ["/watch", "", "weekly", "0.5"],
+    ...WRITERS.map(w => [`/author/${w.key}`, newest, "weekly", "0.6"]),
+    ...stories.map(s => [s.href, s.updatedAt || s.publishedAt, "monthly", "0.8", s]),
+    ...cover.map(c => [`/coverage/${encodeURIComponent(c.slug)}`, c.updated_at, "hourly", "0.6"]),
+    ...posts.map(p => [`/discussion/${encodeURIComponent(p.id)}`, p.created_at, "weekly", "0.4"])
+  ];
+  return xmlResponse(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+${urls.map(([p, m, f, pr, s]) => `<url><loc>${xml(o + p)}</loc>${lastmod(m) ? `<lastmod>${lastmod(m)}</lastmod>` : ""}<changefreq>${f}</changefreq><priority>${pr}</priority>${s ? `<image:image><image:loc>${xml(abs(o, s.heroUrl || s.image))}</image:loc></image:image>` : ""}</url>`).join("\n")}
+</urlset>`);
+}
+
+// Google News: stories from the last two days.
+export async function newsSitemap(request, env, ensureSchema) {
+  const o = origin(request, env);
+  await ensureSchema(env);
+  const stories = await listPublished(env, { since: new Date(Date.now() - 2 * 864e5).toISOString(), limit: 1000 });
+  return xmlResponse(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
+${stories.map(s => `<url><loc>${xml(o + s.href)}</loc><news:news><news:publication><news:name>${SITE}</news:name><news:language>en</news:language></news:publication><news:publication_date>${xml(s.publishedAt)}</news:publication_date><news:title>${xml(s.title)}</news:title></news:news></url>`).join("\n")}
+</urlset>`);
+}
+
+export function robots(request, env) {
+  const o = origin(request, env);
+  return new Response(`User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /read
+Disallow: /search
+Disallow: /account
+Disallow: /saved
+
+Sitemap: ${o}/sitemap.xml
+Sitemap: ${o}/news-sitemap.xml
+`, { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=3600" } });
+}
+
+export async function feed(request, env, ensureSchema) {
+  const o = origin(request, env);
+  await ensureSchema(env);
+  const stories = await listPublished(env, { limit: 50 });
+  return xmlResponse(`<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/">
+<channel><title>${SITE}</title><link>${o}/</link><description>${xml(SITE_DESCRIPTION)}</description><language>en-in</language>
+<atom:link href="${o}/feed.xml" rel="self" type="application/rss+xml"/><image><url>${o}/icon-192.png</url><title>${SITE}</title><link>${o}/</link></image>
+${stories.map(s => `<item><title>${xml(s.title)}</title><link>${o}${s.href}</link><guid isPermaLink="true">${o}${s.href}</guid><pubDate>${new Date(s.publishedAt).toUTCString()}</pubDate><dc:creator>${xml(s.author)}</dc:creator><category>${xml(s.category)}</category><description>${xml(s.dek)}</description><media:content url="${xml(abs(o, s.heroUrl || s.image))}" medium="image"/></item>`).join("\n")}
+</channel></rss>`, "application/rss+xml");
+}
+
+// Paths the Worker renders as HTML pages (the rest are app-only views or static files).
+export const PAGE_PATTERN = /^\/(?:$|editions\/?$|(?:edition|article|author|discussion|coverage)\/[^/]+\/?$|live(?:\/[^/]+)?\/?$|markets\/?$|community\/?$|events\/?$|watch\/?$)/;
