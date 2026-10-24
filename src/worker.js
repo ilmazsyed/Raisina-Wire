@@ -18,7 +18,7 @@ const JSON_HEADERS = {
   "cache-control": "no-cache", // editorial data must show changes at once; wire/markets set their own short caching
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
-  "access-control-allow-headers": "content-type"
+  "access-control-allow-headers": "content-type, authorization"
 };
 
 function json(data, status = 200, headers = {}) {
@@ -90,9 +90,23 @@ function ensureSchema(env) {
   if (!schemaReady) schemaReady = migrate(env.DB).catch(e => { schemaReady = null; throw e; });
   return schemaReady;
 }
+// The autopublisher signs in with "Authorization: Bearer <PUBLISH_TOKEN>" (a Worker secret) and
+// acts as the built-in admin. Tokens shorter than 24 characters are ignored.
+async function publisherUser(request, env) {
+  const header = request.headers.get("Authorization") || "";
+  const secret = String(env.PUBLISH_TOKEN || "");
+  if (!header.startsWith("Bearer ") || secret.length < 24 || !adminEmail(env)) return null;
+  if ((await sha256(header.slice(7).trim())) !== (await sha256(secret))) return null;
+  const find = () => env.DB.prepare("SELECT id,email,display_name,role FROM users WHERE email=?").bind(adminEmail(env)).first();
+  let row = await find();
+  // An empty password hash never verifies; the admin's first password sign-in sets a real one.
+  if (!row) { await env.DB.prepare("INSERT INTO users (id,email,display_name,password_hash,role) VALUES (?,?,?,'','admin')").bind(randomId(), adminEmail(env), "Ilmaz Syed").run(); row = await find(); }
+  return { ...row, role: "admin" };
+}
 async function currentUser(request, env) {
   if (!env.DB) return null;
   await ensureSchema(env);
+  if (request.headers.has("Authorization")) return publisherUser(request, env);
   const token = getCookie(request, "rw_session");
   if (!token) return null;
   const tokenHash = await sha256(token);

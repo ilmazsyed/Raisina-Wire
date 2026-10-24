@@ -31,6 +31,17 @@ A premium, mobile-first editorial and geopolitical briefing platform with a live
 
 In the control room, open **Stories & editions**, choose **Type: Raisina Wire edition**, paste the text, upload a cover (and optionally a hero) image, add the LinkedIn link as the original, and publish.
 
+## Autopublisher (Claude)
+
+Claude can write and publish every kind of item (articles, editions, live coverage and updates, multimedia, events and briefings, alerts) from a link you give it. The workflow is the `/publish` skill in `.claude/skills/publish/SKILL.md`; the Publishing Desk artifact on claude.ai is its queue, where you add requests and approve drafts. Nothing is published without your approval.
+
+It publishes through the control-room API with `npm run publish -- <command>` (`scripts/publish.mjs`), signed in with a publishing key instead of a password:
+1. Make a long random key (at least 24 characters, e.g. `openssl rand -hex 32`).
+2. In Cloudflare (Worker → Settings → Variables and Secrets), add it as a secret named `PUBLISH_TOKEN`.
+3. In the Claude Code cloud environment, add the same value as the environment variable `RW_PUBLISH_TOKEN`, and allow the domain `raisinawire.calibrex.org` under Network access.
+
+A request with `Authorization: Bearer <PUBLISH_TOKEN>` acts as the built-in admin. To revoke it, change or delete the secret.
+
 ## Listen: the natural Indian English voice
 
 Stories are read aloud by a natural Indian English woman's voice (Google Cloud Text-to-Speech, Chirp 3 HD, `TTS_VOICE` in `wrangler.toml`, default `en-IN-Chirp3-HD-Sulafat`; other female options: Aoede, Kore, Leda, Achernar, Vindemiatrix, Despina). Each paragraph is generated once, stored in D1 (`tts_audio`) and reused for every listener, so the cost follows what you publish, not how many people listen. Google's free allowance for these voices is 1 million characters a month (the 13 editions are about 60,000). Playback goes paragraph by paragraph with the text highlighted, and keeps going with the screen locked, with lock-screen controls.
