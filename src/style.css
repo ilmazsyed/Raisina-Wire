@@ -197,6 +197,28 @@ h1 em,h2 em,h3 em{background:linear-gradient(95deg,#f5f7ff 0%,#9dbdf2 45%,#e7c58
 .product-tile small{margin-top:6px;color:var(--dim);font-size:13px;line-height:1.5}
 .tile-arrow{position:absolute;right:20px;top:20px;color:var(--gold2)}
 
+/* ---------- Raisina Wire editions ---------- */
+.editions-band{padding-block:80px 70px}
+.editions-band .section-heading{margin-bottom:14px}
+.editions-intro{max-width:560px;margin:0 0 30px;color:var(--muted);font-size:15px;line-height:1.75}
+.editions-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.edition-card{display:flex;flex-direction:column;min-width:0;min-height:230px;padding:22px;border-radius:20px;border:1px solid var(--line);background:var(--glass);box-shadow:inset 0 1px rgba(255,255,255,.07),0 25px 70px rgba(0,0,0,.2);transition:transform .25s,border-color .25s}
+.edition-card:hover{transform:translateY(-3px);border-color:rgba(233,189,120,.4)}
+.edition-card:hover .edition-title{color:var(--gold2)}
+.edition-meta{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;font:500 10px var(--mono);letter-spacing:1.4px;text-transform:uppercase}
+.edition-meta span{color:var(--gold)}
+.edition-meta time{color:#7d8aa0;white-space:nowrap}
+.edition-title{margin-top:18px;font-size:17px;font-weight:700;line-height:1.32;letter-spacing:-.015em;transition:color .2s}
+.edition-card p{margin:12px 0 0;color:var(--dim);font-size:13px;line-height:1.6}
+.edition-read{margin-top:auto;padding-top:18px;color:var(--gold2);font-size:12px;font-weight:800}
+.edition-lead{grid-column:span 2;grid-row:span 2;padding:34px;background:radial-gradient(ellipse at 100% 0,rgba(233,189,120,.16),transparent 55%),radial-gradient(ellipse at 0 100%,rgba(35,66,120,.3),transparent 60%),var(--glass)}
+.edition-lead .edition-title{margin-top:auto;padding-top:40px;font-size:clamp(28px,2.6vw,40px);line-height:1.1;letter-spacing:-.04em}
+.edition-lead p{max-width:520px;font-size:16px;color:var(--muted)}
+.edition-lead .edition-read{margin-top:0;padding-top:26px;font-size:13px}
+.editions-more{margin-top:24px}
+@media(max-width:1000px){.editions-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.edition-lead{grid-row:auto}.edition-lead .edition-title{padding-top:28px}}
+@media(max-width:700px){.editions-band{padding-block:56px 40px}.editions-grid{grid-template-columns:1fr;gap:12px}.edition-lead{grid-column:auto;padding:24px}.edition-lead .edition-title{font-size:28px}.edition-card{min-height:0}.editions-more{width:100%}}
+
 /* ---------- Footer ---------- */
 .footer{display:flex;align-items:center;gap:28px;flex-wrap:wrap;padding-block:44px 34px;border-top:1px solid var(--line-soft);background:rgba(4,6,11,.6)}
 .footer-links{display:flex;gap:22px;flex-wrap:wrap;flex:1}
