@@ -2,7 +2,7 @@
 // Every source is public and keyless. Nothing is fabricated: a failed source is reported
 // as unavailable and simply contributes no items.
 
-const UA = "Mozilla/5.0 (compatible; RaisinaWire/1.0; +https://raisinawire.com)";
+const UA = "Mozilla/5.0 (compatible; RaisinaWire/1.0; +https://raisinawire.calibrex.org)";
 
 // Small per-isolate cache so bursts of visitors share one upstream fetch.
 const memo = new Map();

@@ -28,7 +28,7 @@ In the control room, open **Stories & editions**, choose **Type: Raisina Wire ed
 
 ## Getting found on Google
 
-1. Once the custom domain is live, set `SITE_URL` in `wrangler.toml` (for example `https://raisinawire.com`) so canonical links and sitemaps use it.
+1. The live address is `https://raisinawire.calibrex.org`, set as `SITE_URL` in `wrangler.toml`. Canonical links, sitemaps, the feed and social cards use it, and page visits to the `workers.dev` address are redirected to it (the API keeps working on both).
 2. In Google Search Console, add the domain as a property, verify it with the DNS record Search Console gives you (in Cloudflare DNS), and submit `https://<domain>/sitemap.xml` and `https://<domain>/news-sitemap.xml`.
 3. For Google News, apply in the Google News Publisher Center with the same domain.
 4. Bing Webmaster Tools can import the property from Search Console.
