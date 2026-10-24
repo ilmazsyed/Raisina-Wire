@@ -4,7 +4,7 @@
   color-scheme:light;
   --bg:#f8f8fa;--ink:#0f1422;--ink-2:#3b414d;--muted:#596173;--line:rgba(15,20,34,.09);
   --gold:#e9bd78;--gold-ink:#7a530f;--saffron:#f5a944;--up:#137a55;--down:#b4332a;--live:#d64535;
-  --serif:Newsreader,Georgia,"Times New Roman",serif;--sans:Manrope,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"DM Mono",ui-monospace,monospace;
+  --serif:Newsreader,Georgia,"Times New Roman",serif;--display:"Bodoni Moda",Didot,"Bodoni 72",Georgia,serif;--sans:Manrope,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"DM Mono",ui-monospace,monospace;
   --max:1360px;--gutter:40px;--text-scale:1;
   --glass-bg:rgba(255,255,255,.6);
   --glass-shadow:inset 0 1px 0 rgba(255,255,255,.95),0 0 0 1px rgba(15,20,34,.05),0 16px 46px rgba(15,20,34,.08);
@@ -66,10 +66,25 @@ img{max-width:100%;display:block}
 .utility-left span{display:inline-flex;align-items:center;gap:8px}
 .utility-right{display:flex;align-items:center;gap:10px}
 .utility-right .text-btn{border:0;background:none;font-weight:700;padding:10px 6px}
-.masthead{text-align:center;padding-top:14px}
-.masthead a{display:inline-block;font:500 clamp(46px,6vw,74px)/1 var(--serif);letter-spacing:-2px;color:var(--ink)}
-.masthead a i{color:var(--gold-ink)}
-.masthead .meta{margin-top:10px}
+/* Nameplate: Bodoni wordmark, Raisina Hill dome mark, tricolour bars, skyline horizon. */
+.wordmark{font:800 1em/.86 var(--display);font-variation-settings:"opsz" 11;letter-spacing:-.035em;color:var(--ink);white-space:nowrap}
+.wordmark em{font-style:italic;font-weight:600;font-variation-settings:"opsz" 11;letter-spacing:-.02em;color:var(--gold-ink)}
+.dome-mark{display:block;flex-shrink:0;color:var(--ink)}
+.tribar{display:inline-flex;gap:3px;align-self:stretch;flex-shrink:0}
+.tribar i{display:block;width:5px;background:#FF671F}
+.tribar i:nth-child(2){background:#fff;box-shadow:inset 0 0 0 1px rgba(15,20,34,.14)}
+.tribar i:nth-child(3){background:#046A38}
+.masthead{padding-top:22px}
+.nameplate{display:flex;align-items:flex-end;justify-content:space-between;gap:30px;padding-bottom:16px;border-bottom:3px solid var(--ink)}
+.nameplate-link{display:flex;align-items:flex-end;gap:clamp(12px,1.6vw,22px);font-size:clamp(46px,7.4vw,104px)}
+.nameplate-link:hover .wordmark{color:var(--ink)}
+.nameplate .dome-mark{width:1.27em;margin-bottom:.08em}
+.nameplate-tag{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+.nameplate-tag .tribar{height:54px}
+.nameplate-tag p{margin:0;font:500 11px/1.7 var(--mono);letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-2)}
+.nameplate-tag .l{display:block}
+.nameplate-tag .gold{color:var(--gold-ink)}
+.skyline-band{display:block;width:100%;height:62px;margin-top:6px;color:rgba(15,20,34,.32)}
 .nav-dock{position:sticky;top:10px;z-index:30;margin-top:20px}
 .nav-dock:before{content:"";position:absolute;left:0;right:0;top:-10px;height:0;background:linear-gradient(var(--bg) 72%,rgba(248,248,250,0));pointer-events:none;z-index:-1;transition:height .2s}
 body.nav-stuck .nav-dock:before{height:84px}
@@ -79,10 +94,11 @@ body.nav-stuck.is-reading .nav-dock:before{height:156px}
 .site-nav a{flex-shrink:0;padding:9px 15px;border-radius:999px;font-size:14px;font-weight:600;white-space:nowrap}
 .site-nav a:hover{background:rgba(15,20,34,.05);color:var(--ink)}
 .site-nav a[aria-current=page]{background:var(--ink);color:#fff}
-.site-nav .nav-brand{display:none;padding:6px 14px 6px 12px;font:500 21px/1 var(--serif);letter-spacing:-.4px}
+.site-nav .nav-brand{display:none;align-items:center;gap:8px;padding:4px 14px 4px 10px;font-size:22px}
+.site-nav .nav-brand .dome-mark{width:36px}
+.site-nav .nav-brand .tribar{height:18px;gap:2px}.site-nav .nav-brand .tribar i{width:3px}
 .site-nav .nav-brand:hover{background:none}
-.site-nav .nav-brand i{color:var(--gold-ink)}
-body.nav-stuck .site-nav .nav-brand{display:inline-block}
+body.nav-stuck .site-nav .nav-brand{display:inline-flex}
 body.nav-stuck .site-nav{max-width:var(--max);background:rgba(255,255,255,.86);box-shadow:inset 0 1px 0 rgba(255,255,255,.95),0 0 0 1px rgba(15,20,34,.06),0 18px 40px rgba(15,20,34,.12)}
 .read-progress{position:fixed;left:0;top:0;z-index:60;width:100%;height:3px;transform:scaleX(0);transform-origin:0 50%;background:linear-gradient(90deg,#cda05b,#e9bd78,#f5a944);pointer-events:none}
 .view-enter{animation:view-in .35s ease}
@@ -167,7 +183,10 @@ body.nav-stuck .site-nav{max-width:var(--max);background:rgba(255,255,255,.86);b
 /* ---------- Footer ---------- */
 .site-footer{margin-top:70px;padding:34px 0 44px;border-top:1px solid var(--line)}
 .footer-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:20px}
-.footer-brand{font:500 28px var(--serif)}.footer-brand i{color:var(--gold-ink)}
+.footer-brand{display:inline-flex;align-items:center;gap:10px;font-size:30px}
+.footer-brand:hover .wordmark{color:var(--ink)}
+.footer-brand .dome-mark{width:46px}
+.footer-brand .tribar{height:24px;gap:2px}.footer-brand .tribar i{width:4px}
 .footer-links{display:flex;flex-wrap:wrap;gap:20px;font-size:14px;color:var(--muted)}
 .lead-form{margin-top:26px;border-radius:22px;padding:20px;display:grid;grid-template-columns:auto repeat(4,minmax(0,1fr)) auto;align-items:center;gap:10px}
 .lead-form .kicker{margin-right:8px}
@@ -277,8 +296,14 @@ body.nav-stuck .site-nav{max-width:var(--max);background:rgba(255,255,255,.86);b
   .side-item .kicker{margin-top:0}
   .side-item h3{font-size:18px}
   .lead-form{grid-template-columns:1fr}
-  .masthead a{letter-spacing:-1.2px}
-  .masthead .meta{font-size:10px}
+  .masthead{padding-top:16px}
+  .nameplate{flex-direction:column;align-items:flex-start;gap:12px;padding-bottom:12px;border-bottom-width:2px}
+  .nameplate-tag{margin-bottom:0}
+  .nameplate-tag .tribar{height:30px}
+  .nameplate-tag p{font-size:9px;line-height:1.6}
+  .nameplate-tag .l{display:inline}
+  .nameplate-tag .gold{display:block}
+  .skyline-band{height:34px}
   .site-nav{border-radius:16px;margin-top:16px}
   .dock{padding:12px}
   .dock-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;margin-inline:-12px;padding:0 12px 4px;scrollbar-width:none}
