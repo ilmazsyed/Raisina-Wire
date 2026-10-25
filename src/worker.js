@@ -11,6 +11,8 @@ import m0009 from "../migrations/0009_translations.sql";
 import m0010 from "../migrations/0010_community_language.sql";
 import m0011 from "../migrations/0011_machine_translation.sql";
 import m0012 from "../migrations/0012_live_images.sql";
+import m0013 from "../migrations/0013_live_results.sql";
+import { liveResults } from "./results.js";
 import { handleTts } from "./tts.js";
 import { editions } from "./editions.js";
 import editionBodies from "./edition-bodies.json";
@@ -64,7 +66,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -507,7 +509,9 @@ async function api(request, env, ctx) {
     if (!isStaff(user)) return err("Editor access required.",403);
     const id=decodeURIComponent(url.pathname.split("/").pop()), b=await request.json().catch(()=>({}));
     // Images and caption can change on their own, without touching the status.
-    const imgs=[["imageUrl","image_url",1500],["socialUrl","social_url",1500],["heroCaption","hero_caption",300]].filter(([k])=>b[k]!==undefined);
+    if (b.results!==undefined && b.results!=="" && typeof b.results!=="object") return err("results must be a JSON object.");
+    if (b.results && typeof b.results==="object") b.results=JSON.stringify(b.results);
+    const imgs=[["imageUrl","image_url",1500],["socialUrl","social_url",1500],["heroCaption","hero_caption",300],["results","results",20000]].filter(([k])=>b[k]!==undefined);
     if (imgs.length && b.status===undefined) {
       const res=await env.DB.prepare(`UPDATE live_coverage SET ${imgs.map(([,c])=>`${c}=?`).join(",")}, updated_at=? WHERE id=?`).bind(...imgs.map(([k,,n])=>String(b[k]||"").slice(0,n)),new Date().toISOString(),id).run();
       if(!res.meta.changes) return err("Live coverage not found.",404);
@@ -547,9 +551,16 @@ async function api(request, env, ctx) {
     const lang=reqLang(url); if(lang) await translateFields(env,lang,rows.results,["title","summary"]);
     return json({items:rows.results});
   }
+  if (url.pathname.startsWith("/api/live/") && url.pathname.endsWith("/results") && request.method === "GET") {
+    const slug=decodeURIComponent(url.pathname.split("/")[3]||"");
+    const row=await env.DB.prepare("SELECT id,results,updated_at FROM live_coverage WHERE slug=? AND status IN ('live','ended')").bind(slug).first();
+    const out=row && await liveResults(env,row);
+    if(!out) return err("No results counter for this coverage.",404);
+    return json(out,200,{"cache-control":"public, max-age=10"});
+  }
   if (url.pathname.startsWith("/api/live/") && request.method === "GET") {
     const slug=decodeURIComponent(url.pathname.split("/").pop()||"");
-    const item=await env.DB.prepare("SELECT id,slug,title,summary,status,started_at AS startedAt,ended_at AS endedAt,image_url AS imageUrl,hero_caption AS heroCaption FROM live_coverage WHERE slug=? AND status IN ('live','ended')").bind(slug).first();
+    const item=await env.DB.prepare("SELECT id,slug,title,summary,status,started_at AS startedAt,ended_at AS endedAt,image_url AS imageUrl,hero_caption AS heroCaption,(COALESCE(results,'')<>'') AS hasResults FROM live_coverage WHERE slug=? AND status IN ('live','ended')").bind(slug).first();
     if(!item) return err("Live coverage not found.",404);
     const updates=await env.DB.prepare("SELECT body,media_url AS mediaUrl,source_url AS sourceUrl,created_at AS createdAt FROM live_updates WHERE coverage_id=? ORDER BY created_at DESC LIMIT 100").bind(item.id).all();
     const lang=reqLang(url); if(lang) await mtLive(env,lang,item,updates.results);
