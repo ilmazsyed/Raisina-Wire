@@ -30,7 +30,9 @@ Needs: Python with `kokoro-onnx` and `soundfile`; the Kokoro model files `kokoro
 
 ## Writing a script
 A script is JSON: `slug`, `title`, `voice` (`bf_emma` by default; any Kokoro voice, e.g.
-`bf_isabella`, `af_heart`, `bm_george`), `speed`, `series` (shown under the logo) and `scenes`.
+`bf_isabella`, `af_heart`, `bm_george`), `speed`, `pace` (how fast scenes animate: 1 is calm, 1.6 is brisk, with push-in cuts, a crimson wipe,
+shorter pauses and a quicker beat), `captionChars` (caption length, 36–44), `series` (shown under
+the logo) and `scenes`.
 Every scene has `say` (the narration, also the captions; write numbers as numerals, e.g.
 "₹3,030 crore") and may have `speak` (the same line spelt for the voice: "three thousand and
 thirty crore rupees"), `hold` (extra seconds on screen) and `source` (shown at the bottom).
@@ -40,6 +42,7 @@ thirty crore rupees"), `hold` (extra seconds on screen) and `source` (shown at t
 | `title` | `kicker`, `title`, `sub` |
 | `number` | `kicker`, `prefix`, `value`, `suffix`, `decimals`, `inr` (Indian digit grouping), `label` |
 | `share` | `kicker`, `value` or `range: [lo, hi]` (per cent), `ringLabel`, `title`, `detail` |
+| `bars` | `kicker`, `title`, `items: [{label, value, display, hot}]`, `max` |
 | `timeline` | `kicker`, `title`, `items: [{when, what, hot}]` |
 | `stats` | `kicker`, `title`, `items: [{prefix, value, suffix, inr, label}]`, `hot` (index in red) |
 | `flow` | `kicker`, `title`, `nodes: [..]` (boxes joined by arrows), `base` (a shared bar beneath) |
@@ -49,6 +52,6 @@ thirty crore rupees"), `hold` (extra seconds on screen) and `source` (shown at t
 | `photo` | `src` (a file path relative to the script, or a URL), `title` |
 | `outro` | `title`, `url` |
 
-Maps are dot maps of land only (Natural Earth coastlines, `engine/land-south-asia.json`, covering
-56–104°E, 2°S–42°N); no borders are drawn. Keep every fact, figure and quote to what the source
+Maps are dot maps of land only (Natural Earth coastlines at 0.4°, `engine/land.json`, covering
+20°W–110°E, 10°S–60°N: Europe, Africa, the Middle East and Asia); no borders are drawn. Keep every fact, figure and quote to what the source
 story says, as for articles.
