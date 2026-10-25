@@ -1041,13 +1041,21 @@ html:is([data-lang=hi],[data-lang=bn]) body{line-height:1.6}
 html:is([data-lang=hi],[data-lang=bn]) :is(h1,h2,h3,.dek){line-height:1.32}
 html:is([data-lang=hi],[data-lang=bn]) .prose{line-height:1.85}
 .lang-menu{position:relative}
-.lang-menu>summary{list-style:none;cursor:pointer;width:auto;padding:0 10px;gap:6px;display:inline-flex;align-items:center;font:700 13px var(--sans)}
+.lang-menu>summary{list-style:none;cursor:pointer}
+/* The language button is a pill (globe + code), not a round icon, at every screen size. */
+.utility .icon-btn.lang-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;width:auto;min-width:0;height:38px;padding:0 12px 0 10px;border-radius:999px;font:700 12.5px/1 var(--sans);letter-spacing:.4px;white-space:nowrap;user-select:none}
+.utility .icon-btn.lang-btn svg{width:15px;height:15px;flex-shrink:0;opacity:.75}
+.utility .icon-btn.lang-btn span{display:block;transform:translateY(.5px)}
+.lang-menu[open]>.lang-btn{border-color:var(--ink);background:rgba(255,255,255,.95)}
+@media(max-width:760px){.utility .icon-btn.lang-btn{height:34px;padding:0 10px 0 8px;font-size:12px;gap:4px}.utility .icon-btn.lang-btn svg{width:14px;height:14px}}
 .lang-menu>summary::-webkit-details-marker{display:none}
-.lang-pop{position:absolute;left:0;top:calc(100% + 8px);z-index:60;display:grid;min-width:160px;padding:6px;border-radius:14px}
-.lang-pop a,.lang-foot a{padding:10px 12px;border-radius:10px;font:600 15px var(--sans);color:var(--ink);text-decoration:none}
+.lang-pop{position:absolute;left:0;top:calc(100% + 8px);z-index:60;display:grid;gap:2px;min-width:168px;padding:6px;border-radius:16px}
+.lang-pop a{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:11px;font:600 15px var(--sans);color:var(--ink);text-decoration:none}
+.lang-foot a{padding:10px 12px;border-radius:10px;font:600 15px var(--sans);color:var(--ink);text-decoration:none}
 .lang-pop a:hover{background:rgba(15,20,34,.06)}
 .lang-pop a[aria-current],.lang-foot a[aria-current]{color:var(--red)}
-.lang-pop a[aria-current]::after{content:" ✓"}
+.lang-pop a[aria-current]{background:rgba(184,20,31,.07)}
+.lang-pop a[aria-current]::after{content:"✓";font-weight:800}
 .lang-foot{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;margin:22px 0 4px}
 .lang-foot a{padding:8px 16px;border:1px solid var(--line);border-radius:999px;font-size:14px}
 .tr-note{margin:14px 0 0;padding:10px 14px;border-radius:12px;background:rgba(184,20,31,.06);color:var(--ink-2);font:500 14px/1.5 var(--sans)}
@@ -1061,3 +1069,5 @@ html[data-theme=dark] .tr-note{background:rgba(255,120,120,.1)}
 .lang-filter{margin-top:8px}
 /* A drop cap splits Indic letter clusters, so Hindi and Bengali stories open without one. */
 html:is([data-lang=hi],[data-lang=bn]) .prose.dropcap>p:first-of-type:first-letter{float:none;margin:0;font:inherit;color:inherit}
+html[data-theme=dark] .lang-menu[open]>.lang-btn{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.5)}
+html[data-theme=dark] .lang-pop a[aria-current]{background:rgba(255,120,120,.12)}
