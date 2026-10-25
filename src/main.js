@@ -1145,18 +1145,34 @@ async function loadCoverage() {
   } catch { state.coverage = []; state.coverageLead = null; }
   renderTicker(); renderLiveBanner(); renderNav(parseRoute());
 }
+let bannerTimer;
 function renderLiveBanner() {
   const host = $("#liveBanner"); if (!host) return;
   const lead = state.coverageLead;
+  clearInterval(bannerTimer);
   if (!lead?.item) { host.innerHTML = ""; host.hidden = true; return; }
   host.hidden = false;
-  const href = `/coverage/${encodeURIComponent(lead.item.slug)}`;
-  // A compact strip: the headline, the latest update and a link; the full coverage is one tap away.
-  const latest = lead.updates[0];
-  host.innerHTML = `<a class="live-banner glass" href="${href}"><span class="lb-top"><span class="live-badge"><span class="pulse"></span>Live</span><span class="meta">${lead.updates.length} update${lead.updates.length === 1 ? "" : "s"}${latest ? ` · ${ago(latest.createdAt)}` : ""}</span></span>
-    <span class="lb-title">${esc(lead.item.title)}</span>
-    ${lead.results ? `<span class="lb-results">${lead.results.candidates.slice(0, 2).map(c => `<b style="color:${esc(c.color || "inherit")}">${esc(c.name)} ${c.pct.toFixed(2)}%</b>`).join(" · ")} · ${lead.results.winner ? `${esc(lead.results.winner)} wins` : `${lead.results.reporting.toFixed(1)}% counted`}</span>` : latest ? `<span class="lb-latest"><time>${clock(latest.createdAt)}</time>${esc(latest.body)}</span>` : ""}
-    <span class="lb-go">Follow live coverage <span aria-hidden="true">→</span></span></a>`;
+  const href = `/coverage/${encodeURIComponent(lead.item.slug)}`, latest = lead.updates[0], r = lead.results;
+  const pic = lead.item.imageUrl && /^(https?:|\/media\/)/.test(lead.item.imageUrl) ? lead.item.imageUrl : "";
+  // A compact broadcast tile: the coverage photo with a blinking LIVE tab, the headline, then either
+  // the results race (election coverage) or the latest update, and a button. The full coverage is one tap away.
+  const race = r?.candidates?.length ? `<span class="lb-race">
+      <span class="lb-race-names">${r.candidates.slice(0, 2).map(c => `<span style="--c:${esc(c.color || "#fff")}"><b>${esc(c.name)}</b> ${c.pct.toFixed(2)}%</span>`).join("")}</span>
+      ${r.candidates.length >= 2 ? `<span class="lb-split">${r.candidates.slice(0, 2).map(c => `<i style="flex-basis:${c.pct}%;background:${esc(c.color || "#fff")}"></i>`).join("")}<em></em></span>` : ""}
+      <small>${r.winner ? `${esc(r.winner)} wins` : `${r.reporting.toFixed(1)}% counted${r.source ? ` · ${esc(r.source.replace(/\s*\(.*\)/, ""))}` : ""}`}</small></span>` : "";
+  host.innerHTML = `<a class="live-banner ${pic ? "has-img" : "no-img"}" href="${href}">
+    <span class="lb-media" aria-hidden="true">${pic ? `<img src="${esc(pic)}" alt="" decoding="async">` : `<span class="lb-glow"></span>`}<span class="live-tab"><span class="pulse"></span>Live</span></span>
+    <span class="lb-body">
+      <span class="lb-meta">Live coverage · ${lead.updates.length} update${lead.updates.length === 1 ? "" : "s"}${latest ? ` · ${ago(latest.createdAt)}` : ""}</span>
+      <span class="lb-title">${esc(lead.item.title)}</span>
+      ${race || (latest ? `<span class="lb-latest"><time>${clock(latest.createdAt)}</time>${esc(latest.body)}</span>` : "")}
+    </span>
+    <span class="lb-go">Follow live <span aria-hidden="true">→</span></span></a>`;
+  if (lead.item.hasResults) bannerTimer = setInterval(async () => {
+    if (!$("#liveBanner") || document.hidden) return;
+    const fresh = await fetch(`/api/live/${encodeURIComponent(lead.item.slug)}/results`).then(x => x.ok ? x.json() : null).catch(() => null);
+    if (fresh && state.coverageLead === lead) { lead.results = fresh; renderLiveBanner(); }
+  }, 20e3);
 }
 /* Live results counter (election coverage): its own 10-second poll, numbers tween between counts. */
 let resultsTimer, resultsHTML = "", resultsPrev = {};

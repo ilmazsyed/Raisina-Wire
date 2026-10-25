@@ -427,7 +427,6 @@ body.nav-stuck .site-nav{max-width:var(--max);background:rgba(255,255,255,.86);b
 .rc-row-bar i{display:block;height:100%;background:var(--c);transition:width .9s cubic-bezier(.2,.8,.2,1)}
 .rc-list li.won .rc-who b{color:var(--c)}
 .rc-tick{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--c);color:#fff;font-size:12px;vertical-align:2px}
-.lb-results{grid-area:latest;display:block;font:500 14px var(--sans)}
 .coverage-feed{list-style:none;margin:30px 0 0;padding:0;display:flex;flex-direction:column;gap:16px}
 .coverage-feed li{display:grid;grid-template-columns:86px minmax(0,1fr);gap:18px}
 .coverage-feed time{display:flex;flex-direction:column;gap:2px;padding-top:16px;font:500 12px var(--mono);color:var(--muted)}
@@ -1099,21 +1098,41 @@ html:is([data-lang=hi],[data-lang=bn]) .prose.dropcap>p:first-of-type:first-lett
 html[data-theme=dark] .lang-menu[open]>.lang-btn{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.5)}
 html[data-theme=dark] .lang-pop a[aria-current]{background:rgba(255,120,120,.12)}
 
-/* Live coverage on the front page: a compact strip, not a feature block. */
-.live-banner{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"top title go" "top latest go";column-gap:18px;row-gap:4px;align-items:center;padding:14px 18px;border-radius:18px;border-left:4px solid var(--live);color:inherit;text-decoration:none}
-.live-banner:hover .lb-title{text-decoration:underline;text-underline-offset:3px}
-.lb-top{grid-area:top;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
-.lb-top .meta{font-size:10px;white-space:nowrap}
-.lb-title{grid-area:title;font:500 clamp(18px,1.6vw,22px)/1.25 var(--serif);letter-spacing:-.2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.lb-latest{grid-area:latest;font-size:13.5px;line-height:1.45;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lb-latest time{font:500 11.5px var(--mono);color:var(--live);margin-right:8px}
-.lb-go{grid-area:go;font:700 13px var(--sans);color:var(--red);white-space:nowrap}
+/* Live coverage on the front page: a compact broadcast tile (photo, headline, race or latest update). */
+.live-banner{position:relative;display:grid;grid-template-columns:clamp(180px,22vw,260px) minmax(0,1fr) auto;align-items:stretch;min-height:132px;border-radius:18px;overflow:hidden;color:#fff;text-decoration:none;
+  background:radial-gradient(120% 140% at 100% 0%,rgba(214,69,53,.35),transparent 55%),linear-gradient(115deg,#0d1019,#161b27 55%,#1f1418);box-shadow:0 10px 30px rgba(10,13,21,.18);border:1px solid rgba(255,255,255,.06)}
+.lb-media{position:relative;display:block;overflow:hidden;background:#20141a}
+.lb-media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 22%;transition:transform .6s ease}
+.lb-media::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 55%,#0d1019 100%)}
+.live-banner:hover .lb-media img{transform:scale(1.04)}
+.lb-glow{position:absolute;inset:0;background:radial-gradient(circle at 35% 50%,rgba(214,69,53,.9),rgba(143,13,22,.6) 35%,transparent 70%),repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 1px,transparent 1px 14px)}
+.lb-media .live-tab{top:12px;left:12px;z-index:1;padding:5px 11px 5px 9px;font-size:11px;letter-spacing:1.6px}
+.lb-media .live-tab .pulse{width:7px;height:7px}
+.lb-body{display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:0;padding:14px 4px 14px 20px}
+.lb-meta{font:500 10.5px var(--mono);letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,.62)}
+.lb-title{font:500 clamp(18px,1.6vw,23px)/1.22 var(--serif);letter-spacing:-.2px;color:#fff;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.live-banner:hover .lb-title{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:4px}
+.lb-latest{font-size:13.5px;line-height:1.45;color:rgba(255,255,255,.78);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.lb-latest time{font:500 11.5px var(--mono);color:#ff7a6b;margin-right:8px}
+.lb-race{display:grid;gap:5px;max-width:520px;margin-top:2px}
+.lb-race-names{display:flex;justify-content:space-between;gap:12px;font:500 13.5px var(--sans);font-variant-numeric:tabular-nums;color:rgba(255,255,255,.85)}
+.lb-race-names b{font-weight:700;color:#fff}
+.lb-race-names span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:6px;vertical-align:1px}
+.lb-split{position:relative;display:flex;height:7px;border-radius:7px;overflow:hidden;background:rgba(255,255,255,.12)}
+.lb-split i{display:block;height:100%;transition:flex-basis .9s cubic-bezier(.2,.8,.2,1)}
+.lb-split em{position:absolute;left:50%;top:0;bottom:0;width:2px;background:#fff;opacity:.85}
+.lb-race small{font:500 10.5px var(--mono);letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.6)}
+.lb-go{align-self:center;margin:0 20px 0 12px;padding:10px 16px;border-radius:999px;background:var(--live);color:#fff;font:700 13px var(--sans);white-space:nowrap;box-shadow:0 6px 18px rgba(214,69,53,.35);transition:transform .2s ease}
+.live-banner:hover .lb-go{transform:translateX(3px)}
 @media(max-width:760px){
-  .live-banner{grid-template-columns:minmax(0,1fr);grid-template-areas:"top" "title" "latest" "go";row-gap:6px;padding:12px 14px;border-radius:16px}
-  .lb-top{flex-direction:row;align-items:center;gap:10px}
-  .lb-title{font-size:17px}
-  .lb-latest{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-  .lb-go{font-size:12.5px}
+  .live-banner{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto;min-height:0;border-radius:16px}
+  .lb-media{height:118px}
+  .lb-media::after{background:linear-gradient(180deg,transparent 45%,#0d1019 100%)}
+  .live-banner.no-img .lb-media{height:44px}
+  .lb-body{padding:6px 14px 14px;gap:5px}
+  .lb-title{font-size:18px}
+  .lb-latest{-webkit-line-clamp:2}
+  .lb-go{position:absolute;top:10px;right:10px;margin:0;padding:7px 12px;font-size:12px}
 }
 
 /* Phones and the installed app: a slim header so the first stories sit in the top of the screen. */
