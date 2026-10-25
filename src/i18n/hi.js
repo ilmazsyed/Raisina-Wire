@@ -561,5 +561,7 @@ export default {
   "Unmute": "आवाज चालू करें",
   "Previous short": "पिछला शॉर्ट",
   "Next short": "अगला शॉर्ट",
-  "Explainer": "एक्सप्लेनर"
+  "Explainer": "एक्सप्लेनर",
+  "Share this update": "यह अपडेट शेयर करें",
+  "Notifications are on for this device": "इस डिवाइस पर सूचनाएं चालू हैं",
 };

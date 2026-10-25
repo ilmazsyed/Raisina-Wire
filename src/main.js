@@ -623,16 +623,17 @@ const SHARE_ICONS = {
   linkedin: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM3 9.75h4v11H3v-11Zm6.5 0h3.8v1.5h.1c.5-1 1.8-1.9 3.7-1.9 4 0 4.7 2.6 4.7 6v5.4h-4v-4.8c0-1.2 0-2.6-1.6-2.6s-1.8 1.2-1.8 2.5v4.9h-4v-11Z"/></svg>`,
   telegram: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21.9 4.3 18.7 19.5c-.2 1-.9 1.3-1.7.8l-4.8-3.5-2.3 2.2c-.3.3-.5.5-1 .5l.3-4.9 8.9-8c.4-.3-.1-.5-.6-.2L6.5 13.3 1.8 11.8c-1-.3-1-1 .2-1.5L20.5 3.2c.9-.3 1.6.2 1.4 1.1Z"/></svg>`,
   mail: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>`,
+  facebook: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M14 8.5V6.8c0-.8.2-1.3 1.4-1.3H17V2.2c-.3 0-1.3-.2-2.5-.2-2.5 0-4.2 1.5-4.2 4.3v2.2H7.5V12h2.8v10h3.7V12h2.8l.4-3.5H14Z"/></svg>`,
+  share: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg>`,
   link: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>`
 };
 function shareLinks(text, url) {
   const t = encodeURIComponent(text), u = encodeURIComponent(url), tu = encodeURIComponent(`${text} ${url}`);
-  return [["whatsapp", "WhatsApp", `https://wa.me/?text=${tu}`], ["x", "X", `https://twitter.com/intent/tweet?text=${t}&url=${u}`], ["linkedin", "LinkedIn", `https://www.linkedin.com/sharing/share-offsite/?url=${u}`],
+  return [["whatsapp", "WhatsApp", `https://wa.me/?text=${tu}`], ["x", "X", `https://twitter.com/intent/tweet?text=${t}&url=${u}`], ["facebook", "Facebook", `https://www.facebook.com/sharer/sharer.php?u=${u}`], ["linkedin", "LinkedIn", `https://www.linkedin.com/sharing/share-offsite/?url=${u}`],
     ["telegram", "Telegram", `https://t.me/share/url?url=${u}&text=${t}`], ["mail", "Email", `mailto:?subject=${t}&body=${tu}`]];
 }
-function shareBlock(title, href) {
-  const url = location.origin + withLang(href);
-  return `<div class="share-row"><span class="meta">Share</span>${shareLinks(title, url).map(([k, label, link]) => `<a class="share-btn share-${k}" href="${link}" target="_blank" rel="noopener" aria-label="Share on ${label}">${SHARE_ICONS[k]}</a>`).join("")}<button class="share-btn" type="button" data-action="copy-link" data-url="${esc(url)}" aria-label="Copy link">${SHARE_ICONS.link}</button></div>`;
+function shareBlock(title, href, url = location.origin + withLang(href)) {
+  return `<div class="share-row"><span class="meta">Share</span><button class="share-btn share-native" type="button" data-action="share-native" data-title="${esc(title)}" data-url="${esc(url)}" aria-label="Share">${SHARE_ICONS.share}</button>${shareLinks(title, url).map(([k, label, link]) => `<a class="share-btn share-${k}" href="${link}" target="_blank" rel="noopener" aria-label="Share on ${label}">${SHARE_ICONS[k]}</a>`).join("")}<button class="share-btn" type="button" data-action="copy-link" data-url="${esc(url)}" aria-label="Copy link">${SHARE_ICONS.link}</button></div>`;
 }
 // Select text in a story to share it as a quote, with a link that jumps to that passage.
 function quoteShare() {
@@ -887,10 +888,11 @@ function renderAlertsPanel() {
   const n = unreadAlerts();
   $$(".icon-btn[data-action=alerts]").forEach(b => { b.dataset.count = n > 9 ? "9+" : n || ""; b.setAttribute("aria-label", n ? `Alerts, ${n} new` : "Alerts"); });
   const panel = $("#alertsPanel"); if (!panel || panel.hidden) return;
-  const device = state.pushOn ? `<div class="ap-device on"><span><b>On for this device</b><small>Stories, live coverage, briefings, 9 am and 9 pm.</small></span><button class="btn btn-light btn-sm" type="button" data-action="alerts-off">Turn off</button></div>`
+  const device = state.pushOn ? ""
     : `<div class="ap-device"><span><b>Get these on your ${isIOS() || /Android/i.test(navigator.userAgent) ? "phone" : "device"}</b><small>${pushSupported() ? "One tap to allow notifications." : isIOS() && !isStandalone() ? "Add Raisina Wire to your Home Screen first." : "This browser can’t show notifications."}</small></span><button class="btn btn-red btn-sm" type="button" data-action="alerts-on">Turn on</button></div>`;
   panel.innerHTML = `<div class="ap-head"><b>Alerts</b><button class="modal-close" type="button" data-action="alerts-close" aria-label="Close">×</button></div>${device}
-    <ol class="ap-list">${(state.alerts || []).map(a => `<li class="${alertTime(a.createdAt) > store.get("rw-alerts-seen", 0) ? "unread" : ""}"><a href="${esc(a.url || "/")}" data-action="alerts-close"><b>${esc(a.title)}</b>${a.body ? `<span>${esc(a.body)}</span>` : ""}<small>${ago(alertTime(a.createdAt).toISOString())}</small></a></li>`).join("") || `<li class="ap-empty">No alerts yet. New stories, live coverage, briefings and the 9 am and 9 pm briefs will appear here.</li>`}</ol>`;
+    <ol class="ap-list">${(state.alerts || []).map(a => `<li class="${alertTime(a.createdAt) > store.get("rw-alerts-seen", 0) ? "unread" : ""}"><a href="${esc(a.url || "/")}" data-action="alerts-close"><b>${esc(a.title)}</b>${a.body ? `<span>${esc(a.body)}</span>` : ""}<small>${ago(alertTime(a.createdAt).toISOString())}</small></a></li>`).join("") || `<li class="ap-empty">No alerts yet. New stories, live coverage, briefings and the 9 am and 9 pm briefs will appear here.</li>`}</ol>
+    ${state.pushOn ? `<p class="ap-foot">Notifications are on for this device · <button type="button" data-action="alerts-off">Turn off</button></p>` : ""}`;
 }
 function toggleAlertsPanel(force) {
   const panel = $("#alertsPanel"), open = force ?? panel.hidden;
@@ -998,7 +1000,8 @@ async function viewExternal(r) {
     <div class="notice">${ICON_INFO}<span>An excerpt from ${esc(site)}, shown with credit for news reporting. The story and its copyright belong to ${esc(site)}. <a href="/copyright">How we use other publishers’ work</a></span></div>
     ${data.image ? `<figure class="reader-hero">${img(data.image)}<figcaption>Image: ${esc(site)}</figcaption></figure>` : ""}
     <div class="prose excerpt">${proseHTML(data.blocks || [])}<p class="excerpt-fade" aria-hidden="true"></p></div>
-    <a class="continue-card" href="${esc(data.url || url)}" target="_blank" rel="noopener"><span><span class="kicker">Continue reading</span><b>The full story is on ${esc(site)}</b><small>${data.readMinutes ? `${data.readMinutes} min read · ` : ""}Opens the publisher’s site</small></span><span class="btn btn-red">Read on ${esc(site)} ↗</span></a>`;
+    <a class="continue-card" href="${esc(data.url || url)}" target="_blank" rel="noopener"><span><span class="kicker">Continue reading</span><b>The full story is on ${esc(site)}</b><small>${data.readMinutes ? `${data.readMinutes} min read · ` : ""}Opens the publisher’s site</small></span><span class="btn btn-red">Read on ${esc(site)} ↗</span></a>
+    ${shareBlock(title, "", location.href)}`;
 }
 function renderExtAside() {
   const host = $("#extAside"); if (!host) return;
@@ -1085,6 +1088,11 @@ async function onAction(e) {
   if (a === "text-smaller") setTextScale(-0.1);
   if (a === "text-larger") setTextScale(0.1);
   if (a === "save") { try { saveForLater(JSON.parse(el.dataset.item)); } catch { /* malformed */ } }
+  if (a === "share-native") {
+    e.preventDefault();
+    const data = { title: el.dataset.title, text: el.dataset.title, url: el.dataset.url };
+    try { if (navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(`${data.title} ${data.url}`); toast("Link copied."); } } catch { /* cancelled */ }
+  }
   if (a === "share") {
     const data = { title: el.dataset.title, url: location.href };
     try { if (navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(location.href); toast("Link copied."); } } catch { /* cancelled */ }
@@ -1229,10 +1237,11 @@ async function viewCoverage(r) {
       <header class="coverage-head">${isLive ? `<span class="live-badge"><span class="pulse"></span>Live</span>` : `<span class="tag">Coverage ended</span>`}
         <h1>${esc(d.item.title)}</h1>${d.item.summary ? `<p class="dek">${esc(d.item.summary)}</p>` : ""}
         ${d.item.imageUrl && /^(https?:|\/media\/)/.test(d.item.imageUrl) ? `<figure class="coverage-hero">${img(d.item.imageUrl)}${isLive ? `<span class="live-tab" aria-hidden="true"><span class="pulse"></span>Live</span>` : ""}${d.item.heroCaption ? `<figcaption>${esc(d.item.heroCaption)}</figcaption>` : ""}</figure>` : ""}
-        <div class="meta">Started ${new Date(d.item.startedAt).toLocaleString(LOCALE, { ...IST, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })} IST · ${d.updates.length} update${d.updates.length === 1 ? "" : "s"}${isLive ? " · refreshes every 30 seconds" : ""}</div></header>
+        <div class="meta">Started ${new Date(d.item.startedAt).toLocaleString(LOCALE, { ...IST, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })} IST · ${d.updates.length} update${d.updates.length === 1 ? "" : "s"}${isLive ? " · refreshes every 30 seconds" : ""}</div>
+        ${shareBlock(`${isLive ? "LIVE: " : ""}${d.item.title}`, `/coverage/${encodeURIComponent(slug)}`)}</header>
       ${d.item.hasResults ? `<section id="resultsCounter" aria-live="polite" aria-label="Live results">${resultsHTML || `<div class="rc glass"><div class="skeleton" style="height:260px"></div></div>`}</section>` : ""}
-      <ol class="coverage-feed">${d.updates.map((u, i) => `<li class="${i === 0 && isLive ? "latest" : ""}"><time datetime="${esc(u.createdAt)}"><b>${clock(u.createdAt)}</b><span>${ago(u.createdAt)}</span></time>
-        <div class="glass">${i === 0 && isLive ? `<span class="tag tag-live">Latest</span>` : ""}${articleBlocks(u.body).map(b => `<p>${esc(b.x)}</p>`).join("")}${u.mediaUrl && /^(https?:|\/media\/)/.test(u.mediaUrl) ? `<div class="reader-hero">${img(u.mediaUrl)}</div>` : ""}${u.sourceUrl && /^https?:/.test(u.sourceUrl) ? `<a class="link-gold" href="${esc(u.sourceUrl)}" target="_blank" rel="noreferrer">Source ↗</a>` : ""}</div></li>`).join("") || `<li><div class="glass"><p class="muted">The first update will appear here shortly.</p></div></li>`}</ol>
+      <ol class="coverage-feed">${d.updates.map((u, i) => `<li id="u-${Date.parse(u.createdAt) || i}" class="${i === 0 && isLive ? "latest" : ""}"><time datetime="${esc(u.createdAt)}"><b>${clock(u.createdAt)}</b><span>${ago(u.createdAt)}</span></time>
+        <div class="glass">${i === 0 && isLive ? `<span class="tag tag-live">Latest</span>` : ""}${articleBlocks(u.body).map(b => `<p>${esc(b.x)}</p>`).join("")}${u.mediaUrl && /^(https?:|\/media\/)/.test(u.mediaUrl) ? `<div class="reader-hero">${img(u.mediaUrl)}</div>` : ""}${u.sourceUrl && /^https?:/.test(u.sourceUrl) ? `<a class="link-gold" href="${esc(u.sourceUrl)}" target="_blank" rel="noreferrer">Source ↗</a>` : ""}<button class="update-share" type="button" data-action="share-native" data-title="${esc(`${d.item.title}: ${String(u.body).slice(0, 110)}${String(u.body).length > 110 ? "…" : ""}`)}" data-url="${esc(`${location.origin}${withLang(`/coverage/${encodeURIComponent(slug)}`)}#u-${Date.parse(u.createdAt) || i}`)}" aria-label="Share this update">${SHARE_ICONS.share}<span>Share</span></button></div></li>`).join("") || `<li><div class="glass"><p class="muted">The first update will appear here shortly.</p></div></li>`}</ol>
     </div></div>`;
   };
   await render(true);

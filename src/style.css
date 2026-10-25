@@ -7,7 +7,8 @@
   --serif:Newsreader,Georgia,"Times New Roman",serif;--display:"Noto Serif Display","Times New Roman",Georgia,serif;--sans:Manrope,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"DM Mono",ui-monospace,monospace;
   --max:1360px;--gutter:40px;--text-scale:1;
   --glass-bg:linear-gradient(140deg,rgba(255,255,255,.82),rgba(255,255,255,.56) 60%,rgba(255,255,255,.66));
-  --glass-shadow:inset 0 1px 0 #fff,inset 0 -1px 0 rgba(15,20,34,.03),0 0 0 1px rgba(15,20,34,.05),0 22px 54px -18px rgba(15,20,34,.18),0 2px 6px rgba(15,20,34,.03);
+  --glass-sheen:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.14) 38%,rgba(255,255,255,0) 60%);
+  --glass-shadow:inset 0 1.5px 0 #fff,inset 0 0 0 1px rgba(255,255,255,.35),inset 0 -10px 24px -18px rgba(255,255,255,.9),inset 0 -1px 0 rgba(15,20,34,.03),0 0 0 1px rgba(15,20,34,.05),0 22px 54px -18px rgba(15,20,34,.18),0 2px 6px rgba(15,20,34,.03);
 }
 *{box-sizing:border-box}
 html{scroll-padding-top:20px;-webkit-text-size-adjust:100%;overflow-anchor:none}
@@ -30,7 +31,8 @@ img{max-width:100%;display:block}
 
 /* ---------- Primitives ---------- */
 .wrap{width:100%;max-width:var(--max);margin:0 auto;padding-inline:var(--gutter)}
-.glass{background:var(--glass-bg);backdrop-filter:blur(26px) saturate(180%);-webkit-backdrop-filter:blur(26px) saturate(180%);border:1px solid rgba(255,255,255,.95);box-shadow:var(--glass-shadow)}
+/* Glossy glass: a light sheen across the top and a bright edge over the frosted fill */
+.glass{background:var(--glass-sheen),var(--glass-bg);backdrop-filter:blur(30px) saturate(200%);-webkit-backdrop-filter:blur(30px) saturate(200%);border:1px solid rgba(255,255,255,.95);box-shadow:var(--glass-shadow)}
 .kicker{font:500 11px var(--mono);letter-spacing:1.4px;text-transform:uppercase;color:var(--red)}
 .meta{font:500 11px var(--mono);letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
 .muted{color:var(--muted)}
@@ -732,7 +734,8 @@ img.desk{border-radius:22%!important}
   --bg:#0a0d15;--ink:#eef1f7;--ink-2:#c5cbd6;--muted:#929bab;--line:rgba(255,255,255,.09);
   --gold-ink:#e8bd78;--red:#f0434d;--red-deep:#a5121c;--up:#3fc493;--down:#ff6b61;
   --glass-bg:linear-gradient(140deg,rgba(32,38,56,.78),rgba(18,23,36,.62) 60%,rgba(24,30,46,.7));
-  --glass-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 0 0 1px rgba(255,255,255,.06),0 24px 60px -20px rgba(0,0,0,.7);
+  --glass-sheen:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.02) 40%,rgba(255,255,255,0) 60%);
+  --glass-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 0 0 1px rgba(255,255,255,.06),0 24px 60px -20px rgba(0,0,0,.7);
 }
 :root[data-theme=dark] body:before{opacity:.45}
 :root[data-theme=dark] .glass{border-color:rgba(255,255,255,.08)}
@@ -1212,3 +1215,31 @@ body.sv-open{overflow:hidden}
 .shorts-viewer.held .sv-paused{display:grid}
 :root[data-theme=dark] .carousel-btn{background:rgba(255,255,255,.08);color:inherit;border-color:rgba(255,255,255,.14)}
 :root[data-theme=dark] .short-face{border-color:var(--bg)}
+
+/* Alerts: a small count on the bell; switching notifications off is a quiet link at the foot. */
+.icon-btn[data-count]:not([data-count=""]):after{top:1px;right:1px;min-width:14px;height:14px;padding:0 3px;font:700 8.5px/14px var(--sans);box-shadow:0 0 0 1.5px var(--bg)}
+.ap-foot{margin:10px 2px 0;font-size:11.5px;color:var(--muted);text-align:center}
+.ap-foot button{border:0;background:none;padding:0;font:inherit;color:var(--muted);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.ap-foot button:hover{color:var(--red)}
+
+/* Sharing live coverage and each update */
+.coverage-head .share-row{margin-top:14px}
+.share-native:hover{background:var(--red);border-color:var(--red);color:#fff}
+.share-facebook:hover{background:#1877f2;border-color:#1877f2}
+.update-share{display:inline-flex;align-items:center;gap:5px;margin-top:10px;margin-left:auto;float:right;padding:5px 10px;border-radius:999px;border:1px solid rgba(15,20,34,.1);background:rgba(255,255,255,.6);color:var(--muted);font:600 12px var(--sans);cursor:pointer}
+.update-share svg{width:13px;height:13px}
+.update-share:hover{color:var(--red);border-color:rgba(184,20,31,.3)}
+.coverage-feed .glass:after{content:"";display:block;clear:both}
+:root[data-theme=dark] .update-share{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1)}
+
+/* Shorts: tighter rail */
+.shorts-rail{margin:2px 0 10px}
+.shorts-head{margin-bottom:6px}
+.shorts-row{gap:10px;padding:2px 2px 4px}
+.short-bubble{width:68px;gap:5px}
+.short-ring{width:62px;height:62px;padding:2.5px}
+.short-face{border-width:2px}
+.short-name{font-size:10.5px;max-width:68px;line-height:1.2}
+@media(max-width:760px){.home>#shortsRail{margin:8px 0 0}}
+
+@media(max-width:760px){.coverage-head .share-row{flex-wrap:nowrap;gap:6px}.coverage-head .share-row .meta{display:none}.coverage-head .share-btn{width:36px;height:36px;flex-shrink:0}.coverage-head .share-btn svg{width:16px;height:16px}}
