@@ -5,7 +5,7 @@
   "pace": 1.6,
   "captionChars": 36,
   "ticker": "Jordan vows harshest penalties after attack on Karak church",
-  "story": "/article/jordan-karak-church-attack-funeral-gunmen",
+  "story": "/article/gunmen-attack-funeral-at-jordan-church-killing-nine-cctv-shows-three-armed-men",
   "scenes": [
     {
       "type": "cutout",
@@ -19,10 +19,24 @@
       "type": "map",
       "kicker": "Where it happened",
       "title": "Hammoud village, Karak governorate",
-      "view": [30.5, 41.5, 27.5, 35],
+      "view": [
+        30.5,
+        41.5,
+        27.5,
+        35
+      ],
       "pins": [
-        { "lon": 35.70, "lat": 31.18, "label": "Karak", "side": "left" },
-        { "lon": 35.93, "lat": 31.95, "label": "Amman" }
+        {
+          "lon": 35.7,
+          "lat": 31.18,
+          "label": "Karak",
+          "side": "left"
+        },
+        {
+          "lon": 35.93,
+          "lat": 31.95,
+          "label": "Amman"
+        }
       ],
       "say": "It happened on Friday, 23 October, at St George's Greek Orthodox Church, in Hammoud village in southern Jordan's Karak governorate.",
       "speak": "It happened on Friday, the twenty-third of October, at Saint George's Greek Orthodox Church, in Hammoud village in southern Jordan's Karak governorate."
@@ -33,9 +47,18 @@
       "title": "Nine dead, dozens wounded",
       "bg": "media/karak-ambulances.webp",
       "items": [
-        { "value": 9, "label": "killed" },
-        { "value": 34, "label": "wounded" },
-        { "value": 3, "label": "days of national mourning" }
+        {
+          "value": 9,
+          "label": "killed"
+        },
+        {
+          "value": 34,
+          "label": "wounded"
+        },
+        {
+          "value": 3,
+          "label": "days of national mourning"
+        }
       ],
       "hot": 0,
       "say": "7 died on the spot. 2 more died in hospital the next day, taking the toll to 9. 34 were wounded, and Jordan declared 3 days of mourning.",
@@ -47,9 +70,18 @@
       "kicker": "Caught on camera",
       "title": "What the CCTV shows",
       "photos": [
-        { "src": "media/karak-cctv-2.jpg", "caption": "An armed man walks towards the church" },
-        { "src": "media/karak-cctv-1.jpg", "caption": "Gunmen fire from the pavement" },
-        { "src": "media/karak-cctv-3.jpg", "caption": "They take cover by a low wall" }
+        {
+          "src": "media/karak-cctv-2.jpg",
+          "caption": "An armed man walks towards the church"
+        },
+        {
+          "src": "media/karak-cctv-1.jpg",
+          "caption": "Gunmen fire from the pavement"
+        },
+        {
+          "src": "media/karak-cctv-3.jpg",
+          "caption": "They take cover by a low wall"
+        }
       ],
       "say": "Security-camera footage on state TV appears to show 2 men with handguns opening fire. A third, with a semi-automatic rifle, joins them. All 3 then run towards the church.",
       "speak": "Security-camera footage on state TV appears to show two men with handguns opening fire. A third, with a semi-automatic rifle, joins them. All three then run towards the church.",
@@ -90,9 +122,19 @@
       "kicker": "Not the first time",
       "title": "Karak has been hit before",
       "items": [
-        { "when": "2016", "what": "Gunmen kill 10, near the Crusader castle" },
-        { "when": "23 Oct 2026", "what": "Church funeral attacked", "hot": true },
-        { "when": "24 Oct 2026", "what": "Toll rises to 9" }
+        {
+          "when": "2016",
+          "what": "Gunmen kill 10, near the Crusader castle"
+        },
+        {
+          "when": "23 Oct 2026",
+          "what": "Church funeral attacked",
+          "hot": true
+        },
+        {
+          "when": "24 Oct 2026",
+          "what": "Toll rises to 9"
+        }
       ],
       "say": "Karak is home to a Christian minority, and it has been targeted before. In 2016, gunmen killed 10 people there, 7 of them police officers.",
       "speak": "Karak is home to a Christian minority, and it has been targeted before. In twenty sixteen, gunmen killed ten people there, seven of them police officers."
@@ -104,9 +146,9 @@
       "items": [
         "Jordan is a moderate, stable state",
         "A partner against terrorism",
-        "Modi and King Abdullah met in Amman in 2025"
+        "Its security matters to the region"
       ],
-      "say": "For India, Jordan is a stable partner in a turbulent region. Modi and King Abdullah stressed a common stance against terror when they met in Amman last December."
+      "say": "For India, Jordan is a stable partner against terror in a turbulent region. An attack like this tests that stability."
     },
     {
       "type": "outro",
