@@ -522,4 +522,18 @@ export default {
   "This page is not available in Hindi yet. Here it is in English.": "এই পাতাটি এখনও হিন্দিতে নেই। ইংরেজিতে পড়ুন।",
   "This page is not available in Bengali yet. Here it is in English.": "এই পাতাটি এখনও বাংলায় নেই। ইংরেজিতে পড়ুন।",
   "All languages": "সব ভাষা",
+  "Shorts": "শর্টস",
+  "All shorts →": "সব শর্টস →",
+  "Explainers": "এক্সপ্লেনার",
+  "Watch all →": "সব দেখুন →",
+  "Vertical shorts": "ভার্টিক্যাল শর্টস",
+  "Videos, audio and images": "ভিডিও, অডিও ও ছবি",
+  "Previous videos": "আগের ভিডিও",
+  "Next videos": "পরের ভিডিও",
+  "Explainer videos": "এক্সপ্লেনার ভিডিও",
+  "Mute": "শব্দ বন্ধ করুন",
+  "Unmute": "শব্দ চালু করুন",
+  "Previous short": "আগের শর্ট",
+  "Next short": "পরের শর্ট",
+  "Explainer": "এক্সপ্লেনার"
 };

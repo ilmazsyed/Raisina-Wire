@@ -119,9 +119,10 @@ write a script for the engine in `video/` (read `video/README.md` for scene type
 Show the script (scene list and narration) and get a go-ahead, then
 `npm run video -- video/scripts/<slug>.json`, check stills, and send the MP4s to the user to watch.
 The files ship with the site: commit `public/videos/<slug>-*` and the script on a branch, open a PR,
-and once it is merged and deployed add the 16:9 cut to Watch with `media` (`mediaUrl`
-`https://raisinawire.calibrex.org/videos/<slug>-16x9.mp4`, `thumbnailUrl` the matching `.jpg`,
-`mediaType` `video`). The 9:16 cut is for Reels, Shorts and LinkedIn.
+and once it is merged and deployed publish both cuts with `media`: the 16:9 cut with `mediaType`
+`video` (it joins the Explainers carousel on the homepage) and the 9:16 cut with `mediaType`
+`short` (a story bubble on the homepage and Vertical shorts on Watch). `mediaUrl` is
+`/videos/<slug>-16x9.mp4` (or `-9x16.mp4`) and `thumbnailUrl` the matching `.jpg`.
 
 **Event or briefing:** `event` with `{ "title": "…", "description": "…", "eventType": "Briefing",
 "startsAt": "2026-11-01T18:00:00+05:30", "access": "public", "notify": true }`.
