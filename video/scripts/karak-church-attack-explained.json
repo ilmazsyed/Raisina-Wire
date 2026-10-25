@@ -1,0 +1,117 @@
+{
+  "slug": "karak-church-attack-explained",
+  "title": "Gunmen at a funeral: the Karak church attack",
+  "series": "Explained",
+  "pace": 1.6,
+  "captionChars": 36,
+  "ticker": "Jordan vows harshest penalties after attack on Karak church",
+  "story": "/article/jordan-karak-church-attack-funeral-gunmen",
+  "scenes": [
+    {
+      "type": "cutout",
+      "src": "media/karak-officer.webp",
+      "kicker": "Explained · Jordan",
+      "title": "Gunmen at a funeral",
+      "say": "Gunmen opened fire on mourners at a church funeral in Jordan. Here's what we know.",
+      "source": "AP"
+    },
+    {
+      "type": "map",
+      "kicker": "Where it happened",
+      "title": "Hammoud village, Karak governorate",
+      "view": [30.5, 41.5, 27.5, 35],
+      "pins": [
+        { "lon": 35.70, "lat": 31.18, "label": "Karak", "side": "left" },
+        { "lon": 35.93, "lat": 31.95, "label": "Amman" }
+      ],
+      "say": "It happened on Friday, 23 October, at St George's Greek Orthodox Church, in Hammoud village in southern Jordan's Karak governorate.",
+      "speak": "It happened on Friday, the twenty-third of October, at Saint George's Greek Orthodox Church, in Hammoud village in southern Jordan's Karak governorate."
+    },
+    {
+      "type": "stats",
+      "kicker": "The toll",
+      "title": "Nine dead, dozens wounded",
+      "bg": "media/karak-ambulances.webp",
+      "items": [
+        { "value": 9, "label": "killed" },
+        { "value": 34, "label": "wounded" },
+        { "value": 3, "label": "days of national mourning" }
+      ],
+      "hot": 0,
+      "say": "7 died on the spot. 2 more died in hospital the next day, taking the toll to 9. 34 were wounded, and Jordan declared 3 days of mourning.",
+      "speak": "Seven died on the spot. Two more died in hospital the next day, taking the toll to nine. Thirty-four were wounded, and Jordan declared three days of mourning.",
+      "source": "Jordan Public Security Directorate"
+    },
+    {
+      "type": "collage",
+      "kicker": "Caught on camera",
+      "title": "What the CCTV shows",
+      "photos": [
+        { "src": "media/karak-cctv-2.jpg", "caption": "An armed man walks towards the church" },
+        { "src": "media/karak-cctv-1.jpg", "caption": "Gunmen fire from the pavement" },
+        { "src": "media/karak-cctv-3.jpg", "caption": "They take cover by a low wall" }
+      ],
+      "say": "Security-camera footage on state TV appears to show 2 men with handguns opening fire. A third, with a semi-automatic rifle, joins them. All 3 then run towards the church.",
+      "speak": "Security-camera footage on state TV appears to show two men with handguns opening fire. A third, with a semi-automatic rifle, joins them. All three then run towards the church.",
+      "source": "Al-Mamlaka TV, verified by Reuters"
+    },
+    {
+      "type": "photo",
+      "src": "media/karak-church.webp",
+      "style": "duotone",
+      "focus": 0.5,
+      "focusV": 0.45,
+      "title": "15 minutes into the funeral",
+      "say": "A mourner told AP the shooting began about 15 minutes into the funeral. Another witness said the gunmen fired for several minutes, inside and outside the church.",
+      "speak": "A mourner told A P the shooting began about fifteen minutes into the funeral. Another witness said the gunmen fired for several minutes, inside and outside the church.",
+      "source": "AP; Jordanian state TV"
+    },
+    {
+      "type": "quote",
+      "text": "Jordan will confront the terrorist act that targeted Karak with the harshest penalties.",
+      "who": "King Abdullah II",
+      "role": "on X, 23 October",
+      "say": "King Abdullah said Jordan will confront the terrorist act that targeted Karak with the harshest penalties. He has ordered an iron fist against those responsible."
+    },
+    {
+      "type": "list",
+      "kicker": "Still unknown",
+      "title": "The questions investigators face",
+      "items": [
+        "Who the gunmen were",
+        "How many took part",
+        "Their motive",
+        "Any link to a militant group"
+      ],
+      "say": "The attackers haven't been identified, and no arrests have been announced. Officials say it's too early to say whether they had links to any group."
+    },
+    {
+      "type": "timeline",
+      "kicker": "Not the first time",
+      "title": "Karak has been hit before",
+      "items": [
+        { "when": "2016", "what": "Gunmen kill 10, near the Crusader castle" },
+        { "when": "23 Oct 2026", "what": "Church funeral attacked", "hot": true },
+        { "when": "24 Oct 2026", "what": "Toll rises to 9" }
+      ],
+      "say": "Karak is home to a Christian minority, and it has been targeted before. In 2016, gunmen killed 10 people there, 7 of them police officers.",
+      "speak": "Karak is home to a Christian minority, and it has been targeted before. In twenty sixteen, gunmen killed ten people there, seven of them police officers."
+    },
+    {
+      "type": "list",
+      "kicker": "Why India is watching",
+      "title": "A stable partner in a region at war",
+      "items": [
+        "Jordan is a moderate, stable state",
+        "A partner against terrorism",
+        "Modi and King Abdullah met in Amman in 2025"
+      ],
+      "say": "For India, Jordan is a stable partner in a turbulent region. Modi and King Abdullah stressed a common stance against terror when they met in Amman last December."
+    },
+    {
+      "type": "outro",
+      "title": "Read the full story in English, Hindi and Bengali",
+      "say": "Read the full story on Raisina Wire."
+    }
+  ]
+}
