@@ -1,7 +1,8 @@
 # Raisina Wire video engine
 
-Animated explainers in the Raisina Wire style (Vox-like motion graphics): a narrator, scenes that
-build in time with the voice, burned-in captions, an original score, in 16:9 and 9:16.
+Animated explainers in the Raisina Wire style (Vox-like motion graphics): two news anchors (female
+and male, taking turns), scenes that build in time with the voice, burned-in captions, an original
+score, in 16:9 and 9:16.
 
 ```bash
 npm run video -- video/scripts/chemical-parks.json            # both formats
@@ -16,8 +17,21 @@ film takes about 3 minutes per format on 4 CPUs.
 **Preview with sound:** serve `video/` (e.g. `npx serve video`) and open
 `engine/engine.html?preview&spec=../out/<slug>/spec.json&format=16x9`; click to play, drag to scrub.
 
+## What keeps it moving
+- The camera never stops: every scene drifts and pushes in slowly, and punches in on each new
+  caption line, so the shot changes every two or three seconds.
+- Items appear as the anchor reaches them: list points, flow boxes, timeline stops, stat cards,
+  bars and map pins are spread across the narration, and the one being read is highlighted.
+- Quotes light up word by word as they are read; numbers burst when the count lands; maps fly
+  towards their pins and draw dashed routes between them; photos push, turn and catch a light sweep.
+- A drifting grid, slow-turning rings and hairlines move behind everything, and a ticker scrolls
+  the headline along the bottom.
+- Brisk pieces (`pace` above 1.2) cut with a crimson wipe, an iris and a split shutter in turn.
+- Files are encoded to stay near 19 MB whatever their length.
+
 ## How it works
-1. `audio.py` voices each scene's narration with Kokoro (offline, free), lays the lines end to end,
+1. `audio.py` voices each scene's narration with Kokoro (offline, free), alternating the anchors and
+   giving each line broadcast processing (presence lift, compression), lays the lines end to end,
    writes `timing.json` (scene starts and caption chunks) and mixes `audio.m4a`: the voice over an
    original score (pads, a soft pulse, a whoosh on each cut, ducked under the voice, -16 LUFS).
 2. `engine/engine.js` draws every frame as a function of time on one canvas, in Raisina Wire's
@@ -29,8 +43,10 @@ Needs: Python with `kokoro-onnx` and `soundfile`; the Kokoro model files `kokoro
 `RW_VIDEO_MODELS`; ffmpeg; Playwright with Chromium.
 
 ## Writing a script
-A script is JSON: `slug`, `title`, `voice` (`bf_emma` by default; any Kokoro voice, e.g.
-`bf_isabella`, `af_heart`, `bm_george`), `speed`, `pace` (how fast scenes animate: 1 is calm, 1.6 is brisk, with push-in cuts, a crimson wipe,
+A script is JSON: `slug`, `title`, `voices` (the anchors, taken in turn scene by scene; default
+`["af_bella", "am_michael"]`, a female and a male voice read briskly with broadcast processing),
+`alternate: false` with a single `voice` for one narrator, `anchorSpeed` (overrides each anchor's
+pace), `ticker` (text after the headline in the scrolling ticker), `pace` (how fast scenes animate: 1 is calm, 1.6 is brisk, with push-in cuts, a crimson wipe,
 shorter pauses and a quicker beat), `captionChars` (caption length, 36–44), `series` (shown under
 the logo) and `scenes`.
 Every scene has `say` (the narration, also the captions; write numbers as numerals, e.g.
