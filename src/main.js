@@ -1143,10 +1143,12 @@ function renderLiveBanner() {
   if (!lead?.item) { host.innerHTML = ""; host.hidden = true; return; }
   host.hidden = false;
   const href = `/coverage/${encodeURIComponent(lead.item.slug)}`;
-  host.innerHTML = `<div class="live-banner glass"><div class="lb-main"><span class="live-badge"><span class="pulse"></span>Live</span>
-      <h2><a href="${href}">${esc(lead.item.title)}</a></h2>${lead.item.summary ? `<p>${esc(lead.item.summary)}</p>` : ""}
-      <a class="btn btn-dark btn-sm" href="${href}">Follow live coverage</a><span class="meta" style="margin-left:12px">Since ${clock(lead.item.startedAt)} IST · ${lead.updates.length} update${lead.updates.length === 1 ? "" : "s"}</span></div>
-    <ol class="lb-updates">${lead.updates.slice(0, 3).map(u => `<li><time>${clock(u.createdAt)}</time><span>${esc(u.body.length > 180 ? u.body.slice(0, 177) + "…" : u.body)}</span></li>`).join("") || `<li><span class="muted">Updates will appear here as they are posted.</span></li>`}</ol></div>`;
+  // A compact strip: the headline, the latest update and a link; the full coverage is one tap away.
+  const latest = lead.updates[0];
+  host.innerHTML = `<a class="live-banner glass" href="${href}"><span class="lb-top"><span class="live-badge"><span class="pulse"></span>Live</span><span class="meta">${lead.updates.length} update${lead.updates.length === 1 ? "" : "s"}${latest ? ` · ${ago(latest.createdAt)}` : ""}</span></span>
+    <span class="lb-title">${esc(lead.item.title)}</span>
+    ${latest ? `<span class="lb-latest"><time>${clock(latest.createdAt)}</time>${esc(latest.body)}</span>` : ""}
+    <span class="lb-go">Follow live coverage <span aria-hidden="true">→</span></span></a>`;
 }
 let coverageTimer;
 async function viewCoverage(r) {
