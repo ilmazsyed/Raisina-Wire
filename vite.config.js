@@ -17,7 +17,7 @@ function precacheServiceWorker() {
         return statSync(path).isDirectory() ? walk(path) : [path];
       });
       const files = walk(outDir).map(f => "/" + relative(outDir, f).split("\\").join("/"))
-        .filter(f => !/^\/(sw\.js|_headers|og-image\.jpg|admin|screenshots\/)/.test(f) && !f.includes("/admin-"))
+        .filter(f => !/^\/(sw\.js|_headers|og-image\.jpg|admin|screenshots\/|videos\/)/.test(f) && !f.includes("/admin-"))
         .map(f => (f === "/index.html" ? "/" : f))
         .sort();
       const hash = createHash("sha256");

@@ -410,8 +410,10 @@ async function api(request, env, ctx) {
     if (!allowedRoles(user,["admin","editor"])) return err("Editor access required.",403);
     const b = await request.json().catch(()=>({}));
     const title=String(b.title||"").trim().slice(0,180), mediaUrl=String(b.mediaUrl||"").trim().slice(0,1500);
-    if(title.length<3 || !/^https:\/\//i.test(mediaUrl)) return err("Add a title and a valid HTTPS media URL.");
-    const type=["video","image","gallery","audio","embed"].includes(b.mediaType)?b.mediaType:"video";
+    // An HTTPS address, or a video shipped with the site (/videos/…, made by the video engine).
+    if(title.length<3 || !(/^https:\/\//i.test(mediaUrl) || /^\/videos\/[\w.-]+$/.test(mediaUrl))) return err("Add a title and a valid HTTPS media URL.");
+    // "short" is a vertical (9:16) video: story bubbles on the homepage and Shorts on Watch.
+    const type=["video","short","image","gallery","audio","embed"].includes(b.mediaType)?b.mediaType:"video";
     const status=b.status==="published"?"published":"draft", id=randomId();
     await env.DB.prepare("INSERT INTO media_items (id,title,description,media_type,media_url,thumbnail_url,category,status,author_id,published_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id,title,String(b.description||"").slice(0,2000),type,mediaUrl,String(b.thumbnailUrl||"").slice(0,1500),String(b.category||"Geopolitics").slice(0,50),status,user.id,status==="published"?new Date().toISOString():null).run();
     return json({ok:true,id},201,{"cache-control":"no-store"});
