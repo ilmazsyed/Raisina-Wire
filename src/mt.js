@@ -58,7 +58,7 @@ const memo = new Map();   // per-isolate copy of recent translations
 function remember(k, v) { memo.set(k, v); if (memo.size > 4000) memo.delete(memo.keys().next().value); }
 
 // Translates a list of strings; returns the list with each string translated where possible.
-export async function translateTexts(env, lang, texts) {
+export async function translateTexts(env, lang, texts, { cacheOnly = false } = {}) {
   if (!isLang(lang) || !mtReady(env)) return texts;
   const out = texts.slice();
   const want = [...new Set(texts.map(t => String(t || "").trim()).filter(needsMt))];
@@ -74,7 +74,7 @@ export async function translateTexts(env, lang, texts) {
     for (const j of part) if (got.has(keys[j])) { found.set(want[j], got.get(keys[j])); remember(keys[j], got.get(keys[j])); }
   }
   const todo = missing.filter(j => !found.has(want[j]));
-  if (todo.length && await spend(env, todo.reduce((n, j) => n + want[j].length, 0))) {
+  if (todo.length && !cacheOnly && await spend(env, todo.reduce((n, j) => n + want[j].length, 0))) {
     const split = todo.map(j => pieces(want[j]));
     const flat = split.flat();
     const done = [];
@@ -102,10 +102,10 @@ export async function translateTexts(env, lang, texts) {
 }
 
 // Translates the named fields of each object in place; marks the ones it changed.
-export async function translateFields(env, lang, items, fields) {
+export async function translateFields(env, lang, items, fields, opts) {
   const refs = [];
   for (const it of items) for (const f of fields) if (it && typeof it[f] === "string" && it[f]) refs.push([it, f]);
-  const res = await translateTexts(env, lang, refs.map(([it, f]) => it[f]));
+  const res = await translateTexts(env, lang, refs.map(([it, f]) => it[f]), opts);
   refs.forEach(([it, f], i) => { if (res[i] !== it[f]) { it[f] = res[i]; it.mt = true; } });
   return items;
 }

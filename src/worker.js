@@ -257,19 +257,18 @@ async function gdeltNews(url) {
 /* ---------- Hindi and Bengali for news text (src/mt.js) ---------- */
 const reqLang = url => { const l = url.searchParams.get("lang"); return isLang(l) ? l : ""; };
 // The live wire in Hindi or Bengali: the language's own publishers, plus the English headlines
-// and summaries translated. Translation gets a few seconds; anything slower carries on in the
-// background (and in the cron) and appears on the next refresh.
+// and summaries translated. Readers get what is already translated at once; new headlines are
+// translated in the background (and by the cron) and appear on the next refresh.
 async function wireIn(env, ctx, lang) {
   const w = await liveWire(lang);
   if (!lang || !mtReady(env)) return w;
   const own = new Set((LANG_FEEDS[lang] || []).map(f => f.name));
-  const items = w.items.filter(i => !own.has(i.source)).map(i => ({ ...i, titleEn: i.title }));
-  const job = translateFields(env, lang, items, ["title", "summary"]);
-  ctx?.waitUntil?.(job.catch(() => {}));
-  const done = await Promise.race([job.then(() => true, () => false), new Promise(r => setTimeout(() => r(false), 8000))]);
-  if (!done) return w;
+  const fresh = () => w.items.filter(i => !own.has(i.source)).map(i => ({ ...i, titleEn: i.title }));
+  const job = translateFields(env, lang, fresh(), ["title", "summary"]);
+  if (ctx?.waitUntil) ctx.waitUntil(job.catch(() => {})); else await job;
+  const items = await translateFields(env, lang, fresh(), ["title", "summary"], { cacheOnly: true });
   const byUrl = new Map(items.map(i => [i.url, i]));
-  return { ...w, items: w.items.map(i => byUrl.get(i.url) || i), mt: true };
+  return { ...w, items: w.items.map(i => byUrl.get(i.url) || i), mt: items.some(i => i.mt) };
 }
 async function mtLive(env, lang, item, updates) {
   await translateFields(env, lang, [item], ["title", "summary"]);
