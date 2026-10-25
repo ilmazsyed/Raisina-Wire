@@ -215,7 +215,7 @@ async function pageFor(path, url, env, o, lang = "en") {
         coverageStartTime: item.startedAt, ...(item.endedAt ? { coverageEndTime: item.endedAt } : {}), datePublished: item.startedAt, dateModified: ups[0] ? iso(ups[0].createdAt) : item.startedAt,
         publisher: organization(o), author: { "@type": "Organization", name: SITE, url: `${o}/` },
         liveBlogUpdate: ups.map(u => ({ "@type": "BlogPosting", headline: clip(u.body, 110), articleBody: u.body, datePublished: iso(u.createdAt) })) }],
-      body: `<article><h1>${esc(item.title)}</h1>${item.summary ? `<p>${esc(item.summary)}</p>` : ""}${ups.map(u => `<p><time datetime="${iso(u.createdAt)}"></time>${esc(u.body)}</p>`).join("")}</article>` };
+      body: `<article><h1>${esc(item.title)}</h1>${item.summary ? `<p>${esc(item.summary)}</p>` : ""}${ups.map(u => `<section><time datetime="${iso(u.createdAt)}"></time>${blocksHTML(textBlocks(u.body))}</section>`).join("")}</article>` };
   }
   return null; // not a page this module renders
 }
