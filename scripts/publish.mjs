@@ -13,6 +13,8 @@
 //   live-open <json>                open live coverage
 //   live-update <coverageId> <json> post an update to live coverage
 //   live-status <coverageId> <live|ended|draft>
+//   live-images <coverageId> <json>  set a live coverage's imageUrl, socialUrl, heroCaption
+//   live-results <coverageId> <json> set a live coverage's results counter ({} or "" removes it)
 //   media <json>                    publish multimedia
 //   media-status <id> <published|draft>
 //   event <json>                    publish an event or briefing
@@ -97,6 +99,8 @@ switch (cmd) {
     out(await call("POST", `/api/admin/live/${encodeURIComponent(a)}/updates`, readJson(b)));
     break;
   }
+  case "live-results": { const j = readJson(b); out(await call("PUT", `/api/admin/live/${encodeURIComponent(a || "")}`, { results: j && Object.keys(j).length ? j : "" })); break; }
+  case "live-images": out(await call("PUT", `/api/admin/live/${encodeURIComponent(a || "")}`, readJson(b))); break;
   case "live-status": out(await call("PUT", `/api/admin/live/${encodeURIComponent(a || "")}`, { status: b })); break;
   case "media": out({ ...(await call("POST", "/api/admin/media", readJson(a))), url: `${SITE}/watch` }); break;
   case "media-status": out(await call("PUT", `/api/admin/media/${encodeURIComponent(a || "")}`, { status: b })); break;
@@ -121,5 +125,5 @@ switch (cmd) {
   }
   case "translation-delete": out(await call("DELETE", trPath(a, b))); break;
   default:
-    fail("Unknown command. Run with one of: health, list, article, article-update, live-open, live-update, live-status, media, media-status, event, event-status, alert, image, translations, translation-get, translation, translation-delete.");
+    fail("Unknown command. Run with one of: health, list, article, article-update, live-open, live-update, live-status, live-images, live-results, media, media-status, event, event-status, alert, image, translations, translation-get, translation, translation-delete.");
 }

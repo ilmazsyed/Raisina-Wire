@@ -108,6 +108,22 @@ that change. Unpublish: `{"status":"draft"}`. Archive: `{"status":"archived"}`. 
 - Update: `live-update <coverageId>` with `{ "body": "…", "sourceUrl": "https://…", "mediaUrl": "", "notify": false }`
   (update alerts are off unless the user asks; they push to every reader)
 - End or resume: `live-status <coverageId> ended` / `live`
+- Hero and social image: `live-images <coverageId>` with `{ "imageUrl": "/media/…", "socialUrl": "/media/…", "heroCaption": "…" }`.
+  The page shows the hero with a blinking LIVE tab. For `socialUrl`, make a 1200×630 copy of the hero with
+  a red "● LIVE" tab and the Raisina Wire wordmark baked in, because link previews never animate. Once
+  the coverage ends, previews switch to the plain hero.
+- **Election results counter** (every live election, unless the user says not to): `live-results <coverageId>` with
+  `{ "title": "Presidential results", "feed": "tse" | "manual", "url": "…", "source": "…", "note": "Over 50% needed to win",
+  "candidates": [{ "match": "NAME IN FEED", "name": "…", "party": "…", "tag": "Incumbent", "color": "#…", "photo": "/media/…" }] }`.
+  - Brazil: `feed: "tse"`, with `url` set to the TSE results file for that election, for example
+    `https://resultados.tse.jus.br/oficial/ele2026/6258/dados/br/br-c0001-e006258-u.json`. The election codes are in
+    `https://resultados.tse.jus.br/oficial/comum/config/ele-c.json`. The Worker reads it at most every 15 seconds and pages
+    refresh every 10 seconds, so nothing needs posting by hand.
+  - Elsewhere: `feed: "manual"`, with `data: { "reporting": 12.5, "updatedAt": "ISO", "candidates": [{ "name", "votes", "pct" }],
+    "nulls", "blanks", "called": "Winner's name", "final": true }`. Re-send it with each new official figure, and only
+    use counts from the election authority or a wire agency quoting it.
+  - Candidate photos only from images the user sent (cropped faces are fine). Without photos, initials in the candidate's colour show.
+  - `{}` removes the counter.
 
 **Multimedia:** `media` with `{ "title": "…", "mediaUrl": "https://…", "mediaType": "video",
 "category": "Geopolitics", "thumbnailUrl": "", "description": "…", "status": "published" }`.
@@ -123,6 +139,13 @@ and once it is merged and deployed publish both cuts with `media`: the 16:9 cut 
 `video` (it joins the Explainers carousel on the homepage) and the 9:16 cut with `mediaType`
 `short` (a story bubble on the homepage and Vertical shorts on Watch). `mediaUrl` is
 `/videos/<slug>-16x9.mp4` (or `-9x16.mp4`) and `thumbnailUrl` the matching `.jpg`.
+**Photos in explainers:** the user may send up to six photos for an explainer. Confirm they have the
+rights and what each one shows (for captions), save them in `video/scripts/media/`, and spread them
+through the film between the motion graphics. Use the clearest portrait as a `cutout` title (the
+subject cut out as a sticker in front of the headline). Use one wide shot as `photo` with `style:
+"parallax"` and one as `style: "duotone"`. Put two or three related shots in a `collage`, and use
+the rest as `bg` backdrops behind `number`, `stats` or `quote` scenes. Never invent what a photo
+shows, and only use photos the user sent.
 
 **Event or briefing:** `event` with `{ "title": "…", "description": "…", "eventType": "Briefing",
 "startsAt": "2026-11-01T18:00:00+05:30", "access": "public", "notify": true }`.

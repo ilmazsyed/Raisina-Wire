@@ -1149,25 +1149,82 @@ async function loadCoverage() {
     const d = await fetch(`/api/live${lang !== "en" ? `?lang=${lang}` : ""}`).then(r => r.ok ? r.json() : { items: [] });
     state.coverage = d.items || [];
     state.coverageLead = state.coverage[0] ? await fetch(`/api/live/${encodeURIComponent(state.coverage[0].slug)}${lang !== "en" ? `?lang=${lang}` : ""}`).then(r => r.ok ? r.json() : null) : null;
+    if (state.coverageLead?.item?.hasResults) state.coverageLead.results = await fetch(`/api/live/${encodeURIComponent(state.coverageLead.item.slug)}/results`).then(r => r.ok ? r.json() : null).catch(() => null);
   } catch { state.coverage = []; state.coverageLead = null; }
   renderTicker(); renderLiveBanner(); renderNav(parseRoute());
 }
+let bannerTimer;
 function renderLiveBanner() {
   const host = $("#liveBanner"); if (!host) return;
   const lead = state.coverageLead;
+  clearInterval(bannerTimer);
   if (!lead?.item) { host.innerHTML = ""; host.hidden = true; return; }
   host.hidden = false;
-  const href = `/coverage/${encodeURIComponent(lead.item.slug)}`;
-  // A compact strip: the headline, the latest update and a link; the full coverage is one tap away.
-  const latest = lead.updates[0];
-  host.innerHTML = `<a class="live-banner glass" href="${href}"><span class="lb-top"><span class="live-badge"><span class="pulse"></span>Live</span><span class="meta">${lead.updates.length} update${lead.updates.length === 1 ? "" : "s"}${latest ? ` · ${ago(latest.createdAt)}` : ""}</span></span>
-    <span class="lb-title">${esc(lead.item.title)}</span>
-    ${latest ? `<span class="lb-latest"><time>${clock(latest.createdAt)}</time>${esc(latest.body)}</span>` : ""}
-    <span class="lb-go">Follow live coverage <span aria-hidden="true">→</span></span></a>`;
+  const href = `/coverage/${encodeURIComponent(lead.item.slug)}`, latest = lead.updates[0], r = lead.results;
+  const pic = lead.item.imageUrl && /^(https?:|\/media\/)/.test(lead.item.imageUrl) ? lead.item.imageUrl : "";
+  // A compact broadcast tile: the coverage photo with a blinking LIVE tab, the headline, then either
+  // the results race (election coverage) or the latest update, and a button. The full coverage is one tap away.
+  const race = r?.candidates?.length ? `<span class="lb-race">
+      <span class="lb-race-names">${r.candidates.slice(0, 2).map(c => `<span style="--c:${esc(c.color || "#fff")}"><b>${esc(c.name)}</b> ${c.pct.toFixed(2)}%</span>`).join("")}</span>
+      ${r.candidates.length >= 2 ? `<span class="lb-split">${r.candidates.slice(0, 2).map(c => `<i style="flex-basis:${c.pct}%;background:${esc(c.color || "#fff")}"></i>`).join("")}<em></em></span>` : ""}
+      <small>${r.winner ? `${esc(r.winner)} wins` : `${r.reporting.toFixed(1)}% counted${r.source ? ` · ${esc(r.source.replace(/\s*\(.*\)/, ""))}` : ""}`}</small></span>` : "";
+  host.innerHTML = `<a class="live-banner ${pic ? "has-img" : "no-img"}" href="${href}">
+    <span class="lb-media" aria-hidden="true">${pic ? `<img src="${esc(pic)}" alt="" decoding="async">` : `<span class="lb-glow"></span>`}<span class="live-tab"><span class="pulse"></span>Live</span></span>
+    <span class="lb-body">
+      <span class="lb-meta">Live coverage · ${lead.updates.length} update${lead.updates.length === 1 ? "" : "s"}${latest ? ` · ${ago(latest.createdAt)}` : ""}</span>
+      <span class="lb-title">${esc(lead.item.title)}</span>
+      ${race || (latest ? `<span class="lb-latest"><time>${clock(latest.createdAt)}</time>${esc(latest.body)}</span>` : "")}
+    </span>
+    <span class="lb-go">Follow live <span aria-hidden="true">→</span></span></a>`;
+  if (lead.item.hasResults) bannerTimer = setInterval(async () => {
+    if (!$("#liveBanner") || document.hidden) return;
+    const fresh = await fetch(`/api/live/${encodeURIComponent(lead.item.slug)}/results`).then(x => x.ok ? x.json() : null).catch(() => null);
+    if (fresh && state.coverageLead === lead) { lead.results = fresh; renderLiveBanner(); }
+  }, 20e3);
+}
+/* Live results counter (election coverage): its own 10-second poll, numbers tween between counts. */
+let resultsTimer, resultsHTML = "", resultsPrev = {};
+const fmtN = n => Math.round(n).toLocaleString("en-IN");
+function resultsCard(d) {
+  const lead = d.candidates[0], time = d.updatedAt ? new Date(d.updatedAt).toLocaleTimeString(LOCALE, { ...IST, hour: "numeric", minute: "2-digit" }) : "";
+  const head2 = d.candidates.length === 2 && d.candidates.every(c => c.pct);
+  const status = d.winner ? `${esc(d.winner)} wins` : lead?.votes ? `${esc(lead.name)} is leading` : "Waiting for the first results";
+  const sub = d.winner ? `${esc(d.source || "Officials")} ${d.final ? "final result" : "has called the race"}` : `${d.source ? `${esc(d.source)} hasn’t called this race` : "Race not called"}${d.note ? ` · ${esc(d.note)}` : ""}`;
+  const face = c => c.photo && /^(https?:|\/media\/)/.test(c.photo) ? `<img src="${esc(c.photo)}" alt="" loading="lazy">` : `<span>${esc(c.name.split(/\s+/).map(w => w[0]).slice(0, 2).join(""))}</span>`;
+  return `<div class="rc glass">
+    <div class="rc-top">${d.final ? `<span class="tag">Final</span>` : `<span class="live-badge"><span class="pulse"></span>Live</span>`}<span class="meta">${time ? `Updated at ${time} IST` : ""}${d.stale ? " · reconnecting" : ""}</span></div>
+    <h2>${esc(d.title)}</h2>${d.source ? `<p class="rc-src">From ${esc(d.source)}${d.final ? "" : " · Preliminary results"}</p>` : ""}
+    <div class="rc-lead"><b>${status}</b><span>${sub}</span>
+      <div class="rc-rep"><span><b data-to="${d.reporting}" data-from="${resultsPrev.rep ?? 0}" data-dec="2">${d.reporting.toFixed(2)}</b>% reporting</span><span class="rc-bar"><i style="width:${Math.min(100, d.reporting)}%"></i></span></div></div>
+    ${head2 ? `<div class="rc-split" role="img" aria-label="${esc(d.candidates.map(c => `${c.name} ${c.pct.toFixed(2)}%`).join(", "))}">${d.candidates.map(c => `<i style="flex-basis:${c.pct}%;background:${esc(c.color || "var(--muted)")}"></i>`).join("")}<em></em></div>` : ""}
+    <ol class="rc-list">${d.candidates.map((c, i) => `<li class="${d.winner === c.name ? "won" : ""}" style="--c:${esc(c.color || "var(--muted)")}">
+      <span class="rc-face">${face(c)}</span><span class="rc-who"><b>${esc(c.name)}${d.winner === c.name ? ` <span class="rc-tick" aria-label="Winner">✓</span>` : ""}</b><small>${esc([c.party, c.tag].filter(Boolean).join(" · "))}</small></span>
+      <span class="rc-num"><b><span data-to="${c.pct}" data-from="${resultsPrev[c.name]?.pct ?? 0}" data-dec="2">${c.pct.toFixed(2)}</span>%</b><small><span data-to="${c.votes}" data-from="${resultsPrev[c.name]?.votes ?? 0}" data-dec="0">${fmtN(c.votes)}</span> votes</small></span>
+      <span class="rc-row-bar"><i style="width:${Math.min(100, c.pct)}%"></i></span></li>`).join("")}
+      ${d.nulls || d.blanks ? `<li class="rc-other"><span class="rc-face"><span>✕</span></span><span class="rc-who"><b>Null and blank</b><small>Not counted as valid votes</small></span><span class="rc-num"><b>–</b><small>${fmtN(d.nulls + d.blanks)} votes</small></span></li>` : ""}</ol>
+  </div>`;
+}
+function tweenResults(host) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const els = [...host.querySelectorAll("[data-to]")].filter(el => +el.dataset.from !== +el.dataset.to), t0 = performance.now();
+  if (!els.length) return;
+  const step = now => {
+    const k = Math.min(1, (now - t0) / 900), e = 1 - Math.pow(1 - k, 3);
+    for (const el of els) { const v = +el.dataset.from + (+el.dataset.to - +el.dataset.from) * e, dec = +el.dataset.dec; el.textContent = dec ? v.toFixed(dec) : fmtN(v); }
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+async function loadResults(slug) {
+  let d; try { const res = await fetch(`/api/live/${encodeURIComponent(slug)}/results`); d = res.ok ? await res.json() : null; } catch { d = null; }
+  const host = $("#resultsCounter");
+  if (!d || !host) return;
+  resultsHTML = resultsCard(d); host.innerHTML = resultsHTML; tweenResults(host);
+  resultsPrev = { rep: d.reporting, ...Object.fromEntries(d.candidates.map(c => [c.name, { pct: c.pct, votes: c.votes }])) };
 }
 let coverageTimer;
 async function viewCoverage(r) {
-  clearInterval(coverageTimer);
+  clearInterval(coverageTimer); clearInterval(resultsTimer); resultsHTML = ""; resultsPrev = {};
   const slug = r.arg;
   const render = async (first) => {
     let d;
@@ -1179,14 +1236,23 @@ async function viewCoverage(r) {
     $("#view").innerHTML = `<div class="wrap"><div class="coverage">
       <header class="coverage-head">${isLive ? `<span class="live-badge"><span class="pulse"></span>Live</span>` : `<span class="tag">Coverage ended</span>`}
         <h1>${esc(d.item.title)}</h1>${d.item.summary ? `<p class="dek">${esc(d.item.summary)}</p>` : ""}
+        ${d.item.imageUrl && /^(https?:|\/media\/)/.test(d.item.imageUrl) ? `<figure class="coverage-hero">${img(d.item.imageUrl)}${isLive ? `<span class="live-tab" aria-hidden="true"><span class="pulse"></span>Live</span>` : ""}${d.item.heroCaption ? `<figcaption>${esc(d.item.heroCaption)}</figcaption>` : ""}</figure>` : ""}
         <div class="meta">Started ${new Date(d.item.startedAt).toLocaleString(LOCALE, { ...IST, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })} IST · ${d.updates.length} update${d.updates.length === 1 ? "" : "s"}${isLive ? " · refreshes every 30 seconds" : ""}</div>
         ${shareBlock(`${isLive ? "LIVE: " : ""}${d.item.title}`, `/coverage/${encodeURIComponent(slug)}`)}</header>
+      ${d.item.hasResults ? `<section id="resultsCounter" aria-live="polite" aria-label="Live results">${resultsHTML || `<div class="rc glass"><div class="skeleton" style="height:260px"></div></div>`}</section>` : ""}
       <ol class="coverage-feed">${d.updates.map((u, i) => `<li id="u-${Date.parse(u.createdAt) || i}" class="${i === 0 && isLive ? "latest" : ""}"><time datetime="${esc(u.createdAt)}"><b>${clock(u.createdAt)}</b><span>${ago(u.createdAt)}</span></time>
         <div class="glass">${i === 0 && isLive ? `<span class="tag tag-live">Latest</span>` : ""}${articleBlocks(u.body).map(b => `<p>${esc(b.x)}</p>`).join("")}${u.mediaUrl && /^(https?:|\/media\/)/.test(u.mediaUrl) ? `<div class="reader-hero">${img(u.mediaUrl)}</div>` : ""}${u.sourceUrl && /^https?:/.test(u.sourceUrl) ? `<a class="link-gold" href="${esc(u.sourceUrl)}" target="_blank" rel="noreferrer">Source ↗</a>` : ""}<button class="update-share" type="button" data-action="share-native" data-title="${esc(`${d.item.title}: ${String(u.body).slice(0, 110)}${String(u.body).length > 110 ? "…" : ""}`)}" data-url="${esc(`${location.origin}${withLang(`/coverage/${encodeURIComponent(slug)}`)}#u-${Date.parse(u.createdAt) || i}`)}" aria-label="Share this update">${SHARE_ICONS.share}<span>Share</span></button></div></li>`).join("") || `<li><div class="glass"><p class="muted">The first update will appear here shortly.</p></div></li>`}</ol>
     </div></div>`;
   };
   await render(true);
   coverageTimer = setInterval(() => { if (!document.hidden) render(false); }, 30e3);
+  if ($("#resultsCounter")) {
+    await loadResults(slug);
+    resultsTimer = setInterval(() => {
+      if (parseRoute().page !== "coverage" || parseRoute().arg !== slug) return clearInterval(resultsTimer);
+      if (!document.hidden) loadResults(slug);
+    }, 10e3);
+  }
 }
 
 /* ---------- Stories: editions and articles from the CMS, newest first ---------- */

@@ -14,24 +14,59 @@ import numpy as np, soundfile as sf
 SR = 24000
 MODEL_DIR = os.environ.get("RW_VIDEO_MODELS", os.path.expanduser("~/.cache/rw-video"))
 LEAD, TAIL, GAP, MIN_SCENE = 0.6, 2.4, 0.55, 2.8      # seconds
+# Two British anchors who take turns, scene by scene: Kokoro's best British female and male voices,
+# each sped so both read at about 2.7 words a second, a brisk news pace.
+ANCHORS = ["bf_emma", "bm_george"]
+ANCHOR_SPEED = {"bf_emma": 1.15, "bm_george": 1.3, "af_bella": 1.12, "am_michael": 1.22}
+
+
+def voices_for(spec):
+    """The voice for each scene: a scene's own `voice`, else the spec's `voices` taken in turn
+    (two anchors by default), else a single `voice` only when `alternate` is false."""
+    if spec.get("voices"): pool = spec["voices"]
+    elif spec.get("alternate") is False and spec.get("voice"): pool = [spec["voice"]]
+    else: pool = ANCHORS
+    out, k = [], 0
+    for sc in spec["scenes"]:
+        if sc.get("voice"): out.append(sc["voice"])
+        else: out.append(pool[k % len(pool)]); k += 1
+    return out
 
 
 def voice_lines(spec):
     from kokoro_onnx import Kokoro
     k = Kokoro(os.path.join(MODEL_DIR, "kokoro-v1.0.onnx"), os.path.join(MODEL_DIR, "voices-v1.0.bin"))
-    voice, speed = spec.get("voice", "bf_emma"), float(spec.get("speed", 1.0))
-    lang = "en-gb" if voice.startswith("b") else "hi" if voice.startswith("h") else "en-us"
     out = []
-    for sc in spec["scenes"]:
+    for sc, voice in zip(spec["scenes"], voices_for(spec)):
         text = sc.get("say", "").strip()
         if not text:
             out.append(np.zeros(0, dtype=np.float32)); continue
+        lang = "en-gb" if voice.startswith("b") else "hi" if voice.startswith("h") else "en-us"
         # `speak` overrides the spoken form (spellings that help pronunciation); captions use `say`
-        a, sr = k.create(sc.get("speak", text), voice=voice, speed=float(sc.get("speed", speed)), lang=lang)
+        a, sr = k.create(sc.get("speak", text), voice=voice, speed=float(sc.get("speed", spec.get("anchorSpeed", ANCHOR_SPEED.get(voice, 1.15)))), lang=lang)
         assert sr == SR, sr
-        a = trim(a.astype(np.float32))
-        out.append(a / (np.max(np.abs(a)) + 1e-9) * 0.89)
+        out.append(anchor_chain(trim(a.astype(np.float32))))
     return out
+
+
+def anchor_chain(a):
+    """Broadcast voice processing: cut rumble, lift presence (2–6 kHz) and air, compress, level."""
+    if not len(a): return a
+    X = np.fft.rfft(a); f = np.fft.rfftfreq(len(a), 1 / SR)
+    X *= 1 - 1 / (1 + (f / 90) ** 4)                                  # high-pass ~90 Hz
+    X *= 1 + 0.55 * np.exp(-((f - 3800) / 1600) ** 2)                 # presence, about +4 dB
+    X *= 1 + 0.25 / (1 + (8000 / np.maximum(f, 1)) ** 4)              # a little air
+    X *= 1 - 0.18 * np.exp(-((f - 350) / 180) ** 2)                   # less boxiness
+    y = np.fft.irfft(X, len(a))
+    # compressor: 10 ms RMS follower, 3:1 above the threshold
+    win = int(0.01 * SR); env = np.sqrt(np.convolve(y ** 2, np.ones(win) / win, "same")) + 1e-6
+    thr = np.percentile(env, 70) * 0.8
+    gain = np.where(env > thr, (env / thr) ** (1 / 3 - 1), 1.0)
+    gain = np.convolve(gain, np.ones(win) / win, "same")
+    y = y * gain
+    y = np.tanh(y / (np.max(np.abs(y)) + 1e-9) * 1.4) / np.tanh(1.4)   # gentle saturation for density
+    rms = np.sqrt(np.mean(y[np.abs(y) > 0.02] ** 2)) if np.any(np.abs(y) > 0.02) else 0.1
+    return (y * (0.2 / rms)).clip(-0.98, 0.98).astype(np.float32)
 
 
 def trim(a, thr=0.01):
@@ -118,11 +153,19 @@ def score(timing, seed=11, bpm=92):
         if k % 2 == 1:
             n = rng.standard_normal(len(tt)) * np.exp(-tt * 60) * 0.012
             L[i:i + len(tt)] += n * 0.7; R[i:i + len(tt)] += n
+        if bpm >= 110:   # news-bed drive: off-beat hats and a pulsing bass on every beat
+            h = int((b + beat / 2) * SR); hd = min(int(0.06 * SR), N - h)
+            if hd > 0:
+                hat = lowpass(rng.standard_normal(hd), 9000) * np.exp(-np.arange(hd) / SR * 70) * 0.02
+                L[h:h + hd] += hat * 0.8; R[h:h + hd] += hat
+            root = [45, 41, 43, 40][(k // 8) % 4] - 12; bd = min(int(beat * 0.9 * SR), N - i); bt = np.arange(bd) / SR
+            bass = np.sin(2 * np.pi * hz(root) * bt) * np.exp(-bt * 5) * 0.05
+            L[i:i + bd] += bass; R[i:i + bd] += bass
         b += beat; k += 1
     # whoosh into every scene after the first
     for sc in timing["scenes"][1:]:
         s = sc["start"] - 0.45; i = max(0, int(s * SR)); d = int(0.7 * SR); tt = np.arange(min(d, N - i)) / SR
-        noise = lowpass(rng.standard_normal(len(tt)), 2400) * np.sin(np.pi * tt / 0.7) ** 2 * 0.05
+        noise = lowpass(rng.standard_normal(len(tt)), 2400 if bpm < 110 else 5200) * np.sin(np.pi * tt / 0.7) ** 2 * (0.05 if bpm < 110 else 0.07)
         L[i:i + len(tt)] += noise; R[i:i + len(tt)] += noise[::-1] if len(noise) else noise
     # a closing swell and low hit on the outro
     o = timing["scenes"][-1]["start"]; i = int(o * SR); tt = np.arange(min(int(3 * SR), N - i)) / SR
@@ -141,7 +184,7 @@ def main():
     vo = np.zeros(N)
     for sc, a in zip(timing["scenes"], lines):
         i = int(sc["voiceAt"] * SR); vo[i:i + len(a)] += a[: max(0, N - i)]
-    music = score(timing, int(spec.get("seed", 11)), 112 if float(spec.get("pace", 1)) > 1.2 else 92)
+    music = score(timing, int(spec.get("seed", 11)), 120 if float(spec.get("pace", 1)) > 1.2 else 92)
     # duck the music under the voice (smoothed envelope)
     env = np.convolve(np.abs(vo), np.ones(int(0.25 * SR)) / int(0.25 * SR), "same")
     duck = 1 - 0.55 * np.clip(env / 0.05, 0, 1)
