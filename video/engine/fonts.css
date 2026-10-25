@@ -1,0 +1,4 @@
+/* Raisina Wire's type, bundled so renders don't depend on the network (SIL Open Font License). */
+@font-face{font-family:'Newsreader';font-weight:200 800;src:url(fonts/Newsreader.woff2) format('woff2')}
+@font-face{font-family:'Manrope';font-weight:200 800;src:url(fonts/Manrope.woff2) format('woff2')}
+@font-face{font-family:'DM Mono';font-weight:500;src:url(fonts/DMMono.woff2) format('woff2')}

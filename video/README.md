@@ -1,0 +1,58 @@
+# Raisina Wire video engine
+
+Animated explainers in the Raisina Wire style (Vox-like motion graphics): a narrator, scenes that
+build in time with the voice, burned-in captions, an original score, in 16:9 and 9:16.
+
+```bash
+npm run video -- video/scripts/chemical-parks.json            # both formats
+npm run video -- video/scripts/<slug>.json --formats 16x9      # one format
+npm run video -- video/scripts/<slug>.json --skip-audio --stills 4,20,40   # check layouts fast
+```
+
+Output: `public/videos/<slug>-16x9.mp4`, `-9x16.mp4` and a poster `.jpg` for each. Scratch files
+(voice, score, timing, stills) go to `video/out/<slug>/`, which is not committed. A 100-second
+film takes about 3 minutes per format on 4 CPUs.
+
+**Preview with sound:** serve `video/` (e.g. `npx serve video`) and open
+`engine/engine.html?preview&spec=../out/<slug>/spec.json&format=16x9`; click to play, drag to scrub.
+
+## How it works
+1. `audio.py` voices each scene's narration with Kokoro (offline, free), lays the lines end to end,
+   writes `timing.json` (scene starts and caption chunks) and mixes `audio.m4a`: the voice over an
+   original score (pads, a soft pulse, a whoosh on each cut, ducked under the voice, -16 LUFS).
+2. `engine/engine.js` draws every frame as a function of time on one canvas, in Raisina Wire's
+   colours and type (Newsreader, Manrope, DM Mono, bundled in `engine/fonts/`).
+3. `render.mjs` steps the engine frame by frame in headless Chromium and pipes the frames to ffmpeg.
+
+Needs: Python with `kokoro-onnx` and `soundfile`; the Kokoro model files `kokoro-v1.0.onnx` and
+`voices-v1.0.bin` (from the kokoro-onnx GitHub releases) in `~/.cache/rw-video/`, or set
+`RW_VIDEO_MODELS`; ffmpeg; Playwright with Chromium.
+
+## Writing a script
+A script is JSON: `slug`, `title`, `voice` (`bf_emma` by default; any Kokoro voice, e.g.
+`bf_isabella`, `af_heart`, `bm_george`), `speed`, `pace` (how fast scenes animate: 1 is calm, 1.6 is brisk, with push-in cuts, a crimson wipe,
+shorter pauses and a quicker beat), `captionChars` (caption length, 36–44), `series` (shown under
+the logo) and `scenes`.
+Every scene has `say` (the narration, also the captions; write numbers as numerals, e.g.
+"₹3,030 crore") and may have `speak` (the same line spelt for the voice: "three thousand and
+thirty crore rupees"), `hold` (extra seconds on screen) and `source` (shown at the bottom).
+
+| type | fields |
+|---|---|
+| `title` | `kicker`, `title`, `sub` |
+| `number` | `kicker`, `prefix`, `value`, `suffix`, `decimals`, `inr` (Indian digit grouping), `label` |
+| `share` | `kicker`, `value` or `range: [lo, hi]` (per cent), `ringLabel`, `title`, `detail` |
+| `bars` | `kicker`, `title`, `items: [{label, value, display, hot}]`, `max` |
+| `timeline` | `kicker`, `title`, `items: [{when, what, hot}]` |
+| `stats` | `kicker`, `title`, `items: [{prefix, value, suffix, inr, label}]`, `hot` (index in red) |
+| `flow` | `kicker`, `title`, `nodes: [..]` (boxes joined by arrows), `base` (a shared bar beneath) |
+| `map` | `kicker`, `title`, `view: [lon0, lon1, lat0, lat1]`, `pins: [{lon, lat, label, side}]`, `stats: [{value, label}]` |
+| `quote` | `text`, `who`, `role` |
+| `list` | `kicker`, `title`, `items: [..]` |
+| `photo` | `src` (a file path relative to the script, or a URL), `title`, `focus` / `focusV` (0–1: which part of a wide photo stays in frame, landscape / vertical) |
+| `outro` | `title`, `url` |
+
+Maps are dot maps of land only (Natural Earth coastlines at 0.4°, `engine/land.json`, covering
+20°W–110°E, 10°S–60°N: Europe, Africa, the Middle East and Asia; plus 95°W–30°W, 25°S–30°N:
+the Caribbean, Central America and northern South America); no borders are drawn. Keep every fact, figure and quote to what the source
+story says, as for articles.

@@ -547,4 +547,18 @@ export default {
   "GBP/INR": "পাউন্ড/টাকা",
   "JPY/INR": "ইয়েন/টাকা",
   "Translated automatically from English": "ইংরেজি থেকে যন্ত্রে অনূদিত",
+  "Shorts": "শর্টস",
+  "All shorts →": "সব শর্টস →",
+  "Explainers": "এক্সপ্লেনার",
+  "Watch all →": "সব দেখুন →",
+  "Vertical shorts": "ভার্টিক্যাল শর্টস",
+  "Videos, audio and images": "ভিডিও, অডিও ও ছবি",
+  "Previous videos": "আগের ভিডিও",
+  "Next videos": "পরের ভিডিও",
+  "Explainer videos": "এক্সপ্লেনার ভিডিও",
+  "Mute": "শব্দ বন্ধ করুন",
+  "Unmute": "শব্দ চালু করুন",
+  "Previous short": "আগের শর্ট",
+  "Next short": "পরের শর্ট",
+  "Explainer": "এক্সপ্লেনার"
 };

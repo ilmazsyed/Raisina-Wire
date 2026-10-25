@@ -347,6 +347,7 @@ function viewHome() {
   const [lead, ...rest] = stories();
   $("#view").innerHTML = `
   <div class="wrap home">
+    <section id="shortsRail" class="shorts-rail" aria-label="Shorts" hidden></section>
     <section class="dock glass" aria-label="Market pulse"><div class="dock-head"><b>Market pulse</b><span class="muted" id="dockStatus" style="font-size:12px">Loading quotes…</span><a class="link-gold" href="/markets" style="font-size:13px">All markets →</a></div><div class="dock-grid" id="dock"></div></section>
 
     <section id="liveBanner" class="band-tight" aria-label="Live coverage" hidden></section>
@@ -369,6 +370,8 @@ function viewHome() {
 
     <section class="band"><div class="section-head"><h2>From the Raisina Wire desk</h2><a class="link-gold" href="/editions">All stories →</a></div>
       <div class="card-grid">${rest.slice(3, 7).map(e => edCard(e)).join("")}</div></section>
+
+    <section id="videoBand" class="band" aria-labelledby="videoBandTitle" hidden></section>
 
     ${joinBand()}
 
@@ -394,7 +397,7 @@ function viewHome() {
     <section class="band"><div class="section-head"><h2>Live coverage</h2><a class="link-gold" href="/live">Live wire →</a></div><div class="topic-cols" id="topicCols"></div></section>
 
   </div>`;
-  renderDock(); renderRail(); renderHomeMarkets(); renderTopicCols(); renderCommunity(); renderLiveBanner(); renderBriefing();
+  renderDock(); renderRail(); renderHomeMarkets(); renderTopicCols(); renderCommunity(); renderLiveBanner(); renderBriefing(); renderHomeMedia();
   loadBodies().then(bodies => { const q = pullQuote(bodies[lead.slug]?.blocks || []); if (q && $("#editorQuote")) $("#editorQuote").textContent = `“${q}”`; }).catch(() => {});
 }
 const EDITOR_PICKS = ["iran-500m-masterstroke", "himalayan-tunnel", "cia-invisible-front"];
@@ -1099,6 +1102,9 @@ async function onAction(e) {
   if (a === "join") openAuth("register");
   if (a === "signout") { toggleAccountMenu(false); signOut(); }
   if (a === "listen") toggleListening();
+  if (a === "short") openShorts(Number(el.dataset.index) || 0);
+  if (a === "play-video") playInline(el.dataset.id);
+  if (a === "carousel") { const c = el.closest("section")?.querySelector(".vcarousel"); c?.scrollBy({ left: Number(el.dataset.dir) * c.clientWidth * .85, behavior: "smooth" }); }
   if (a === "copy-link" || a === "copy-quote") { e.preventDefault(); const text = a === "copy-link" ? el.dataset.url : el.closest(".quote-bubble")?.dataset.quote; try { await navigator.clipboard.writeText(text); toast(a === "copy-link" ? "Link copied." : "Quote copied with a link."); } catch { toast("Couldn’t copy. Select and copy instead."); } }
   if (a === "unsave") unsave(el.dataset.href);
   if (a === "vote") { e.preventDefault(); vote(el.dataset.id, el); }
@@ -1355,6 +1361,100 @@ function viewEvents() {
 async function loadMedia() {
   try { const r = await fetch("/api/media"); state.media = r.ok ? (await r.json()).items || [] : []; } catch { state.media = []; }
   if (parseRoute().page === "watch") viewWatch();
+  renderHomeMedia();
+}
+// Vertical (9:16) videos are "shorts": story bubbles on the homepage, a row on Watch, and a
+// full-screen player. Landscape videos sit in a carousel on the homepage.
+const isShort = m => m.mediaType === "short";
+const isFilm = m => m.mediaType === "video" && /\.(mp4|webm)(\?|$)|youtube\.com|youtu\.be/i.test(m.mediaUrl || "");
+const shorts = () => (state.media || []).filter(isShort);
+const seenShorts = () => new Set(store.get("rw-seen-shorts", []));
+function shortBubbles(list) {
+  const seen = seenShorts();
+  return list.map((m, i) => `<button class="short-bubble${seen.has(m.id) ? " seen" : ""}" type="button" data-action="short" data-index="${i}" aria-label="Play: ${esc(m.title)}">
+    <span class="short-ring"><span class="short-face">${img(m.thumbnailUrl, "")}</span></span><span class="short-name">${esc(m.title)}</span></button>`).join("");
+}
+function videoCard(m) {
+  return `<article class="vcard"><div class="vcard-media" data-video="${esc(m.id)}"><button class="vcard-play" type="button" data-action="play-video" data-id="${esc(m.id)}" aria-label="Play: ${esc(m.title)}">${img(m.thumbnailUrl, "")}<span class="play-badge" aria-hidden="true"></span></button></div>
+    <div class="vcard-body"><span class="kicker">${esc(m.category || "Explainer")}</span><h3>${esc(m.title)}</h3>${m.description ? `<p>${esc(m.description)}</p>` : ""}</div></article>`;
+}
+function renderHomeMedia() {
+  const rail = $("#shortsRail"), band = $("#videoBand");
+  if (rail) {
+    const list = shorts();
+    rail.hidden = !list.length;
+    rail.innerHTML = list.length ? `<div class="shorts-head"><span class="kicker">Shorts</span><a class="link-gold" href="/watch#shorts">All shorts →</a></div><div class="shorts-row">${shortBubbles(list)}</div>` : "";
+  }
+  if (band) {
+    const films = (state.media || []).filter(isFilm);
+    band.hidden = !films.length;
+    band.innerHTML = films.length ? `<div class="section-head"><h2 id="videoBandTitle">Explainers</h2><div class="carousel-nav"><button class="carousel-btn" type="button" data-action="carousel" data-dir="-1" aria-label="Previous videos">‹</button><button class="carousel-btn" type="button" data-action="carousel" data-dir="1" aria-label="Next videos">›</button><a class="link-gold" href="/watch">Watch all →</a></div></div>
+      <div class="vcarousel" tabindex="0" aria-label="Explainer videos">${films.map(videoCard).join("")}</div>` : "";
+  }
+}
+function playInline(id) {
+  const m = (state.media || []).find(x => x.id === id), host = document.querySelector(`[data-video="${CSS.escape(id)}"]`);
+  if (!m || !host) return;
+  const yt = String(m.mediaUrl).match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
+  host.innerHTML = yt ? `<iframe src="https://www.youtube-nocookie.com/embed/${yt[1]}?autoplay=1" title="${esc(m.title)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`
+    : `<video controls autoplay playsinline src="${esc(m.mediaUrl)}"${m.thumbnailUrl ? ` poster="${esc(m.thumbnailUrl)}"` : ""}></video>`;
+  host.querySelector("video")?.play().catch(() => {});
+}
+/* The shorts player: full screen, one after another, tap the sides to skip, swipe down or Esc to close. */
+let shortsState = null;
+function openShorts(index) {
+  const list = shorts(); if (!list.length) return;
+  let el = $("#shortsViewer");
+  if (!el) {
+    el = document.createElement("div"); el.id = "shortsViewer"; el.className = "shorts-viewer"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-label", "Shorts");
+    el.innerHTML = `<div class="sv-stage"><div class="sv-bars"></div><div class="sv-top"><b class="sv-title sr-only" aria-live="polite"></b><span class="sv-grow"></span><button class="sv-btn" type="button" data-sv="mute" aria-label="Mute">🔊</button><button class="sv-btn" type="button" data-sv="close" aria-label="Close">✕</button></div>
+      <video class="sv-video" playsinline preload="auto"></video><button class="sv-zone sv-prev" type="button" data-sv="prev" aria-label="Previous short"></button><button class="sv-zone sv-next" type="button" data-sv="next" aria-label="Next short"></button>
+      <div class="sv-paused" aria-hidden="true">❚❚</div></div>`;
+    document.body.append(el);
+    const v = el.querySelector("video");
+    v.addEventListener("timeupdate", () => { const bar = el.querySelectorAll(".sv-bars i")[shortsState?.i]; if (bar && v.duration) bar.style.width = `${(v.currentTime / v.duration) * 100}%`; });
+    v.addEventListener("ended", () => stepShort(1));
+    el.addEventListener("click", e => {
+      if (el.dataset.held) { delete el.dataset.held; return; }   // a press-and-hold pause is not a tap
+      const b = e.target.closest("[data-sv]"); if (!b) return;
+      const k = b.dataset.sv;
+      if (k === "close") closeShorts(); else if (k === "prev") stepShort(-1); else if (k === "next") stepShort(1);
+      else if (k === "mute") { v.muted = !v.muted; b.textContent = v.muted ? "🔇" : "🔊"; b.setAttribute("aria-label", v.muted ? "Unmute" : "Mute"); }
+    });
+    // hold to pause, swipe down to close
+    let y0 = null, held = null;
+    el.addEventListener("pointerdown", e => { if (e.target.closest(".sv-top")) return; y0 = e.clientY; held = setTimeout(() => { v.pause(); el.classList.add("held"); }, 220); });
+    const release = e => { clearTimeout(held); if (el.classList.contains("held")) { el.classList.remove("held"); el.dataset.held = "1"; v.play().catch(() => {}); } if (y0 != null && e.clientY - y0 > 90) closeShorts(); y0 = null; };
+    el.addEventListener("pointerup", release); el.addEventListener("pointercancel", release);
+    document.addEventListener("keydown", e => { if (el.hidden) return; if (e.key === "Escape") closeShorts(); if (e.key === "ArrowRight") stepShort(1); if (e.key === "ArrowLeft") stepShort(-1); if (e.key === " ") { e.preventDefault(); v.paused ? v.play() : v.pause(); } });
+  }
+  document.querySelectorAll("video").forEach(x => { if (!el.contains(x)) x.pause(); });   // stop a carousel video
+  shortsState = { i: index, list, opener: document.activeElement };
+  el.querySelector(".sv-bars").innerHTML = list.map(() => `<span><i></i></span>`).join("");
+  el.hidden = false; document.body.classList.add("sv-open");
+  showShort();
+  el.querySelector('[data-sv="close"]').focus({ preventScroll: true });
+}
+function showShort() {
+  const el = $("#shortsViewer"), { i, list } = shortsState, m = list[i], v = el.querySelector("video");
+  el.querySelectorAll(".sv-bars i").forEach((b, k) => { b.style.width = k < i ? "100%" : "0%"; });
+  el.querySelector(".sv-title").textContent = m.title;
+  v.poster = m.thumbnailUrl || ""; v.src = m.mediaUrl; v.currentTime = 0; v.play().catch(() => {});
+  const seen = seenShorts(); seen.add(m.id); store.set("rw-seen-shorts", [...seen].slice(-200));
+}
+function stepShort(d) {
+  if (!shortsState) return;
+  const n = shortsState.i + d;
+  if (n < 0) { $("#shortsViewer video").currentTime = 0; return; }
+  if (n >= shortsState.list.length) return closeShorts();
+  shortsState.i = n; showShort();
+}
+function closeShorts() {
+  const el = $("#shortsViewer"); if (!el || el.hidden) return;
+  const v = el.querySelector("video"); v.pause(); v.removeAttribute("src"); v.load();
+  el.hidden = true; document.body.classList.remove("sv-open");
+  shortsState?.opener?.focus?.({ preventScroll: true }); shortsState = null;
+  renderHomeMedia(); if (parseRoute().page === "watch") viewWatch();
 }
 function mediaEmbed(m) {
   const u = String(m.mediaUrl || "");
@@ -1366,8 +1466,10 @@ function mediaEmbed(m) {
   return `${m.thumbnailUrl ? `<div class="media-frame">${img(m.thumbnailUrl, m.title)}</div>` : ""}<a class="btn btn-light btn-sm" href="${esc(u)}" target="_blank" rel="noreferrer">Open ↗</a>`;
 }
 function viewWatch() {
-  const items = state.media;
+  const all = state.media, list = all && shorts(), items = all && all.filter(m => !isShort(m));
   $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Watch &amp; listen</div><h1>Video, audio and images</h1><p>Briefings and explainers from the Raisina Wire desk.</p></div></div>
+  ${list && list.length ? `<section class="watch-shorts" id="shorts" aria-labelledby="shortsTitle"><div class="section-head"><h2 id="shortsTitle">Vertical shorts</h2></div><div class="shorts-grid">${list.map((m, i) => `<button class="short-tile" type="button" data-action="short" data-index="${i}" aria-label="Play: ${esc(m.title)}">${img(m.thumbnailUrl, "")}<span class="play-badge" aria-hidden="true"></span><span class="short-tile-title">${esc(m.title)}</span></button>`).join("")}</div></section>
+  <div class="section-head" style="margin-top:34px"><h2>Videos, audio and images</h2></div>` : ""}
   <div class="media-grid">${items == null ? `<div class="skeleton" style="height:300px"></div>` : items.length ? items.map(m => `<article class="glass media-card">${mediaEmbed(m)}<div class="body"><span class="kicker">${esc(m.category || m.mediaType)}</span><h3>${esc(m.title)}</h3>${m.description ? `<p>${esc(m.description)}</p>` : ""}<span class="meta">${m.publishedAt ? shortDate(m.publishedAt) : ""}</span></div></article>`).join("") : `<div class="empty">Nothing published yet. Video and audio briefings will appear here.</div>`}</div></div>`;
 }
 
