@@ -65,8 +65,11 @@ for (const f of formats) {
     console.log(`${f}: stills in ${out}`); await page.close(); continue;
   }
   const file = join(pub, `${slug}-${f}.mp4`), frames = Math.ceil(timing.total * fps);
+  // Constant motion is expensive to encode: cap the bitrate so a file stays near 19 MB whatever its
+  // length (Cloudflare serves static files up to 25 MiB), and never above 2.6 Mbps.
+  const vkbps = Math.max(900, Math.min(2600, Math.floor(19e6 * 8 / timing.total / 1000 - 170)));
   const ff = spawn("ffmpeg", ["-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", String(fps), "-c:v", "mjpeg", "-i", "-",
-    "-i", join(out, "audio.m4a"), "-c:v", "libx264", "-preset", "medium", "-crf", "21", "-tune", "animation", "-pix_fmt", "yuv420p",
+    "-i", join(out, "audio.m4a"), "-c:v", "libx264", "-preset", "medium", "-crf", "22", "-maxrate", `${vkbps}k`, "-bufsize", `${vkbps * 2}k`, "-tune", "animation", "-pix_fmt", "yuv420p",
     "-c:a", "copy", "-shortest", "-movflags", "+faststart", file], { stdio: ["pipe", "inherit", "inherit"] });
   const started = Date.now();
   for (let i = 0; i < frames; i++) {

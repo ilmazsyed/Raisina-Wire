@@ -48,11 +48,32 @@
   }
   function sourceLine(text, u) {
     if (!text) return; ctx.save(); ctx.globalAlpha *= ease((u - .6) / .6); ctx.font = font('mono', M * .016, 500); ctx.fillStyle = C.muted;
-    ctx.textAlign = 'left'; ctx.fillText(('Source: ' + text).toUpperCase(), pad(), H - (V ? H * .055 : M * .045)); ctx.restore();
+    ctx.textAlign = 'left'; ctx.fillText(('Source: ' + text).toUpperCase(), pad(), H - M * .044 - (V ? H * .035 : M * .028)); ctx.restore();
+  }
+  // Quote text: words rise in, then light up in turn as the narrator reads them.
+  function karaoke(text, x, y, maxW, lh, u) {
+    const lines = wrap(text, maxW), total = String(text).split(/\s+/).length, lit = (S.r - .3) / Math.max(1, S.vd * .9) * total; let k = 0;
+    lines.forEach((line, li) => {
+      let cx = x;
+      for (const w of line.split(' ')) {
+        const p = ease((u - k * .03) / .45), on = k < lit;
+        ctx.save(); ctx.globalAlpha *= p; ctx.fillStyle = on ? C.ink : 'rgba(15,20,34,.28)'; ctx.textAlign = 'left'; ctx.fillText(w, cx, y + li * lh + (1 - p) * lh * .4);
+        if (on && k > lit - 1.2) { ctx.fillStyle = C.red; ctx.fillRect(cx, y + li * lh + lh * .16, ctx.measureText(w).width, Math.max(3, M * .004)); }
+        ctx.restore(); cx += ctx.measureText(w + ' ').width; k++;
+      }
+    });
+    return lines.length;
   }
   // Largest font size (≤ px) at which text fits maxW.
   function fit(text, fam, px, w, maxW) { let f = px; ctx.font = font(fam, f, w); const tw = ctx.measureText(text).width; if (tw > maxW) { f = px * maxW / tw; ctx.font = font(fam, f, w); } return f; }
   const pad = () => V ? W * .08 : W * .07;
+  // Narration-synced reveals. S = {r: real seconds into the scene, vd: voice duration}. Item i of n
+  // appears as the narrator reaches it (spread across the line), and `now` is the item being spoken.
+  let S = { r: 0, vd: 4, dur: 5 };
+  const step = n => clamp((S.vd * .82 - .35) / Math.max(1, n), .35, 1.4);
+  const itemQ = (i, n, d = .45) => ease((S.r - .35 - i * step(n)) * PACE / d);
+  const now = n => clamp(Math.floor((S.r - .35) / step(n)), 0, n - 1);
+  const glow = (i, n) => (now(n) === i && S.r < S.vd + .3) ? 1 : 0;   // 1 while item i is being narrated
   const counter = (v, p, dec = 0) => (v * easeIO(p)).toFixed(dec);
 
   /* ---------- the scenes: each returns draw(u, dur), u = seconds since the scene started ---------- */
@@ -79,7 +100,10 @@
         if (s.kicker) kicker(s.kicker, cx, cy - M * .26, u, C.red, 'center');
         const val = s.inr ? inr(s.value * easeIO(p)) : counter(s.value, p, s.decimals || 0);
         fit(`${s.prefix || ''}${s.inr ? inr(s.value) : (+s.value).toFixed(s.decimals || 0)}${s.suffix || ''}`, 'serif', M * (V ? .3 : .28), 700, W * .86); ctx.fillStyle = C.red; ctx.textAlign = 'center';
-        ctx.save(); const sc = lerp(.85, 1, back(u / .7)); ctx.translate(cx, cy); ctx.scale(sc, sc); ctx.globalAlpha *= ease(u / .4);
+        const land = u - 1.9; if (land > 0 && land < 1.2) for (let k = 0; k < 3; k++) {   // rings burst out as the count lands
+          const q = clamp((land - k * .12) / .9); if (q <= 0) continue; ctx.save(); ctx.globalAlpha = (1 - q) * .35; ctx.strokeStyle = C.red; ctx.lineWidth = Math.max(2, M * .004);
+          ctx.beginPath(); ctx.arc(cx, cy - M * .08, M * (.18 + q * .5), 0, TAU); ctx.stroke(); ctx.restore(); }
+        ctx.save(); const sc = lerp(.85, 1, back(u / .7)) * (1 + .03 * Math.sin(S.r * 2.2) * clamp(land)); ctx.translate(cx, cy); ctx.scale(sc, sc); ctx.globalAlpha *= ease(u / .4);
         ctx.fillText(`${s.prefix || ''}${val}${s.suffix || ''}`, 0, 0); ctx.restore();
         ctx.font = font('sans', M * .04, 600); ctx.fillStyle = C.ink;
         riseText(s.label, cx, cy + M * .1, V ? W * .84 : W * .6, M * .054, u - .9, { align: 'center', stagger: .03 });
@@ -115,12 +139,12 @@
         const tx = V ? W / 2 : pad(), align = V ? 'center' : 'left';
         kicker(s.kicker || '', tx, V ? H * .2 : H * .17, u, C.red, align);
         ctx.font = font('serif', M * .07, 600); ctx.fillStyle = C.ink; riseText(s.title, tx, (V ? H * .2 : H * .17) + M * .09, V ? W * .84 : W * .8, M * .078, u - .2, { align });
-        const p = easeIO((u - .5) / 1.6), n = s.items.length;
+        const n = s.items.length, p = easeIO((S.r - .2) / Math.max(1, (n - .5) * step(n)));
         if (V) {   // vertical: a spine down the left, labels to the right
           const lx = W * .16, y0 = H * .36, y1 = H * .72;
           ctx.strokeStyle = C.ink; ctx.lineWidth = Math.max(3, M * .004); ctx.beginPath(); ctx.moveTo(lx, y0); ctx.lineTo(lx, lerp(y0, y1, p)); ctx.stroke();
           s.items.forEach((it, i) => {
-            const f = n === 1 ? .5 : i / (n - 1), yy = lerp(y0 + M * .02, y1 - M * .02, f), q = ease((u - .6 - f * 1.4) / .5);
+            const f = n === 1 ? .5 : i / (n - 1), yy = lerp(y0 + M * .02, y1 - M * .02, f), q = itemQ(i, n, .5);
             if (q <= 0) return;
             ctx.save(); ctx.globalAlpha *= q;
             ctx.fillStyle = it.hot ? C.red : C.ink; ctx.beginPath(); ctx.arc(lx, yy, M * .02 * back(q), 0, TAU); ctx.fill();
@@ -134,7 +158,7 @@
         }
         ctx.strokeStyle = C.ink; ctx.lineWidth = Math.max(3, M * .004); ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(lerp(x0, x1, p), y); ctx.stroke();
         s.items.forEach((it, i) => {
-          const f = n === 1 ? .5 : i / (n - 1), x = lerp(x0 + M * .02, x1 - M * .02, f), q = ease((u - .6 - f * 1.4) / .5);
+          const f = n === 1 ? .5 : i / (n - 1), x = lerp(x0 + M * .02, x1 - M * .02, f), q = itemQ(i, n, .5);
           if (q <= 0) return;
           ctx.save(); ctx.globalAlpha *= q;
           ctx.fillStyle = it.hot ? C.red : C.ink; ctx.beginPath(); ctx.arc(x, y, M * .016 * back(q), 0, TAU); ctx.fill();
@@ -160,12 +184,12 @@
         const cw = V ? W * .84 : (W - pad() * 2 - gap * (n - 1)) / n, ch = V ? H * .12 : H * .36;
         const gx = V ? W * .08 : pad(), gy = V ? H * .3 : H * .44;
         s.items.forEach((it, i) => {
-          const col = i % cols, row = Math.floor(i / cols), x = gx + col * (cw + gap), y = gy + row * (ch + gap), q = ease((u - .6 - i * .35) / .6);
+          const col = i % cols, row = Math.floor(i / cols), x = gx + col * (cw + gap), y = gy + row * (ch + gap), q = itemQ(i, n, .6);
           if (q <= 0) return;
           ctx.save(); ctx.globalAlpha *= q; ctx.translate(0, (1 - q) * M * .04);
           rrect(x, y, cw, ch, M * .02); ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.stroke();
           ctx.fillStyle = i === (s.hot ?? 0) ? C.red : C.ink; ctx.fillRect(x, y, Math.max(6, M * .008), ch);
-          const p = clamp((u - .7 - i * .35) / 1.2), num = it.inr ? inr(it.value * easeIO(p)) : counter(it.value, p, it.decimals || 0);
+          const p = clamp((S.r - .45 - i * step(n)) * PACE / 1.2), num = it.inr ? inr(it.value * easeIO(p)) : counter(it.value, p, it.decimals || 0);
           ctx.textAlign = 'left'; fit(`${it.prefix || ''}${it.inr ? inr(it.value) : it.value}${it.suffix || ''}`, 'serif', M * (V ? .085 : .095), 700, cw - M * .08); ctx.fillStyle = i === (s.hot ?? 0) ? C.red : C.ink;
           ctx.fillText(`${it.prefix || ''}${num}${it.suffix || ''}`, x + M * .04, y + (V ? ch * .5 : ch * .45));
           ctx.font = font('sans', M * .03, 600); ctx.fillStyle = C.ink2;
@@ -186,15 +210,16 @@
         const bw = V ? W * .62 : (W - pad() * 2 - gap * (n - 1)) / n, bh = V ? Math.min(H * .06, H * .44 / n - gap) : H * .16;
         const pos = i => V ? [W / 2 - bw / 2, H * .3 + i * (bh + gap)] : [pad() + i * (bw + gap), H * .5];
         s.nodes.forEach((label, i) => {
-          const [x, y] = pos(i), q = back((u - .7 - i * .45) / .5);
+          const [x, y] = pos(i), q = back((S.r - .35 - i * step(n)) * PACE / .5);
           if (q <= 0) return;
           ctx.save(); ctx.globalAlpha *= clamp(q); ctx.translate(x + bw / 2, y + bh / 2); ctx.scale(lerp(.8, 1, q), lerp(.8, 1, q));
-          rrect(-bw / 2, -bh / 2, bw, bh, M * .018); ctx.fillStyle = i === n - 1 ? C.red : '#ffffff'; ctx.fill(); ctx.strokeStyle = i === n - 1 ? C.red : C.ink; ctx.lineWidth = Math.max(2, M * .0025); ctx.stroke();
+          const g = glow(i, n); if (g) ctx.scale(1.05, 1.05);
+          rrect(-bw / 2, -bh / 2, bw, bh, M * .018); ctx.fillStyle = i === n - 1 ? C.red : '#ffffff'; ctx.fill(); ctx.strokeStyle = i === n - 1 || g ? C.red : C.ink; ctx.lineWidth = Math.max(2, M * .0025) * (1 + g * 1.5); ctx.stroke();
           ctx.fillStyle = i === n - 1 ? '#ffffff' : C.ink; ctx.font = font('sans', M * .03, 700); ctx.textAlign = 'center';
           const ls = wrap(label, bw - M * .04); ls.forEach((l, li) => ctx.fillText(l, 0, (li - (ls.length - 1) / 2) * M * .038 + M * .011));
           ctx.restore();
           if (i < n - 1) {   // arrow to the next box, drawn on
-            const a = ease((u - .95 - i * .45) / .4); if (a <= 0) return;
+            const a = ease((S.r - .35 - (i + .6) * step(n)) * PACE / .4); if (a <= 0) return;
             ctx.save(); ctx.strokeStyle = C.red; ctx.fillStyle = C.red; ctx.lineWidth = Math.max(3, M * .004);
             let x0, y0, x1, y1;
             if (V) { x0 = x1 = W / 2; y0 = y + bh + M * .01; y1 = lerp(y0, y + bh + gap - M * .01, a); }
@@ -206,7 +231,7 @@
           }
         });
         if (s.base) {
-          const q = ease((u - 1 - n * .45) / .6), [fx] = pos(0), [lx, ly] = pos(n - 1);
+          const q = ease((S.r - .35 - n * step(n)) * PACE / .6), [fx] = pos(0), [lx, ly] = pos(n - 1);
           const bx = V ? W * .08 : fx, by = V ? ly + bh + M * .05 : ly + bh + M * .07, bwid = V ? W * .84 : lx + bw - fx;
           ctx.save(); ctx.globalAlpha *= q; rrect(bx, by, bwid * q, M * .07, M * .014); ctx.fillStyle = C.gold; ctx.fill();
           ctx.fillStyle = C.ink; ctx.font = font('mono', M * .022, 500); ctx.textAlign = 'center'; ctx.fillText(s.base.toUpperCase(), bx + bwid / 2, by + M * .043); ctx.restore();
@@ -226,8 +251,8 @@
         const y0 = H * (V ? .18 : .17) + M * .17 + n0 * M * .074, rowH = Math.min(V ? M * .2 : M * .14, (H * (V ? .74 : .86) - y0) / n);
         const labelW = V ? 0 : W * .2, bx = tx + labelW, bwMax = (V ? W * .84 : W - pad() - bx - W * .1);
         s.items.forEach((it, i) => {
-          const q = ease((u - .6 - i * .3) / .5); if (q <= 0) return;
-          const y = y0 + i * rowH, p = easeIO((u - .7 - i * .3) / 1.1), bh = rowH * (V ? .34 : .46);
+          const q = itemQ(i, n, .5); if (q <= 0) return;
+          const y = y0 + i * rowH, p = easeIO((S.r - .45 - i * step(n)) * PACE / 1.1), bh = rowH * (V ? .34 : .46);
           ctx.save(); ctx.globalAlpha *= q; ctx.textAlign = 'left';
           ctx.font = font('sans', M * .03, 700); ctx.fillStyle = C.ink2;
           if (V) ctx.fillText(it.label, tx, y); else wrap(it.label, labelW - M * .03).forEach((l, li, all) => ctx.fillText(l, tx, y + bh / 2 + M * .011 + (li - (all.length - 1) / 2) * M * .036));
@@ -252,8 +277,12 @@
         const boxW = V ? W * .96 : W * .56, boxH = V ? H * .5 : H * .8;
         let mw = boxW, mh = mw / ar; if (mh > boxH) { mh = boxH; mw = mh * ar; }
         const mx = V ? (W - mw) / 2 : W - pad() * .6 - mw, my = V ? H * .34 : (H - mh) / 2 + H * .02;
-        const zoom = lerp(1.06, 1, easeIO(u / 3));
-        const P = (lon, lat) => { const x = mx + (lon - lon0) / (lon1 - lon0) * mw, y = my + (lat1 - lat) / (lat1 - lat0) * mh; return [mx + mw / 2 + (x - mx - mw / 2) * zoom, my + mh / 2 + (y - my - mh / 2) * zoom]; };
+        // the camera eases in from wide, then keeps drifting towards the pins
+        const pins = s.pins || [], plon = pins.length ? pins.reduce((a, p) => a + p.lon, 0) / pins.length : (lon0 + lon1) / 2, plat = pins.length ? pins.reduce((a, p) => a + p.lat, 0) / pins.length : (lat0 + lat1) / 2;
+        const zoom = lerp(1.1, 1, easeIO(u / 2.5)) * lerp(1, 1.16, easeIO(S.r / Math.max(4, S.dur)));
+        const fxp = mx + (plon - lon0) / (lon1 - lon0) * mw, fyp = my + (lat1 - plat) / (lat1 - lat0) * mh, pull = easeIO(S.r / Math.max(4, S.dur)) * .35;
+        const cxm = lerp(mx + mw / 2, fxp, pull), cym = lerp(my + mh / 2, fyp, pull);
+        const P = (lon, lat) => { const x = mx + (lon - lon0) / (lon1 - lon0) * mw, y = my + (lat1 - lat) / (lat1 - lat0) * mh; return [mx + mw / 2 + (x - cxm) * zoom, my + mh / 2 + (y - cym) * zoom]; };
         const dr = Math.max(1.6, mw / (lon1 - lon0) * .4 * .42);
         ctx.fillStyle = C.land;
         for (let i = 0; i < LAND.length; i += 2) {
@@ -266,10 +295,19 @@
         kicker(s.kicker || '', V ? W / 2 : tx, V ? H * .12 : H * .2, u, C.red, V ? 'center' : align);
         ctx.font = font('serif', M * .062, 600); ctx.fillStyle = C.ink;
         const n = riseText(s.title, V ? W / 2 : tx, (V ? H * .12 : H * .2) + M * .09, V ? W * .84 : W * .34, M * .07, u - .2, { align: V ? 'center' : align });
-        (s.pins || []).forEach((pin, i) => {
-          const q = ease((u - 1 - i * .5) / .45); if (q <= 0) return;
-          const [x, y] = P(pin.lon, pin.lat), drop = (1 - back((u - 1 - i * .5) / .45)) * M * .05;
-          const pr = M * .016, pulse = (u - 1 - i * .5) % 1.6 / 1.6;
+        const np = pins.length;
+        // dashed routes between consecutive pins, drawn on as the next pin arrives
+        for (let i = 1; i < np; i++) {
+          const a = ease((S.r - .35 - i * step(np)) * PACE / .7); if (a <= 0) continue;
+          const [x0, y0] = P(pins[i - 1].lon, pins[i - 1].lat), [x1, y1] = P(pins[i].lon, pins[i].lat), mxp = (x0 + x1) / 2, myp = Math.min(y0, y1) - Math.hypot(x1 - x0, y1 - y0) * .25;
+          ctx.save(); ctx.strokeStyle = C.red; ctx.globalAlpha = .7; ctx.lineWidth = Math.max(2, M * .003); ctx.setLineDash([M * .012, M * .01]); ctx.lineDashOffset = -S.r * M * .05;
+          ctx.beginPath(); for (let k = 0; k <= 40 * a; k++) { const t = k / 40, bx = (1 - t) ** 2 * x0 + 2 * (1 - t) * t * mxp + t * t * x1, by = (1 - t) ** 2 * y0 + 2 * (1 - t) * t * myp + t * t * y1; k ? ctx.lineTo(bx, by) : ctx.moveTo(bx, by); }
+          ctx.stroke(); ctx.restore();
+        }
+        pins.forEach((pin, i) => {
+          const q = itemQ(i, np, .45); if (q <= 0) return;
+          const t0 = .35 + i * step(np), [x, y] = P(pin.lon, pin.lat), drop = (1 - back((S.r - t0) * PACE / .45)) * M * .05;
+          const pr = M * .016 * (1 + glow(i, np) * .25), pulse = ((S.r - t0) % 1.2) / 1.2;
           ctx.save(); ctx.globalAlpha = (1 - pulse) * .45 * q; ctx.strokeStyle = C.red; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, pr * (1 + pulse * 2.4), 0, TAU); ctx.stroke(); ctx.restore();
           ctx.save(); ctx.globalAlpha = q; ctx.fillStyle = C.red; ctx.beginPath(); ctx.arc(x, y - drop, pr, 0, TAU); ctx.fill();
           ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y - drop, pr * .38, 0, TAU); ctx.fill();
@@ -282,7 +320,7 @@
         });
         if (s.stats) {   // a stack of small figures beside (or under) the map
           s.stats.forEach((st, i) => {
-            const q = ease((u - 2 - i * .35) / .5); if (q <= 0) return;
+            const q = ease((S.r - .6 - i * step(s.stats.length)) * PACE / .5); if (q <= 0) return;
             const colW = W * .84 / s.stats.length, x = V ? W * .08 + i * colW : tx, y = V ? H * .12 + M * .17 + n * M * .07 : (H * .2 + M * .14 + n * M * .07) + i * M * .13;
             ctx.save(); ctx.globalAlpha = q; ctx.textAlign = 'left';
             if (V) fit(st.value, 'serif', M * .06, 700, colW - M * .03); else ctx.font = font('serif', M * .066, 700); ctx.fillStyle = C.red; ctx.fillText(st.value, x, y);
@@ -297,8 +335,8 @@
       return u => {
         const x = V ? W * .08 : W * .14, maxW = V ? W * .84 : W * .72, y0 = V ? H * .3 : H * .3;
         ctx.save(); ctx.globalAlpha *= ease(u / .6); ctx.font = font('serif', M * .32, 700); ctx.fillStyle = C.gold; ctx.textAlign = 'left'; ctx.fillText('“', x - M * .04, y0 + M * .1); ctx.restore();
-        ctx.font = font('serif', M * (V ? .06 : .058), 500); ctx.fillStyle = C.ink;
-        const n = riseText(s.text, x, y0 + M * .1, maxW, M * (V ? .075 : .072), u - .3, { stagger: .05 });
+        ctx.font = font('serif', M * (V ? .06 : .058), 500);
+        const n = karaoke(s.text, x, y0 + M * .1, maxW, M * (V ? .075 : .072), u - .3);
         const q = ease((u - .6 - n * .3) / .5); ctx.save(); ctx.globalAlpha *= q;
         const by = y0 + M * .14 + n * M * .072; ctx.fillStyle = C.red; ctx.fillRect(x, by, M * .05, Math.max(3, M * .004));
         ctx.font = font('sans', M * .032, 800); ctx.fillStyle = C.ink; ctx.fillText(s.who, x, by + M * .06);
@@ -315,12 +353,14 @@
         ctx.font = font('serif', M * .068, 600); ctx.fillStyle = C.ink;
         const n = riseText(s.title, tx, H * (V ? .18 : .16) + M * .09, V ? W * .84 : W * .8, M * .076, u - .2);
         const y0 = H * (V ? .18 : .16) + M * .16 + n * M * .076, rowH = Math.min(V ? M * .13 : M * .11, (H * (V ? .74 : .8) - y0) / Math.max(1, s.items.length - .5));
+        const N = s.items.length;
         s.items.forEach((it, i) => {
-          const q = ease((u - .8 - i * .45) / .5); if (q <= 0) return;
-          const y = y0 + i * rowH; ctx.save(); ctx.globalAlpha *= q; ctx.translate((1 - q) * -M * .04, 0);
-          ctx.fillStyle = C.red; ctx.beginPath(); ctx.arc(tx + M * .03, y, M * .03, 0, TAU); ctx.fill();
+          const q = itemQ(i, N); if (q <= 0) return;
+          const g = glow(i, N), y = y0 + i * rowH; ctx.save(); ctx.globalAlpha *= q * (g || S.r > S.vd ? 1 : .55); ctx.translate((1 - q) * -M * .06, 0);
+          if (g) { rrect(tx - M * .015, y - rowH * .42, W - tx - pad() * .3, rowH * .84, M * .016); ctx.fillStyle = 'rgba(184,20,31,.08)'; ctx.fill(); }
+          ctx.fillStyle = C.red; ctx.beginPath(); ctx.arc(tx + M * .03, y, M * .03 * (1 + g * .12), 0, TAU); ctx.fill();
           ctx.fillStyle = '#fff'; ctx.font = font('mono', M * .028, 500); ctx.textAlign = 'center'; ctx.fillText(String(i + 1), tx + M * .03, y + M * .01);
-          ctx.fillStyle = C.ink; fit(it, 'sans', M * .04, 700, W - tx - M * .09 - pad() * .5); ctx.textAlign = 'left'; ctx.fillText(it, tx + M * .09, y + M * .014);
+          ctx.fillStyle = g ? C.red : C.ink; fit(it, 'sans', M * .04, 700, W - tx - M * .09 - pad() * .5); ctx.textAlign = 'left'; ctx.fillText(it, tx + M * .09, y + M * .014);
           ctx.restore();
         });
         sourceLine(s.source, u);
@@ -332,10 +372,14 @@
       const im = new Image(); im.src = s.src;
       return u => {
         if (im.complete && im.naturalWidth) {
-          const sc = Math.max(W / im.naturalWidth, H / im.naturalHeight) * lerp(1.04, 1.14, u / 8);
+          const k = clamp(S.r / Math.max(3, S.dur)), sc = Math.max(W / im.naturalWidth, H / im.naturalHeight) * lerp(1.08, 1.26, easeIO(k));
+          ctx.save(); ctx.translate(W / 2, H / 2); ctx.rotate(lerp(-.012, .012, k)); ctx.translate(-W / 2, -H / 2);
           const dw = im.naturalWidth * sc, dh = im.naturalHeight * sc;
           const fx = V ? (s.focusV ?? s.focus ?? .5) : (s.focus ?? .5);   // which part of a wide photo stays in frame (0 left … 1 right)
           ctx.drawImage(im, (W - dw) * fx + lerp(0, -W * .02, u / 8), (H - dh) / 2, dw, dh);
+          ctx.restore();
+          const sw = ((S.r * .35) % 1.4) - .2, lg = ctx.createLinearGradient(W * sw - W * .3, 0, W * sw + W * .3, H);   // light sweep
+          lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(.5, 'rgba(255,255,255,.10)'); lg.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = lg; ctx.fillRect(0, 0, W, H);
           const g = ctx.createLinearGradient(0, H * .45, 0, H); g.addColorStop(0, 'rgba(15,20,34,0)'); g.addColorStop(1, 'rgba(15,20,34,.85)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
         }
         ctx.font = font('serif', M * .07, 600); ctx.fillStyle = '#fff';
@@ -384,6 +428,14 @@
     ctx.font = font('sans', M * .024, 800); ctx.fillStyle = C.ink; ctx.textAlign = 'left'; ctx.fillText('RAISINA', x + ms * 1.3, y + ms * .48);
     ctx.fillStyle = C.red; ctx.fillText('WIRE', x + ms * 1.3 + ctx.measureText('RAISINA ').width, y + ms * .48);
     ctx.font = font('mono', M * .016, 500); ctx.fillStyle = C.muted; ctx.fillText((spec.series || 'EXPLAINED').toUpperCase(), x + ms * 1.3, y + ms * .9);
+    // ticker: a red tag and the headline scrolling, always moving
+    const th = M * .044, ty = H - Math.max(4, M * .006) - th;
+    ctx.save(); ctx.fillStyle = 'rgba(15,20,34,.9)'; ctx.fillRect(0, ty, W, th);
+    ctx.font = font('mono', th * .4, 500); const tag = 'RAISINA WIRE · EXPLAINED', tagW = ctx.measureText(tag).width + th;
+    const msg = `${(spec.title || '').toUpperCase()}   ●   ${(spec.ticker || 'RAISINAWIRE.CALIBREX.ORG').toUpperCase()}   ●   `, mw = ctx.measureText(msg).width, sx = tagW - (t * M * .09) % mw;
+    ctx.beginPath(); ctx.rect(tagW, ty, W - tagW, th); ctx.clip(); ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
+    for (let x = sx; x < W; x += mw) ctx.fillText(msg, x, ty + th * .66);
+    ctx.restore(); ctx.save(); ctx.fillStyle = C.red; ctx.fillRect(0, ty, tagW - th * .4, th); ctx.font = font('mono', th * .4, 500); ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.fillText(tag, th * .4, ty + th * .66); ctx.restore();
     ctx.fillStyle = C.line; ctx.fillRect(0, H - Math.max(4, M * .006), W, Math.max(4, M * .006));
     ctx.fillStyle = C.red; ctx.fillRect(0, H - Math.max(4, M * .006), W * clamp(t / total), Math.max(4, M * .006));
   }
@@ -392,7 +444,7 @@
     const c = timing.captions.find(c => t >= c.t0 && t < c.t1); if (!c) return;
     const fs = M * (V ? .036 : .034); ctx.font = font('sans', fs, 700);
     const lines = wrap(c.text, V ? W * .84 : W * .7), lh = fs * 1.3, bw = Math.max(...lines.map(l => ctx.measureText(l).width)) + fs * 1.2, bh = lines.length * lh + fs * .6;
-    const cy = V ? H * .82 : H * .87, a = clamp((t - c.t0) / .12) * clamp((c.t1 - t) / .12);
+    const cy = V ? H * .8 : H * .85, a = clamp((t - c.t0) / .12) * clamp((c.t1 - t) / .12);
     ctx.save(); ctx.globalAlpha = a; rrect(W / 2 - bw / 2, cy - bh / 2, bw, bh, fs * .35); ctx.fillStyle = 'rgba(15,20,34,.88)'; ctx.fill();
     ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; lines.forEach((l, i) => ctx.fillText(l, W / 2, cy - bh / 2 + fs * .3 + (i + .78) * lh)); ctx.restore();
   }
@@ -403,6 +455,16 @@
     g1.addColorStop(0, 'rgba(233,189,120,.28)'); g1.addColorStop(1, 'rgba(233,189,120,0)'); ctx.fillStyle = g1; ctx.fillRect(0, 0, W, H);
     const g2 = ctx.createRadialGradient(W * .05, H * (.95 + .03 * Math.cos(t * .17)), 0, W * .05, H * .95, M * .8);
     g2.addColorStop(0, 'rgba(184,20,31,.08)'); g2.addColorStop(1, 'rgba(184,20,31,0)'); ctx.fillStyle = g2; ctx.fillRect(0, 0, W, H);
+    // motion graphics that never stop: a drifting grid, slow-turning rings and diagonal hairlines
+    ctx.save(); ctx.strokeStyle = 'rgba(15,20,34,.045)'; ctx.lineWidth = 1; const gs = M * .09, off = (t * M * .012) % gs;
+    for (let x = -gs + off; x < W + gs; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = -gs + off * .6; y < H + gs; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(184,20,31,.07)'; ctx.lineWidth = Math.max(2, M * .003);
+    for (let k = 0; k < 3; k++) { const r = M * (.32 + k * .14), a = t * (.12 + k * .05) * (k % 2 ? -1 : 1);
+      ctx.beginPath(); ctx.arc(W * (V ? .85 : .9), H * (V ? .12 : .2), r, a, a + Math.PI * (1.1 + k * .2)); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(233,189,120,.18)'; ctx.lineWidth = Math.max(1.5, M * .002);
+    for (let k = 0; k < 5; k++) { const x = ((k * .27 + t * .025) % 1.4 - .2) * W; ctx.beginPath(); ctx.moveTo(x, H); ctx.lineTo(x + H * .55, 0); ctx.stroke(); }
+    ctx.restore();
     // fine paper grain from a fixed pattern
     ctx.fillStyle = GRAIN; ctx.globalAlpha = .5; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
   }
@@ -412,6 +474,21 @@
     let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     for (let i = 0; i < d.data.length; i += 4) { const v = rnd() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 10; }
     g.putImageData(d, 0, 0); GRAIN = ctx.createPattern(c, 'repeat');
+  }
+
+  /* ---------- transitions: a crimson wipe, an iris and a split shutter, in turn ---------- */
+  function transition(kind, p) {
+    ctx.save(); ctx.fillStyle = C.red;
+    if (kind === 0) {
+      const x0 = lerp(-W * .3, W * 1.05, easeIO(p)); ctx.globalAlpha = .95 * Math.sin(Math.PI * p);
+      ctx.beginPath(); ctx.moveTo(x0, 0); ctx.lineTo(x0 + W * .22, 0); ctx.lineTo(x0 + W * .12, H); ctx.lineTo(x0 - W * .1, H); ctx.fill();
+    } else if (kind === 1) {
+      const r = Math.hypot(W, H) * .6 * Math.sin(Math.PI * p); ctx.globalAlpha = .9;
+      ctx.beginPath(); ctx.arc(W / 2, H / 2, r, 0, TAU); ctx.arc(W / 2, H / 2, r * clamp(p * 1.6 - .3), 0, TAU, true); ctx.fill();
+    } else {
+      const h = H / 2 * Math.sin(Math.PI * p); ctx.globalAlpha = .95; ctx.fillRect(0, 0, W, h * .9); ctx.fillStyle = C.ink; ctx.fillRect(0, H - h * .9, W, h * .9);
+    }
+    ctx.restore();
   }
 
   /* ---------- timeline ---------- */
@@ -424,16 +501,17 @@
       const sc = timing.scenes[i], u = t - sc.start, end = sc.start + sc.dur;
       if (t < sc.start || t > end + OUT) continue;
       const out = clamp((t - end) / OUT), inn = fast ? ease(u / .35) : 1;
+      S = { r: u, vd: sc.voiceDur || sc.dur * .8, dur: sc.dur };
+      // camera: a slow push and drift through the whole scene, plus a punch on every new caption line
+      const caps = timing.captions.filter(c => c.t0 >= sc.start - .01 && c.t0 < end), ci = caps.findLastIndex(c => c.t0 <= t);
+      const since = ci > 0 ? t - caps[ci].t0 : 9, punch = .028 * Math.exp(-since * 7), dir = ci % 2 ? 1 : -1, kk = clamp(u / Math.max(2, sc.dur));
+      const z = (fast ? lerp(1.06, 1, inn) : 1) * lerp(1, 1.045, easeIO(kk)) * (1 + punch);
+      const dx = Math.sin(u * .5 + i) * M * .006 + dir * punch * W * .35 - out * W * .06, dy = Math.cos(u * .4 + i * 2) * M * .005;
       ctx.save(); ctx.globalAlpha = 1 - ease(out);
-      if (fast) {   // push in on entry, slide left on exit
-        const z = lerp(1.06, 1, inn); ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.translate(-W / 2 - out * W * .06, -H / 2);
-      } else ctx.translate(0, -out * M * .03);
+      ctx.translate(W / 2 + dx, H / 2 + dy); ctx.scale(z, z); ctx.translate(-W / 2, -H / 2);
+      if (!fast) ctx.translate(0, -out * M * .03);
       built[i](u * PACE, sc.dur); ctx.restore();
-      if (fast && i > 0 && u < .42) {   // a crimson wipe across the cut
-        const p = u / .42, x0 = lerp(-W * .3, W * 1.05, easeIO(p));
-        ctx.save(); ctx.fillStyle = C.red; ctx.globalAlpha = .95 * Math.sin(Math.PI * p);
-        ctx.beginPath(); ctx.moveTo(x0, 0); ctx.lineTo(x0 + W * .22, 0); ctx.lineTo(x0 + W * .12, H); ctx.lineTo(x0 - W * .1, H); ctx.fill(); ctx.restore();
-      }
+      if (fast && i > 0 && u < .42) transition(i % 3, u / .42);
     }
     chrome(t, total); captions(t);
   }
