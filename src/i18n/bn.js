@@ -563,4 +563,5 @@ export default {
   "Explainer": "এক্সপ্লেনার",
   "Share this update": "এই আপডেট শেয়ার করুন",
   "Notifications are on for this device": "এই ডিভাইসে নোটিফিকেশন চালু আছে",
+  "Share this short": "এই শর্ট শেয়ার করুন",
 };
