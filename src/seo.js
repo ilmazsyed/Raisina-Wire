@@ -205,13 +205,15 @@ async function pageFor(path, url, env, o, lang = "en") {
       body: `<h1>Events and briefings</h1><ul class="ssr-list">${results.map(e => `<li>${esc(e.title)} <small>${esc(e.eventType)} · ${fmtDate(e.startsAt)}</small></li>`).join("")}</ul>` };
   }
   if (section === "coverage" && arg) {
-    const item = await env.DB.prepare("SELECT id,slug,title,summary,status,started_at AS startedAt,ended_at AS endedAt,updated_at AS updatedAt FROM live_coverage WHERE slug=? AND status IN ('live','ended')").bind(arg).first();
+    const item = await env.DB.prepare("SELECT id,slug,title,summary,status,started_at AS startedAt,ended_at AS endedAt,updated_at AS updatedAt,image_url AS imageUrl,social_url AS socialUrl FROM live_coverage WHERE slug=? AND status IN ('live','ended')").bind(arg).first();
     if (!item) return { status: 404, title: `Live coverage not found · ${SITE}`, description: "", noindex: true, body: `<h1>Live coverage not found</h1>` };
     const { results: ups } = await env.DB.prepare("SELECT body,created_at AS createdAt FROM live_updates WHERE coverage_id=? ORDER BY created_at DESC LIMIT 50").bind(item.id).all();
     const iso = d => new Date(String(d).replace(" ", "T") + (String(d).includes("Z") || String(d).includes("+") ? "" : "Z")).toISOString();
     const href = `/coverage/${encodeURIComponent(item.slug)}`;
-    return { title: `${item.status === "live" ? "LIVE: " : ""}${item.title} · ${SITE}`, ogTitle: item.title, description: clip(item.summary || ups[0]?.body || item.title, 160),
-      ld: [{ "@context": "https://schema.org", "@type": "LiveBlogPosting", url: `${o}${href}`, headline: clip(item.title, 110), description: clip(item.summary || item.title, 300),
+    // While live, link previews use the social image (the hero with a LIVE tab); once ended, the plain hero.
+    const pic = (item.status === "live" && item.socialUrl) || item.imageUrl || item.socialUrl, image = pic ? abs(o, pic) : undefined;
+    return { title: `${item.status === "live" ? "LIVE: " : ""}${item.title} · ${SITE}`, ogTitle: item.title, description: clip(item.summary || ups[0]?.body || item.title, 160), image,
+      ld: [{ "@context": "https://schema.org", "@type": "LiveBlogPosting", url: `${o}${href}`, headline: clip(item.title, 110), description: clip(item.summary || item.title, 300), ...(image ? { image: [image] } : {}),
         coverageStartTime: item.startedAt, ...(item.endedAt ? { coverageEndTime: item.endedAt } : {}), datePublished: item.startedAt, dateModified: ups[0] ? iso(ups[0].createdAt) : item.startedAt,
         publisher: organization(o), author: { "@type": "Organization", name: SITE, url: `${o}/` },
         liveBlogUpdate: ups.map(u => ({ "@type": "BlogPosting", headline: clip(u.body, 110), articleBody: u.body, datePublished: iso(u.createdAt) })) }],
