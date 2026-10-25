@@ -10,6 +10,7 @@ import m0008 from "../migrations/0008_community_votes.sql";
 import m0009 from "../migrations/0009_translations.sql";
 import m0010 from "../migrations/0010_community_language.sql";
 import m0011 from "../migrations/0011_machine_translation.sql";
+import m0012 from "../migrations/0012_live_images.sql";
 import { handleTts } from "./tts.js";
 import { editions } from "./editions.js";
 import editionBodies from "./edition-bodies.json";
@@ -63,7 +64,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -495,7 +496,8 @@ async function api(request, env, ctx) {
     const b=await request.json().catch(()=>({})), title=String(b.title||"").trim().slice(0,180);
     if(title.length<5) return err("Live coverage title must be at least 5 characters.");
     const id=randomId(), slug=await uniqueSlug(env,"live_coverage",b.slug||title), status=b.status==="live"?"live":"draft";
-    await env.DB.prepare("INSERT INTO live_coverage (id,slug,title,summary,status,author_id,started_at) VALUES (?,?,?,?,?,?,?)").bind(id,slug,title,String(b.summary||"").slice(0,500),status,user.id,status==="live"?new Date().toISOString():null).run();
+    await env.DB.prepare("INSERT INTO live_coverage (id,slug,title,summary,status,author_id,started_at,image_url,social_url,hero_caption) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id,slug,title,String(b.summary||"").slice(0,500),status,user.id,status==="live"?new Date().toISOString():null,
+      String(b.imageUrl||"").slice(0,1500),String(b.socialUrl||"").slice(0,1500),String(b.heroCaption||"").slice(0,300)).run();
     await audit(env,user,"live.create","live_coverage",id,{title,status});
     if (status === "live" && wantsAlert(b.notify)) await createAlert(env, ctx, { title: "LIVE · Raisina Wire", body: title, url: `/coverage/${encodeURIComponent(slug)}`, userId: user.id });
     return json({ok:true,id,slug},201,{"cache-control":"no-store"});
@@ -504,6 +506,14 @@ async function api(request, env, ctx) {
     const user=await currentUser(request,env);
     if (!isStaff(user)) return err("Editor access required.",403);
     const id=decodeURIComponent(url.pathname.split("/").pop()), b=await request.json().catch(()=>({}));
+    // Images and caption can change on their own, without touching the status.
+    const imgs=[["imageUrl","image_url",1500],["socialUrl","social_url",1500],["heroCaption","hero_caption",300]].filter(([k])=>b[k]!==undefined);
+    if (imgs.length && b.status===undefined) {
+      const res=await env.DB.prepare(`UPDATE live_coverage SET ${imgs.map(([,c])=>`${c}=?`).join(",")}, updated_at=? WHERE id=?`).bind(...imgs.map(([k,,n])=>String(b[k]||"").slice(0,n)),new Date().toISOString(),id).run();
+      if(!res.meta.changes) return err("Live coverage not found.",404);
+      await audit(env,user,"live.images","live_coverage",id,{});
+      return json({ok:true},200,{"cache-control":"no-store"});
+    }
     const status=["live","ended","draft"].includes(b.status)?b.status:null;
     if(!status) return err("Status must be live, ended or draft.");
     const now=new Date().toISOString();
@@ -539,7 +549,7 @@ async function api(request, env, ctx) {
   }
   if (url.pathname.startsWith("/api/live/") && request.method === "GET") {
     const slug=decodeURIComponent(url.pathname.split("/").pop()||"");
-    const item=await env.DB.prepare("SELECT id,slug,title,summary,status,started_at AS startedAt,ended_at AS endedAt FROM live_coverage WHERE slug=? AND status IN ('live','ended')").bind(slug).first();
+    const item=await env.DB.prepare("SELECT id,slug,title,summary,status,started_at AS startedAt,ended_at AS endedAt,image_url AS imageUrl,hero_caption AS heroCaption FROM live_coverage WHERE slug=? AND status IN ('live','ended')").bind(slug).first();
     if(!item) return err("Live coverage not found.",404);
     const updates=await env.DB.prepare("SELECT body,media_url AS mediaUrl,source_url AS sourceUrl,created_at AS createdAt FROM live_updates WHERE coverage_id=? ORDER BY created_at DESC LIMIT 100").bind(item.id).all();
     const lang=reqLang(url); if(lang) await mtLive(env,lang,item,updates.results);

@@ -392,6 +392,13 @@ body.nav-stuck .site-nav{max-width:var(--max);background:rgba(255,255,255,.86);b
 .coverage{max-width:860px;margin:36px auto 0}
 .coverage-head h1{margin:14px 0 0;font:500 clamp(34px,4vw,52px)/1.06 var(--serif);letter-spacing:-1px}
 .coverage-head .dek{margin:14px 0 12px;font:400 21px/1.5 var(--serif);color:var(--ink-2)}
+.coverage-hero{position:relative;margin:18px 0 14px;border-radius:18px;overflow:hidden;aspect-ratio:3/2;background:var(--paper-2,#eee)}
+.coverage-hero img{width:100%;height:100%;object-fit:cover;display:block}
+.coverage-hero figcaption{position:absolute;left:0;right:0;bottom:0;padding:28px 16px 12px;background:linear-gradient(transparent,rgba(0,0,0,.65));color:#fff;font:400 13px/1.4 var(--sans)}
+.live-tab{position:absolute;top:14px;left:14px;display:inline-flex;align-items:center;gap:8px;padding:7px 14px 7px 12px;border-radius:6px;background:var(--live);color:#fff;font:600 13px var(--mono);letter-spacing:2px;text-transform:uppercase;box-shadow:0 4px 18px rgba(0,0,0,.3);animation:live-tab 1.2s steps(1) infinite}
+.live-tab .pulse{width:9px;height:9px}
+@keyframes live-tab{0%,100%{background:var(--live)}50%{background:#8f1d14}}
+@media (prefers-reduced-motion:reduce){.live-tab{animation:none}}
 .coverage-feed{list-style:none;margin:30px 0 0;padding:0;display:flex;flex-direction:column;gap:16px}
 .coverage-feed li{display:grid;grid-template-columns:86px minmax(0,1fr);gap:18px}
 .coverage-feed time{display:flex;flex-direction:column;gap:2px;padding-top:16px;font:500 12px var(--mono);color:var(--muted)}
