@@ -61,10 +61,13 @@ def chunks(text, max_chars):
 
 
 def build_timing(spec, lines):
+    # brisk pieces (pace > 1.2) breathe less between scenes
+    fast = float(spec.get("pace", 1)) > 1.2
+    gap, min_scene = (0.25, 2.2) if fast else (GAP, MIN_SCENE)
     t, scenes, caps = LEAD, [], []
     for sc, a in zip(spec["scenes"], lines):
         vdur = len(a) / SR
-        dur = max(MIN_SCENE, vdur + GAP + float(sc.get("hold", 0)))
+        dur = max(min_scene, vdur + gap + float(sc.get("hold", 0)))
         scenes.append({"start": round(t, 3), "dur": round(dur, 3), "voiceAt": round(t + 0.15, 3), "voiceDur": round(vdur, 3), "type": sc["type"]})
         text = sc.get("say", "").strip()
         if text:
@@ -87,7 +90,7 @@ def lowpass(x, cut):
     return np.fft.irfft(X / (1 + (f / cut) ** 4), len(x))
 
 
-def score(timing, seed=11):
+def score(timing, seed=11, bpm=92):
     rng = np.random.default_rng(seed)
     N = int(timing["total"] * SR); T = np.arange(N) / SR
     L = np.zeros(N); R = np.zeros(N)
@@ -104,7 +107,7 @@ def score(timing, seed=11):
             pan = (j - 2) * 0.18
             L[i0:i1] += w * env * breath * 0.035 * (1 - pan); R[i0:i1] += w * env * breath * 0.035 * (1 + pan)
     # a soft pulse (low tom + tick) at 92 bpm, from the first scene to the outro
-    bpm, beat = 92, 60 / 92
+    beat = 60 / bpm
     start, stop = timing["scenes"][0]["start"] + 1.0, timing["scenes"][-1]["start"]
     b = start
     k = 0
@@ -138,7 +141,7 @@ def main():
     vo = np.zeros(N)
     for sc, a in zip(timing["scenes"], lines):
         i = int(sc["voiceAt"] * SR); vo[i:i + len(a)] += a[: max(0, N - i)]
-    music = score(timing, int(spec.get("seed", 11)))
+    music = score(timing, int(spec.get("seed", 11)), 112 if float(spec.get("pace", 1)) > 1.2 else 92)
     # duck the music under the voice (smoothed envelope)
     env = np.convolve(np.abs(vo), np.ones(int(0.25 * SR)) / int(0.25 * SR), "same")
     duck = 1 - 0.55 * np.clip(env / 0.05, 0, 1)

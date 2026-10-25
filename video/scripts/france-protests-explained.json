@@ -1,0 +1,148 @@
+{
+  "slug": "france-protests-explained",
+  "series": "Explained",
+  "voice": "bf_emma",
+  "speed": 1.1,
+  "pace": 1.6,
+  "captionChars": 36,
+  "title": "France on edge: from school protests to a test for Macron",
+  "story": "/article/france-on-edge-70-000-security-personnel-deploy-as-protests-test-macron-government",
+  "scenes": [
+    {
+      "type": "title",
+      "kicker": "Explained · France",
+      "title": "France on edge: how school protests became a test for Macron",
+      "say": "It started at school gates. Now it's a national test for Emmanuel Macron."
+    },
+    {
+      "type": "timeline",
+      "kicker": "How it grew",
+      "title": "From classrooms to the streets",
+      "items": [
+        {
+          "when": "Mid-September",
+          "what": "High school students block schools"
+        },
+        {
+          "when": "17 October",
+          "what": "Looting and clashes; over 2,000 held"
+        },
+        {
+          "when": "24 October",
+          "what": "70,000 police deployed",
+          "hot": true
+        }
+      ],
+      "say": "In mid-September, students blocked schools over teacher shortages and admissions. On 17 October, protests turned violent and over 2,000 people were detained.",
+      "speak": "In mid-September, students blocked schools over teacher shortages and admissions. On the seventeenth of October, protests turned violent and over two thousand people were detained."
+    },
+    {
+      "type": "number",
+      "kicker": "The response",
+      "value": 70000,
+      "inr": true,
+      "label": "police and gendarmes deployed, about 20% more than the week before",
+      "source": "French Interior Ministry",
+      "say": "So on 24 October, France deployed 70,000 police and gendarmes, about a fifth more than the weekend before.",
+      "speak": "So on the twenty-fourth of October, France deployed seventy thousand police and gendarmes, about a fifth more than the weekend before."
+    },
+    {
+      "type": "bars",
+      "kicker": "The turnout",
+      "title": "How many marched on 24 October?",
+      "items": [
+        {
+          "label": "Government count",
+          "value": 410000,
+          "display": "410,000"
+        },
+        {
+          "label": "Organisers' count",
+          "value": 800000,
+          "display": "~800,000",
+          "hot": true
+        }
+      ],
+      "source": "French government; CGT union",
+      "say": "The government counted 410,000 marchers. Organisers claimed nearly 800,000.",
+      "speak": "The government counted four hundred and ten thousand marchers. Organisers claimed nearly eight hundred thousand."
+    },
+    {
+      "type": "map",
+      "kicker": "Tear gas",
+      "title": "Clashes in cities across France",
+      "view": [
+        -6,
+        10,
+        41,
+        52
+      ],
+      "pins": [
+        {
+          "lon": 2.35,
+          "lat": 48.86,
+          "label": "Paris"
+        },
+        {
+          "lon": 3.06,
+          "lat": 50.63,
+          "label": "Lille"
+        },
+        {
+          "lon": 4.84,
+          "lat": 45.76,
+          "label": "Lyon"
+        },
+        {
+          "lon": -0.58,
+          "lat": 44.84,
+          "label": "Bordeaux",
+          "side": "left"
+        },
+        {
+          "lon": 5.37,
+          "lat": 43.3,
+          "label": "Marseille"
+        }
+      ],
+      "stats": [
+        {
+          "value": "~1,000",
+          "label": "arrests"
+        },
+        {
+          "value": "2",
+          "label": "seriously injured"
+        }
+      ],
+      "source": "Interior Minister Laurent Nuñez; Euronews; AP",
+      "say": "Police fired tear gas in Paris, Marseille, Lyon, Bordeaux, Lille and beyond. Nearly 1,000 people were arrested.",
+      "speak": "Police fired tear gas in Paris, Marseille, Lyon, Bordeaux, Lille and beyond. Nearly a thousand people were arrested."
+    },
+    {
+      "type": "list",
+      "kicker": "What's next",
+      "title": "The pressure isn't easing",
+      "items": [
+        "Macron promises more teachers",
+        "A Parcoursup overhaul",
+        "Yellow vests rally on 31 October",
+        "Presidential election in 2027"
+      ],
+      "say": "Macron has promised more teachers and an overhaul of university admissions. But the yellow vests plan new rallies on 31 October, with an election due in 2027.",
+      "speak": "Macron has promised more teachers and an overhaul of university admissions. But the yellow vests plan new rallies on the thirty-first of October, with an election due in twenty twenty-seven."
+    },
+    {
+      "type": "quote",
+      "text": "A state can reinforce streets. It cannot resolve dissatisfaction over education, affordability and inequality through policing alone.",
+      "who": "Raisina Wire analysis",
+      "role": "France on edge",
+      "say": "Policing can hold the streets. It can't fix schools, prices or inequality."
+    },
+    {
+      "type": "outro",
+      "title": "Read the full story on Raisina Wire",
+      "say": "Read the full story on Raisina Wire."
+    }
+  ]
+}

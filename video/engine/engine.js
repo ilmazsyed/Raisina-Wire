@@ -183,7 +183,7 @@
         kicker(s.kicker || '', tx, H * .15, u, C.red, align);
         ctx.font = font('serif', M * .064, 600); ctx.fillStyle = C.ink; riseText(s.title, tx, H * .15 + M * .09, V ? W * .84 : W * .8, M * .072, u - .2, { align });
         const n = s.nodes.length, gap = V ? M * .06 : M * .06;
-        const bw = V ? W * .62 : (W - pad() * 2 - gap * (n - 1)) / n, bh = V ? H * .06 : H * .16;
+        const bw = V ? W * .62 : (W - pad() * 2 - gap * (n - 1)) / n, bh = V ? Math.min(H * .06, H * .44 / n - gap) : H * .16;
         const pos = i => V ? [W / 2 - bw / 2, H * .3 + i * (bh + gap)] : [pad() + i * (bw + gap), H * .5];
         s.nodes.forEach((label, i) => {
           const [x, y] = pos(i), q = back((u - .7 - i * .45) / .5);
@@ -211,6 +211,35 @@
           ctx.save(); ctx.globalAlpha *= q; rrect(bx, by, bwid * q, M * .07, M * .014); ctx.fillStyle = C.gold; ctx.fill();
           ctx.fillStyle = C.ink; ctx.font = font('mono', M * .022, 500); ctx.textAlign = 'center'; ctx.fillText(s.base.toUpperCase(), bx + bwid / 2, by + M * .043); ctx.restore();
         }
+        sourceLine(s.source, u);
+      };
+    },
+
+    // Horizontal bars that grow to their values; `display` is the label shown at the end of each bar.
+    bars(s) {
+      return u => {
+        const tx = V ? W * .08 : pad();
+        kicker(s.kicker || '', tx, H * (V ? .18 : .17), u, C.red);
+        ctx.font = font('serif', M * .066, 600); ctx.fillStyle = C.ink;
+        const n0 = riseText(s.title, tx, H * (V ? .18 : .17) + M * .09, V ? W * .84 : W * .8, M * .074, u - .2);
+        const n = s.items.length, max = s.max || Math.max(...s.items.map(i => i.value));
+        const y0 = H * (V ? .18 : .17) + M * .17 + n0 * M * .074, rowH = Math.min(V ? M * .2 : M * .14, (H * (V ? .74 : .86) - y0) / n);
+        const labelW = V ? 0 : W * .2, bx = tx + labelW, bwMax = (V ? W * .84 : W - pad() - bx - W * .1);
+        s.items.forEach((it, i) => {
+          const q = ease((u - .6 - i * .3) / .5); if (q <= 0) return;
+          const y = y0 + i * rowH, p = easeIO((u - .7 - i * .3) / 1.1), bh = rowH * (V ? .34 : .46);
+          ctx.save(); ctx.globalAlpha *= q; ctx.textAlign = 'left';
+          ctx.font = font('sans', M * .03, 700); ctx.fillStyle = C.ink2;
+          if (V) ctx.fillText(it.label, tx, y); else wrap(it.label, labelW - M * .03).forEach((l, li, all) => ctx.fillText(l, tx, y + bh / 2 + M * .011 + (li - (all.length - 1) / 2) * M * .036));
+          const by = V ? y + M * .025 : y, w = bwMax * it.value / max * p;
+          rrect(bx, by, Math.max(w, 2), bh, Math.min(bh / 2, M * .012)); ctx.fillStyle = it.hot ? C.red : C.ink; ctx.fill();
+          ctx.font = font('serif', M * (V ? .05 : .048), 700); ctx.fillStyle = it.hot ? C.red : C.ink;
+          const label = it.display || String(Math.round(it.value * p)), lw = ctx.measureText(label).width;
+          const inside = V && w + lw + M * .03 > W * .84;
+          if (inside) { ctx.fillStyle = '#fff'; ctx.textAlign = 'right'; ctx.fillText(label, bx + w - M * .02, by + bh / 2 + M * .018); }
+          else ctx.fillText(label, bx + w + M * .02, by + bh / 2 + M * .018);
+          ctx.restore();
+        });
         sourceLine(s.source, u);
       };
     },
@@ -245,7 +274,7 @@
           ctx.save(); ctx.globalAlpha = q; ctx.fillStyle = C.red; ctx.beginPath(); ctx.arc(x, y - drop, pr, 0, TAU); ctx.fill();
           ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y - drop, pr * .38, 0, TAU); ctx.fill();
           ctx.font = font('sans', M * .028, 800); const tw = ctx.measureText(pin.label).width;
-          const left = pin.side === 'left', lx = left ? x - pr * 1.6 - tw - M * .024 : x + pr * 1.6, ly = y - drop - M * .024;
+          const left = pin.side === 'left' || x + pr * 1.6 + tw + M * .03 > W * .97, lx = left ? x - pr * 1.6 - tw - M * .024 : x + pr * 1.6, ly = y - drop - M * .024;
           rrect(lx, ly, tw + M * .024, M * .048, M * .01); ctx.fillStyle = C.ink; ctx.fill();
           ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.fillText(pin.label, lx + M * .012, ly + M * .033); ctx.restore();
         });
@@ -283,7 +312,7 @@
         kicker(s.kicker || '', tx, H * (V ? .18 : .16), u, C.red);
         ctx.font = font('serif', M * .068, 600); ctx.fillStyle = C.ink;
         const n = riseText(s.title, tx, H * (V ? .18 : .16) + M * .09, V ? W * .84 : W * .8, M * .076, u - .2);
-        const y0 = H * (V ? .18 : .16) + M * .16 + n * M * .076, rowH = V ? M * .13 : M * .11;
+        const y0 = H * (V ? .18 : .16) + M * .16 + n * M * .076, rowH = Math.min(V ? M * .13 : M * .11, (H * (V ? .74 : .8) - y0) / Math.max(1, s.items.length - .5));
         s.items.forEach((it, i) => {
           const q = ease((u - .8 - i * .45) / .5); if (q <= 0) return;
           const y = y0 + i * rowH; ctx.save(); ctx.globalAlpha *= q; ctx.translate((1 - q) * -M * .04, 0);
@@ -303,7 +332,8 @@
         if (im.complete && im.naturalWidth) {
           const sc = Math.max(W / im.naturalWidth, H / im.naturalHeight) * lerp(1.04, 1.14, u / 8);
           const dw = im.naturalWidth * sc, dh = im.naturalHeight * sc;
-          ctx.drawImage(im, (W - dw) / 2 + lerp(0, -W * .02, u / 8), (H - dh) / 2, dw, dh);
+          const fx = V ? (s.focusV ?? s.focus ?? .5) : (s.focus ?? .5);   // which part of a wide photo stays in frame (0 left … 1 right)
+          ctx.drawImage(im, (W - dw) * fx + lerp(0, -W * .02, u / 8), (H - dh) / 2, dw, dh);
           const g = ctx.createLinearGradient(0, H * .45, 0, H); g.addColorStop(0, 'rgba(15,20,34,0)'); g.addColorStop(1, 'rgba(15,20,34,.85)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
         }
         ctx.font = font('serif', M * .07, 600); ctx.fillStyle = '#fff';
@@ -383,25 +413,33 @@
   }
 
   /* ---------- timeline ---------- */
-  const OUT = .45;          // scene exit
-  let built = [];
+  // `pace` speeds every entrance (1 = calm, 1.6 = brisk); fast pieces also cut with a push and a red wipe.
+  let built = [], PACE = 1;
   function draw(t) {
     background(t);
-    const total = timing.total;
+    const total = timing.total, OUT = PACE > 1.2 ? .25 : .45, fast = PACE > 1.2;
     for (let i = 0; i < built.length; i++) {
       const sc = timing.scenes[i], u = t - sc.start, end = sc.start + sc.dur;
       if (t < sc.start || t > end + OUT) continue;
-      const out = clamp((t - end) / OUT);
-      ctx.save(); ctx.globalAlpha = 1 - ease(out); ctx.translate(0, -out * M * .03);
-      built[i](u, sc.dur); ctx.restore();
+      const out = clamp((t - end) / OUT), inn = fast ? ease(u / .35) : 1;
+      ctx.save(); ctx.globalAlpha = 1 - ease(out);
+      if (fast) {   // push in on entry, slide left on exit
+        const z = lerp(1.06, 1, inn); ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.translate(-W / 2 - out * W * .06, -H / 2);
+      } else ctx.translate(0, -out * M * .03);
+      built[i](u * PACE, sc.dur); ctx.restore();
+      if (fast && i > 0 && u < .42) {   // a crimson wipe across the cut
+        const p = u / .42, x0 = lerp(-W * .3, W * 1.05, easeIO(p));
+        ctx.save(); ctx.fillStyle = C.red; ctx.globalAlpha = .95 * Math.sin(Math.PI * p);
+        ctx.beginPath(); ctx.moveTo(x0, 0); ctx.lineTo(x0 + W * .22, 0); ctx.lineTo(x0 + W * .12, H); ctx.lineTo(x0 - W * .1, H); ctx.fill(); ctx.restore();
+      }
     }
     chrome(t, total); captions(t);
   }
   async function load(s, tm, w, h, canvas) {
-    spec = s; timing = tm; W = w; H = h; M = Math.min(w, h); V = h > w;
+    spec = s; timing = tm; W = w; H = h; PACE = Number(s.pace || 1); M = Math.min(w, h); V = h > w;
     canvas.width = w; canvas.height = h; ctx = canvas.getContext('2d');
     await document.fonts.load(font('serif', 40, 600)); await document.fonts.load(font('sans', 40, 700)); await document.fonts.load(font('mono', 40, 500));
-    LAND = await fetch('land-south-asia.json').then(r => r.json()).catch(() => []);
+    LAND = await fetch('land.json').then(r => r.json()).catch(() => []);
     makeGrain();
     built = spec.scenes.map(sc => (SCENES[sc.type] || SCENES.title)(sc));
     const imgs = spec.scenes.filter(sc => sc.type === 'photo').map(sc => new Promise(r => { const im = new Image(); im.onload = im.onerror = r; im.src = sc.src; }));
