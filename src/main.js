@@ -595,7 +595,7 @@ function translationNote(a, original) {
   const here = withLang(a.href || location.pathname);
   if (original) return `<p class="tr-note" lang="${LOCALE}">${tr("You are reading the English original.")} <a href="${here}">${tr(lang === "hi" ? "Read this story in Hindi" : "Read this story in Bengali")}</a></p>`;
   if (a.lang === lang) return `<p class="tr-note" lang="${LOCALE}">${tr("Translated from English")} · <a href="${here}?orig=1">${tr("Read the English original")}</a></p>`;
-  return `<p class="tr-note" lang="${LOCALE}">${tr(lang === "hi" ? "The Hindi translation of this story is on its way. Here it is in English for now." : "The Bengali translation of this story is on its way. Here it is in English for now.")}</p>`;
+  return `<p class="tr-note" lang="${LOCALE}">${tr(lang === "hi" ? "This story is not available in Hindi yet. Here it is in English." : "This story is not available in Bengali yet. Here it is in English.")}</p>`;
 }
 // One view per story per browser session; nothing is stored about the reader.
 function countView(a) {
@@ -923,7 +923,7 @@ async function localPage(key, fallback) {
 }
 function pageNote(p, legal) {
   if (lang === "en") return "";
-  if (p.lang !== lang) return `<p class="tr-note">${tr(lang === "hi" ? "This page is being translated into Hindi. Here it is in English for now." : "This page is being translated into Bengali. Here it is in English for now.")}</p>`;
+  if (p.lang !== lang) return `<p class="tr-note">${tr(lang === "hi" ? "This page is not available in Hindi yet. Here it is in English." : "This page is not available in Bengali yet. Here it is in English.")}</p>`;
   return legal ? `<p class="tr-note">${tr("This is a translation for your convenience. If it differs from the English version, the English version prevails.")}</p>` : "";
 }
 async function viewAbout() {
@@ -1210,7 +1210,7 @@ function openFormDialog({ kicker = "", title, fields, submitLabel = "Save", onSu
   $("#formDialogMessage").textContent = "";
   $("#formDialogFields").innerHTML = fields.map(f => `<label>${esc(f.label)}${f.hint ? ` <small>${esc(f.hint)}</small>` : ""}${
     f.type === "textarea" ? `<textarea name="${f.name}" rows="${f.rows || 5}" ${f.required ? "required" : ""} minlength="${f.minlength || 0}" maxlength="${f.maxlength || 5000}">${esc(f.value || "")}</textarea>`
-    : f.type === "select" ? `<select name="${f.name}">${f.options.map(o => `<option${o === f.value ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>`
+    : f.type === "select" ? `<select name="${f.name}">${f.options.map(o => { const [val, label] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(val)}"${val === f.value ? " selected" : ""}>${esc(label)}</option>`; }).join("")}</select>`
     : `<input name="${f.name}" type="${f.type || "text"}" value="${esc(f.value || "")}" ${f.required ? "required" : ""} minlength="${f.minlength || 0}" maxlength="${f.maxlength || 300}" ${f.autocomplete ? `autocomplete="${f.autocomplete}"` : ""}>`}</label>`).join("");
   const form = $("#dialogForm");
   form.onsubmit = async e => {
@@ -1236,6 +1236,7 @@ function openDiscussionDialog(title = "") {
   openFormDialog({ kicker: "Community", title: "Start a discussion", submitLabel: "Publish discussion", fields: [
     { name: "title", label: "Title", required: true, minlength: 5, maxlength: 180, value: title.slice(0, 180) },
     { name: "topic", label: "Topic", type: "select", options: TOPICS, value: "Geopolitics" },
+    { name: "lang", label: "Language", type: "select", options: Object.entries(LANGUAGES).map(([k, x]) => [k, x.name]), value: lang },
     { name: "body", label: "Your opening post", type: "textarea", rows: 7, required: true, minlength: 10 }
   ], onSubmit: async v => { const d = await apiJSON("/api/community/posts", v); toast("Discussion published."); await loadCommunity(); navigate(`/discussion/${d.id}`); } });
 }
@@ -1245,6 +1246,9 @@ const avatarColour = name => AVATAR_COLOURS[[...String(name)].reduce((h, c) => (
 const avatar = (name, cls = "") => `<span class="av ${cls}" style="--av:${avatarColour(name)}" aria-hidden="true">${esc(initials(name))}</span>`;
 const TOPIC_COLOURS = { Geopolitics: "#0f5c8c", Security: "#b8141f", India: "#b4570e", Diplomacy: "#6b3fa0", Markets: "#137a55", Energy: "#7a530f", General: "#596173" };
 const topicChip = t => `<span class="topic-chip" style="--tc:${TOPIC_COLOURS[t] || "#596173"}">${esc(t)}</span>`;
+// Discussions are held in English, Hindi or Bengali; the language shows on each one.
+const langChip = l => l && l !== "en" && LANGUAGES[l] ? `<span class="lang-chip" lang="${l}">${LANGUAGES[l].name}</span>` : "";
+const langAttr = l => LANGUAGES[l] ? ` lang="${LANGUAGES[l].locale}"` : "";
 const sqlTime = d => new Date(String(d).replace(" ", "T") + (/[zZ+]/.test(String(d)) ? "" : "Z")).toISOString();
 function voteButton(p) {
   return `<button class="vote${p.voted ? " on" : ""}" type="button" data-action="vote" data-id="${esc(p.id)}" aria-pressed="${!!p.voted}" aria-label="Useful (${p.votes || 0})"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 4l8 10h-5v6H9v-6H4z"/></svg><b>${p.votes || 0}</b></button>`;
@@ -1253,9 +1257,9 @@ function threadCard(p) {
   const last = p.lastReplyAt ? `last reply ${ago(sqlTime(p.lastReplyAt))}` : `posted ${ago(sqlTime(p.createdAt))}`;
   return `<article class="thread-card glass">${voteButton(p)}
     <a class="thread-main" href="/discussion/${encodeURIComponent(p.id)}">
-      <span class="thread-top">${topicChip(p.topic)}${p.replies >= 3 || p.votes >= 3 ? `<span class="hot">Active</span>` : ""}</span>
-      <h3>${esc(p.title)}</h3>
-      <p>${esc(p.body.length > 220 ? p.body.slice(0, 217) + "…" : p.body)}</p>
+      <span class="thread-top">${topicChip(p.topic)}${langChip(p.lang)}${p.replies >= 3 || p.votes >= 3 ? `<span class="hot">Active</span>` : ""}</span>
+      <h3${langAttr(p.lang)}>${esc(p.title)}</h3>
+      <p${langAttr(p.lang)}>${esc(p.body.length > 220 ? p.body.slice(0, 217) + "…" : p.body)}</p>
       <span class="thread-foot">${avatar(p.author, "sm")}<span class="who"><b>${esc(p.author)}</b> · ${last}</span>
         <span class="talkers">${(p.repliers || []).slice(0, 3).map(n => avatar(n, "xs")).join("")}</span>
         <span class="count"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16v10H9l-5 4z"/></svg>${p.replies || 0}</span></span>
@@ -1263,7 +1267,8 @@ function threadCard(p) {
 }
 async function viewCommunity(r = parseRoute()) {
   const sort = r.params.get("sort") === "top" ? "top" : "latest", topic = TOPICS.includes(r.params.get("topic")) ? r.params.get("topic") : "";
-  const q = (o = {}) => { const p = new URLSearchParams(); const s_ = o.sort ?? sort, t = o.topic ?? topic; if (s_ === "top") p.set("sort", "top"); if (t) p.set("topic", t); const qs = p.toString(); return `/community${qs ? "?" + qs : ""}`; };
+  const inLang = LANGUAGES[r.params.get("in")] ? r.params.get("in") : ""; // discussions in one language
+  const q = (o = {}) => { const p = new URLSearchParams(); const s_ = o.sort ?? sort, t = o.topic ?? topic, l = o.in ?? inLang; if (s_ === "top") p.set("sort", "top"); if (t) p.set("topic", t); if (l) p.set("in", l); const qs = p.toString(); return `/community${qs ? "?" + qs : ""}`; };
   const st = state.communityStats;
   $("#view").innerHTML = `<div class="wrap">
     <section class="community-hero"><div><span class="join-eyebrow"><span class="pulse"></span>The Raisina Wire community</span><h1>Ideas in conversation</h1>
@@ -1273,12 +1278,13 @@ async function viewCommunity(r = parseRoute()) {
     <div class="community-page"><div>
       <button class="composer glass" type="button" data-action="discuss">${state.user ? avatar(state.user.displayName) : `<span class="av" style="--av:#596173">+</span>`}<span>${state.user ? `What’s your take, ${esc(state.user.displayName.split(" ")[0])}? Start a discussion…` : "Join free to start a discussion…"}</span><span class="btn btn-red btn-sm">Post</span></button>
       <div class="community-tools"><div class="pill-tabs" role="tablist"><a role="tab" href="${q({ sort: "latest" })}" aria-selected="${sort === "latest"}">Latest</a><a role="tab" href="${q({ sort: "top" })}" aria-selected="${sort === "top"}">Top</a></div>
-        <div class="chips topic-filter"><a class="chip" href="${q({ topic: "" })}" aria-pressed="${!topic}">All topics</a>${TOPICS.map(t => `<a class="chip" href="${q({ topic: t })}" aria-pressed="${t === topic}">${t}</a>`).join("")}</div></div>
+        <div class="chips topic-filter"><a class="chip" href="${q({ topic: "" })}" aria-pressed="${!topic}">All topics</a>${TOPICS.map(t => `<a class="chip" href="${q({ topic: t })}" aria-pressed="${t === topic}">${t}</a>`).join("")}</div>
+        <div class="chips lang-filter" aria-label="Language"><a class="chip" href="${q({ in: "" })}" aria-pressed="${!inLang}">All languages</a>${Object.entries(LANGUAGES).map(([k, x]) => `<a class="chip" href="${q({ in: k })}" aria-pressed="${k === inLang}" lang="${k}" data-no-tr>${x.name}</a>`).join("")}</div></div>
       <div class="thread-list" id="threadList">${Array.from({ length: 3 }, () => `<div class="skeleton" style="height:150px;border-radius:20px"></div>`).join("")}</div></div>
     <aside>${studioMiniAd("community_page")}<div class="aside-card glass"><div class="kicker">Upcoming</div><ol class="agenda" id="agenda"></ol><a class="link-gold" href="/events" style="display:block;margin-top:12px;font-size:13px">All events →</a></div></aside></div></div>`;
   renderCommunity();
   let posts = [];
-  try { posts = (await fetch(`/api/community/posts?${new URLSearchParams(Object.entries({ sort, topic }).filter(([, v]) => v && v !== "latest"))}`).then(x => x.json())).posts || []; } catch { /* offline */ }
+  try { posts = (await fetch(`/api/community/posts?${new URLSearchParams(Object.entries({ sort, topic, lang: inLang }).filter(([, v]) => v && v !== "latest"))}`).then(x => x.json())).posts || []; } catch { /* offline */ }
   if (parseRoute().page !== "community") return;
   $("#threadList").innerHTML = posts.length ? posts.map(threadCard).join("") : `<div class="empty-state glass"><span class="empty-icon">${PERK_ICONS.talk}</span><b>${topic ? `No ${topic.toLowerCase()} discussions yet` : "No discussions yet"}</b><p>Start the first one. Ask a question, share a source, or challenge a story.</p><button class="btn btn-red" type="button" data-action="discuss">Start a discussion</button></div>`;
   const people = [...new Set(posts.flatMap(p => [p.author, ...(p.repliers || [])]))].slice(0, 7);
@@ -1296,8 +1302,8 @@ async function viewDiscussion(r) {
   $("#view").innerHTML = `<div class="wrap"><div class="discussion">
     <a class="back-link" href="/community">← All discussions</a>
     <article class="thread-post glass">
-      <header>${topicChip(p.topic)}<h1>${esc(p.title)}</h1><div class="post-by">${avatar(p.author)}<span><b>${esc(p.author)}</b><small>${ago(sqlTime(p.createdAt))}</small></span></div></header>
-      <p class="post-body">${esc(p.body)}</p>
+      <header>${topicChip(p.topic)}${langChip(p.lang)}<h1${langAttr(p.lang)}>${esc(p.title)}</h1><div class="post-by">${avatar(p.author)}<span><b>${esc(p.author)}</b><small>${ago(sqlTime(p.createdAt))}</small></span></div></header>
+      <p class="post-body"${langAttr(p.lang)}>${esc(p.body)}</p>
       <footer>${voteButton(p)}<span class="muted">${d.replies.length} repl${d.replies.length === 1 ? "y" : "ies"}</span>${shareBlock(p.title, `/discussion/${encodeURIComponent(p.id)}`)}</footer>
     </article>
     <h2 class="thread-count">${d.replies.length ? `${d.replies.length} repl${d.replies.length === 1 ? "y" : "ies"}` : "No replies yet"}</h2>

@@ -121,7 +121,36 @@ Cancel: `event-status <id> cancelled`.
 Confirm before sending; it reaches every reader's phone.
 
 Public links: articles `/article/<slug>`, editions `/edition/<slug>`, live `/coverage/<slug>`,
-multimedia `/watch`, events `/events`.
+multimedia `/watch`, events `/events`. Hindi and Bengali versions: the same path after `/hi` or `/bn`.
+
+## Hindi and Bengali versions
+
+Every article and edition you publish gets a Hindi and a Bengali version, written by you in the
+same step (unless the user says not to). Show the translated headlines with the English draft;
+after the English is published, save each version with its story id:
+
+`npm run publish -- translation <storyId> hi hi.json` (and `bn`), where the JSON is
+`{ "title": "…", "dek": "…", "topic": "…", "heroCaption": "…", "tags": ["…"], "body": "…" }`.
+`tags` are labels in the same order as the English tags (the links stay English).
+
+- **Hindi:** the house style of Sanmarg and Dainik Bhaskar: standard Hindi news language in
+  Devanagari, clear and direct, short sentences; the words Hindi papers print (सरकार, सेना, सीमा,
+  बाजार) over heavy Sanskritised coinages; English terms only where Hindi papers keep them (ड्रोन,
+  सेंसेक्स); Indian numbering (हजार, लाख, करोड़) with digits 0-9.
+- **Bengali:** Anandabazar Patrika's colloquial standard (চলিত ভাষা, never সাধু): natural Kolkata
+  newsroom idiom; English terms only where Kolkata papers keep them; Bengali digits (০-৯) and
+  Indian numbering (হাজার, লক্ষ, কোটি).
+- Both: faithful to the English, nothing added or dropped; facts, numbers, quotes and attributions
+  exactly as in the English; same paragraphs, `## ` headings and bullets; established spellings of
+  names; "Raisina Wire" stays in Latin script; URLs and @handles unchanged.
+
+Other commands: `translations` (which stories and pages have each language; "English changed"
+means the English was edited after the translation), `translation-get <ref> <hi|bn>` (the English
+and the current version, to update one), `translation-delete <ref> <hi|bn>`. Site pages use
+`page:<key>` as the ref (`page:about`, `page:terms`, `page:privacy`, `page:disclaimer`,
+`page:copyright`, `page:community-guidelines`, `page:grievance`) with `{ "title", "body" }`, the
+body being the page's HTML with only the text translated. When the user asks to "translate what's
+missing", list `translations` and work through the missing and "English changed" ones.
 
 ## Desk request fields
 

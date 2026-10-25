@@ -19,6 +19,11 @@
 //   event-status <id> <published|cancelled|draft>
 //   alert <json>                    send a major alert
 //   image <file> [alt]              upload an image; prints its /media/ URL
+//   translations                    which stories and pages have Hindi and Bengali versions
+//   translation-get <ref> <hi|bn>   the English source and the current translation
+//   translation <ref> <hi|bn> <json>  save a translation: {title, dek, topic, heroCaption, tags, body}
+//   translation-delete <ref> <hi|bn>
+//     <ref> is a story id, or page:<key> for a site page (page:about, page:terms, …; body is HTML)
 import { readFileSync } from "node:fs";
 
 const SITE = (process.env.RW_SITE || "https://raisinawire.calibrex.org").replace(/\/+$/, "");
@@ -47,6 +52,12 @@ async function call(method, path, body, headers = {}) {
   return data;
 }
 const out = data => console.log(JSON.stringify(data, null, 2));
+// Translations: <ref> is a story id or page:<key>; the language is hi or bn.
+function trPath(ref, lang) {
+  if (!ref || !["hi", "bn"].includes(lang)) fail("Give the story id (or page:<key>) and the language, hi or bn.");
+  const [kind, id] = ref.startsWith("page:") ? ["page", ref.slice(5)] : ["article", ref];
+  return `/api/admin/translations/${kind}/${encodeURIComponent(id)}/${lang}`;
+}
 const link = (kind, slug) => `${SITE}/${kind}/${encodeURIComponent(slug)}`;
 
 const [cmd, a, b] = process.argv.slice(2);
@@ -58,7 +69,7 @@ switch (cmd) {
     break;
   }
   case "list": {
-    const paths = { articles: "/api/admin/articles", live: "/api/admin/live", media: "/api/admin/media", events: "/api/admin/events", alerts: "/api/admin/alerts", images: "/api/admin/images" };
+    const paths = { translations: "/api/admin/translations", articles: "/api/admin/articles", live: "/api/admin/live", media: "/api/admin/media", events: "/api/admin/events", alerts: "/api/admin/alerts", images: "/api/admin/images" };
     if (!paths[a]) fail(`list one of: ${Object.keys(paths).join(", ")}`);
     const d = await call("GET", paths[a]);
     if (a === "articles") d.articles = d.articles.map(({ body, ...rest }) => rest);
@@ -99,6 +110,16 @@ switch (cmd) {
     out({ ...d, absoluteUrl: SITE + d.url });
     break;
   }
+  case "translations": out(await call("GET", "/api/admin/translations")); break;
+  case "translation-get": out(await call("GET", trPath(a, b))); break;
+  case "translation": {
+    const d = await call("PUT", trPath(a, b), readJson(process.argv[5]));
+    const [kind, ref] = a.startsWith("page:") ? ["page", a.slice(5)] : ["article", a];
+    const href = kind === "page" ? `/${ref}` : (await call("GET", "/api/admin/articles")).articles.find(x => x.id === ref)?.href;
+    out({ ...d, url: href ? `${SITE}/${b}${href}` : undefined });
+    break;
+  }
+  case "translation-delete": out(await call("DELETE", trPath(a, b))); break;
   default:
-    fail("Unknown command. Run with one of: health, list, article, article-update, live-open, live-update, live-status, media, media-status, event, event-status, alert, image.");
+    fail("Unknown command. Run with one of: health, list, article, article-update, live-open, live-update, live-status, media, media-status, event, event-status, alert, image, translations, translation-get, translation, translation-delete.");
 }
