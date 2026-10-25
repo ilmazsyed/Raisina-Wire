@@ -1059,3 +1059,5 @@ html[data-theme=dark] .lang-pop a:hover{background:rgba(255,255,255,.08)}
 html[data-theme=dark] .tr-note{background:rgba(255,120,120,.1)}
 .lang-chip{display:inline-flex;padding:3px 9px;border-radius:999px;background:rgba(15,20,34,.06);color:var(--ink-2);font:700 12px var(--sans)}
 .lang-filter{margin-top:8px}
+/* A drop cap splits Indic letter clusters, so Hindi and Bengali stories open without one. */
+html:is([data-lang=hi],[data-lang=bn]) .prose.dropcap>p:first-of-type:first-letter{float:none;margin:0;font:inherit;color:inherit}
