@@ -123,6 +123,13 @@ and once it is merged and deployed publish both cuts with `media`: the 16:9 cut 
 `video` (it joins the Explainers carousel on the homepage) and the 9:16 cut with `mediaType`
 `short` (a story bubble on the homepage and Vertical shorts on Watch). `mediaUrl` is
 `/videos/<slug>-16x9.mp4` (or `-9x16.mp4`) and `thumbnailUrl` the matching `.jpg`.
+**Photos in explainers:** the user may send up to six photos for an explainer. Confirm they have the
+rights and what each one shows (for captions), save them in `video/scripts/media/`, and spread them
+through the film between the motion graphics. Use the clearest portrait as a `cutout` title (the
+subject cut out as a sticker in front of the headline). Use one wide shot as `photo` with `style:
+"parallax"` and one as `style: "duotone"`. Put two or three related shots in a `collage`, and use
+the rest as `bg` backdrops behind `number`, `stats` or `quote` scenes. Never invent what a photo
+shows, and only use photos the user sent.
 
 **Event or briefing:** `event` with `{ "title": "…", "description": "…", "eventType": "Briefing",
 "startsAt": "2026-11-01T18:00:00+05:30", "access": "public", "notify": true }`.

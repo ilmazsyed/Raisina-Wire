@@ -14,9 +14,10 @@ import numpy as np, soundfile as sf
 SR = 24000
 MODEL_DIR = os.environ.get("RW_VIDEO_MODELS", os.path.expanduser("~/.cache/rw-video"))
 LEAD, TAIL, GAP, MIN_SCENE = 0.6, 2.4, 0.55, 2.8      # seconds
-# Two anchors who take turns, scene by scene: Kokoro's liveliest female and male voices, read briskly.
-ANCHORS = ["af_bella", "am_michael"]
-ANCHOR_SPEED = {"af_bella": 1.12, "am_michael": 1.22}   # matched so both read at an anchor's clip
+# Two British anchors who take turns, scene by scene: Kokoro's best British female and male voices,
+# each sped so both read at about 2.7 words a second, a brisk news pace.
+ANCHORS = ["bf_emma", "bm_george"]
+ANCHOR_SPEED = {"bf_emma": 1.15, "bm_george": 1.3, "af_bella": 1.12, "am_michael": 1.22}
 
 
 def voices_for(spec):
