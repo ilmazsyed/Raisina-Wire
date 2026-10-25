@@ -1,0 +1,133 @@
+{
+  "slug": "europe-youth-protests-explained",
+  "title": "Why Europe's youth are on the streets",
+  "series": "Explained",
+  "pace": 1.6,
+  "captionChars": 36,
+  "ticker": "France calls nationwide strike as protests over housing and living costs spread across Europe",
+  "scenes": [
+    {
+      "type": "photo",
+      "src": "media/eu-wake-up.jpg",
+      "focus": 0.5,
+      "focusV": 0.45,
+      "title": "Why Europe's youth are on the streets",
+      "say": "From Paris to Milan to Lisbon, young Europeans are on the streets. Here's why.",
+      "source": "Reuters"
+    },
+    {
+      "type": "map",
+      "kicker": "A continent in protest",
+      "title": "Marches, clashes and cleared camps",
+      "view": [-12, 17, 36, 53],
+      "pins": [
+        { "lon": 2.35, "lat": 48.86, "label": "Paris" },
+        { "lon": 4.84, "lat": 45.76, "label": "Lyon", "side": "left" },
+        { "lon": 9.19, "lat": 45.46, "label": "Milan" },
+        { "lon": 12.5, "lat": 41.9, "label": "Rome" },
+        { "lon": -9.14, "lat": 38.72, "label": "Lisbon", "side": "left" },
+        { "lon": -8.61, "lat": 41.15, "label": "Porto", "side": "left" },
+        { "lon": 4.35, "lat": 50.85, "label": "Brussels" }
+      ],
+      "say": "France, Italy, Portugal and Belgium have all seen protests. The common thread is rent, wages and the rising cost of living."
+    },
+    {
+      "type": "stats",
+      "kicker": "France, Saturday 24 October",
+      "title": "A huge march, a huge police operation",
+      "bg": "media/eu-paris-barricade.jpg",
+      "items": [
+        { "value": 410000, "label": "marched", "inr": true },
+        { "value": 70000, "label": "police deployed", "inr": true },
+        { "value": 1314, "label": "arrested", "inr": true }
+      ],
+      "hot": 0,
+      "say": "In France, 410,000 people marched on Saturday. 70,000 police kept a lid on the looting seen a week earlier, and 1,314 people were arrested.",
+      "speak": "In France, four hundred and ten thousand people marched on Saturday. Seventy thousand police kept a lid on the looting seen a week earlier, and one thousand three hundred and fourteen people were arrested.",
+      "source": "French Interior Ministry"
+    },
+    {
+      "type": "collage",
+      "kicker": "Clashes",
+      "title": "Paris and Lyon",
+      "photos": [
+        { "src": "media/eu-paris-window.jpg", "caption": "A shop window smashed in Paris" },
+        { "src": "media/eu-lyon-teargas.jpg", "caption": "Tear gas in Lyon" },
+        { "src": "media/eu-masked-fence.jpg", "caption": "Masked protesters" }
+      ],
+      "say": "There were still sporadic clashes, in Paris, Lyon and Marseille. And police unions say they can't keep up this level of deployment for long.",
+      "source": "Reuters"
+    },
+    {
+      "type": "timeline",
+      "kicker": "What comes next",
+      "title": "France braces for more",
+      "items": [
+        { "when": "17 Oct", "what": "Looting and vandalism" },
+        { "when": "24 Oct", "what": "410,000 march" },
+        { "when": "31 Oct", "what": "New rallies called" },
+        { "when": "5 Nov", "what": "Nationwide strike", "hot": true }
+      ],
+      "say": "Unions have called fresh rallies for 31 October and a nationwide strike on 5 November. The Yellow Vests are joining in.",
+      "speak": "Unions have called fresh rallies for the thirty-first of October and a nationwide strike on the fifth of November. The Yellow Vests are joining in."
+    },
+    {
+      "type": "quote",
+      "text": "We see an aggregation of anger.",
+      "who": "Murielle Guilbert",
+      "role": "Co-leader, Solidaires union federation",
+      "bg": "media/eu-flare-night.jpg",
+      "say": "We see an aggregation of anger, says union leader Murielle Guilbert. Students, workers and firefighters are converging. And Macron, with strained finances and no majority, has little to offer."
+    },
+    {
+      "type": "photo",
+      "src": "media/eu-milan-statue.jpg",
+      "style": "duotone",
+      "focus": 0.5,
+      "focusV": 0.4,
+      "title": "Italy sends soldiers to Milan",
+      "say": "In Italy, thousands marched in Milan, Rome and Turin. Giorgia Meloni sent 500 more soldiers to Milan, and luxury stores boarded up their windows.",
+      "speak": "In Italy, thousands marched in Milan, Rome and Turin. Giorgia Meloni sent five hundred more soldiers to Milan, and luxury stores boarded up their windows.",
+      "source": "Reuters"
+    },
+    {
+      "type": "collage",
+      "kicker": "Portugal",
+      "title": "A housing emergency",
+      "photos": [
+        { "src": "media/eu-lisbon-housing.jpg", "caption": "Housing march in Lisbon" },
+        { "src": "media/eu-lisbon-students.jpg", "caption": "Students against higher tuition fees" }
+      ],
+      "say": "In Lisbon, police cleared a camp of more than 100 tents after a housing march, making 25 arrests. Activists say 60 people were hurt.",
+      "speak": "In Lisbon, police cleared a camp of more than a hundred tents after a housing march, making twenty-five arrests. Activists say sixty people were hurt.",
+      "source": "Reuters"
+    },
+    {
+      "type": "number",
+      "kicker": "Why Portugal is angry",
+      "value": 300000,
+      "inr": true,
+      "label": "homes short nationwide, as many as all of Lisbon. Prices have more than doubled since 2017",
+      "bg": "media/eu-lisbon-housing.jpg",
+      "say": "Portugal is short of 300,000 homes, as many as all of Lisbon. House prices have more than doubled since 2017.",
+      "speak": "Portugal is short of three hundred thousand homes, as many as all of Lisbon. House prices have more than doubled since twenty seventeen.",
+      "source": "Bank of Portugal"
+    },
+    {
+      "type": "list",
+      "kicker": "Why India is watching",
+      "title": "Partners under pressure",
+      "items": [
+        "France faces a strike as Macron's term winds down",
+        "Italy is fortifying its commercial capital",
+        "Housing anger spreads fast"
+      ],
+      "say": "For India, key European partners have less bandwidth for trade and strategy. And the lesson travels: when homes slip out of reach for the young, anger follows."
+    },
+    {
+      "type": "outro",
+      "title": "Read the full story in English, Hindi and Bengali",
+      "say": "Read the full story on Raisina Wire."
+    }
+  ]
+}
