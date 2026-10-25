@@ -113,6 +113,16 @@ that change. Unpublish: `{"status":"draft"}`. Archive: `{"status":"archived"}`. 
 "category": "Geopolitics", "thumbnailUrl": "", "description": "…", "status": "published" }`.
 Unpublish: `media-status <id> draft`.
 
+**Explainer video** (when the user asks for an explainer, video or Vox-style animation of a story):
+write a script for the engine in `video/` (read `video/README.md` for scene types), 60–120 seconds,
+8–12 scenes, facts only from the source, numbers as numerals in `say` with a spelt-out `speak`.
+Show the script (scene list and narration) and get a go-ahead, then
+`npm run video -- video/scripts/<slug>.json`, check stills, and send the MP4s to the user to watch.
+The files ship with the site: commit `public/videos/<slug>-*` and the script on a branch, open a PR,
+and once it is merged and deployed add the 16:9 cut to Watch with `media` (`mediaUrl`
+`https://raisinawire.calibrex.org/videos/<slug>-16x9.mp4`, `thumbnailUrl` the matching `.jpg`,
+`mediaType` `video`). The 9:16 cut is for Reels, Shorts and LinkedIn.
+
 **Event or briefing:** `event` with `{ "title": "…", "description": "…", "eventType": "Briefing",
 "startsAt": "2026-11-01T18:00:00+05:30", "access": "public", "notify": true }`.
 Cancel: `event-status <id> cancelled`.
