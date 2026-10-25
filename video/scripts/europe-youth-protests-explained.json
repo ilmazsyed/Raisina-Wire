@@ -19,15 +19,51 @@
       "type": "map",
       "kicker": "A continent in protest",
       "title": "Marches, clashes and cleared camps",
-      "view": [-12, 17, 36, 53],
+      "view": [
+        -12,
+        17,
+        36,
+        53
+      ],
       "pins": [
-        { "lon": 2.35, "lat": 48.86, "label": "Paris" },
-        { "lon": 4.84, "lat": 45.76, "label": "Lyon", "side": "left" },
-        { "lon": 9.19, "lat": 45.46, "label": "Milan" },
-        { "lon": 12.5, "lat": 41.9, "label": "Rome" },
-        { "lon": -9.14, "lat": 38.72, "label": "Lisbon", "side": "left" },
-        { "lon": -8.61, "lat": 41.15, "label": "Porto", "side": "left" },
-        { "lon": 4.35, "lat": 50.85, "label": "Brussels" }
+        {
+          "lon": 2.35,
+          "lat": 48.86,
+          "label": "Paris"
+        },
+        {
+          "lon": 4.84,
+          "lat": 45.76,
+          "label": "Lyon",
+          "side": "left"
+        },
+        {
+          "lon": 9.19,
+          "lat": 45.46,
+          "label": "Milan"
+        },
+        {
+          "lon": 12.5,
+          "lat": 41.9,
+          "label": "Rome"
+        },
+        {
+          "lon": -9.14,
+          "lat": 38.72,
+          "label": "Lisbon",
+          "side": "left"
+        },
+        {
+          "lon": -8.61,
+          "lat": 41.15,
+          "label": "Porto",
+          "side": "left"
+        },
+        {
+          "lon": 4.35,
+          "lat": 50.85,
+          "label": "Brussels"
+        }
       ],
       "say": "France, Italy, Portugal and Belgium have all seen protests. The common thread is rent, wages and the rising cost of living."
     },
@@ -37,9 +73,21 @@
       "title": "A huge march, a huge police operation",
       "bg": "media/eu-paris-barricade.jpg",
       "items": [
-        { "value": 410000, "label": "marched", "inr": true },
-        { "value": 70000, "label": "police deployed", "inr": true },
-        { "value": 1314, "label": "arrested", "inr": true }
+        {
+          "value": 410000,
+          "label": "marched",
+          "inr": true
+        },
+        {
+          "value": 70000,
+          "label": "police deployed",
+          "inr": true
+        },
+        {
+          "value": 1314,
+          "label": "arrested",
+          "inr": true
+        }
       ],
       "hot": 0,
       "say": "In France, 410,000 people marched on Saturday. 70,000 police kept a lid on the looting seen a week earlier, and 1,314 people were arrested.",
@@ -51,9 +99,18 @@
       "kicker": "Clashes",
       "title": "Paris and Lyon",
       "photos": [
-        { "src": "media/eu-paris-window.jpg", "caption": "A shop window smashed in Paris" },
-        { "src": "media/eu-lyon-teargas.jpg", "caption": "Tear gas in Lyon" },
-        { "src": "media/eu-masked-fence.jpg", "caption": "Masked protesters" }
+        {
+          "src": "media/eu-paris-window.jpg",
+          "caption": "A shop window smashed in Paris"
+        },
+        {
+          "src": "media/eu-lyon-teargas.jpg",
+          "caption": "Tear gas in Lyon"
+        },
+        {
+          "src": "media/eu-masked-fence.jpg",
+          "caption": "Masked protesters"
+        }
       ],
       "say": "There were still sporadic clashes, in Paris, Lyon and Marseille. And police unions say they can't keep up this level of deployment for long.",
       "source": "Reuters"
@@ -63,10 +120,23 @@
       "kicker": "What comes next",
       "title": "France braces for more",
       "items": [
-        { "when": "17 Oct", "what": "Looting and vandalism" },
-        { "when": "24 Oct", "what": "410,000 march" },
-        { "when": "31 Oct", "what": "New rallies called" },
-        { "when": "5 Nov", "what": "Nationwide strike", "hot": true }
+        {
+          "when": "17 Oct",
+          "what": "Looting and vandalism"
+        },
+        {
+          "when": "24 Oct",
+          "what": "410,000 march"
+        },
+        {
+          "when": "31 Oct",
+          "what": "New rallies called"
+        },
+        {
+          "when": "5 Nov",
+          "what": "Nationwide strike",
+          "hot": true
+        }
       ],
       "say": "Unions have called fresh rallies for 31 October and a nationwide strike on 5 November. The Yellow Vests are joining in.",
       "speak": "Unions have called fresh rallies for the thirty-first of October and a nationwide strike on the fifth of November. The Yellow Vests are joining in."
@@ -95,8 +165,14 @@
       "kicker": "Portugal",
       "title": "A housing emergency",
       "photos": [
-        { "src": "media/eu-lisbon-housing.jpg", "caption": "Housing march in Lisbon" },
-        { "src": "media/eu-lisbon-students.jpg", "caption": "Students against higher tuition fees" }
+        {
+          "src": "media/eu-lisbon-housing.jpg",
+          "caption": "Housing march in Lisbon"
+        },
+        {
+          "src": "media/eu-lisbon-students.jpg",
+          "caption": "Students against higher tuition fees"
+        }
       ],
       "say": "In Lisbon, police cleared a camp of more than 100 tents after a housing march, making 25 arrests. Activists say 60 people were hurt.",
       "speak": "In Lisbon, police cleared a camp of more than a hundred tents after a housing march, making twenty-five arrests. Activists say sixty people were hurt.",
@@ -129,5 +205,6 @@
       "title": "Read the full story in English, Hindi and Bengali",
       "say": "Read the full story on Raisina Wire."
     }
-  ]
+  ],
+  "story": "/article/europe-s-youth-take-to-the-streets-france-plans-a-nationwide-strike-as-protests-spread-ove"
 }
