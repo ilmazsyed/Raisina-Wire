@@ -632,6 +632,28 @@ function shareLinks(text, url) {
   return [["whatsapp", "WhatsApp", `https://wa.me/?text=${tu}`], ["x", "X", `https://twitter.com/intent/tweet?text=${t}&url=${u}`], ["facebook", "Facebook", `https://www.facebook.com/sharer/sharer.php?u=${u}`], ["linkedin", "LinkedIn", `https://www.linkedin.com/sharing/share-offsite/?url=${u}`],
     ["telegram", "Telegram", `https://t.me/share/url?url=${u}&text=${t}`], ["mail", "Email", `mailto:?subject=${t}&body=${tu}`]];
 }
+// Where a video or short is shared to: the Watch page opens it (a short in the player).
+const mediaUrl = m => `${location.origin}${withLang("/watch")}?v=${encodeURIComponent(m.id)}`;
+const shareBtn = (title, url, cls = "update-share") => `<button class="${cls}" type="button" data-action="share-native" data-title="${esc(title)}" data-url="${esc(url)}" aria-label="Share">${SHARE_ICONS.share}<span>Share</span></button>`;
+// No share sheet (most desktop browsers): a small panel with the social buttons instead.
+function openSharePop(title, url) {
+  let pop = $("#sharePop");
+  if (!pop) {
+    pop = document.createElement("div"); pop.id = "sharePop"; pop.className = "share-pop glass"; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Share");
+    document.body.append(pop);
+    pop.addEventListener("click", e => { if (e.target.closest("[data-pop-close]") || e.target.closest("a.share-btn")) closeSharePop(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && !pop.hidden) { e.stopPropagation(); closeSharePop(); } }, true);
+    document.addEventListener("pointerdown", e => { if (!pop.hidden && !pop.contains(e.target) && !e.target.closest("[data-action=share-native],[data-sv=share]")) closeSharePop(); });
+  }
+  pop.innerHTML = `<div class="share-pop-head"><b>${esc(title)}</b><button class="modal-close" type="button" data-pop-close aria-label="Close">×</button></div>${shareBlock(title, "", url).replace(/<button class="share-btn share-native"[^]*?<\/button>/, "")}`;
+  pop.hidden = false;
+  pop.querySelector("a.share-btn")?.focus({ preventScroll: true });
+}
+function closeSharePop() { const p = $("#sharePop"); if (p) p.hidden = true; }
+async function shareOut(title, url) {
+  if (navigator.share) { try { await navigator.share({ title, text: title, url }); } catch { /* cancelled */ } return; }
+  openSharePop(title, url);
+}
 function shareBlock(title, href, url = location.origin + withLang(href)) {
   return `<div class="share-row"><span class="meta">Share</span><button class="share-btn share-native" type="button" data-action="share-native" data-title="${esc(title)}" data-url="${esc(url)}" aria-label="Share">${SHARE_ICONS.share}</button>${shareLinks(title, url).map(([k, label, link]) => `<a class="share-btn share-${k}" href="${link}" target="_blank" rel="noopener" aria-label="Share on ${label}">${SHARE_ICONS[k]}</a>`).join("")}<button class="share-btn" type="button" data-action="copy-link" data-url="${esc(url)}" aria-label="Copy link">${SHARE_ICONS.link}</button></div>`;
 }
@@ -1090,8 +1112,7 @@ async function onAction(e) {
   if (a === "save") { try { saveForLater(JSON.parse(el.dataset.item)); } catch { /* malformed */ } }
   if (a === "share-native") {
     e.preventDefault();
-    const data = { title: el.dataset.title, text: el.dataset.title, url: el.dataset.url };
-    try { if (navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(`${data.title} ${data.url}`); toast("Link copied."); } } catch { /* cancelled */ }
+    await shareOut(el.dataset.title, el.dataset.url);
   }
   if (a === "share") {
     const data = { title: el.dataset.title, url: location.href };
@@ -1451,7 +1472,7 @@ function shortBubbles(list) {
 }
 function videoCard(m) {
   return `<article class="vcard"><div class="vcard-media" data-video="${esc(m.id)}"><button class="vcard-play" type="button" data-action="play-video" data-id="${esc(m.id)}" aria-label="Play: ${esc(m.title)}">${img(m.thumbnailUrl, "")}<span class="play-badge" aria-hidden="true"></span></button></div>
-    <div class="vcard-body"><span class="kicker">${esc(m.category || "Explainer")}</span><h3>${esc(m.title)}</h3>${m.description ? `<p>${esc(m.description)}</p>` : ""}</div></article>`;
+    <div class="vcard-body"><span class="kicker">${esc(m.category || "Explainer")}</span><h3>${esc(m.title)}</h3>${m.description ? `<p>${esc(m.description)}</p>` : ""}${shareBtn(m.title, mediaUrl(m))}</div></article>`;
 }
 function renderHomeMedia() {
   const rail = $("#shortsRail"), band = $("#videoBand");
@@ -1482,7 +1503,7 @@ function openShorts(index) {
   let el = $("#shortsViewer");
   if (!el) {
     el = document.createElement("div"); el.id = "shortsViewer"; el.className = "shorts-viewer"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-label", "Shorts");
-    el.innerHTML = `<div class="sv-stage"><div class="sv-bars"></div><div class="sv-top"><b class="sv-title sr-only" aria-live="polite"></b><span class="sv-grow"></span><button class="sv-btn" type="button" data-sv="mute" aria-label="Mute">🔊</button><button class="sv-btn" type="button" data-sv="close" aria-label="Close">✕</button></div>
+    el.innerHTML = `<div class="sv-stage"><div class="sv-bars"></div><div class="sv-top"><b class="sv-title sr-only" aria-live="polite"></b><span class="sv-grow"></span><button class="sv-btn sv-share" type="button" data-sv="share" aria-label="Share this short">${SHARE_ICONS.share}</button><button class="sv-btn" type="button" data-sv="mute" aria-label="Mute">🔊</button><button class="sv-btn" type="button" data-sv="close" aria-label="Close">✕</button></div>
       <video class="sv-video" playsinline preload="auto"></video><button class="sv-zone sv-prev" type="button" data-sv="prev" aria-label="Previous short"></button><button class="sv-zone sv-next" type="button" data-sv="next" aria-label="Next short"></button>
       <div class="sv-paused" aria-hidden="true">❚❚</div></div>`;
     document.body.append(el);
@@ -1493,13 +1514,14 @@ function openShorts(index) {
       if (el.dataset.held) { delete el.dataset.held; return; }   // a press-and-hold pause is not a tap
       const b = e.target.closest("[data-sv]"); if (!b) return;
       const k = b.dataset.sv;
-      if (k === "close") closeShorts(); else if (k === "prev") stepShort(-1); else if (k === "next") stepShort(1);
+      if (k === "share") { const m = shortsState?.list[shortsState.i]; if (m) { v.pause(); shareOut(m.title, mediaUrl(m)).then(() => { if (!$("#sharePop") || $("#sharePop").hidden) v.play().catch(() => {}); }); } }
+      else if (k === "close") closeShorts(); else if (k === "prev") stepShort(-1); else if (k === "next") stepShort(1);
       else if (k === "mute") { v.muted = !v.muted; b.textContent = v.muted ? "🔇" : "🔊"; b.setAttribute("aria-label", v.muted ? "Unmute" : "Mute"); }
     });
     // hold to pause, swipe down to close
     let y0 = null, held = null;
     el.addEventListener("pointerdown", e => { if (e.target.closest(".sv-top")) return; y0 = e.clientY; held = setTimeout(() => { v.pause(); el.classList.add("held"); }, 220); });
-    const release = e => { clearTimeout(held); if (el.classList.contains("held")) { el.classList.remove("held"); el.dataset.held = "1"; v.play().catch(() => {}); } if (y0 != null && e.clientY - y0 > 90) closeShorts(); y0 = null; };
+    const release = e => { if (e.target.closest?.(".sv-top")) { clearTimeout(held); y0 = null; return; } clearTimeout(held); if (el.classList.contains("held")) { el.classList.remove("held"); el.dataset.held = "1"; v.play().catch(() => {}); } if (y0 != null && e.clientY - y0 > 90) closeShorts(); y0 = null; };
     el.addEventListener("pointerup", release); el.addEventListener("pointercancel", release);
     document.addEventListener("keydown", e => { if (el.hidden) return; if (e.key === "Escape") closeShorts(); if (e.key === "ArrowRight") stepShort(1); if (e.key === "ArrowLeft") stepShort(-1); if (e.key === " ") { e.preventDefault(); v.paused ? v.play() : v.pause(); } });
   }
@@ -1540,12 +1562,21 @@ function mediaEmbed(m) {
   if (/\.(mp4|webm)(\?|$)/i.test(u)) return `<div class="media-frame"><video controls preload="none" src="${esc(u)}"${m.thumbnailUrl ? ` poster="${esc(m.thumbnailUrl)}"` : ""}></video></div>`;
   return `${m.thumbnailUrl ? `<div class="media-frame">${img(m.thumbnailUrl, m.title)}</div>` : ""}<a class="btn btn-light btn-sm" href="${esc(u)}" target="_blank" rel="noreferrer">Open ↗</a>`;
 }
+let openedShared = null;
 function viewWatch() {
   const all = state.media, list = all && shorts(), items = all && all.filter(m => !isShort(m));
   $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Watch &amp; listen</div><h1>Video, audio and images</h1><p>Briefings and explainers from the Raisina Wire desk.</p></div></div>
   ${list && list.length ? `<section class="watch-shorts" id="shorts" aria-labelledby="shortsTitle"><div class="section-head"><h2 id="shortsTitle">Vertical shorts</h2></div><div class="shorts-grid">${list.map((m, i) => `<button class="short-tile" type="button" data-action="short" data-index="${i}" aria-label="Play: ${esc(m.title)}">${img(m.thumbnailUrl, "")}<span class="play-badge" aria-hidden="true"></span><span class="short-tile-title">${esc(m.title)}</span></button>`).join("")}</div></section>
   <div class="section-head" style="margin-top:34px"><h2>Videos, audio and images</h2></div>` : ""}
-  <div class="media-grid">${items == null ? `<div class="skeleton" style="height:300px"></div>` : items.length ? items.map(m => `<article class="glass media-card">${mediaEmbed(m)}<div class="body"><span class="kicker">${esc(m.category || m.mediaType)}</span><h3>${esc(m.title)}</h3>${m.description ? `<p>${esc(m.description)}</p>` : ""}<span class="meta">${m.publishedAt ? shortDate(m.publishedAt) : ""}</span></div></article>`).join("") : `<div class="empty">Nothing published yet. Video and audio briefings will appear here.</div>`}</div></div>`;
+  <div class="media-grid">${items == null ? `<div class="skeleton" style="height:300px"></div>` : items.length ? items.map(m => `<article class="glass media-card" id="m-${esc(m.id)}">${mediaEmbed(m)}<div class="body"><span class="kicker">${esc(m.category || m.mediaType)}</span><h3>${esc(m.title)}</h3>${m.description ? `<p>${esc(m.description)}</p>` : ""}<span class="meta">${m.publishedAt ? shortDate(m.publishedAt) : ""}</span>${shareBtn(m.title, mediaUrl(m))}</div></article>`).join("") : `<div class="empty">Nothing published yet. Video and audio briefings will appear here.</div>`}</div></div>`;
+  // A shared link (/watch?v=id) opens that short in the player, or scrolls to that video.
+  const want = parseRoute().params.get("v");
+  if (want && all && openedShared !== want) {
+    openedShared = want;
+    const k = list.findIndex(m => m.id === want);
+    if (k >= 0) openShorts(k);
+    else { const card = document.getElementById(`m-${want}`); if (card) { card.scrollIntoView({ block: "center" }); card.classList.add("flash"); } }
+  }
 }
 
 /* ---------- Account ---------- */

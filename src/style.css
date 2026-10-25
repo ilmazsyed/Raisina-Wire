@@ -1243,3 +1243,17 @@ body.sv-open{overflow:hidden}
 @media(max-width:760px){.home>#shortsRail{margin:8px 0 0}}
 
 @media(max-width:760px){.coverage-head .share-row{flex-wrap:nowrap;gap:6px}.coverage-head .share-row .meta{display:none}.coverage-head .share-btn{width:36px;height:36px;flex-shrink:0}.coverage-head .share-btn svg{width:16px;height:16px}}
+
+/* Share panel (browsers without a share sheet) and share buttons on videos and shorts */
+.share-pop{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:260;width:min(440px,calc(100% - 24px));border-radius:22px;padding:14px 16px 16px}
+.share-pop[hidden]{display:none}
+.share-pop-head{display:flex;align-items:flex-start;gap:10px;justify-content:space-between}
+.share-pop-head b{font:500 16px/1.3 var(--serif);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.share-pop .share-row{margin-top:12px;flex-wrap:nowrap;gap:6px}
+.share-pop .share-row .meta{display:none}
+.share-pop .share-btn{width:38px;height:38px;flex-shrink:0}
+.vcard-body .update-share,.media-card .update-share{float:none;margin:12px 0 0}
+.sv-share{display:grid;place-items:center}
+.sv-share svg{width:17px;height:17px}
+.media-card.flash{animation:cardflash 2.2s ease}
+@keyframes cardflash{0%,40%{box-shadow:0 0 0 3px var(--red),var(--glass-shadow)}100%{box-shadow:var(--glass-shadow)}}

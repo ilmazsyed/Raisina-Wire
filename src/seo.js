@@ -176,6 +176,13 @@ async function pageFor(path, url, env, o, lang = "en") {
       ld: [{ "@context": "https://schema.org", "@type": "WebPage", url: `${o}/${section}`, name: d.title, dateModified: new Date(LEGAL_UPDATED).toISOString(), isPartOf: { "@id": `${o}/#website` } }],
       body: `<article><h1>${d.title}</h1><p>Last updated ${LEGAL_UPDATED}</p>${d.html}</article>` };
   }
+  // A shared video or short (/watch?v=id): its own title and picture in link previews.
+  if (section === "watch" && url.searchParams.get("v")) {
+    const m = await env.DB.prepare("SELECT id,title,description,media_type AS mediaType,thumbnail_url AS thumb FROM media_items WHERE id=? AND status='published'").bind(url.searchParams.get("v")).first();
+    if (m) return { canonicalPath: "/watch", ogUrl: `${o}${lang === "en" ? "" : `/${lang}`}/watch?v=${encodeURIComponent(m.id)}`, type: "video.other",
+      title: `${m.title} · ${SITE}`, ogTitle: m.title, description: clip(m.description || `${m.mediaType === "short" ? "A short" : "An explainer"} from the Raisina Wire desk.`, 200),
+      image: m.thumb ? (/^https?:/.test(m.thumb) ? m.thumb : o + m.thumb) : undefined, body: `<h1>${esc(m.title)}</h1>${m.description ? `<p>${esc(m.description)}</p>` : ""}` };
+  }
   if (section === "watch") return { title: `Watch and listen: video and audio briefings · ${SITE}`, description: "Video, audio and image briefings from the Raisina Wire desk.", body: `<h1>Watch and listen</h1>` };
 
   if (section === "community") {
@@ -240,7 +247,7 @@ export async function renderPage(request, env, ensureSchema) {
   const head = [
     `<link rel="canonical" href="${esc(canonical)}">`, ...hreflang,
     ...(lang !== "en" ? [`<meta property="og:locale" content="${LOCALES[lang].replace("-", "_")}">`] : []),
-    `<meta property="og:url" content="${esc(canonical)}">`,
+    `<meta property="og:url" content="${esc(page.ogUrl || canonical)}">`,
     `<meta name="twitter:title" content="${esc(page.ogTitle || page.title)}">`,
     `<meta name="twitter:description" content="${esc(page.description)}">`,
     ...(page.article ? [`<meta property="article:published_time" content="${esc(page.article.published)}">`, `<meta property="article:modified_time" content="${esc(page.article.modified)}">`,
