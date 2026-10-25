@@ -53,5 +53,6 @@ thirty crore rupees"), `hold` (extra seconds on screen) and `source` (shown at t
 | `outro` | `title`, `url` |
 
 Maps are dot maps of land only (Natural Earth coastlines at 0.4°, `engine/land.json`, covering
-20°W–110°E, 10°S–60°N: Europe, Africa, the Middle East and Asia); no borders are drawn. Keep every fact, figure and quote to what the source
+20°W–110°E, 10°S–60°N: Europe, Africa, the Middle East and Asia; plus 95°W–30°W, 25°S–30°N:
+the Caribbean, Central America and northern South America); no borders are drawn. Keep every fact, figure and quote to what the source
 story says, as for articles.
