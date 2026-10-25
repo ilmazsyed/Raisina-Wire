@@ -49,7 +49,7 @@ thirty crore rupees"), `hold` (extra seconds on screen) and `source` (shown at t
 | `map` | `kicker`, `title`, `view: [lon0, lon1, lat0, lat1]`, `pins: [{lon, lat, label, side}]`, `stats: [{value, label}]` |
 | `quote` | `text`, `who`, `role` |
 | `list` | `kicker`, `title`, `items: [..]` |
-| `photo` | `src` (a file path relative to the script, or a URL), `title` |
+| `photo` | `src` (a file path relative to the script, or a URL), `title`, `focus` / `focusV` (0–1: which part of a wide photo stays in frame, landscape / vertical) |
 | `outro` | `title`, `url` |
 
 Maps are dot maps of land only (Natural Earth coastlines at 0.4°, `engine/land.json`, covering

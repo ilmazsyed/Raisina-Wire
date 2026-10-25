@@ -1,0 +1,117 @@
+{
+  "slug": "netanyahu-nuclear-image-explained",
+  "title": "Netanyahu's nuclear image, two days before Israel votes",
+  "series": "Explained",
+  "voice": "bf_emma",
+  "speed": 1.1,
+  "pace": 1.6,
+  "captionChars": 36,
+  "story": "/article/netanyahu-ai-nuclear-image-tel-aviv-israel-election",
+  "scenes": [
+    {
+      "type": "title",
+      "kicker": "Explained · Israel",
+      "title": "Netanyahu's nuclear image, two days before Israel votes",
+      "say": "Two days before Israel votes, Benjamin Netanyahu posted a mushroom cloud over Tel Aviv. Here's why."
+    },
+    {
+      "type": "photo",
+      "src": "media/netanyahu-ai-image.webp",
+      "focus": 0.5,
+      "focusV": 0.22,
+      "title": "An AI-generated image of a nuclear blast over Tel Aviv",
+      "say": "On 25 October, the Israeli prime minister shared an AI-generated image of a nuclear explosion engulfing the city.",
+      "speak": "On the twenty-fifth of October, the Israeli prime minister shared an AI-generated image of a nuclear explosion engulfing the city."
+    },
+    {
+      "type": "quote",
+      "text": "The State of Israel is in real and tangible existential danger.",
+      "who": "Yuval Blumberg",
+      "role": "Israeli writer and commentator, in the statement Netanyahu shared",
+      "say": "With it came a statement by commentator Yuval Blumberg: Israel is in real and tangible existential danger if Iran gets nuclear weapons."
+    },
+    {
+      "type": "number",
+      "kicker": "The deadline",
+      "value": 2,
+      "suffix": " years",
+      "label": "of Trump's term left to 'finish the work in Iran', the statement argued",
+      "source": "NDTV",
+      "say": "Its argument: Israel has two more years of Donald Trump to finish the work in Iran, and no one knows what comes after.",
+      "speak": "Its argument: Israel has two more years of Donald Trump to finish the work in Iran, and no one knows what comes after."
+    },
+    {
+      "type": "quote",
+      "text": "The man and those around him have lost it. The pressure is mounting.",
+      "who": "Yair Golan",
+      "role": "Chairman, the Democrats",
+      "say": "Rivals called it fearmongering. Yair Golan said Netanyahu should be kept off social media. Gadi Eisenkot called him hysterical."
+    },
+    {
+      "type": "stats",
+      "kicker": "The vote",
+      "title": "Israel votes on Tuesday",
+      "items": [
+        {
+          "value": 120,
+          "label": "Seats in the Knesset"
+        },
+        {
+          "value": 61,
+          "label": "Needed to govern"
+        }
+      ],
+      "hot": 1,
+      "source": "NDTV",
+      "say": "Israel votes on Tuesday by proportional representation. A party or coalition needs 61 of the Knesset's 120 seats to govern.",
+      "speak": "Israel votes on Tuesday by proportional representation. A party or coalition needs sixty-one of the Knesset's hundred and twenty seats to govern."
+    },
+    {
+      "type": "map",
+      "kicker": "Why India is watching",
+      "title": "Iran, Israel and the oil route",
+      "view": [
+        28,
+        64,
+        18,
+        42
+      ],
+      "pins": [
+        {
+          "lon": 34.78,
+          "lat": 32.08,
+          "label": "Tel Aviv",
+          "side": "left"
+        },
+        {
+          "lon": 51.39,
+          "lat": 35.69,
+          "label": "Tehran"
+        },
+        {
+          "lon": 56.4,
+          "lat": 26.6,
+          "label": "Strait of Hormuz"
+        }
+      ],
+      "say": "For India, a two-year deadline on Iran means risk. Most of India's crude is imported, and much of the Gulf's energy passes through Hormuz."
+    },
+    {
+      "type": "list",
+      "kicker": "The stakes for India",
+      "title": "What escalation could cost",
+      "items": [
+        "Higher oil prices",
+        "Costlier freight and insurance",
+        "Pressure on the rupee",
+        "A harder balancing act"
+      ],
+      "say": "Escalation could mean higher oil, freight and insurance costs, a weaker rupee, and a harder balancing act between Israel, Iran and the Gulf."
+    },
+    {
+      "type": "outro",
+      "title": "Read the full analysis in English, Hindi and Bengali",
+      "say": "Read the full analysis on Raisina Wire."
+    }
+  ]
+}

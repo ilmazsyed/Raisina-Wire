@@ -332,7 +332,8 @@
         if (im.complete && im.naturalWidth) {
           const sc = Math.max(W / im.naturalWidth, H / im.naturalHeight) * lerp(1.04, 1.14, u / 8);
           const dw = im.naturalWidth * sc, dh = im.naturalHeight * sc;
-          ctx.drawImage(im, (W - dw) / 2 + lerp(0, -W * .02, u / 8), (H - dh) / 2, dw, dh);
+          const fx = V ? (s.focusV ?? s.focus ?? .5) : (s.focus ?? .5);   // which part of a wide photo stays in frame (0 left … 1 right)
+          ctx.drawImage(im, (W - dw) * fx + lerp(0, -W * .02, u / 8), (H - dh) / 2, dw, dh);
           const g = ctx.createLinearGradient(0, H * .45, 0, H); g.addColorStop(0, 'rgba(15,20,34,0)'); g.addColorStop(1, 'rgba(15,20,34,.85)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
         }
         ctx.font = font('serif', M * .07, 600); ctx.fillStyle = '#fff';
