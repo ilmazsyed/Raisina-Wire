@@ -346,7 +346,7 @@ function wireEmpty() {
 function viewHome() {
   const [lead, ...rest] = stories();
   $("#view").innerHTML = `
-  <div class="wrap">
+  <div class="wrap home">
     <section class="dock glass" aria-label="Market pulse"><div class="dock-head"><b>Market pulse</b><span class="muted" id="dockStatus" style="font-size:12px">Loading quotes…</span><a class="link-gold" href="/markets" style="font-size:13px">All markets →</a></div><div class="dock-grid" id="dock"></div></section>
 
     <section id="liveBanner" class="band-tight" aria-label="Live coverage" hidden></section>
@@ -594,7 +594,7 @@ function translationNote(a, original) {
   if (lang === "en") return "";
   const here = withLang(a.href || location.pathname);
   if (original) return `<p class="tr-note" lang="${LOCALE}">${tr("You are reading the English original.")} <a href="${here}">${tr(lang === "hi" ? "Read this story in Hindi" : "Read this story in Bengali")}</a></p>`;
-  if (a.lang === lang) return `<p class="tr-note" lang="${LOCALE}">${tr("Translated from English")} · <a href="${here}?orig=1">${tr("Read the English original")}</a></p>`;
+  if (a.lang === lang) return `<p class="tr-note" lang="${LOCALE}">${tr(a.machine ? "Translated automatically from English" : "Translated from English")} · <a href="${here}?orig=1">${tr("Read the English original")}</a></p>`;
   return `<p class="tr-note" lang="${LOCALE}">${tr(lang === "hi" ? "This story is not available in Hindi yet. Here it is in English." : "This story is not available in Bengali yet. Here it is in English.")}</p>`;
 }
 // One view per story per browser session; nothing is stored about the reader.
@@ -970,7 +970,7 @@ async function viewExternal(r) {
     <aside class="reader-aside" id="extAside"></aside></div></div>`;
   renderExtAside();
   let data;
-  try { data = await fetch(`/api/read?url=${encodeURIComponent(url)}`).then(res => res.json()); }
+  try { data = await fetch(`/api/read?url=${encodeURIComponent(url)}${lang !== "en" ? `&lang=${lang}` : ""}`).then(res => res.json()); }
   catch { data = { blocked: true, reason: "unreachable" }; }
   if (parseRoute().params.get("u") !== url) return; // navigated away meanwhile
   const title = data.title || known.title || "Article";
@@ -991,6 +991,7 @@ async function viewExternal(r) {
   $("#extArticle").innerHTML = `<div class="kicker">${esc(known.category || site)}</div><h1>${esc(title)}</h1>
     ${data.description ? `<p class="dek">${esc(data.description)}</p>` : ""}
     <div class="reader-byline"><div><b>${esc(data.byline || site)}</b><div class="muted" style="font-size:13px">${esc(site)}</div></div><span class="grow"></span><span class="meta">${data.publishedAt ? new Date(data.publishedAt).toLocaleString(LOCALE, { ...IST, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : known.publishedAt ? `${clock(known.publishedAt)} IST` : ""}</span></div>
+    ${data.mt ? `<p class="tr-note" lang="${LOCALE}">${tr("Translated automatically from English")} · <a href="${esc(data.url || url)}" target="_blank" rel="noopener">${tr("Read the English original")}</a></p>` : ""}
     <div class="notice">${ICON_INFO}<span>An excerpt from ${esc(site)}, shown with credit for news reporting. The story and its copyright belong to ${esc(site)}. <a href="/copyright">How we use other publishers’ work</a></span></div>
     ${data.image ? `<figure class="reader-hero">${img(data.image)}<figcaption>Image: ${esc(site)}</figcaption></figure>` : ""}
     <div class="prose excerpt">${proseHTML(data.blocks || [])}<p class="excerpt-fade" aria-hidden="true"></p></div>
@@ -1131,9 +1132,9 @@ function renderTicker() {
 }
 async function loadCoverage() {
   try {
-    const d = await fetch("/api/live").then(r => r.ok ? r.json() : { items: [] });
+    const d = await fetch(`/api/live${lang !== "en" ? `?lang=${lang}` : ""}`).then(r => r.ok ? r.json() : { items: [] });
     state.coverage = d.items || [];
-    state.coverageLead = state.coverage[0] ? await fetch(`/api/live/${encodeURIComponent(state.coverage[0].slug)}`).then(r => r.ok ? r.json() : null) : null;
+    state.coverageLead = state.coverage[0] ? await fetch(`/api/live/${encodeURIComponent(state.coverage[0].slug)}${lang !== "en" ? `?lang=${lang}` : ""}`).then(r => r.ok ? r.json() : null) : null;
   } catch { state.coverage = []; state.coverageLead = null; }
   renderTicker(); renderLiveBanner(); renderNav(parseRoute());
 }
@@ -1156,7 +1157,7 @@ async function viewCoverage(r) {
   const slug = r.arg;
   const render = async (first) => {
     let d;
-    try { const res = await fetch(`/api/live/${encodeURIComponent(slug)}`); d = res.ok ? await res.json() : null; } catch { d = null; }
+    try { const res = await fetch(`/api/live/${encodeURIComponent(slug)}${lang !== "en" ? `?lang=${lang}` : ""}`); d = res.ok ? await res.json() : null; } catch { d = null; }
     if (parseRoute().page !== "coverage" || parseRoute().arg !== slug) return clearInterval(coverageTimer);
     if (!d) { if (first) $("#view").innerHTML = `<div class="wrap"><div class="blocked glass"><h1>This live coverage isn’t available</h1><p class="muted">It may have ended or been removed.</p><div class="blocked-actions"><a class="btn btn-dark" href="/live">Go to the live wire</a></div></div></div>`; return; }
     const isLive = d.item.status === "live";
@@ -1431,7 +1432,7 @@ async function loadMarkets() {
 }
 async function loadCommunity() {
   try { state.community = (await fetch("/api/community/posts").then(r => r.json())).posts || []; } catch { state.community = []; }
-  try { state.events = (await fetch("/api/events").then(r => r.json())).events || []; } catch { state.events = []; }
+  try { state.events = (await fetch(`/api/events${lang !== "en" ? `?lang=${lang}` : ""}`).then(r => r.json())).events || []; } catch { state.events = []; }
   try { state.communityStats = await fetch("/api/community/stats").then(r => r.ok ? r.json() : null); } catch { /* optional */ }
   renderCommunity();
   if (parseRoute().page === "community" && !$("#threadList")) viewCommunity();

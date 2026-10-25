@@ -44,3 +44,6 @@ TTS_VOICE = "en-IN-Chirp3-HD-Sulafat"
 PUBLISHER_OPT_OUT = ""
 
 # Market pulse uses keyless public feeds; no market-data secret is required.
+
+[ai]
+binding = "AI"

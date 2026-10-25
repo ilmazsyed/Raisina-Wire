@@ -124,7 +124,7 @@ export async function loadLanguage() {
   document.documentElement.lang = lang === "en" ? "en-IN" : LOCALE;
   document.documentElement.dataset.lang = lang;
   if (lang === "en") return;
-  const fonts = { hi: "Tiro+Devanagari+Hindi:ital@0;1&family=Mukta:wght@400;500;600;700;800", bn: "Tiro+Bangla:ital@0;1&family=Hind+Siliguri:wght@400;500;600;700" }[lang];
+  const fonts = { hi: "Tiro+Devanagari+Hindi:ital@0;1", bn: "Tiro+Bangla:ital@0;1" }[lang];
   const link = document.createElement("link");
   link.rel = "stylesheet"; link.href = `https://fonts.googleapis.com/css2?family=${fonts}&display=swap`;
   document.head.append(link);

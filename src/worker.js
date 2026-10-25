@@ -1,4 +1,4 @@
-import { cached, liveWire, readArticle, marketBoard } from "./feeds.js";
+import { cached, liveWire, readArticle, marketBoard, LANG_FEEDS } from "./feeds.js";
 import m0001 from "../migrations/0001_init.sql";
 import m0002 from "../migrations/0002_platform_modules.sql";
 import m0003 from "../migrations/0003_editorial_console.sql";
@@ -9,6 +9,7 @@ import m0007 from "../migrations/0007_tts_audio.sql";
 import m0008 from "../migrations/0008_community_votes.sql";
 import m0009 from "../migrations/0009_translations.sql";
 import m0010 from "../migrations/0010_community_language.sql";
+import m0011 from "../migrations/0011_machine_translation.sql";
 import { handleTts } from "./tts.js";
 import { editions } from "./editions.js";
 import editionBodies from "./edition-bodies.json";
@@ -16,6 +17,7 @@ import seedHi from "./translations/hi.json";
 import seedBn from "./translations/bn.json";
 import { ARTICLE_COLS, toArticle, listPublished, getBySlug, blocksToText, splitTags, tagSlug, isPublic, textHash, WRITERS, DEFAULT_WRITER } from "./store.js";
 import { LANGS, isLang, localiseArticles, localisePage, PAGES, pageVer } from "./translate.js";
+import { mtReady, translateFields, translateBody } from "./mt.js";
 import { vapidKeys, createAlert, drainAlerts } from "./push.js";
 import { renderPage, sitemap, newsSitemap, robots, feed, PAGE_PATTERN } from "./seo.js";
 
@@ -61,7 +63,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -252,6 +254,54 @@ async function gdeltNews(url) {
   return { source: "GDELT DOC 2.0", updatedAt: new Date().toISOString(), query: safeQ, articles };
 }
 
+/* ---------- Hindi and Bengali for news text (src/mt.js) ---------- */
+const reqLang = url => { const l = url.searchParams.get("lang"); return isLang(l) ? l : ""; };
+// The live wire in Hindi or Bengali: the language's own publishers, plus the English headlines
+// and summaries translated. Translation gets a few seconds; anything slower carries on in the
+// background (and in the cron) and appears on the next refresh.
+async function wireIn(env, ctx, lang) {
+  const w = await liveWire(lang);
+  if (!lang || !mtReady(env)) return w;
+  const own = new Set((LANG_FEEDS[lang] || []).map(f => f.name));
+  const items = w.items.filter(i => !own.has(i.source)).map(i => ({ ...i, titleEn: i.title }));
+  const job = translateFields(env, lang, items, ["title", "summary"]);
+  ctx?.waitUntil?.(job.catch(() => {}));
+  const done = await Promise.race([job.then(() => true, () => false), new Promise(r => setTimeout(() => r(false), 8000))]);
+  if (!done) return w;
+  const byUrl = new Map(items.map(i => [i.url, i]));
+  return { ...w, items: w.items.map(i => byUrl.get(i.url) || i), mt: true };
+}
+async function mtLive(env, lang, item, updates) {
+  await translateFields(env, lang, [item], ["title", "summary"]);
+  const bodies = await Promise.all(updates.map(u => translateBody(env, lang, u.body)));
+  updates.forEach((u, i) => { if (bodies[i] !== u.body) { u.body = bodies[i]; u.mt = true; } });
+}
+// Stories without an editor's translation: machine-translated, and marked so the reader says so.
+async function mtArticles(env, lang, list) {
+  if (!list.length || !mtReady(env)) return;
+  await translateFields(env, lang, list, ["title", "dek", "topic", "heroCaption"]);
+  for (const a of list) {
+    if (a.body !== undefined) { const b = await translateBody(env, lang, a.body); if (b !== a.body) { a.body = b; a.mt = true; } }
+    if (a.mt) { a.lang = lang; a.machine = true; }
+  }
+}
+// Cron: translate new headlines, live coverage and stories ahead of readers, so their pages
+// come from the D1 cache. Every five minutes; the daily cap in src/mt.js still applies.
+async function mtWarm(env) {
+  if (!mtReady(env) || new Date().getUTCMinutes() % 5) return;
+  for (const lang of LANGS) {
+    await wireIn(env, null, lang);
+    const live = await env.DB.prepare("SELECT id,title,summary FROM live_coverage WHERE status='live'").all();
+    for (const c of live.results) {
+      const ups = await env.DB.prepare("SELECT body FROM live_updates WHERE coverage_id=? ORDER BY created_at DESC LIMIT 30").bind(c.id).all();
+      await mtLive(env, lang, c, ups.results);
+    }
+    const list = (await localiseArticles(env, lang, await listPublished(env, { limit: 40 }))).filter(a => a.lang === "en");
+    const at = (Math.floor(Date.now() / 300e3) * 3) % Math.max(list.length, 1);
+    for (const a of list.slice(at, at + 3)) { const full = await getBySlug(env, a.slug); if (full) await mtArticles(env, lang, [full]); }
+  }
+}
+
 async function api(request, env, ctx) {
   const url = new URL(request.url);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: JSON_HEADERS });
@@ -266,13 +316,19 @@ async function api(request, env, ctx) {
     return json(await cached("markets", 45e3, marketBoard), 200, { "cache-control":"public, max-age=45, s-maxage=60" });
   }
   if (url.pathname === "/api/wire") {
-    const lang = isLang(url.searchParams.get("lang")) ? url.searchParams.get("lang") : "";
-    return json(await cached(`wire${lang}`, 90e3, () => liveWire(lang)), 200, { "cache-control":"public, max-age=60, s-maxage=90" });
+    const lang = reqLang(url);
+    return json(await cached(`wire${lang}`, 90e3, () => wireIn(env, ctx, lang)), 200, { "cache-control":"public, max-age=60, s-maxage=90" });
   }
   if (url.pathname === "/api/read") {
     const target = url.searchParams.get("url") || "";
     const optOut = String(env.PUBLISHER_OPT_OUT || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
-    const result = await cached(`read:${target}`, 10 * 60e3, () => readArticle(target, { optOut }));
+    const lang = reqLang(url);
+    const result = await cached(`read:${lang}:${target}`, 10 * 60e3, async () => {
+      const r = await readArticle(target, { optOut });
+      if (lang && r.ok) { await translateFields(env, lang, [r], ["title", "description"]); await translateFields(env, lang, r.blocks || [], ["x"]); if ((r.blocks || []).some(b => b.mt)) r.mt = true; }
+      else if (lang && r.title) await translateFields(env, lang, [r], ["title"]);
+      return r;
+    });
     return json(result, 200, { "cache-control":"public, max-age=600, s-maxage=600" });
   }
   if (url.pathname === "/api/config") {
@@ -477,6 +533,7 @@ async function api(request, env, ctx) {
   }
   if (url.pathname === "/api/live" && request.method === "GET") {
     const rows=await env.DB.prepare("SELECT id,slug,title,summary,status,started_at AS startedAt,ended_at AS endedAt FROM live_coverage WHERE status='live' ORDER BY started_at DESC LIMIT 20").all();
+    const lang=reqLang(url); if(lang) await translateFields(env,lang,rows.results,["title","summary"]);
     return json({items:rows.results});
   }
   if (url.pathname.startsWith("/api/live/") && request.method === "GET") {
@@ -484,6 +541,7 @@ async function api(request, env, ctx) {
     const item=await env.DB.prepare("SELECT id,slug,title,summary,status,started_at AS startedAt,ended_at AS endedAt FROM live_coverage WHERE slug=? AND status IN ('live','ended')").bind(slug).first();
     if(!item) return err("Live coverage not found.",404);
     const updates=await env.DB.prepare("SELECT body,media_url AS mediaUrl,source_url AS sourceUrl,created_at AS createdAt FROM live_updates WHERE coverage_id=? ORDER BY created_at DESC LIMIT 100").bind(item.id).all();
+    const lang=reqLang(url); if(lang) await mtLive(env,lang,item,updates.results);
     return json({item,updates:updates.results});
   }
   if (url.pathname === "/api/media" && request.method === "GET") {
@@ -494,7 +552,10 @@ async function api(request, env, ctx) {
   if (url.pathname === "/api/articles" && request.method === "GET") {
     const w = url.searchParams.get("writer");
     const list = await listPublished(env, { writerKey: WRITERS.some(x => x.key === w) ? w : null, tag: url.searchParams.get("tag"), limit: 300 });
-    return json({ articles: await localiseArticles(env, url.searchParams.get("lang"), list) });
+    const lang = reqLang(url);
+    const out = await localiseArticles(env, lang, list);
+    if (lang) await mtArticles(env, lang, out.filter(a => a.lang === "en"));
+    return json({ articles: out });
   }
   if (url.pathname === "/api/tags" && request.method === "GET") {
     const counts = new Map();
@@ -505,7 +566,9 @@ async function api(request, env, ctx) {
     const a = await getBySlug(env, decodeURIComponent(url.pathname.split("/").pop() || ""));
     if (!a) return err("Article not found.", 404);
     if (!isPublic(a) && !isStaff(await currentUser(request, env))) return err("Article not found.", 404);
-    const [localised] = await localiseArticles(env, url.searchParams.get("lang"), [a]);
+    const lang = reqLang(url);
+    const [localised] = await localiseArticles(env, lang, [a]);
+    if (lang && localised.lang === "en") await mtArticles(env, lang, [localised]);
     return json({ article: localised }, 200, { "cache-control": isPublic(a) ? "no-cache" : "no-store" });
   }
 
@@ -861,6 +924,7 @@ async function api(request, env, ctx) {
 
   if (url.pathname === "/api/events" && request.method === "GET") {
     const rows = await env.DB.prepare("SELECT id,title,description,event_type AS eventType,starts_at AS startsAt,access FROM events WHERE status='published' AND starts_at >= ? ORDER BY starts_at LIMIT 30").bind(new Date().toISOString()).all();
+    const lang = reqLang(url); if (lang) await translateFields(env, lang, rows.results, ["title", "description"]);
     return json({events:rows.results});
   }
   if (url.pathname === "/api/events" && request.method === "POST") {
@@ -987,6 +1051,8 @@ async function scheduled(env) {
   await step("scheduled stories", async () => { for (const row of results) await storyAlert(env, null, null, row); });
   await step("daily alerts", () => dailyAlerts(env, env.CRON_TEST_NOW ? new Date(env.CRON_TEST_NOW) : new Date())); // CRON_TEST_NOW: local tests only
   await step("push delivery", () => drainAlerts(env));
+  await step("translations", () => mtWarm(env));
+  await step("translation cache", () => env.DB.prepare("DELETE FROM mt_cache WHERE created_at < datetime('now','-45 days')").run());
 }
 // 9 am and 9 pm India time, every day (unless switched off in the control room).
 // The settings row makes each one send exactly once, even if two cron runs overlap.

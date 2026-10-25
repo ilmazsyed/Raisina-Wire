@@ -1020,8 +1020,8 @@ img.desk{border-radius:22%!important}
 
 /* ---------- Languages: Hindi and Bengali ---------- */
 /* Latin text keeps the house fonts; Devanagari and Bengali fall through to newspaper faces. */
-html[data-lang=hi]{--serif:Newsreader,"Tiro Devanagari Hindi",Georgia,serif;--display:"Noto Serif Display","Tiro Devanagari Hindi",Georgia,serif;--sans:Manrope,Mukta,system-ui,sans-serif;--mono:"DM Mono",Mukta,ui-monospace,monospace}
-html[data-lang=bn]{--serif:Newsreader,"Tiro Bangla",Georgia,serif;--display:"Noto Serif Display","Tiro Bangla",Georgia,serif;--sans:Manrope,"Hind Siliguri",system-ui,sans-serif;--mono:"DM Mono","Hind Siliguri",ui-monospace,monospace}
+html[data-lang=hi]{--serif:Newsreader,"Tiro Devanagari Hindi",Georgia,serif;--display:"Noto Serif Display","Tiro Devanagari Hindi",Georgia,serif;--sans:Manrope,"Tiro Devanagari Hindi",system-ui,sans-serif;--mono:"DM Mono","Tiro Devanagari Hindi",ui-monospace,monospace}
+html[data-lang=bn]{--serif:Newsreader,"Tiro Bangla",Georgia,serif;--display:"Noto Serif Display","Tiro Bangla",Georgia,serif;--sans:Manrope,"Tiro Bangla",system-ui,sans-serif;--mono:"DM Mono","Tiro Bangla",ui-monospace,monospace}
 /* Letter-spacing breaks the joined letters of Indic scripts, small sizes blur them, and they need
    more line height. The Raisina Wire wordmark keeps its own spacing. */
 html:is([data-lang=hi],[data-lang=bn]) :not(.wordmark,.wordmark *,.cx-word,.cx-word *){letter-spacing:0!important}
@@ -1078,4 +1078,24 @@ html[data-theme=dark] .lang-pop a[aria-current]{background:rgba(255,120,120,.12)
   .lb-title{font-size:17px}
   .lb-latest{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .lb-go{font-size:12.5px}
+}
+
+/* Phones and the installed app: a slim header so the first stories sit in the top of the screen. */
+@media(max-width:760px){
+  .masthead{padding-top:6px}
+  .nameplate{flex-direction:row;align-items:center;padding-bottom:8px;border-bottom-width:2px}
+  .nameplate-link{font-size:38px;gap:8px}
+  .nameplate-tag,.skyline-band{display:none}
+  .utility{padding-top:6px}
+  .nav-dock{margin-top:8px}
+  .site-nav{margin-top:0;padding:5px}
+  .site-nav a{padding:7px 12px;font-size:13.5px}
+  .home{display:flex;flex-direction:column}
+  .home>*{order:3}
+  .home>#liveBanner{order:1;margin-top:14px}
+  .home>.lead-grid{order:2;margin-top:14px}
+  .home>.dock{margin-top:30px}
+  .hero>img{height:200px}
+  .hero-card{margin-top:-40px}
+  .hero-card h1{font-size:27px}
 }
