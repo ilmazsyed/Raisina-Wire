@@ -560,5 +560,7 @@ export default {
   "Unmute": "শব্দ চালু করুন",
   "Previous short": "আগের শর্ট",
   "Next short": "পরের শর্ট",
-  "Explainer": "এক্সপ্লেনার"
+  "Explainer": "এক্সপ্লেনার",
+  "Share this update": "এই আপডেট শেয়ার করুন",
+  "Notifications are on for this device": "এই ডিভাইসে নোটিফিকেশন চালু আছে",
 };
