@@ -76,6 +76,59 @@
   const glow = (i, n) => (now(n) === i && S.r < S.vd + .3) ? 1 : 0;   // 1 while item i is being narrated
   const counter = (v, p, dec = 0) => (v * easeIO(p)).toFixed(dec);
 
+  /* ---------- photo toolkit: duotone, halftone, cut-out stickers, 3D cards ---------- */
+  // IMG[src] = { img, duo: crimson/ink duotone canvas, cut: cut-out image, sil: white silhouette, box }
+  const IMG = {};
+  let HALF = null;
+  function makeDuotone(img) {
+    const sc = Math.min(1, 1400 / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * sc); c.height = Math.round(img.naturalHeight * sc);
+    const g = c.getContext('2d'); g.drawImage(img, 0, 0, c.width, c.height);
+    const d = g.getImageData(0, 0, c.width, c.height), a = d.data, ink = [15, 20, 34], red = [184, 20, 31], pap = [245, 225, 205];
+    for (let i = 0; i < a.length; i += 4) {
+      let l = (a[i] * .3 + a[i + 1] * .59 + a[i + 2] * .11) / 255; l = clamp((l - .08) / .84);
+      const [p, q, t] = l < .5 ? [ink, red, l * 2] : [red, pap, (l - .5) * 2];
+      a[i] = p[0] + (q[0] - p[0]) * t; a[i + 1] = p[1] + (q[1] - p[1]) * t; a[i + 2] = p[2] + (q[2] - p[2]) * t;
+    }
+    g.putImageData(d, 0, 0); return c;
+  }
+  function makeSilhouette(img) {
+    const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const g = c.getContext('2d'); g.drawImage(img, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); return c;
+  }
+  function makeHalftone() {
+    const c = document.createElement('canvas'), n = Math.round(M * .012); c.width = c.height = n;
+    const g = c.getContext('2d'); g.fillStyle = 'rgba(15,20,34,.55)'; g.beginPath(); g.arc(n / 2, n / 2, n * .22, 0, TAU); g.fill(); HALF = ctx.createPattern(c, 'repeat');
+  }
+  const iw = im => im.naturalWidth || im.width, ih = im => im.naturalHeight || im.height;
+  // Draw an image to cover a box, zoomed by z around a focus point (fx, fy in 0..1).
+  function cover(im, x, y, w, h, z = 1, fx = .5, fy = .5) {
+    const sc = Math.max(w / iw(im), h / ih(im)) * z, dw = iw(im) * sc, dh = ih(im) * sc;
+    ctx.drawImage(im, x + (w - dw) * fx, y + (h - dh) * fy, dw, dh);
+  }
+  // A cut-out with a white sticker outline and a soft shadow.
+  function sticker(rec, x, y, w, h, outline = M * .008) {
+    if (!rec?.cut) return;
+    ctx.save(); ctx.shadowColor = 'rgba(15,20,34,.45)'; ctx.shadowBlur = M * .04; ctx.shadowOffsetY = M * .015;
+    for (let k = 0; k < 12; k++) { const a = k / 12 * TAU; ctx.drawImage(rec.sil, x + Math.cos(a) * outline, y + Math.sin(a) * outline, w, h); if (k === 0) ctx.shadowColor = 'transparent'; }
+    ctx.restore(); ctx.drawImage(rec.cut, x, y, w, h);
+  }
+  // A polaroid card with a pseudo-3D turn (ry around the vertical axis, rz in the picture plane).
+  function card3d(im, cx, cy, w, h, ry = 0, rz = 0, caption = '') {
+    const bd = w * .05, ch = caption ? h * .12 : bd;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(rz); ctx.transform(Math.cos(ry), Math.sin(ry) * .18, 0, 1, 0, 0);
+    ctx.shadowColor = 'rgba(15,20,34,.35)'; ctx.shadowBlur = M * .05; ctx.shadowOffsetY = M * .02;
+    ctx.fillStyle = '#fff'; ctx.fillRect(-w / 2 - bd, -h / 2 - bd, w + bd * 2, h + bd + ch); ctx.shadowColor = 'transparent';
+    ctx.save(); ctx.beginPath(); ctx.rect(-w / 2, -h / 2, w, h); ctx.clip(); cover(im, -w / 2, -h / 2, w, h, 1.05); ctx.restore();
+    if (caption) { ctx.fillStyle = C.ink; ctx.font = font('sans', ch * .42, 700); ctx.textAlign = 'center'; ctx.fillText(caption, 0, h / 2 + ch * .62, w); }
+    ctx.restore();
+  }
+  // A full-frame backdrop from a photo: duotone, halftone, slow drift.
+  function duoBackdrop(rec, alpha, k) {
+    if (!rec) return; ctx.save(); ctx.globalAlpha *= alpha; cover(rec.duo, 0, 0, W, H, lerp(1.08, 1.2, k), .5, .4);
+    ctx.globalAlpha *= .3; ctx.fillStyle = HALF; ctx.fillRect(0, 0, W, H); ctx.restore();
+  }
+
   /* ---------- the scenes: each returns draw(u, dur), u = seconds since the scene started ---------- */
   const SCENES = {
     title(s) {
@@ -367,11 +420,74 @@
       };
     },
 
-    // A full-frame photo with a slow push-in and a caption bar.
+    // The subject cut out as a sticker, a giant headline behind it, a duotone of the photo behind that.
+    cutout(s) {
+      return u => {
+        const rec = IMG[s.src], k = clamp(S.r / Math.max(3, S.dur)), right = (s.side || 'right') === 'right';
+        if (!rec) return;
+        duoBackdrop(rec, 1, k);
+        const vg = ctx.createLinearGradient(0, 0, W, 0); vg.addColorStop(0, 'rgba(15,20,34,.75)'); vg.addColorStop(1, 'rgba(15,20,34,.15)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+        // giant headline, sliding slowly, behind the subject
+        ctx.save(); ctx.font = font('serif', M * (V ? .13 : .16), 700); ctx.fillStyle = '#fff'; ctx.globalAlpha *= ease((u - .1) / .5);
+        const lines = wrap(s.title || '', V ? W * .9 : W * .5), lh = M * (V ? .13 : .16) * 1.02;
+        lines.forEach((l, i) => ctx.fillText(l, (V ? W * .06 : pad()) - (1 - ease((u - .1 - i * .08) / .6)) * W * .1 - k * W * .02 * (right ? 1 : -1), (V ? H * .2 : H * .3) + i * lh));
+        ctx.restore();
+        if (s.kicker) { ctx.save(); ctx.font = font('mono', M * .024, 500); const kw = ctx.measureText(s.kicker.toUpperCase()).width + M * .04; const ky = V ? H * .13 : H * .17;
+          ctx.globalAlpha *= ease(u / .4); ctx.fillStyle = C.red; ctx.fillRect(V ? W * .06 : pad(), ky - M * .032, kw, M * .046); ctx.fillStyle = '#fff'; ctx.fillText(s.kicker.toUpperCase(), (V ? W * .06 : pad()) + M * .02, ky); ctx.restore(); }
+        // the subject: pops up from the bottom, then floats against the background
+        if (rec.cut) {
+          const hgt = H * (V ? .6 : .88), wid = hgt * iw(rec.cut) / ih(rec.cut), maxW = W * (V ? .92 : .44);
+          const sc = Math.min(1, maxW / wid) * (1 + .035 * Math.sin(S.r * 1.3)), w = wid * sc, h = hgt * sc;
+          const x = V ? (W - w) / 2 : right ? W - w - W * .04 : W * .04, y = H - h + (1 - back((u - .15) / .7)) * H * .5;
+          ctx.save(); ctx.translate(x + w / 2 + k * W * .015 * (right ? -1 : 1), y + h); ctx.rotate(Math.sin(S.r * .8) * .012); sticker(rec, -w / 2, -h, w, h); ctx.restore();
+        }
+        sourceLine(s.source, u);
+      };
+    },
+
+    // Up to four photos as polaroids that fly in with a 3D turn; the one being talked about comes forward.
+    collage(s) {
+      return u => {
+        const ps = (s.photos || []).map(p => typeof p === 'string' ? { src: p } : p).filter(p => IMG[p.src]), n = ps.length; if (!n) return;
+        const tx = V ? W / 2 : pad(), align = V ? 'center' : 'left';
+        if (s.kicker) kicker(s.kicker, tx, H * (V ? .12 : .14), u, C.red, align);
+        if (s.title) { ctx.font = font('serif', M * .062, 600); ctx.fillStyle = C.ink; riseText(s.title, tx, H * (V ? .12 : .14) + M * .085, V ? W * .84 : W * .8, M * .07, u - .2, { align }); }
+        const cw = V ? W * .62 : Math.min(W * .3, W * .82 / n), chh = cw * .72, cur = now(n);
+        const order = [...ps.keys()].sort((a, b) => (a === cur) - (b === cur));
+        for (const i of order) {
+          const q = itemQ(i, n, .7); if (q <= 0) continue;
+          const f = n === 1 ? .5 : i / (n - 1);
+          const hx = V ? W / 2 + (i % 2 ? 1 : -1) * W * .08 : lerp(W * .18 + cw * .2, W * .82 - cw * .2, f), hy = V ? lerp(H * .36, H * .62, f) : H * (.56 + (i % 2 ? .06 : -.02));
+          const fromX = hx + (i % 2 ? 1 : -1) * W * .7, g = glow(i, n);
+          const cx = lerp(fromX, hx, ease(q)) + Math.sin(S.r * .9 + i) * M * .006, cy = hy + (1 - ease(q)) * H * .2 + Math.cos(S.r * .7 + i) * M * .005;
+          const ry = (1 - ease(q)) * 1.1 * (i % 2 ? -1 : 1), rz = ((i % 3) - 1) * .06 * (1 - g * .7) + (1 - q) * .3;
+          const sc = 1 + g * .14;
+          card3d(IMG[ps[i].src].img, cx, cy, cw * sc, chh * sc, ry, rz, ps[i].caption || '');
+        }
+        sourceLine(s.source, u);
+      };
+    },
+
+    // A full-frame photo. style: 'kenburns' (default), 'duotone' (brand duotone + halftone) or
+    // 'parallax' (the cut-out subject floats off its own background in 2.5D).
     photo(s) {
       const im = new Image(); im.src = s.src;
       return u => {
-        if (im.complete && im.naturalWidth) {
+        const rec = IMG[s.src];
+        if (s.style === 'duotone' && rec) {
+          duoBackdrop(rec, 1, clamp(S.r / Math.max(3, S.dur)));
+          const g = ctx.createLinearGradient(0, H * .4, 0, H); g.addColorStop(0, 'rgba(15,20,34,0)'); g.addColorStop(1, 'rgba(15,20,34,.8)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+        } else if (s.style === 'parallax' && rec?.cut && rec.box) {
+          const k = clamp(S.r / Math.max(3, S.dur)), b = rec.box, fx = V ? (s.focusV ?? s.focus ?? .5) : (s.focus ?? .5);
+          const base = Math.max(W / b.W, H / b.H), z1 = lerp(1.06, 1.12, easeIO(k)), z2 = lerp(1.06, 1.3, easeIO(k));
+          const ox = (W - b.W * base * z1) * fx - k * W * .02, oy = (H - b.H * base * z1) / 2;
+          ctx.save(); ctx.filter = `blur(${Math.round(M * .004 + k * M * .006)}px)`; ctx.drawImage(rec.img, ox, oy, b.W * base * z1, b.H * base * z1); ctx.restore();
+          ctx.fillStyle = 'rgba(15,20,34,.25)'; ctx.fillRect(0, 0, W, H);
+          // the subject sits where it was, but scales and shifts more: depth
+          const cxs = ox + (b.x + b.w / 2) * base * z1, cys = oy + (b.y + b.h) * base * z1, sw = b.w * base * z2, sh = b.h * base * z2;
+          ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = M * .05; ctx.drawImage(rec.cut, cxs - sw / 2 + k * W * .025, cys - sh + (z2 - z1) * sh * .1, sw, sh); ctx.restore();
+          const g = ctx.createLinearGradient(0, H * .45, 0, H); g.addColorStop(0, 'rgba(15,20,34,0)'); g.addColorStop(1, 'rgba(15,20,34,.8)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+        } else if (im.complete && im.naturalWidth) {
           const k = clamp(S.r / Math.max(3, S.dur)), sc = Math.max(W / im.naturalWidth, H / im.naturalHeight) * lerp(1.08, 1.26, easeIO(k));
           ctx.save(); ctx.translate(W / 2, H / 2); ctx.rotate(lerp(-.012, .012, k)); ctx.translate(-W / 2, -H / 2);
           const dw = im.naturalWidth * sc, dh = im.naturalHeight * sc;
@@ -382,6 +498,7 @@
           lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(.5, 'rgba(255,255,255,.10)'); lg.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = lg; ctx.fillRect(0, 0, W, H);
           const g = ctx.createLinearGradient(0, H * .45, 0, H); g.addColorStop(0, 'rgba(15,20,34,0)'); g.addColorStop(1, 'rgba(15,20,34,.85)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
         }
+        if (u < .3) { ctx.save(); ctx.globalAlpha = (1 - u / .3) * .6; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); ctx.restore(); }   // a flash on the cut
         ctx.font = font('serif', M * .07, 600); ctx.fillStyle = '#fff';
         riseText(s.title || '', pad(), H * (V ? .62 : .66), V ? W * .84 : W * .7, M * .08, u - .3);
       };
@@ -424,6 +541,8 @@
   }
   function chrome(t, total) {
     const ms = M * .05, x = pad(), y = V ? H * .05 : M * .06;
+    ctx.save(); ctx.font = font('sans', M * .024, 800); const bw = ms * 1.3 + ctx.measureText('RAISINA WIRE').width + M * .03;   // a light pill keeps the logo readable over photos
+    rrect(x - M * .012, y - M * .01, bw, ms + M * .02, (ms + M * .02) / 2); ctx.fillStyle = 'rgba(245,241,234,.82)'; ctx.fill(); ctx.restore();
     drawMark(x + ms / 2, y + ms / 2, ms);
     ctx.font = font('sans', M * .024, 800); ctx.fillStyle = C.ink; ctx.textAlign = 'left'; ctx.fillText('RAISINA', x + ms * 1.3, y + ms * .48);
     ctx.fillStyle = C.red; ctx.fillText('WIRE', x + ms * 1.3 + ctx.measureText('RAISINA ').width, y + ms * .48);
@@ -510,6 +629,7 @@
       ctx.save(); ctx.globalAlpha = 1 - ease(out);
       ctx.translate(W / 2 + dx, H / 2 + dy); ctx.scale(z, z); ctx.translate(-W / 2, -H / 2);
       if (!fast) ctx.translate(0, -out * M * .03);
+      const bg = spec.scenes[i].bg; if (bg && IMG[bg]) { duoBackdrop(IMG[bg], .16, kk); ctx.fillStyle = 'rgba(245,241,234,.55)'; ctx.fillRect(0, 0, W, H); }
       built[i](u * PACE, sc.dur); ctx.restore();
       if (fast && i > 0 && u < .42) transition(i % 3, u / .42);
     }
@@ -521,9 +641,19 @@
     await document.fonts.load(font('serif', 40, 600)); await document.fonts.load(font('sans', 40, 700)); await document.fonts.load(font('mono', 40, 500));
     LAND = await fetch('land.json').then(r => r.json()).catch(() => []);
     makeGrain();
+    makeHalftone();
+    const loadImg = src => new Promise(r => { const im = new Image(); im.onload = () => r(im); im.onerror = () => r(null); im.src = src; });
+    const srcs = new Set(), cuts = {};
+    for (const sc of spec.scenes) {
+      for (const p of [sc.src, sc.bg, ...(sc.photos || []).map(p => typeof p === 'string' ? p : p.src)]) if (p) srcs.add(p);
+      if (sc.cut) cuts[sc.src] = { cut: sc.cut, box: sc.cutBox };
+    }
+    await Promise.all([...srcs].map(async src => {
+      const img = await loadImg(src); if (!img) return;
+      const rec = IMG[src] = { img, duo: makeDuotone(img) };
+      if (cuts[src]) { const c = await loadImg(cuts[src].cut); if (c) { rec.cut = c; rec.sil = makeSilhouette(c); rec.box = cuts[src].box; } }
+    }));
     built = spec.scenes.map(sc => (SCENES[sc.type] || SCENES.title)(sc));
-    const imgs = spec.scenes.filter(sc => sc.type === 'photo').map(sc => new Promise(r => { const im = new Image(); im.onload = im.onerror = r; im.src = sc.src; }));
-    await Promise.all(imgs);
     return { total: timing.total };
   }
   window.RW = { load, draw, scenes: Object.keys(SCENES) };

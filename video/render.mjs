@@ -25,10 +25,34 @@ const fps = Number(opt("fps", 30));
 const out = join(ROOT, "out", slug), pub = resolve(ROOT, "..", "public", "videos");
 mkdirSync(out, { recursive: true }); mkdirSync(pub, { recursive: true });
 
-// Photos named in the script are copied next to the render so the engine can load them.
-for (const sc of spec.scenes) if (sc.type === "photo" && sc.src && !/^https?:/.test(sc.src)) {
-  const src = resolve(dirname(specPath), sc.src), name = `photo-${spec.scenes.indexOf(sc)}${extname(src)}`;
-  writeFileSync(join(out, name), readFileSync(src)); sc.src = `../out/${slug}/${name}`;
+// Photos named in the script (a scene's src, bg or photos) are copied next to the render so the
+// engine can load them. Scenes that animate the subject on its own layer (cutout, photo with
+// style "parallax", or cutout: true) get a cut-out from cutout.py, cached by file name.
+const copied = new Map();
+const local = p => {
+  if (!p || /^https?:/.test(p)) return p;
+  const src = resolve(dirname(specPath), p);
+  if (!copied.has(src)) {
+    const name = `img-${copied.size}${extname(src)}`;
+    writeFileSync(join(out, name), readFileSync(src)); copied.set(src, { name, src });
+  }
+  return `../out/${slug}/${copied.get(src).name}`;
+};
+for (const sc of spec.scenes) {
+  const srcPath = sc.src && !/^https?:/.test(sc.src) ? resolve(dirname(specPath), sc.src) : null;
+  if (sc.src) sc.src = local(sc.src);
+  if (sc.bg) sc.bg = local(sc.bg);
+  if (sc.photos) sc.photos = sc.photos.map(p => typeof p === "string" ? local(p) : { ...p, src: local(p.src) });
+  const wantsCut = sc.type === "cutout" || (sc.type === "photo" && sc.style === "parallax") || sc.cutout === true;
+  if (wantsCut && srcPath) {
+    const base = copied.get(srcPath).name.replace(/\.\w+$/, ""), cutFile = join(out, `${base}.cut.png`);
+    if (!existsSync(cutFile) || statSync(cutFile).mtimeMs < statSync(srcPath).mtimeMs) {
+      console.log(`Cutting out ${srcPath.replace(/^.*\//, "")}…`);
+      const r = spawnSync("python3", [join(ROOT, "cutout.py"), srcPath, cutFile, sc.cutModel || "u2net_human_seg"], { stdio: ["ignore", "inherit", "inherit"] });
+      if (r.status !== 0) { console.error("Cut-out failed; the scene will use the plain photo."); continue; }
+    }
+    sc.cut = `../out/${slug}/${base}.cut.png`; sc.cutBox = JSON.parse(readFileSync(cutFile + ".json", "utf8"));
+  }
 }
 writeFileSync(join(out, "spec.json"), JSON.stringify(spec, null, 1));
 
