@@ -274,7 +274,9 @@
           ctx.save(); ctx.globalAlpha = q; ctx.fillStyle = C.red; ctx.beginPath(); ctx.arc(x, y - drop, pr, 0, TAU); ctx.fill();
           ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y - drop, pr * .38, 0, TAU); ctx.fill();
           ctx.font = font('sans', M * .028, 800); const tw = ctx.measureText(pin.label).width;
-          const left = pin.side === 'left' || x + pr * 1.6 + tw + M * .03 > W * .97, lx = left ? x - pr * 1.6 - tw - M * .024 : x + pr * 1.6, ly = y - drop - M * .024;
+          const roomL = x - pr * 1.6 - tw - M * .024 >= W * .02, roomR = x + pr * 1.6 + tw + M * .03 <= W * .97;
+          const left = (pin.side === 'left' && roomL) || (!roomR && roomL);   // the preferred side, unless it would leave the frame
+          const lx = clamp(left ? x - pr * 1.6 - tw - M * .024 : x + pr * 1.6, W * .02, W * .98 - tw - M * .024), ly = y - drop - M * .024;
           rrect(lx, ly, tw + M * .024, M * .048, M * .01); ctx.fillStyle = C.ink; ctx.fill();
           ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.fillText(pin.label, lx + M * .012, ly + M * .033); ctx.restore();
         });
@@ -318,7 +320,7 @@
           const y = y0 + i * rowH; ctx.save(); ctx.globalAlpha *= q; ctx.translate((1 - q) * -M * .04, 0);
           ctx.fillStyle = C.red; ctx.beginPath(); ctx.arc(tx + M * .03, y, M * .03, 0, TAU); ctx.fill();
           ctx.fillStyle = '#fff'; ctx.font = font('mono', M * .028, 500); ctx.textAlign = 'center'; ctx.fillText(String(i + 1), tx + M * .03, y + M * .01);
-          ctx.fillStyle = C.ink; ctx.font = font('sans', M * .04, 700); ctx.textAlign = 'left'; ctx.fillText(it, tx + M * .09, y + M * .014);
+          ctx.fillStyle = C.ink; fit(it, 'sans', M * .04, 700, W - tx - M * .09 - pad() * .5); ctx.textAlign = 'left'; ctx.fillText(it, tx + M * .09, y + M * .014);
           ctx.restore();
         });
         sourceLine(s.source, u);
