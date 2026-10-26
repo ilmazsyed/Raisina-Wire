@@ -13,6 +13,8 @@ import m0011 from "../migrations/0011_machine_translation.sql";
 import m0012 from "../migrations/0012_live_images.sql";
 import m0013 from "../migrations/0013_live_results.sql";
 import m0014 from "../migrations/0014_audience.sql";
+import m0015 from "../migrations/0015_guest_writers.sql";
+import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { liveResults } from "./results.js";
 import { handleTts } from "./tts.js";
@@ -68,7 +70,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -133,9 +135,18 @@ async function seedEditions(db, applied) {
     db.prepare("INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)").bind(marker)
   ]);
 }
-function ensureSchema(env) {
+async function ensureSchema(env) {
   if (!schemaReady) schemaReady = migrate(env.DB).catch(e => { schemaReady = null; throw e; });
-  return schemaReady;
+  await schemaReady;
+  await refreshWriters(env);
+}
+// Guest writers (control room → Writers) join the built-in ones; re-read every 30 seconds.
+let writersAt = 0;
+async function refreshWriters(env, force = false) {
+  if (!force && Date.now() - writersAt < 30e3) return;
+  writersAt = Date.now();
+  const { results } = await env.DB.prepare("SELECT key,name,role,bio,photo FROM writers ORDER BY created_at").all().catch(() => ({ results: null }));
+  if (results) setGuestWriters(results);
 }
 // The autopublisher signs in with "Authorization: Bearer <PUBLISH_TOKEN>" (a Worker secret) and
 // acts as the built-in admin. Tokens shorter than 24 characters are ignored.
@@ -509,18 +520,46 @@ async function api(request, env, ctx) {
     if (status === "live" && wantsAlert(b.notify)) await createAlert(env, ctx, { title: "LIVE · Raisina Wire", body: title, url: `/coverage/${encodeURIComponent(slug)}`, userId: user.id });
     return json({ok:true,id,slug},201,{"cache-control":"no-store"});
   }
-  if (url.pathname.startsWith("/api/admin/live/") && !url.pathname.endsWith("/updates") && request.method === "PUT") {
+  // ---- Editing live coverage after posting: each update can be corrected or removed.
+  if (/^\/api\/admin\/live\/[^/]+\/updates$/.test(url.pathname) && request.method === "GET") {
+    if (!isStaff(await currentUser(request, env))) return err("Editor access required.", 403);
+    const id = decodeURIComponent(url.pathname.split("/")[4]);
+    const item = await env.DB.prepare("SELECT id,slug,title,summary,status FROM live_coverage WHERE id=?").bind(id).first();
+    if (!item) return err("Live coverage not found.", 404);
+    const { results } = await env.DB.prepare("SELECT id,body,media_url AS mediaUrl,source_url AS sourceUrl,created_at AS createdAt,edited_at AS editedAt FROM live_updates WHERE coverage_id=? ORDER BY created_at DESC").bind(id).all();
+    return json({ item, updates: results }, 200, { "cache-control": "no-store" });
+  }
+  if (/^\/api\/admin\/live\/[^/]+\/updates\/[^/]+$/.test(url.pathname) && ["PUT", "DELETE"].includes(request.method)) {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const [, , , , id, , uid] = url.pathname.split("/").map(decodeURIComponent);
+    const row = await env.DB.prepare("SELECT id FROM live_updates WHERE id=? AND coverage_id=?").bind(uid, id).first();
+    if (!row) return err("Update not found.", 404);
+    if (request.method === "DELETE") {
+      await env.DB.prepare("DELETE FROM live_updates WHERE id=?").bind(uid).run();
+      await audit(env, user, "live.update.delete", "live_update", uid, { coverage: id });
+    } else {
+      const b = await request.json().catch(() => ({})), body = String(b.body || "").trim();
+      if (!body) return err("Live update text is required.");
+      await env.DB.prepare("UPDATE live_updates SET body=?,media_url=?,source_url=?,edited_at=? WHERE id=?").bind(body.slice(0, 12000), String(b.mediaUrl || "").slice(0, 1500), String(b.sourceUrl || "").slice(0, 1500), new Date().toISOString(), uid).run();
+      await audit(env, user, "live.update.edit", "live_update", uid, { coverage: id });
+    }
+    await env.DB.prepare("UPDATE live_coverage SET updated_at=? WHERE id=?").bind(new Date().toISOString(), id).run();
+    return json({ ok: true }, 200, { "cache-control": "no-store" });
+  }
+  if (url.pathname.startsWith("/api/admin/live/") && !url.pathname.includes("/updates") && request.method === "PUT") {
     const user=await currentUser(request,env);
     if (!isStaff(user)) return err("Editor access required.",403);
     const id=decodeURIComponent(url.pathname.split("/").pop()), b=await request.json().catch(()=>({}));
     // Images and caption can change on their own, without touching the status.
     if (b.results!==undefined && b.results!=="" && typeof b.results!=="object") return err("results must be a JSON object.");
     if (b.results && typeof b.results==="object") b.results=JSON.stringify(b.results);
-    const imgs=[["imageUrl","image_url",1500],["socialUrl","social_url",1500],["heroCaption","hero_caption",300],["results","results",20000]].filter(([k])=>b[k]!==undefined);
+    if (b.title!==undefined && String(b.title).trim().length<5) return err("Live coverage title must be at least 5 characters.");
+    const imgs=[["title","title",180],["summary","summary",500],["imageUrl","image_url",1500],["socialUrl","social_url",1500],["heroCaption","hero_caption",300],["results","results",20000]].filter(([k])=>b[k]!==undefined);
     if (imgs.length && b.status===undefined) {
-      const res=await env.DB.prepare(`UPDATE live_coverage SET ${imgs.map(([,c])=>`${c}=?`).join(",")}, updated_at=? WHERE id=?`).bind(...imgs.map(([k,,n])=>String(b[k]||"").slice(0,n)),new Date().toISOString(),id).run();
+      const res=await env.DB.prepare(`UPDATE live_coverage SET ${imgs.map(([,c])=>`${c}=?`).join(",")}, updated_at=? WHERE id=?`).bind(...imgs.map(([k,,n])=>String(b[k]||"").trim().slice(0,n)),new Date().toISOString(),id).run();
       if(!res.meta.changes) return err("Live coverage not found.",404);
-      await audit(env,user,"live.images","live_coverage",id,{});
+      await audit(env,user,"live.edit","live_coverage",id,{fields:imgs.map(([k])=>k)});
       return json({ok:true},200,{"cache-control":"no-store"});
     }
     const status=["live","ended","draft"].includes(b.status)?b.status:null;
@@ -567,7 +606,7 @@ async function api(request, env, ctx) {
     const slug=decodeURIComponent(url.pathname.split("/").pop()||"");
     const item=await env.DB.prepare("SELECT id,slug,title,summary,status,started_at AS startedAt,ended_at AS endedAt,image_url AS imageUrl,hero_caption AS heroCaption,(COALESCE(results,'')<>'') AS hasResults FROM live_coverage WHERE slug=? AND status IN ('live','ended')").bind(slug).first();
     if(!item) return err("Live coverage not found.",404);
-    const updates=await env.DB.prepare("SELECT body,media_url AS mediaUrl,created_at AS createdAt FROM live_updates WHERE coverage_id=? ORDER BY created_at DESC LIMIT 100").bind(item.id).all();
+    const updates=await env.DB.prepare("SELECT body,media_url AS mediaUrl,created_at AS createdAt,edited_at AS editedAt FROM live_updates WHERE coverage_id=? ORDER BY created_at DESC LIMIT 100").bind(item.id).all();
     const lang=reqLang(url); if(lang) await mtLive(env,lang,item,updates.results);
     return json({item,updates:updates.results});
   }
@@ -654,6 +693,49 @@ async function api(request, env, ctx) {
     return err("Method not allowed.", 405);
   }
 
+  // ---- Writers: the built-in two plus guest writers (name, photo, one-line bio)
+  if (url.pathname === "/api/writers" && request.method === "GET") {
+    return json({ writers: WRITERS.map(w => ({ key: w.key, name: w.name, role: w.role, bio: w.bio, photo: w.photo, guest: !!w.guest, isDesk: !!w.isDesk })) }, 200, { "cache-control": "public, max-age=60" });
+  }
+  if (url.pathname === "/api/admin/writers" && request.method === "GET") {
+    if (!isStaff(await currentUser(request, env))) return err("Editor access required.", 403);
+    const { results } = await env.DB.prepare("SELECT writer, COUNT(*) AS n FROM articles GROUP BY writer").all();
+    const counts = Object.fromEntries(results.map(r => [r.writer, r.n]));
+    return json({ writers: WRITERS.map(w => ({ key: w.key, name: w.name, role: w.role, bio: w.bio, photo: w.guest && w.photo.startsWith("data:") ? "" : w.photo, guest: !!w.guest, stories: counts[w.key] || 0 })) }, 200, { "cache-control": "no-store" });
+  }
+  if ((url.pathname === "/api/admin/writers" && request.method === "POST") || (/^\/api\/admin\/writers\/[\w-]+$/.test(url.pathname) && ["PUT", "DELETE"].includes(request.method))) {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const key = request.method === "POST" ? null : url.pathname.split("/").pop();
+    if (key && isBuiltIn(key)) return err("The founder and the desk are fixed. Only guest writers can be changed here.");
+    if (key && !(await env.DB.prepare("SELECT 1 FROM writers WHERE key=?").bind(key).first())) return err("Writer not found.", 404);
+    if (request.method === "DELETE") {
+      const used = await env.DB.prepare("SELECT COUNT(*) AS n FROM articles WHERE writer=?").bind(key).first();
+      if (used.n) return err(`This writer has ${used.n} ${used.n === 1 ? "story" : "stories"}. Move them to another writer first.`);
+      await env.DB.prepare("DELETE FROM writers WHERE key=?").bind(key).run();
+      await audit(env, user, "writer.delete", "writer", key, {});
+      await refreshWriters(env, true);
+      return json({ ok: true }, 200, { "cache-control": "no-store" });
+    }
+    const b = await request.json().catch(() => ({}));
+    const name = String(b.name || "").replace(/\s+/g, " ").trim().slice(0, 80), role = String(b.role || "Guest writer").replace(/\s+/g, " ").trim().slice(0, 60) || "Guest writer";
+    const bio = String(b.bio || "").replace(/\s+/g, " ").trim().slice(0, 200), photo = imageRef(b.photo);
+    if (name.length < 2) return err("Write the writer's name.");
+    if (b.photo && !photo) return err("Upload the photo, or use an https:// image address.");
+    if (key) {
+      await env.DB.prepare("UPDATE writers SET name=?,role=?,bio=?,photo=?,updated_at=? WHERE key=?").bind(name, role, bio, photo, new Date().toISOString(), key).run();
+      await audit(env, user, "writer.update", "writer", key, { name });
+    } else {
+      let k = slugify(name).slice(0, 60);
+      for (let i = 2; isBuiltIn(k) || await env.DB.prepare("SELECT 1 FROM writers WHERE key=?").bind(k).first(); i++) k = `${slugify(name).slice(0, 56)}-${i}`;
+      await env.DB.prepare("INSERT INTO writers (key,name,role,bio,photo) VALUES (?,?,?,?,?)").bind(k, name, role, bio, photo).run();
+      await audit(env, user, "writer.create", "writer", k, { name });
+      await refreshWriters(env, true);
+      return json({ ok: true, key: k }, 201, { "cache-control": "no-store" });
+    }
+    await refreshWriters(env, true);
+    return json({ ok: true, key }, 200, { "cache-control": "no-store" });
+  }
   if (url.pathname === "/api/admin/articles" && request.method === "GET") {
     const user = await currentUser(request,env);
     if (!isStaff(user)) return err("Editor access required.",403);
