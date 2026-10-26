@@ -1359,3 +1359,5 @@ body.is-reading .new-pill{top:calc(18px + env(safe-area-inset-top))}
 @media(max-width:760px){.fresh-btn{padding:3px 8px;font-size:11px;flex-shrink:0}}
 @media(max-width:760px){.utility-left{overflow:hidden}.fresh-btn{max-width:100%;overflow:hidden}}
 @media(max-width:760px){html:is([data-lang=hi],[data-lang=bn]) #freshText{display:none}html:is([data-lang=hi],[data-lang=bn]) .fresh-btn{width:30px;height:30px;padding:0;justify-content:center;border-radius:50%}html:is([data-lang=hi],[data-lang=bn]) .fresh-btn svg{width:14px;height:14px}}
+/* Phones and tablets swipe the explainer carousel; the arrow buttons are for mouse users only. */
+@media(hover:none),(max-width:760px){.carousel-btn{display:none}}

@@ -35,10 +35,13 @@ export const plain = (s = "") => squash(decodeEntities(stripTags(cdata(s))));
 export function categorize(text = "") {
   const t = text.toLowerCase();
   if (/\b(army|navy|air force|military|defen[cs]e|missile|drone|terror|militant|border|ceasefire|war|troops|security forces|insurgen|attack)\b/.test(t)) return "Security";
+  // Crime, courts, accidents and weather are news, not markets ("illicit trade", "bank robbery").
+  const INDIA = /\b(india|indian|delhi|mumbai|kolkata|chennai|bengaluru|hyderabad|modi|lok sabha|parliament|state government|uttar pradesh|madhya pradesh|maharashtra|bihar|rajasthan|gujarat|west bengal|tamil nadu|kerala|karnataka|telangana|andhra|odisha|assam|punjab|haryana|jharkhand|chhattisgarh|kashmir|manipur|goa|uttarakhand|himachal)\b/;
+  if (/\b(police|arrest\w*|court|murder\w*|deaths?|killed|liquor|accident|fire|flood\w*|rain|cyclone|landslide|crime|smuggl\w*|probe)\b/.test(t) && !/\b(sensex|nifty|stocks?|shares|rbi|ipo|earnings)\b/.test(t)) return INDIA.test(t) ? "India" : "World";
   if (/\b(sensex|nifty|stock|shares|market|rupee|inflation|rbi|gdp|trade|tariff|ipo|earnings|profit|economy|bank)\b/.test(t)) return "Markets";
   if (/\b(oil|crude|gas|lng|energy|power|coal|solar|refin)\w*/.test(t)) return "Energy";
   if (/\b(minister|summit|talks|diplomat|embassy|treaty|bilateral|foreign policy|un |united nations|g20|brics|quad|sco)\b/.test(t)) return "Diplomacy";
-  if (/\b(india|indian|delhi|mumbai|kolkata|modi|lok sabha|parliament|state government)\b/.test(t)) return "India";
+  if (INDIA.test(t)) return "India";
   // Hindi and Bengali headlines
   if (/सेना|सैन्य|मिसाइल|ड्रोन|आतंक|सीमा|हमला|युद्ध|সেনা|জঙ্গি|সীমান্ত|হামলা|ড্রোন|যুদ্ধ|ক্ষেপণাস্ত্র/.test(t)) return "Security";
   if (/सेंसेक्स|निफ्टी|शेयर|बाजार|रुपया|महंगाई|सেনসেক্স|শেয়ার|বাজার|টাকা|মূল্যবৃদ্ধি/.test(t)) return "Markets";
