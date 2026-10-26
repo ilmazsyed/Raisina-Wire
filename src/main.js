@@ -1253,10 +1253,11 @@ function renderLiveBanner() {
   const pic = lead.item.imageUrl && /^(https?:|\/media\/)/.test(lead.item.imageUrl) ? lead.item.imageUrl : "";
   // A compact broadcast tile: the coverage photo with a blinking LIVE tab, the headline, then either
   // the results race (election coverage) or the latest update, and a button. The full coverage is one tap away.
-  const race = r?.candidates?.length ? `<span class="lb-race">
+  const war = r?.kind === "conflict" ? `<span class="lb-war">${r.started ? `<b class="lb-day">Day ${warDay(r.started)}</b>` : ""}<span><b>${fmtN(r.killed)}+</b> killed${r.injured ? ` · <b>${fmtN(r.injured)}+</b> injured` : ""}</span><small>${esc(r.fronts.map(f => f.name).join(" · "))}</small></span>` : "";
+  const race = war || (r?.candidates?.length ? `<span class="lb-race">
       <span class="lb-race-names">${r.candidates.slice(0, 2).map(c => `<span style="--c:${esc(c.color || "#fff")}"><b>${esc(c.name)}</b> ${c.pct.toFixed(2)}%</span>`).join("")}</span>
       ${r.candidates.length >= 2 ? `<span class="lb-split">${r.candidates.slice(0, 2).map(c => `<i style="flex-basis:${c.pct}%;background:${esc(c.color || "#fff")}"></i>`).join("")}<em></em></span>` : ""}
-      <small>${r.winner ? `${esc(r.winner)} wins` : `${r.reporting.toFixed(1)}% counted${r.source ? ` · ${esc(r.source.replace(/\s*\(.*\)/, ""))}` : ""}`}</small></span>` : "";
+      <small>${r.winner ? `${esc(r.winner)} wins` : `${r.reporting.toFixed(1)}% counted${r.source ? ` · ${esc(r.source.replace(/\s*\(.*\)/, ""))}` : ""}`}</small></span>` : "");
   host.innerHTML = `<a class="live-banner ${pic ? "has-img" : "no-img"}" href="${href}">
     <span class="lb-media" aria-hidden="true">${pic ? `<img src="${esc(pic)}" alt="" decoding="async">` : `<span class="lb-glow"></span>`}<span class="live-tab"><span class="pulse"></span>Live</span></span>
     <span class="lb-body">
@@ -1274,7 +1275,25 @@ function renderLiveBanner() {
 /* Live results counter (election coverage): its own 10-second poll, numbers tween between counts. */
 let resultsTimer, resultsHTML = "", resultsPrev = {};
 const fmtN = n => Math.round(n).toLocaleString("en-IN");
+// Days since a conflict began, counting the start date as day 1 (IST calendar days).
+const warDay = started => { const ist = d => new Date(new Date(d).toLocaleString("en-US", IST)); const a = ist(`${started}T00:00:00+05:30`), b = ist(new Date()); a.setHours(0, 0, 0, 0); b.setHours(0, 0, 0, 0); return Math.round((b - a) / 864e5) + 1; };
+const fmtDay = iso => new Date(`${iso}T00:00:00+05:30`).toLocaleDateString(LOCALE, { ...IST, day: "numeric", month: "short", year: "numeric" });
+function conflictCard(d) {
+  const day = d.started ? warDay(d.started) : null, time = d.updatedAt ? new Date(d.updatedAt).toLocaleString(LOCALE, { ...IST, day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "";
+  return `<div class="rc wt glass">
+    <div class="rc-top"><span class="live-badge"><span class="pulse"></span>Live</span><span class="meta">${time ? `Figures updated ${time} IST` : ""}</span></div>
+    <div class="wt-head"><div>${day ? `<span class="wt-day"><small>Day</small><b data-to="${day}" data-from="${resultsPrev.day ?? Math.max(0, day - 30)}" data-dec="0">${day}</b></span>` : ""}</div>
+      <div><h2>${esc(d.title)}</h2>${d.started ? `<p class="rc-src">${esc(d.startLabel || "Began")} ${fmtDay(d.started)}</p>` : ""}${d.status ? `<p class="wt-status">${esc(d.status)}</p>` : ""}</div></div>
+    <div class="wt-total"><span><b data-to="${d.killed}" data-from="${resultsPrev.killed ?? 0}" data-dec="0">${fmtN(d.killed)}</b><small>killed, at least</small></span>${d.injured ? `<span><b data-to="${d.injured}" data-from="${resultsPrev.injured ?? 0}" data-dec="0">${fmtN(d.injured)}</b><small>injured, at least</small></span>` : ""}</div>
+    <ol class="wt-fronts">${d.fronts.map(f => `<li style="--c:${esc(f.color || "var(--live)")}"><span class="wt-name"><b>${esc(f.name)}</b><small>${esc([f.source, f.asOf && `as of ${f.asOf}`].filter(Boolean).join(" · "))}</small></span>
+      <span class="wt-n"><b>${f.killed != null ? fmtN(f.killed) : "–"}</b><small>killed</small></span><span class="wt-n">${f.injured != null ? `<b>${fmtN(f.injured)}</b><small>injured</small>` : ""}</span>
+      <span class="wt-bar"><i style="width:${d.killed && f.killed ? Math.max(2, f.killed / d.killed * 100) : 0}%"></i></span></li>`).join("")}</ol>
+    ${d.dates?.length ? `<ol class="wt-dates">${d.dates.map(x => `<li><time>${fmtDay(x.date)}</time><span>${esc(x.label)}</span></li>`).join("")}</ol>` : ""}
+    <p class="wt-note">${esc(d.note || "Official counts from each side; independent tallies are often higher and totals may never be fully known.")}</p>
+  </div>`;
+}
 function resultsCard(d) {
+  if (d.kind === "conflict") return conflictCard(d);
   const lead = d.candidates[0], time = d.updatedAt ? new Date(d.updatedAt).toLocaleTimeString(LOCALE, { ...IST, hour: "numeric", minute: "2-digit" }) : "";
   const head2 = d.candidates.length === 2 && d.candidates.every(c => c.pct);
   const status = d.winner ? `${esc(d.winner)} wins` : lead?.votes ? `${esc(lead.name)} is leading` : "Waiting for the first results";
@@ -1309,7 +1328,7 @@ async function loadResults(slug) {
   const host = $("#resultsCounter");
   if (!d || !host) return;
   resultsHTML = resultsCard(d); host.innerHTML = resultsHTML; tweenResults(host);
-  resultsPrev = { rep: d.reporting, ...Object.fromEntries(d.candidates.map(c => [c.name, { pct: c.pct, votes: c.votes }])) };
+  resultsPrev = d.kind === "conflict" ? { day: d.started ? warDay(d.started) : 0, killed: d.killed, injured: d.injured } : { rep: d.reporting, ...Object.fromEntries(d.candidates.map(c => [c.name, { pct: c.pct, votes: c.votes }])) };
 }
 let coverageTimer;
 async function viewCoverage(r) {

@@ -134,6 +134,13 @@ that change. Unpublish: `{"status":"draft"}`. Archive: `{"status":"archived"}`. 
     use counts from the election authority or a wire agency quoting it.
   - Candidate photos only from images the user sent (cropped faces are fine). Without photos, initials in the candidate's colour show.
   - `{}` removes the counter.
+- **War / conflict tracker** (every live war or conflict coverage, unless the user says not to): `live-results <coverageId>` with
+  `{ "kind": "conflict", "title": "Iran war tracker", "started": "2026-02-28", "startLabel": "…began", "status": "one line on where things stand",
+  "fronts": [{ "name": "Iran", "killed": 3468, "injured": null, "source": "Iranian Health Ministry", "asOf": "12 Oct", "color": "#…" }],
+  "dates": [{ "date": "2026-04-08", "label": "Ceasefire takes effect" }], "updatedAt": "ISO", "note": "" }`.
+  The page shows a live "Day N" counter from `started`, the total killed and injured, each front with its source and date, and
+  the key dates; the homepage tile shows "Day N · X+ killed". Only use official or wire-reported figures, always with `source`
+  and `asOf`, and re-send the whole object whenever a figure or the status changes during the coverage's updates.
 
 **Multimedia:** `media` with `{ "title": "…", "mediaUrl": "https://…", "mediaType": "video",
 "category": "Geopolitics", "thumbnailUrl": "", "description": "…", "status": "published" }`.
