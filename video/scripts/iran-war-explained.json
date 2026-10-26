@@ -24,19 +24,19 @@
       "items": [
         {
           "when": "2018",
-          "what": "US quits the nuclear deal"
+          "what": "US quits the deal"
         },
         {
           "when": "June 2025",
-          "what": "The 12-Day War"
+          "what": "12-Day War"
         },
         {
           "when": "Dec 2025",
-          "what": "Protests over the economy"
+          "what": "Protests"
         },
         {
           "when": "Jan 2026",
-          "what": "A brutal crackdown",
+          "what": "Crackdown",
           "hot": true
         }
       ],
@@ -245,19 +245,19 @@
       "items": [
         {
           "when": "7–8 Apr",
-          "what": "Pakistan brokers a ceasefire"
+          "what": "Ceasefire"
         },
         {
           "when": "13 Apr",
-          "what": "US blockades Iranian ports"
+          "what": "US blockade"
         },
         {
           "when": "14 Jun",
-          "what": "A memorandum to end the war"
+          "what": "Deal to end war"
         },
         {
           "when": "7 Jul",
-          "what": "Ships hit; Trump: truce over",
+          "what": "Truce over",
           "hot": true
         }
       ],
