@@ -1,0 +1,19 @@
+{
+  "slug": "china-economy-short",
+  "title": "China's spending problem in 60 seconds",
+  "series": "Explained",
+  "formats": ["9x16"],
+  "pace": 1.7,
+  "captionChars": 34,
+  "ticker": "China's spending problem in 60 seconds: why its people won't buy, and why the world pays",
+  "scenes": [
+    {"type":"cutout","src":"media/cn-xi-summit.jpg","kicker":"Explained · China","title":"China's spending problem","say":"China's economy has a huge problem. Its people aren't spending. Here's why that matters, in 60 seconds.","speak":"China's economy has a huge problem. Its people aren't spending. Here's why that matters, in sixty seconds."},
+    {"type":"share","kicker":"The gap","value":56,"ringLabel":"of GDP","title":"Consumption in China","detail":"Most economies: 70%+","bg":"media/cn-shoppers.jpg","say":"Consumption is just 56 per cent of China's economy. Most countries are at 70 or more. Even Japan, at its worst in the 1990s, was 10 points higher.","speak":"Consumption is just fifty-six per cent of China's economy. Most countries are at seventy or more. Even Japan, at its worst in the nineteen-nineties, was ten points higher."},
+    {"type":"timeline","kicker":"Growth","title":"Slowing down","items":[{"when":"2000s","what":"10%+"},{"when":"2026","what":"Under 5%","hot":true}],"bg":"media/cn-xi-bars.jpg","say":"Growth has slid from over 10 per cent to under 5.","speak":"Growth has slid from over ten per cent to under five."},
+    {"type":"photo","src":"media/cn-estate.jpg","style":"duotone","focus":0.5,"focusV":0.5,"title":"Property: -20.6%","say":"The property crash hit family savings. Property investment is down 20.6 per cent this year. So families save, and don't spend.","speak":"The property crash hit family savings. Property investment is down twenty point six per cent this year. So families save, and don't spend."},
+    {"type":"number","kicker":"Trade surplus, 9 months","prefix":"$","value":938,"suffix":" bn","label":"Jan–Sept 2026","bg":"media/cn-yuan-fist.jpg","say":"But factories keep running. The extra goods go abroad, cheaper and cheaper. China's trade surplus hit 938 billion dollars in nine months.","speak":"But factories keep running. The extra goods go abroad, cheaper and cheaper. China's trade surplus hit nine hundred and thirty-eight billion dollars in nine months."},
+    {"type":"number","kicker":"India's deficit with China","prefix":"$","value":112,"suffix":" bn","label":"2025-26","bg":"media/cn-flag-chart.jpg","say":"India's trade gap with China is about 112 billion dollars, and India has opened a wave of anti-dumping probes.","speak":"India's trade gap with China is about a hundred and twelve billion dollars, and India has opened a wave of anti-dumping probes."},
+    {"type":"photo","src":"media/cn-xi-tightrope.jpg","focus":0.6,"focusV":0.6,"title":"Beijing's balancing act","say":"Beijing wants retail sales of 60 trillion yuan by 2030. Getting families to spend is the hard part.","speak":"Beijing wants retail sales of sixty trillion yuan by twenty-thirty. Getting families to spend is the hard part."},
+    {"type":"outro","title":"Watch the full explainer","say":"Watch the full explainer on Raisina Wire."}
+  ]
+}
