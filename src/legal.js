@@ -3,7 +3,7 @@
 // These documents were drafted with care but are not a substitute for advice from an
 // Indian lawyer, who should review them before relying on them.
 
-export const LEGAL_UPDATED = "24 October 2026";
+export const LEGAL_UPDATED = "26 October 2026";
 export const CONTACT_EMAIL = "ilmazsyed@gmail.com";
 export const SITE_URL = "https://raisinawire.calibrex.org";
 const mail = `<a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>`;
@@ -237,6 +237,7 @@ export const LEGAL = {
   <li><b>Contact requests</b>: the name, email, organisation and interest you submit through the briefings and partnerships form.</li>
   <li><b>Alerts</b>: if you allow push notifications, the anonymous push address issued by your browser’s push service (and, if you are signed in, a link to your account).</li>
   <li><b>Story view counts</b>: we count how many times each story is opened, per day. We do not record who opened it, and we do not use cookies or identifiers for this.</li>
+  <li><b>Audience totals</b>: to understand whether readers come back, we count per day how many browsers visit and whether they have visited before, whether the site was opened as an installed app, how long stories are actively read, and where visits come from (for example WhatsApp, a search engine or a shared link). Your browser remembers the dates of its first and last visit for this; we keep only daily totals, with no names, emails, IP addresses, cookies or identifiers, and they cannot be linked to you.</li>
   <li><b>Data on your device</b>: preferences such as text size, light or dark mode, saved stories and alert choices are stored in your browser’s local storage and stay on your device.</li>
   <li><b>Technical data</b>: like any website, our hosting provider (Cloudflare) processes IP addresses and request data to deliver and protect the Service.</li>
 </ul>

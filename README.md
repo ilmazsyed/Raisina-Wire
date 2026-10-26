@@ -67,6 +67,26 @@ The whole site is available in English, हिन्दी and বাংলা. 
 - **Live wire**: Hindi and Bengali readers also get BBC News हिन्दी and BBC News বাংলা.
 - **Everything else in the news is machine-translated** for Hindi and Bengali readers: the live wire and briefing headlines and summaries, reader excerpts, live coverage and its updates, events, and any story that has no editor's translation yet (marked "translated automatically", with a link to the English). Market names come from the hand-made dictionary. Videos are left as they are. This uses **Cloudflare Workers AI** (`@cf/ai4bharat/indictrans2-en-indic-1B`, AI4Bharat's English to Indian-languages model) through the `[ai]` binding in `wrangler.toml`: no API key and no separate account. Each sentence is translated once and kept in D1 (`mt_cache`, cleared after 45 days); the cron translates new headlines, live updates and stories every five minutes so readers get them from the cache. Workers AI's free allowance is 10,000 neurons a day (about 300,000 words' worth of tokens for this model); `MT_DAILY_CHARS` (default 300,000 characters a day) keeps use inside it, and when it is spent, or the model can't be reached, the English is shown. Machine translation of other publishers' headlines and excerpts is a derivative of their work: keep it to the short excerpts the reader already shows, and add any publisher who objects to `PUBLISHER_OPT_OUT`. Local `wrangler dev` can't reach Workers AI without a Cloudflare login; set `MT_ENDPOINT` in `.dev.vars` to a stand-in that answers like the model.
 
+## Control room (`/admin`) and who can do what
+
+Sections: **Overview** (stories, drafts, members, discussions, alert subscribers, most read), **Audience** (below), **Stories & editions** (write, edit, schedule, publish, unpublish, preview, autosave, images, tags, writers, alerts), **Multimedia** (videos, shorts, audio, images, embeds), **Live publishing** (live coverage, timestamped updates, hero and social images, results counter), **Alerts** (automatic story/live/briefing alerts, the 9 am and 9 pm briefs, manual major alerts), **Translations** (Hindi and Bengali versions of stories and site pages), **Members & roles**, **Community moderation** (hide, remove, edit discussions and replies), **Events & briefings**, **Sales & leads**, **Social metrics**.
+
+| Role | Website | Control room |
+|---|---|---|
+| Reader (not signed in) | Read everything, listen, share, save on the device, alerts | none |
+| member | + start and reply to discussions, vote, saved stories and topics on every device | none |
+| premium, analyst | same as member today (labels for future paid or analyst features) | none |
+| editor | as member | everything except Members & roles, Sales & leads and Social metrics; Overview without the leads count |
+| admin | as member | everything, including changing roles (an admin can't remove their own admin role) |
+
+Roles are enforced by the API, not just hidden in the page. The built-in admin is `ADMIN_EMAIL` with the `ADMIN_PASSWORD` secret.
+
+### Audience
+
+Returning readers (new vs returning per day, how soon readers come back, weekly retention cohorts), app installs and launches from the home-screen app, notification opt-ins and opt-outs with the current subscriber count, active reading time per story with the share read to the end, and where visits come from (WhatsApp, Facebook, Instagram, X, LinkedIn, Telegram, Google, Google News, email, shared and copied links, notifications, direct), plus devices and languages, for 7, 30 or 90 days with comparisons to the previous period.
+
+How it is counted (`src/audience.js`, migration 0014): the browser remembers the dates of its first and last visit and sends small anonymous events to `/api/m`; the Worker keeps daily totals in India time (`metrics_daily`, `reading_daily`) and nothing that identifies a reader (no cookies, IP addresses, names or account IDs). Bots and link previews are ignored. Share buttons tag links with `utm_source` (WhatsApp hides where visitors come from otherwise; notifications are tagged by the service worker) and the site removes the tag from the address on arrival. Reading time counts only while the page is on screen and the reader has scrolled or tapped in the last 30 seconds; a read cut short by a closed tab is sent on the next visit. The privacy policy describes this. The totals can be inflated by someone posting fake events to `/api/m`; treat them as trends, not audited figures.
+
 ## Legal pages and how we use other publishers' work
 
 The About page (`/about`) and the legal pages (`/terms`, `/privacy`, `/disclaimer`, `/copyright`, `/community-guidelines`, `/grievance`) are in `src/legal.js`, shown in the app and rendered by the Worker for search engines. They were drafted with care for Indian law (Copyright Act 1957 s.52 and Copyright Rules 2013 r.75; IT Act 2000 s.79 and IT Rules 2021; DPDP Act 2023; SEBI rules on investment advice; the Emblems and State Emblem Acts) but **should be reviewed by an Indian lawyer** before you rely on them.
