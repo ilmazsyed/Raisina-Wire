@@ -673,6 +673,8 @@ img.desk{border-radius:22%!important}
 .author-hero p{max-width:720px;font:400 18px/1.6 var(--serif);color:var(--ink-2)}
 .reader-hero{margin:28px 0 0}
 .reader-hero figcaption{padding:10px 2px 0;font-size:13px;line-height:1.5;color:var(--muted)}
+.reader-video{max-height:none}
+.reader-video video{display:block;width:100%;aspect-ratio:16/9;background:#000;border-radius:18px}
 
 @media(max-width:1180px){.join-panel{grid-template-columns:1fr;padding:32px}}
 @media(max-width:760px){

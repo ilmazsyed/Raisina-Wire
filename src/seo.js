@@ -113,11 +113,12 @@ async function pageFor(path, url, env, o, lang = "en") {
         { "@type": a.kind === "edition" ? "AnalysisNewsArticle" : "NewsArticle", "@id": `${o}${here}#article`, mainEntityOfPage: `${o}${here}`, url: `${o}${here}`,
           headline: clip(a.title, 110), description, image: [image], datePublished: a.publishedAt, dateModified: a.updatedAt || a.publishedAt,
           author: [personLd(o, w)], publisher: { "@id": `${o}/#organization` }, articleSection: a.category, keywords: [...a.tags, a.category, "India"].filter(Boolean).join(", "),
-          wordCount: words, inLanguage: LOCALES[lang], isAccessibleForFree: true, ...(translated ? { translationOfWork: { "@id": `${o}${a.href}#article` } } : {}) },
+          wordCount: words, inLanguage: LOCALES[lang], isAccessibleForFree: true,
+          ...(a.videoUrl ? { video: { "@type": "VideoObject", name: clip(a.title, 110), description, thumbnailUrl: [image], uploadDate: a.publishedAt, contentUrl: abs(o, a.videoUrl), embedUrl: `${o}${here}` } } : {}), ...(translated ? { translationOfWork: { "@id": `${o}${a.href}#article` } } : {}) },
         organization(o), breadcrumbs(o, [["Home", prefixed(lang, "/")], crumb, [a.title, here]])] }],
       body: `<article><p class="ssr-kicker">${esc(a.topic)}</p><h1>${esc(a.title)}</h1>${a.dek ? `<p class="ssr-dek">${esc(a.dek)}</p>` : ""}
         <p class="ssr-byline">${lang === "en" ? "By " : ""}<a href="${prefixed(lang, `/author/${w.key}`)}">${esc(w.name)}</a> · <time datetime="${esc(a.publishedAt)}">${fmtDate(a.publishedAt, lang)}</time>${lang === "en" ? ` · ${a.readMinutes} min read` : ""}</p>
-        <img src="${esc(a.heroUrl || a.image)}" alt="" width="1600" height="1000">${blocksHTML(blocks)}</article>`
+        ${a.videoUrl ? `<video controls preload="none" src="${esc(a.videoUrl)}" poster="${esc(a.heroUrl || a.image)}"></video>` : `<img src="${esc(a.heroUrl || a.image)}" alt="" width="1600" height="1000">`}${blocksHTML(blocks)}</article>`
     };
   }
 

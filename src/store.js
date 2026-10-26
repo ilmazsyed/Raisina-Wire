@@ -1,7 +1,7 @@
 // Articles and editions as stored in D1, shared by the API (worker.js) and the HTML pages (seo.js).
 import { WRITERS, DEFAULT_WRITER, writer } from "./writers.js";
 
-export const ARTICLE_COLS = "id,slug,kind,title,dek,topic,category,status,image_url,hero_url,hero_caption,source_url,published_at,updated_at,writer,tags,alert_state,text_hash,length(body) AS body_length";
+export const ARTICLE_COLS = "id,slug,kind,title,dek,topic,category,status,image_url,hero_url,hero_caption,video_url,source_url,published_at,updated_at,writer,tags,alert_state,text_hash,length(body) AS body_length";
 export const storyPath = row => `/${row.kind === "edition" ? "edition" : "article"}/${encodeURIComponent(row.slug)}`;
 export const readMinutes = chars => Math.max(2, Math.round((chars || 0) / 1300));
 
@@ -14,7 +14,7 @@ export function toArticle(row, { body = false } = {}) {
   const out = {
     id: row.id, slug: row.slug, kind: row.kind || "article", href: storyPath(row),
     title: row.title, dek: row.dek || "", topic: row.topic || row.category, category: row.category,
-    imageUrl: row.image_url || "", heroUrl: row.hero_url || "", heroCaption: row.hero_caption || "",
+    imageUrl: row.image_url || "", heroUrl: row.hero_url || "", heroCaption: row.hero_caption || "", videoUrl: row.video_url || "",
     image: row.image_url || row.hero_url || genericImage(row.category),
     sourceUrl: row.source_url || "", publishedAt: row.published_at, updatedAt: row.updated_at,
     writer: w.key, author: w.name, status: row.status, tags: splitTags(row.tags), alertState: row.alert_state || "", textHash: row.text_hash || "",
