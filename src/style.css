@@ -1257,3 +1257,4 @@ body.sv-open{overflow:hidden}
 .sv-share svg{width:17px;height:17px}
 .media-card.flash{animation:cardflash 2.2s ease}
 @keyframes cardflash{0%,40%{box-shadow:0 0 0 3px var(--red),var(--glass-shadow)}100%{box-shadow:var(--glass-shadow)}}
+.coverage-feed time .edited{display:block;margin-top:2px;font:500 10.5px var(--mono);color:var(--muted)}

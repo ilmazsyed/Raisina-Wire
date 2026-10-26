@@ -1,7 +1,7 @@
 import "./style.css";
 import { editions, NEWSLETTER_URL, AUTHOR } from "./editions.js";
 import { brandMark, skyline, tribar, wordmark } from "./brand.js";
-import { WRITERS, writer } from "./writers.js";
+import { WRITERS, writer, setGuestWriters } from "./writers.js";
 import { ABOUT, LEGAL, LEGAL_ORDER, LEGAL_UPDATED } from "./legal.js";
 import { lang, LOCALE, LANGUAGES, stripLang, withLang, tr, ago, digits, loadLanguage, startTranslator, languageLinks } from "./i18n.js";
 
@@ -354,7 +354,7 @@ async function route({ restoreY = null } = {}) {
   const view = views[r.page] || viewNotFound;
   // Lists that mix in control-room articles wait briefly for them, so the lead story doesn't flash.
   stopListening();
-  if (["home", "editions", "search", "author", "edition", "article", "tag", "my"].includes(r.page)) await Promise.race([articlesReady, new Promise(res => setTimeout(res, 1200))]);
+  if (["home", "editions", "search", "author", "edition", "article", "tag", "my"].includes(r.page)) await Promise.race([Promise.all([articlesReady, writersReady]), new Promise(res => setTimeout(res, 1200))]);
   if (["account", "discussion", "community", "my", "saved", "tag"].includes(r.page)) await Promise.race([userReady, new Promise(res => setTimeout(res, 2500))]);
   document.body.classList.toggle("is-reading", ["edition", "article", "read"].includes(r.page));
   const main = $("#view");
@@ -1329,7 +1329,7 @@ async function viewCoverage(r) {
         <div class="meta">Started ${new Date(d.item.startedAt).toLocaleString(LOCALE, { ...IST, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })} IST · ${d.updates.length} update${d.updates.length === 1 ? "" : "s"}${isLive ? " · refreshes every 30 seconds" : ""}</div>
         ${shareBlock(`${isLive ? "LIVE: " : ""}${d.item.title}`, `/coverage/${encodeURIComponent(slug)}`)}</header>
       ${d.item.hasResults ? `<section id="resultsCounter" aria-live="polite" aria-label="Live results">${resultsHTML || `<div class="rc glass"><div class="skeleton" style="height:260px"></div></div>`}</section>` : ""}
-      <ol class="coverage-feed">${d.updates.map((u, i) => `<li id="u-${Date.parse(u.createdAt) || i}" class="${i === 0 && isLive ? "latest" : ""}"><time datetime="${esc(u.createdAt)}"><b>${clock(u.createdAt)}</b><span>${ago(u.createdAt)}</span></time>
+      <ol class="coverage-feed">${d.updates.map((u, i) => `<li id="u-${Date.parse(u.createdAt) || i}" class="${i === 0 && isLive ? "latest" : ""}"><time datetime="${esc(u.createdAt)}"><b>${clock(u.createdAt)}</b><span>${ago(u.createdAt)}</span>${u.editedAt ? `<span class="edited">Updated ${clock(u.editedAt)}</span>` : ""}</time>
         <div class="glass">${i === 0 && isLive ? `<span class="tag tag-live">Latest</span>` : ""}${articleBlocks(u.body).map(b => `<p>${esc(b.x)}</p>`).join("")}${u.mediaUrl && /^(https?:|\/media\/)/.test(u.mediaUrl) ? `<div class="reader-hero">${img(u.mediaUrl)}</div>` : ""}<button class="update-share" type="button" data-action="share-native" data-title="${esc(`${d.item.title}: ${String(u.body).slice(0, 110)}${String(u.body).length > 110 ? "…" : ""}`)}" data-url="${esc(`${location.origin}${withLang(`/coverage/${encodeURIComponent(slug)}`)}#u-${Date.parse(u.createdAt) || i}`)}" aria-label="Share this update">${SHARE_ICONS.share}<span>Share</span></button></div></li>`).join("") || `<li><div class="glass"><p class="muted">The first update will appear here shortly.</p></div></li>`}</ol>
     </div></div>`;
   };
@@ -1354,6 +1354,8 @@ function stories() {
   if (!state.articles?.length) return EDITION_STORIES;
   return state.articles.map(a => ({ ...a, date: a.publishedAt, topic: a.topic || a.category }));
 }
+// Guest writers come from the control room; bylines wait briefly for them.
+const writersReady = fetch("/api/writers").then(r => r.ok ? r.json() : null).then(d => { if (d?.writers) setGuestWriters(d.writers.filter(w => w.guest)); }).catch(() => {});
 let articlesSettled = false;
 async function loadArticles() {
   try { const r = await fetch(`/api/articles${lang !== "en" ? `?lang=${lang}` : ""}`); if (r.ok) state.articles = (await r.json()).articles || []; } catch { /* keep what we have */ }

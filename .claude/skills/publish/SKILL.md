@@ -54,8 +54,10 @@ tags, slug): propose those in the draft.
 | Alert | Which page it links to |
 
 Options:
-- Writers: `ilmaz-syed` (Ilmaz Syed, default) · `raisina-wire` (Raisina Wire desk). The list is
-  `src/writers.js`.
+- Writers: `ilmaz-syed` (Ilmaz Syed, default) · `raisina-wire` (Raisina Wire desk), plus any guest
+  writers added in the control room (Writers). The current list, with keys, is at
+  `https://raisinawire.calibrex.org/api/writers`. A guest writer is added there by the editor,
+  not by this skill.
 - Article categories: Geopolitics, Security, India, Diplomacy, Markets, Energy, Analysis.
 - Multimedia categories: Geopolitics, Security, Markets, India, Analysis.
 - Event types: Briefing, Debate, Workshop, Research mission, Roundtable.
@@ -109,6 +111,11 @@ that change. Unpublish: `{"status":"draft"}`. Archive: `{"status":"archived"}`. 
 **Live coverage:**
 - Open: `live-open` with `{ "title": "…", "summary": "…", "status": "live", "notify": true }`
 - Update: `live-update <coverageId>` with `{ "body": "…", "sourceUrl": "https://…", "mediaUrl": "", "notify": false }`
+- Corrections: the headline and summary are changed with `PUT /api/admin/live/<coverageId>`
+  `{ "title": "…", "summary": "…" }`; a posted update with `PUT /api/admin/live/<coverageId>/updates/<updateId>`
+  `{ "body": "…" }` (readers see "Updated" with the time) or removed with `DELETE` on the same address.
+  `GET /api/admin/live/<coverageId>/updates` lists the update ids. The editor can do all of this in
+  Live publishing → Edit.
   (update alerts are off unless the user asks; they push to every reader)
 - End or resume: `live-status <coverageId> ended` / `live`
 - Hero and social image: `live-images <coverageId>` with `{ "imageUrl": "/media/…", "socialUrl": "/media/…", "heroCaption": "…" }`.
