@@ -29,6 +29,26 @@ film takes about 3 minutes per format on 4 CPUs.
 - Brisk pieces (`pace` above 1.2) cut with a crimson wipe, an iris and a split shutter in turn.
 - Files are encoded to stay near 19 MB whatever their length.
 
+## Vox style (`"style": "vox"`, the house style for new explainers)
+One narrator (an Indian-English female voice, `hf_beta:0.6+bf_isabella:0.4`, set with `voice`), short
+shots that run straight into each other (one sentence each, 2–5 seconds; `para: true` on the first shot
+of a new paragraph adds a breath), a paper background, no ticker, and a news bed with sound effects
+on every hit. Shots cut in turn hard, whip (a fast pan with motion blur), hard, zoom; set `cut` on a
+scene to choose. A 3-minute film is about 45–55 shots.
+
+| type | fields |
+|---|---|
+| `kinetic` | `say`; `text` (what is shown, default the narration; "\|" breaks a line), `hl` (words given a highlighter stroke and a pop), `kicker`, `size` |
+| `snap` | `src`, `frame` (`clip`: a taped paper clipping, default; `full`: full bleed), `marks`, `title`, `zoom`, `tilt`, `duotone`, `credit` |
+| `doc` | `text` (a clipping of a document or statement), `hl` (the phrase swept with a highlighter), `kicker`, `source`, `at` |
+| `versus` | `a`, `b` (`{value, prefix, suffix, label, inr, decimals}`), `at` (when b lands), `kicker`, `hot` |
+
+`marks` on a `snap` are drawn by hand as the narrator reaches them, and the camera glides to each:
+`{kind: "circle", x, y, r}`, `{kind: "arrow", from: [x, y], to: [x, y]}`, `{kind: "underline", x, y, w}`,
+`{kind: "box", x, y, w, h}`, `{kind: "highlight", x, y, w, h}`, `{kind: "label", x, y, text, color: "red"}`.
+Coordinates are 0–1 across the photo. `at` is a word of the narration (the mark lands when it is said)
+or a fraction of the line. `number`, `stats`, `map` and the other types still work inside a Vox film.
+
 ## How it works
 1. `audio.py` voices each scene's narration with Kokoro (offline, free), alternating the anchors and
    giving each line broadcast processing (presence lift, compression), lays the lines end to end,

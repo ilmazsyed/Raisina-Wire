@@ -17,14 +17,17 @@ LEAD, TAIL, GAP, MIN_SCENE = 0.6, 2.4, 0.55, 2.8      # seconds
 # Two British anchors who take turns, scene by scene: Kokoro's best British female and male voices,
 # each sped so both read at about 2.7 words a second, a brisk news pace.
 ANCHORS = ["bf_emma", "bm_george"]
-ANCHOR_SPEED = {"bf_emma": 1.15, "bm_george": 1.3, "af_bella": 1.12, "am_michael": 1.22}
+# The Vox-style narrator: one Indian-English female voice (Kokoro's Hindi voice blended with a
+# British one, reading English), chosen by the editor.
+NARRATOR = "hf_beta:0.6+bf_isabella:0.4"
+ANCHOR_SPEED = {NARRATOR: 1.06, "bf_emma": 1.15, "bm_george": 1.3, "af_bella": 1.12, "am_michael": 1.22}
 
 
 def voices_for(spec):
     """The voice for each scene: a scene's own `voice`, else the spec's `voices` taken in turn
     (two anchors by default), else a single `voice` only when `alternate` is false."""
     if spec.get("voices"): pool = spec["voices"]
-    elif spec.get("voice") and spec.get("style") == "vox": pool = [spec["voice"]]
+    elif spec.get("style") == "vox": pool = [spec.get("voice") or NARRATOR]
     elif spec.get("alternate") is False and spec.get("voice"): pool = [spec["voice"]]
     else: pool = ANCHORS
     out, k = [], 0
