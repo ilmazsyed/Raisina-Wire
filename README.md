@@ -100,6 +100,10 @@ To keep the live wire on the right side of copyright, the in-app reader shows on
 3. For Google News, apply in the Google News Publisher Center with the same domain.
 4. Bing Webmaster Tools can import the property from Search Console.
 
+**Share cards.** `public/og-image.jpg`, `og-image-hi.jpg` and `og-image-bn.jpg` (1200×630) are the link previews for WhatsApp, X, LinkedIn and Facebook: real phone screens of the site in light and dark mode, the wordmark, and English · हिन्दी · বাংলা, with the tagline in each language. Each language's pages use their own card; stories, live coverage and videos use their own pictures. To redraw them after a redesign, run from the repository root: `node tools/og/cap.cjs` (screenshots of the live site), `node tools/og/build.mjs`, then `node tools/og/shoot.cjs`.
+
+**What search engines get:** server-rendered pages in all three languages with `hreflang` alternates, canonical links and `og:locale` alternates; `NewsMediaOrganization` (with its Hindi and Bengali names, languages and publishing principles), `NewsArticle`, `LiveBlogPosting`, `VideoObject` (Watch and every shared video), `ItemList`, breadcrumbs and site search; `sitemap.xml` with image and video entries; `news-sitemap.xml` for Google News; `max-image-preview:large` for Discover.
+
 ## Data-source notes
 
 1. GDELT is a broad global news-monitoring source. Results are not a substitute for editorial verification. Each story links to its publisher.
