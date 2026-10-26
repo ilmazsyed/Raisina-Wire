@@ -103,6 +103,7 @@ switch (cmd) {
   case "live-images": out(await call("PUT", `/api/admin/live/${encodeURIComponent(a || "")}`, readJson(b))); break;
   case "live-status": out(await call("PUT", `/api/admin/live/${encodeURIComponent(a || "")}`, { status: b })); break;
   case "media": out({ ...(await call("POST", "/api/admin/media", readJson(a))), url: `${SITE}/watch` }); break;
+  case "media-link": out(await call("PUT", `/api/admin/media/${encodeURIComponent(a || "")}`, { fullId: b || "" })); break;
   case "media-status": out(await call("PUT", `/api/admin/media/${encodeURIComponent(a || "")}`, { status: b })); break;
   case "event": out({ ...(await call("POST", "/api/events", readJson(a))), url: `${SITE}/events` }); break;
   case "event-status": out(await call("PUT", `/api/admin/events/${encodeURIComponent(a || "")}`, { status: b })); break;
@@ -125,5 +126,5 @@ switch (cmd) {
   }
   case "translation-delete": out(await call("DELETE", trPath(a, b))); break;
   default:
-    fail("Unknown command. Run with one of: health, list, article, article-update, live-open, live-update, live-status, live-images, live-results, media, media-status, event, event-status, alert, image, translations, translation-get, translation, translation-delete.");
+    fail("Unknown command. Run with one of: health, list, article, article-update, live-open, live-update, live-status, live-images, live-results, media, media-status, media-link, event, event-status, alert, image, translations, translation-get, translation, translation-delete.");
 }

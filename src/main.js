@@ -1576,16 +1576,18 @@ function openShorts(index) {
     el = document.createElement("div"); el.id = "shortsViewer"; el.className = "shorts-viewer"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-label", "Shorts");
     el.innerHTML = `<div class="sv-stage"><div class="sv-bars"></div><div class="sv-top"><b class="sv-title sr-only" aria-live="polite"></b><span class="sv-grow"></span><button class="sv-btn sv-share" type="button" data-sv="share" aria-label="Share this short">${SHARE_ICONS.share}</button><button class="sv-btn" type="button" data-sv="mute" aria-label="Mute">🔊</button><button class="sv-btn" type="button" data-sv="close" aria-label="Close">✕</button></div>
       <video class="sv-video" playsinline preload="auto"></video><button class="sv-zone sv-prev" type="button" data-sv="prev" aria-label="Previous short"></button><button class="sv-zone sv-next" type="button" data-sv="next" aria-label="Next short"></button>
-      <div class="sv-paused" aria-hidden="true">❚❚</div></div>`;
+      <div class="sv-paused" aria-hidden="true">❚❚</div><div class="sv-end" hidden></div></div>`;
     document.body.append(el);
     const v = el.querySelector("video");
     v.addEventListener("timeupdate", () => { const bar = el.querySelectorAll(".sv-bars i")[shortsState?.i]; if (bar && v.duration) bar.style.width = `${(v.currentTime / v.duration) * 100}%`; });
-    v.addEventListener("ended", () => stepShort(1));
+    v.addEventListener("ended", () => { if (!showFullOffer()) stepShort(1); });
     el.addEventListener("click", e => {
       if (el.dataset.held) { delete el.dataset.held; return; }   // a press-and-hold pause is not a tap
       const b = e.target.closest("[data-sv]"); if (!b) return;
       const k = b.dataset.sv;
       if (k === "share") { const m = shortsState?.list[shortsState.i]; if (m) { v.pause(); shareOut(m.title, mediaUrl(m)).then(() => { if (!$("#sharePop") || $("#sharePop").hidden) v.play().catch(() => {}); }); } }
+      else if (k === "full") { const full = fullOf(shortsState?.list[shortsState.i]); closeShorts(); if (full) { openedShared = null; navigate(withLang(`/watch?v=${encodeURIComponent(full.id)}&play=1`)); } }
+      else if (k === "replay") { el.querySelector(".sv-end").hidden = true; v.currentTime = 0; v.play().catch(() => {}); }
       else if (k === "close") closeShorts(); else if (k === "prev") stepShort(-1); else if (k === "next") stepShort(1);
       else if (k === "mute") { v.muted = !v.muted; b.textContent = v.muted ? "🔇" : "🔊"; b.setAttribute("aria-label", v.muted ? "Unmute" : "Mute"); }
     });
@@ -1603,8 +1605,24 @@ function openShorts(index) {
   showShort();
   el.querySelector('[data-sv="close"]').focus({ preventScroll: true });
 }
+// A short linked to its full-length video ends on a card offering it; the card stays until the
+// viewer picks something (watch the full video, replay, the next short, or close).
+const fullOf = m => m?.fullId ? (state.media || []).find(x => x.id === m.fullId && !isShort(x)) : null;
+function showFullOffer() {
+  const el = $("#shortsViewer"), m = shortsState?.list[shortsState.i], full = fullOf(m);
+  if (!full) return false;
+  const end = el.querySelector(".sv-end"), more = shortsState.i < shortsState.list.length - 1;
+  end.innerHTML = `<div class="sv-end-card">${full.thumbnailUrl ? `<span class="sv-end-thumb">${img(full.thumbnailUrl, "")}<span class="play-badge" aria-hidden="true"></span></span>` : ""}
+    <span class="kicker">Full explainer</span><b>${esc(full.title)}</b>
+    <button class="btn sv-end-go" type="button" data-sv="full">▶ Watch the full video</button>
+    <span class="sv-end-row"><button type="button" data-sv="replay">↺ Replay</button>${more ? `<button type="button" data-sv="next">Next short →</button>` : ""}</span></div>`;
+  end.hidden = false;
+  end.querySelector(".sv-end-go").focus({ preventScroll: true });
+  return true;
+}
 function showShort() {
   const el = $("#shortsViewer"), { i, list } = shortsState, m = list[i], v = el.querySelector("video");
+  el.querySelector(".sv-end").hidden = true;
   el.querySelectorAll(".sv-bars i").forEach((b, k) => { b.style.width = k < i ? "100%" : "0%"; });
   el.querySelector(".sv-title").textContent = m.title;
   v.poster = m.thumbnailUrl || ""; v.src = m.mediaUrl; v.currentTime = 0; v.play().catch(() => {});
@@ -1646,7 +1664,7 @@ function viewWatch() {
     openedShared = want;
     const k = list.findIndex(m => m.id === want);
     if (k >= 0) openShorts(k);
-    else { const card = document.getElementById(`m-${want}`); if (card) { card.scrollIntoView({ block: "center" }); card.classList.add("flash"); } }
+    else { const card = document.getElementById(`m-${want}`); if (card) { card.scrollIntoView({ block: "center" }); card.classList.add("flash"); if (parseRoute().params.get("play")) card.querySelector("video")?.play().catch(() => {}); } }
   }
 }
 

@@ -1206,13 +1206,24 @@ body.sv-open{overflow:hidden}
 .sv-bars{position:absolute;top:10px;left:10px;right:10px;z-index:3;display:flex;gap:4px}
 .sv-bars span{flex:1;height:3px;border-radius:3px;background:rgba(15,20,34,.22);box-shadow:0 0 3px rgba(0,0,0,.25);overflow:hidden}
 .sv-bars i{display:block;height:100%;width:0;background:var(--red)}
-.sv-top{position:absolute;top:22px;left:10px;right:10px;z-index:3;display:flex;align-items:center;gap:8px;color:#fff}
+.sv-top{position:absolute;top:22px;left:10px;right:10px;z-index:5;display:flex;align-items:center;gap:8px;color:#fff}
 .sv-grow{flex:1}
 .sv-btn{width:38px;height:38px;border-radius:50%;border:0;background:rgba(15,20,34,.55);color:#fff;font-size:16px;cursor:pointer}
 .sv-zone{position:absolute;top:70px;bottom:0;z-index:2;width:34%;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .sv-prev{left:0}.sv-next{right:0}
 .sv-paused{position:absolute;inset:0;display:none;place-items:center;color:#fff;font-size:42px;z-index:2;pointer-events:none}
 .shorts-viewer.held .sv-paused{display:grid}
+.sv-end{position:absolute;inset:0;z-index:4;display:grid;place-items:center;padding:24px;background:linear-gradient(180deg,rgba(10,13,21,.35),rgba(10,13,21,.88));backdrop-filter:blur(3px);animation:sv-end-in .35s ease}
+.sv-end[hidden]{display:none}
+.sv-end-card{display:grid;justify-items:center;gap:10px;max-width:300px;text-align:center;color:#fff}
+.sv-end-card .kicker{color:#ff8a7d}
+.sv-end-card b{font:500 20px/1.25 var(--serif)}
+.sv-end-thumb{position:relative;display:block;width:100%;aspect-ratio:16/9;border-radius:12px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.sv-end-thumb img{width:100%;height:100%;object-fit:cover}
+.sv-end-go{margin-top:4px;padding:12px 20px;border-radius:999px;border:0;background:var(--live);color:#fff;font:700 14px var(--sans);cursor:pointer;box-shadow:0 8px 22px rgba(214,69,53,.45)}
+.sv-end-row{display:flex;gap:16px}
+.sv-end-row button{border:0;background:none;color:rgba(255,255,255,.85);font:600 13px var(--sans);cursor:pointer;padding:6px}
+@keyframes sv-end-in{from{opacity:0}to{opacity:1}}
 :root[data-theme=dark] .carousel-btn{background:rgba(255,255,255,.08);color:inherit;border-color:rgba(255,255,255,.14)}
 :root[data-theme=dark] .short-face{border-color:var(--bg)}
 
