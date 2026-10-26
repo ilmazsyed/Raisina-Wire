@@ -357,7 +357,10 @@ async function route({ restoreY = null } = {}) {
   const view = views[r.page] || viewNotFound;
   // Lists that mix in control-room articles wait briefly for them, so the lead story doesn't flash.
   stopListening();
-  if (["home", "editions", "search", "author", "edition", "article", "tag", "my"].includes(r.page)) await Promise.race([Promise.all([articlesReady, writersReady]), new Promise(res => setTimeout(res, 1200))]);
+  if (["home", "editions", "search", "author", "edition", "article", "tag", "my"].includes(r.page)) {
+    await Promise.race([Promise.all([articlesReady, writersReady]), new Promise(res => setTimeout(res, 1200))]);
+    if (!articlesSettled && ["home", "editions", "author"].includes(r.page)) state.drewWithoutArticles = true;
+  }
   if (["account", "discussion", "community", "my", "saved", "tag"].includes(r.page)) await Promise.race([userReady, new Promise(res => setTimeout(res, 2500))]);
   document.body.classList.toggle("is-reading", ["edition", "article", "read"].includes(r.page));
   const main = $("#view");
@@ -1402,7 +1405,13 @@ async function loadArticles({ apply = false } = {}) {
   try { const r = await fetch(`/api/articles${lang !== "en" ? `?lang=${lang}` : ""}`); if (r.ok) list = (await r.json()).articles || []; } catch { /* keep what we have */ }
   const first = !articlesSettled; articlesSettled = true;
   if (list) markFresh();
-  if (first) { if (list) state.articles = list; return; } // the first load is awaited by route() instead
+  if (first) {
+    if (list) state.articles = list;
+    // A slow first answer: the page was already drawn with the bundled editions (the oldest
+    // stories), so draw it again with the real list straight away.
+    if (list && state.drewWithoutArticles) { state.drewWithoutArticles = false; rerenderStories(); }
+    return;
+  }
   if (!list) return;
   const known = new Set((state.articles || []).map(a => a.id));
   const fresh = list.filter(a => !known.has(a.id) && !(state.dismissedNew || new Set()).has(a.id));
