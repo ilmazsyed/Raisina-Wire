@@ -156,19 +156,19 @@
       "items": [
         {
           "when": "1800s",
-          "what": "Britain and Russia hollow out Iran"
+          "what": "Britain, Russia dominate"
         },
         {
           "when": "1935",
-          "what": "Persia formally becomes Iran"
+          "what": "Renamed Iran"
         },
         {
           "when": "1953",
-          "what": "Coup topples Mossadegh"
+          "what": "Mossadegh toppled"
         },
         {
           "when": "1979",
-          "what": "Islamic Revolution",
+          "what": "Revolution",
           "hot": true
         }
       ],
