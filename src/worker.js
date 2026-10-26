@@ -15,6 +15,7 @@ import m0013 from "../migrations/0013_live_results.sql";
 import m0014 from "../migrations/0014_audience.sql";
 import m0015 from "../migrations/0015_guest_writers.sql";
 import m0016 from "../migrations/0016_media_full.sql";
+import m0017 from "../migrations/0017_article_video.sql";
 import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { liveResults } from "./results.js";
@@ -71,7 +72,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -179,6 +180,8 @@ function allowedRoles(user, roles) { return user && roles.includes(user.role); }
 const isStaff = user => allowedRoles(user, ["admin", "editor"]);
 const httpsUrl = (v, max = 1500) => { const s = String(v || "").trim().slice(0, max); return /^https:\/\//i.test(s) ? s : ""; };
 // Images: an HTTPS URL, an uploaded image (/media/…) or bundled artwork (/editions/…).
+// A story video: one of the site's own explainers (/videos/…) or an https MP4/WebM.
+const videoRef = v => { const s = String(v || "").trim().slice(0, 1500); return /^\/videos\/[\w.-]+\.(mp4|webm)$/.test(s) || /^https:\/\/\S+\.(mp4|webm)(\?\S*)?$/.test(s) ? s : ""; };
 const imageRef = v => { const s = String(v || "").trim().slice(0, 1500); return /^\/(media|editions)\/[\w.-]+$/.test(s) ? s : httpsUrl(s); };
 const writerKey = v => WRITERS.some(w => w.key === v) ? v : DEFAULT_WRITER;
 const tagsValue = v => splitTags(Array.isArray(v) ? v.join(",") : v).map(t => t.slice(0, 40)).join(",");
@@ -762,9 +765,9 @@ async function api(request, env, ctx) {
     const publishedAt = status === "published" ? (Date.parse(b.publishedAt) ? new Date(b.publishedAt).toISOString() : new Date().toISOString()) : null;
     const category = String(b.category||"Analysis").slice(0,40);
     const text = { title, dek: String(b.dek||"").trim().slice(0,400), topic: String(b.topic||"").trim().slice(0,80), tags: tagsValue(b.tags), body: String(b.body||"").slice(0,100000), hero_caption: String(b.heroCaption||"").trim().slice(0,300) };
-    await env.DB.prepare("INSERT INTO articles (id,slug,kind,title,dek,topic,tags,body,category,status,author_id,writer,published_at,image_url,hero_url,hero_caption,source_url,text_hash) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(
+    await env.DB.prepare("INSERT INTO articles (id,slug,kind,title,dek,topic,tags,body,category,status,author_id,writer,published_at,image_url,hero_url,hero_caption,source_url,text_hash,video_url) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(
       id, slug, b.kind === "edition" ? "edition" : "article", title, text.dek, text.topic, text.tags, text.body,
-      category, status, user.id, writerKey(b.writer), publishedAt, imageRef(b.imageUrl), imageRef(b.heroUrl), text.hero_caption, httpsUrl(b.sourceUrl), await textHash(text)).run();
+      category, status, user.id, writerKey(b.writer), publishedAt, imageRef(b.imageUrl), imageRef(b.heroUrl), text.hero_caption, httpsUrl(b.sourceUrl), await textHash(text), videoRef(b.videoUrl)).run();
     await audit(env, user, "article.create", "article", id, { title, status });
     const alert = wantsAlert(b.notify) && status === "published" ? await storyAlert(env, ctx, user, { id, slug, title, status, kind: b.kind === "edition" ? "edition" : "article", published_at: publishedAt }) : "";
     return json({ok:true,id,slug,alert},201,{"cache-control":"no-store"});
@@ -783,7 +786,7 @@ async function api(request, env, ctx) {
     const publishedAt = status === "published" ? (Date.parse(b.publishedAt) ? new Date(b.publishedAt).toISOString() : (c.published_at || new Date().toISOString())) : c.published_at;
     const text = { title, dek: pick("dek", v => String(v).trim().slice(0,400), c.dek), topic: pick("topic", v => String(v).trim().slice(0,80), c.topic),
       tags: pick("tags", tagsValue, c.tags), body: pick("body", v => String(v).slice(0,100000), c.body), hero_caption: pick("heroCaption", v => String(v).trim().slice(0,300), c.hero_caption) };
-    await env.DB.prepare("UPDATE articles SET title=?,dek=?,topic=?,tags=?,body=?,category=?,kind=?,writer=?,status=?,published_at=?,image_url=?,hero_url=?,hero_caption=?,source_url=?,updated_at=?,text_hash=?,alert_state=CASE WHEN ?<>'published' AND alert_state='pending' THEN '' ELSE alert_state END WHERE id=?").bind(
+    await env.DB.prepare("UPDATE articles SET title=?,dek=?,topic=?,tags=?,body=?,category=?,kind=?,writer=?,status=?,published_at=?,image_url=?,hero_url=?,hero_caption=?,source_url=?,updated_at=?,text_hash=?,video_url=?,alert_state=CASE WHEN ?<>'published' AND alert_state='pending' THEN '' ELSE alert_state END WHERE id=?").bind(
       title, text.dek, text.topic, text.tags, text.body,
       pick("category", v => String(v).slice(0,40), c.category),
       pick("kind", v => v === "edition" ? "edition" : "article", c.kind),
@@ -793,7 +796,7 @@ async function api(request, env, ctx) {
       pick("heroUrl", imageRef, c.hero_url),
       text.hero_caption,
       pick("sourceUrl", httpsUrl, c.source_url),
-      new Date().toISOString(), await textHash(text), status, id).run();
+      new Date().toISOString(), await textHash(text), pick("videoUrl", videoRef, c.video_url || ""), status, id).run();
     await audit(env,user,"article.update","article",id,{title,status});
     // First publication of a story sends its alert (unless switched off); later edits never re-send.
     const firstPublish = c.status !== "published" || c.alert_state === "pending";

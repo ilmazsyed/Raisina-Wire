@@ -640,7 +640,7 @@ async function viewStory(r) {
   <div class="reader-layout"><article class="reader-article" data-lang="${a.lang || "en"}"${lang !== "en" && (a.lang || "en") === "en" ? ' lang="en"' : ""}>
     <div class="kicker">${esc(a.topic || a.category)}</div><h1>${esc(a.title)}</h1>${a.dek ? `<p class="dek">${esc(a.dek)}</p>` : ""}${translationNote(a, original)}
     <div class="reader-byline"><a href="/author/${w.key}" class="byline-link"><img src="${w.photo}" alt="" class="${w.isDesk ? "desk" : ""}"><span><b>${esc(w.name)}</b><span class="muted" style="display:block;font-size:13px">${esc(w.role)}</span></span></a><span class="grow"></span><span class="meta">${a.publishedAt ? editionDate(a.publishedAt) : "Not yet published"} · ${Math.max(1, Math.round(words / 220))} min read</span></div>
-    <figure class="reader-hero">${img(hero, a.heroCaption || "")}${a.heroCaption ? `<figcaption>${esc(a.heroCaption)}</figcaption>` : ""}</figure>
+    ${a.videoUrl ? `<figure class="reader-hero reader-video"><video controls playsinline preload="metadata" src="${esc(a.videoUrl)}" poster="${esc(hero)}"></video>${a.heroCaption ? `<figcaption>${esc(a.heroCaption)}</figcaption>` : ""}</figure>` : `<figure class="reader-hero">${img(hero, a.heroCaption || "")}${a.heroCaption ? `<figcaption>${esc(a.heroCaption)}</figcaption>` : ""}</figure>`}
     <div class="prose dropcap">${blocks.length ? proseHTML(blocks, { pull: pullQuote(blocks) }) : `<p>This story could not be loaded.</p>`}</div>
     ${(a.tags || []).length ? `<div class="story-tags"><span class="meta">Topics</span>${a.tags.map((t, i) => `<a class="tag-chip" href="/tag/${tagSlug(t)}">${esc(a.tagLabels?.[i] || t)}</a>`).join("")}</div>` : ""}
     ${shareBlock(a.title, a.href)}
