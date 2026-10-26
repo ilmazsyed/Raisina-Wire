@@ -156,7 +156,7 @@
         const land = u - 1.9; if (land > 0 && land < 1.2) for (let k = 0; k < 3; k++) {   // rings burst out as the count lands
           const q = clamp((land - k * .12) / .9); if (q <= 0) continue; ctx.save(); ctx.globalAlpha = (1 - q) * .35; ctx.strokeStyle = C.red; ctx.lineWidth = Math.max(2, M * .004);
           ctx.beginPath(); ctx.arc(cx, cy - M * .08, M * (.18 + q * .5), 0, TAU); ctx.stroke(); ctx.restore(); }
-        ctx.save(); const sc = lerp(.85, 1, back(u / .7)) * (1 + .03 * Math.sin(S.r * 2.2) * clamp(land)); ctx.translate(cx, cy); ctx.scale(sc, sc); ctx.globalAlpha *= ease(u / .4);
+        ctx.save(); const sc = lerp(.85, 1, back(u / .7)); ctx.translate(cx, cy); ctx.scale(sc, sc); ctx.globalAlpha *= ease(u / .4);
         ctx.fillText(`${s.prefix || ''}${val}${s.suffix || ''}`, 0, 0); ctx.restore();
         ctx.font = font('sans', M * .04, 600); ctx.fillStyle = C.ink;
         riseText(s.label, cx, cy + M * .1, V ? W * .84 : W * .6, M * .054, u - .9, { align: 'center', stagger: .03 });
@@ -437,9 +437,9 @@
         // the subject: pops up from the bottom, then floats against the background
         if (rec.cut) {
           const hgt = H * (V ? .6 : .88), wid = hgt * iw(rec.cut) / ih(rec.cut), maxW = W * (V ? .92 : .44);
-          const sc = Math.min(1, maxW / wid) * (1 + .035 * Math.sin(S.r * 1.3)), w = wid * sc, h = hgt * sc;
+          const sc = Math.min(1, maxW / wid) * lerp(1, 1.03, clamp(S.r / Math.max(4, S.dur))), w = wid * sc, h = hgt * sc;
           const x = V ? (W - w) / 2 : right ? W - w - W * .04 : W * .04, y = H - h + (1 - back((u - .15) / .7)) * H * .5;
-          ctx.save(); ctx.translate(x + w / 2 + k * W * .015 * (right ? -1 : 1), y + h); ctx.rotate(Math.sin(S.r * .8) * .012); sticker(rec, -w / 2, -h, w, h); ctx.restore();
+          ctx.save(); ctx.translate(x + w / 2 + k * W * .015 * (right ? -1 : 1), y + h); sticker(rec, -w / 2, -h, w, h); ctx.restore();
         }
         sourceLine(s.source, u);
       };
@@ -621,11 +621,10 @@
       if (t < sc.start || t > end + OUT) continue;
       const out = clamp((t - end) / OUT), inn = fast ? ease(u / .35) : 1;
       S = { r: u, vd: sc.voiceDur || sc.dur * .8, dur: sc.dur };
-      // camera: a slow push and drift through the whole scene, plus a punch on every new caption line
-      const caps = timing.captions.filter(c => c.t0 >= sc.start - .01 && c.t0 < end), ci = caps.findLastIndex(c => c.t0 <= t);
-      const since = ci > 0 ? t - caps[ci].t0 : 9, punch = .028 * Math.exp(-since * 7), dir = ci % 2 ? 1 : -1, kk = clamp(u / Math.max(2, sc.dur));
-      const z = (fast ? lerp(1.06, 1, inn) : 1) * lerp(1, 1.045, easeIO(kk)) * (1 + punch);
-      const dx = Math.sin(u * .5 + i) * M * .006 + dir * punch * W * .35 - out * W * .06, dy = Math.cos(u * .4 + i * 2) * M * .005;
+      // camera: one smooth, slow push through the whole scene (no pulses or wobble: the frame never throbs)
+      const kk = clamp(u / Math.max(2, sc.dur));
+      const z = (fast ? lerp(1.06, 1, inn) : 1) * lerp(1, 1.04, easeIO(kk));
+      const dx = -out * W * .06, dy = 0;
       ctx.save(); ctx.globalAlpha = 1 - ease(out);
       ctx.translate(W / 2 + dx, H / 2 + dy); ctx.scale(z, z); ctx.translate(-W / 2, -H / 2);
       if (!fast) ctx.translate(0, -out * M * .03);
