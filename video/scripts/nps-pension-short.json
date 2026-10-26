@@ -1,0 +1,19 @@
+{
+  "slug": "nps-pension-short",
+  "title": "₹17 lakh crore at risk? The NPS row in 60 seconds",
+  "series": "Explained",
+  "formats": ["9x16"],
+  "pace": 1.7,
+  "captionChars": 34,
+  "ticker": "₹17 lakh crore at risk? The NPS row in 60 seconds",
+  "scenes": [
+    {"type":"cutout","src":"media/pn-woman-notes.jpg","kicker":"Explained · Pensions","title":"₹17 lakh crore at risk?","say":"Are the pension savings of nearly 1 crore government employees at risk? A union says yes. Here's the row in 60 seconds.","speak":"Are the pension savings of nearly one crore government employees at risk? A union says yes. Here's the row in sixty seconds."},
+    {"type":"number","kicker":"The NPS corpus","prefix":"₹","value":17,"suffix":" lakh crore","label":"Savings of ~1 crore employees","bg":"media/pn-bag.jpg","say":"The National Pension System holds about 17 lakh crore rupees for Central and state government staff.","speak":"The National Pension System holds about seventeen lakh crore rupees for Central and state government staff."},
+    {"type":"flow","kicker":"The deal","title":"₹17,000 crore to 2 firms","nodes":["NPS corpus","Altirra Capital & Trifecta"],"bg":"media/pn-hands-notes.jpg","say":"The All India NPS Employees Federation says 17,000 crore rupees is being committed to two startups, Altirra Capital and Trifecta, without adequate guarantees.","speak":"The All India N P S Employees Federation says seventeen thousand crore rupees is being committed to two startups, Altirra Capital and Trifecta, without adequate guarantees."},
+    {"type":"number","kicker":"NPS Day","prefix":"₹","value":400,"suffix":" crore","label":"Symbolic cheques, reportedly","bg":"media/pn-bag.jpg","say":"Symbolic cheques worth 400 crore were reportedly handed over on NPS Day.","speak":"Symbolic cheques worth four hundred crore were reportedly handed over on N P S Day."},
+    {"type":"list","kicker":"The demands","title":"What the union wants","items":["Dissolve the NPS Trust","CAG audit","Recover losses","Fix accountability"],"bg":"media/pn-min-pension.jpg","say":"In a complaint to the PM, it wants the NPS Trust dissolved, a CAG audit, and accountability.","speak":"In a complaint to the P M, it wants the N P S Trust dissolved, a C A G audit, and accountability."},
+    {"type":"photo","src":"media/pn-woman-counting.jpg","style":"duotone","focus":0.45,"focusV":0.45,"title":"20 December","say":"If nothing changes, it plans to blockade the pension regulator's office on 20 December.","speak":"If nothing changes, it plans to blockade the pension regulator's office on the twentieth of December."},
+    {"type":"photo","src":"media/pn-ups-nps-ops.jpg","focus":0.5,"focusV":0.5,"title":"Claims, not findings","say":"These are allegations, not yet verified, and the NPS Trust and regulator haven't publicly responded.","speak":"These are allegations, not yet verified, and the N P S Trust and regulator haven't publicly responded."},
+    {"type":"outro","title":"Watch the full explainer","say":"Watch the full explainer on Raisina Wire."}
+  ]
+}
