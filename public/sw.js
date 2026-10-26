@@ -111,6 +111,9 @@ self.addEventListener("fetch", event => {
     return;
   }
   if (url.origin !== self.location.origin) return;
+  // Videos stream straight from the network (range requests, large files), never from the cache,
+  // so a re-rendered film reaches readers at once.
+  if (url.pathname.startsWith("/videos/")) return;
 
   if (url.pathname.startsWith("/api/")) {
     if (url.pathname === "/api/read") event.respondWith(networkFirst(request, READ_CACHE, { wait: 10000, max: 60 }));
