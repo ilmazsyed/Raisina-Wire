@@ -257,6 +257,9 @@ async function gdeltNews(url) {
   return { source: "GDELT DOC 2.0", updatedAt: new Date().toISOString(), query: safeQ, articles };
 }
 
+// Where a story came from stays in the control room; readers never see it.
+const hideSource = ({ sourceUrl, ...a }) => a;
+
 /* ---------- Hindi and Bengali for news text (src/mt.js) ---------- */
 const reqLang = url => { const l = url.searchParams.get("lang"); return isLang(l) ? l : ""; };
 // The live wire in Hindi or Bengali: the language's own publishers, plus the English headlines
@@ -562,7 +565,7 @@ async function api(request, env, ctx) {
     const slug=decodeURIComponent(url.pathname.split("/").pop()||"");
     const item=await env.DB.prepare("SELECT id,slug,title,summary,status,started_at AS startedAt,ended_at AS endedAt,image_url AS imageUrl,hero_caption AS heroCaption,(COALESCE(results,'')<>'') AS hasResults FROM live_coverage WHERE slug=? AND status IN ('live','ended')").bind(slug).first();
     if(!item) return err("Live coverage not found.",404);
-    const updates=await env.DB.prepare("SELECT body,media_url AS mediaUrl,source_url AS sourceUrl,created_at AS createdAt FROM live_updates WHERE coverage_id=? ORDER BY created_at DESC LIMIT 100").bind(item.id).all();
+    const updates=await env.DB.prepare("SELECT body,media_url AS mediaUrl,created_at AS createdAt FROM live_updates WHERE coverage_id=? ORDER BY created_at DESC LIMIT 100").bind(item.id).all();
     const lang=reqLang(url); if(lang) await mtLive(env,lang,item,updates.results);
     return json({item,updates:updates.results});
   }
@@ -577,7 +580,7 @@ async function api(request, env, ctx) {
     const lang = reqLang(url);
     const out = await localiseArticles(env, lang, list);
     if (lang) await mtArticles(env, lang, out.filter(a => a.lang === "en"));
-    return json({ articles: out });
+    return json({ articles: out.map(hideSource) });
   }
   if (url.pathname === "/api/tags" && request.method === "GET") {
     const counts = new Map();
@@ -591,7 +594,7 @@ async function api(request, env, ctx) {
     const lang = reqLang(url);
     const [localised] = await localiseArticles(env, lang, [a]);
     if (lang && localised.lang === "en") await mtArticles(env, lang, [localised]);
-    return json({ article: localised }, 200, { "cache-control": isPublic(a) ? "no-cache" : "no-store" });
+    return json({ article: hideSource(localised) }, 200, { "cache-control": isPublic(a) ? "no-cache" : "no-store" });
   }
 
   // About and the legal pages in Hindi or Bengali (English when no current translation exists).

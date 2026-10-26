@@ -551,7 +551,7 @@ const storyNotFound = () => { $("#view").innerHTML = `<div class="wrap"><div cla
 // An edition from the copy bundled with the app, used when the reader is offline.
 function bundledStory(e, body) {
   return { kind: "edition", slug: e.slug, href: `/edition/${e.slug}`, title: e.title, dek: e.dek, topic: e.topic, category: e.topic, image: e.image, imageUrl: e.image, heroUrl: "", heroCaption: "",
-    sourceUrl: e.url, publishedAt: e.date, writer: "ilmaz-syed", author: AUTHOR.name, status: "published", blocks: body?.blocks || [] };
+    publishedAt: e.date, writer: "ilmaz-syed", author: AUTHOR.name, status: "published", blocks: body?.blocks || [] };
 }
 async function viewStory(r) {
   const slug = r.arg;
@@ -570,15 +570,15 @@ async function viewStory(r) {
   const w = writer(a.writer), blocks = a.blocks || articleBlocks(a.body);
   const words = blocks.reduce((n, b) => n + b.x.split(/\s+/).length, 0);
   const list = stories(), i = list.findIndex(x => x.slug === a.slug), newer = list[i - 1], older = i >= 0 ? list[i + 1] : null;
-  const linkedin = /linkedin\.com/.test(a.sourceUrl || ""), edition = a.kind === "edition";
+  const edition = a.kind === "edition", linkedin = edition;
   const hero = a.heroUrl || a.imageUrl || genericImage(a.category);
   document.title = `${a.title} · Raisina Wire`;
-  $("#view").innerHTML = `<div class="wrap">${readerBar({ badge: a.status === "published" ? (edition ? "Raisina Wire · Edition" : `Raisina Wire · ${a.category}`) : `Preview · ${a.status}`, original: a.sourceUrl, originalLabel: linkedin ? "Original on LinkedIn" : "Original", saveItem: { href: a.href, title: a.title, source: "Raisina Wire" } })}
+  $("#view").innerHTML = `<div class="wrap">${readerBar({ badge: a.status === "published" ? (edition ? "Raisina Wire · Edition" : `Raisina Wire · ${a.category}`) : `Preview · ${a.status}`, saveItem: { href: a.href, title: a.title, source: "Raisina Wire" } })}
   <div class="reader-layout"><article class="reader-article" data-lang="${a.lang || "en"}"${lang !== "en" && (a.lang || "en") === "en" ? ' lang="en"' : ""}>
     <div class="kicker">${esc(a.topic || a.category)}</div><h1>${esc(a.title)}</h1>${a.dek ? `<p class="dek">${esc(a.dek)}</p>` : ""}${translationNote(a, original)}
     <div class="reader-byline"><a href="/author/${w.key}" class="byline-link"><img src="${w.photo}" alt="" class="${w.isDesk ? "desk" : ""}"><span><b>${esc(w.name)}</b><span class="muted" style="display:block;font-size:13px">${esc(w.role)}</span></span></a><span class="grow"></span><span class="meta">${a.publishedAt ? editionDate(a.publishedAt) : "Not yet published"} · ${Math.max(1, Math.round(words / 220))} min read</span></div>
     <figure class="reader-hero">${img(hero, a.heroCaption || "")}${a.heroCaption ? `<figcaption>${esc(a.heroCaption)}</figcaption>` : ""}</figure>
-    <div class="prose dropcap">${blocks.length ? proseHTML(blocks, { pull: pullQuote(blocks) }) : `<p>This story could not be loaded.${a.sourceUrl ? ` <a href="${esc(a.sourceUrl)}" target="_blank" rel="noreferrer">Read the original ↗</a>` : ""}</p>`}</div>
+    <div class="prose dropcap">${blocks.length ? proseHTML(blocks, { pull: pullQuote(blocks) }) : `<p>This story could not be loaded.</p>`}</div>
     ${(a.tags || []).length ? `<div class="story-tags"><span class="meta">Topics</span>${a.tags.map((t, i) => `<a class="tag-chip" href="/tag/${tagSlug(t)}">${esc(a.tagLabels?.[i] || t)}</a>`).join("")}</div>` : ""}
     ${shareBlock(a.title, a.href)}
     <div class="author-box"><img src="${w.photo}" alt="" class="${w.isDesk ? "desk" : ""}"><div><span class="kicker">${w.isDesk ? "From the desk" : "About the author"}</span><b><a href="/author/${w.key}">${esc(w.name)}</a></b><p>${esc(w.bio)}</p><a class="link-gold" href="/author/${w.key}" style="font-size:13px">More from ${esc(w.name)} →</a></div></div>
@@ -1262,7 +1262,7 @@ async function viewCoverage(r) {
         ${shareBlock(`${isLive ? "LIVE: " : ""}${d.item.title}`, `/coverage/${encodeURIComponent(slug)}`)}</header>
       ${d.item.hasResults ? `<section id="resultsCounter" aria-live="polite" aria-label="Live results">${resultsHTML || `<div class="rc glass"><div class="skeleton" style="height:260px"></div></div>`}</section>` : ""}
       <ol class="coverage-feed">${d.updates.map((u, i) => `<li id="u-${Date.parse(u.createdAt) || i}" class="${i === 0 && isLive ? "latest" : ""}"><time datetime="${esc(u.createdAt)}"><b>${clock(u.createdAt)}</b><span>${ago(u.createdAt)}</span></time>
-        <div class="glass">${i === 0 && isLive ? `<span class="tag tag-live">Latest</span>` : ""}${articleBlocks(u.body).map(b => `<p>${esc(b.x)}</p>`).join("")}${u.mediaUrl && /^(https?:|\/media\/)/.test(u.mediaUrl) ? `<div class="reader-hero">${img(u.mediaUrl)}</div>` : ""}${u.sourceUrl && /^https?:/.test(u.sourceUrl) ? `<a class="link-gold" href="${esc(u.sourceUrl)}" target="_blank" rel="noreferrer">Source ↗</a>` : ""}<button class="update-share" type="button" data-action="share-native" data-title="${esc(`${d.item.title}: ${String(u.body).slice(0, 110)}${String(u.body).length > 110 ? "…" : ""}`)}" data-url="${esc(`${location.origin}${withLang(`/coverage/${encodeURIComponent(slug)}`)}#u-${Date.parse(u.createdAt) || i}`)}" aria-label="Share this update">${SHARE_ICONS.share}<span>Share</span></button></div></li>`).join("") || `<li><div class="glass"><p class="muted">The first update will appear here shortly.</p></div></li>`}</ol>
+        <div class="glass">${i === 0 && isLive ? `<span class="tag tag-live">Latest</span>` : ""}${articleBlocks(u.body).map(b => `<p>${esc(b.x)}</p>`).join("")}${u.mediaUrl && /^(https?:|\/media\/)/.test(u.mediaUrl) ? `<div class="reader-hero">${img(u.mediaUrl)}</div>` : ""}<button class="update-share" type="button" data-action="share-native" data-title="${esc(`${d.item.title}: ${String(u.body).slice(0, 110)}${String(u.body).length > 110 ? "…" : ""}`)}" data-url="${esc(`${location.origin}${withLang(`/coverage/${encodeURIComponent(slug)}`)}#u-${Date.parse(u.createdAt) || i}`)}" aria-label="Share this update">${SHARE_ICONS.share}<span>Share</span></button></div></li>`).join("") || `<li><div class="glass"><p class="muted">The first update will appear here shortly.</p></div></li>`}</ol>
     </div></div>`;
   };
   await render(true);
@@ -1283,7 +1283,7 @@ const genericImage = category => `/editions/generic-${GENERIC_ART[String(categor
 const EDITION_STORIES = editions.map(e => ({ kind: "edition", slug: e.slug, href: `/edition/${e.slug}`, title: e.title, dek: e.dek, topic: e.topic, date: e.date, image: e.image, readMinutes: e.readMinutes, author: AUTHOR.name, writer: "ilmaz-syed", url: e.url }));
 function stories() {
   if (!state.articles?.length) return EDITION_STORIES;
-  return state.articles.map(a => ({ ...a, date: a.publishedAt, topic: a.topic || a.category, url: a.sourceUrl }));
+  return state.articles.map(a => ({ ...a, date: a.publishedAt, topic: a.topic || a.category }));
 }
 let articlesSettled = false;
 async function loadArticles() {
