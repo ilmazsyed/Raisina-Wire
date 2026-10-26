@@ -1,265 +1,422 @@
 {
-  "slug": "persia-to-iran-explained",
-  "title": "From Persia to Iran: why this civilisation never forgets",
-  "series": "Explained",
-  "formats": [
-    "16x9"
-  ],
-  "pace": 1.6,
-  "captionChars": 38,
-  "ticker": "From Airyana Vaeja to the Islamic Republic: the long civilisational arc of Persia and Iran",
-  "scenes": [
+ "slug": "persia-to-iran-explained-v2",
+ "title": "From Persia to Iran",
+ "series": "Explained",
+ "style": "vox",
+ "formats": [
+  "16x9"
+ ],
+ "captionChars": 40,
+ "scenes": [
+  {
+   "type": "snap",
+   "src": "media/ir-illustration.jpg",
+   "say": "Empires come and go.",
+   "frame": "full"
+  },
+  {
+   "type": "kinetic",
+   "say": "Iran has outlasted almost all of them.",
+   "text": "Iran outlasted | them all",
+   "hl": [
+    "outlasted"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "So why does it still unsettle the world's great powers?",
+   "text": "Why does it still | unsettle the world?",
+   "hl": [
+    "unsettle"
+   ]
+  },
+  {
+   "type": "title",
+   "say": "To understand, start at the very beginning.",
+   "kicker": "Explained · Iran",
+   "title": "From Persia to Iran",
+   "cut": "zoom"
+  },
+  {
+   "type": "number",
+   "say": "Middle Persian tradition speaks of as many as 240 kingdoms on the Iranian plateau.",
+   "para": true,
+   "value": 240,
+   "label": "Kingdoms on the Iranian plateau, in Middle Persian tradition",
+   "bg": "media/ir-persepolis-sunset.jpg",
+   "speak": "Middle Persian tradition speaks of as many as two hundred and forty kingdoms on the Iranian plateau."
+  },
+  {
+   "type": "kinetic",
+   "say": "Bound not by one ruler, but by language, ritual and a shared cosmos.",
+   "text": "Language. Ritual. | A shared cosmos.",
+   "hl": [
+    "cosmos."
+   ]
+  },
+  {
+   "type": "map",
+   "say": "Power moved across this world: from Balkh in the east, to Media, to Parthia, and finally to Pars.",
+   "kicker": "Where power moved",
+   "title": "Across the plateau",
+   "view": [
+    44,
+    70,
+    26,
+    40
+   ],
+   "pins": [
     {
-      "type": "photo",
-      "src": "media/ir-illustration.jpg",
-      "focus": 0.5,
-      "focusV": 0.5,
-      "title": "From Persia to Iran",
-      "source": "Illustration",
-      "say": "Empires come and go. Iran has outlasted almost all of them. To see why it still unsettles the world's great powers, start at the very beginning."
+     "lon": 66.9,
+     "lat": 36.76,
+     "label": "Balkh"
     },
     {
-      "type": "number",
-      "kicker": "Act one · Origins",
-      "value": 240,
-      "label": "kingdoms, bound by language, ritual and belief, not by one ruler",
-      "source": "Middle Persian tradition, via Niti Shastra",
-      "say": "Middle Persian tradition speaks of as many as 240 kingdoms on the Iranian plateau. They were bound not by one ruler, but by language, ritual and a shared cosmos.",
-      "speak": "Middle Persian tradition speaks of as many as two hundred and forty kingdoms on the Iranian plateau. They were bound not by one ruler, but by language, ritual and a shared cosmos.",
-      "bg": "media/ir-persepolis-sunset.jpg"
+     "lon": 48.5,
+     "lat": 34.8,
+     "label": "Media",
+     "side": "left"
     },
     {
-      "type": "map",
-      "kicker": "Power on the move",
-      "title": "From Balkh to Pars",
-      "view": [
-        40,
-        76,
-        22,
-        45
-      ],
-      "pins": [
-        {
-          "lon": 66.9,
-          "lat": 36.76,
-          "label": "Balkh"
-        },
-        {
-          "lon": 48.5,
-          "lat": 34.8,
-          "label": "Media",
-          "side": "left"
-        },
-        {
-          "lon": 58.2,
-          "lat": 37.95,
-          "label": "Parthia"
-        },
-        {
-          "lon": 52.89,
-          "lat": 29.94,
-          "label": "Pars",
-          "side": "left"
-        }
-      ],
-      "say": "Power moved across this world: from Balkh in the east, to Media, to Parthia, and finally to Pars, the province that gave Persia its name. But Persia was never the whole of Iran."
+     "lon": 58.5,
+     "lat": 37.0,
+     "label": "Parthia"
     },
     {
-      "type": "flow",
-      "kicker": "The big idea",
-      "title": "Shahanshah: the King of Kings",
-      "nodes": [
-        "Local kings keep their lands",
-        "They accept one overlord",
-        "Shahanshah"
-      ],
-      "base": "Layered sovereignty: echoed in India's Rajadhiraja and Chakravarti",
-      "say": "When one kingdom rose, it didn't abolish the others. It ruled over them. That gave the world the Shahanshah, the King of Kings, an idea echoed in India's Rajadhiraja and Chakravarti."
-    },
-    {
-      "type": "quote",
-      "text": "Empire was not annihilation of difference but orchestration of plurality.",
-      "who": "Navroop Singh and Himja Parekh",
-      "role": "Niti Shastra",
-      "say": "In the Iranian imagination, empire was not the annihilation of difference, but the orchestration of plurality."
-    },
-    {
-      "type": "collage",
-      "kicker": "Act two · Empire",
-      "title": "Persepolis: an imperial voice",
-      "photos": [
-        {
-          "src": "media/ir-gate.jpg",
-          "caption": "Gate of All Nations, Persepolis"
-        },
-        {
-          "src": "media/ir-gate-lamassu.jpg",
-          "caption": "Guardian figures at the gate"
-        },
-        {
-          "src": "media/ir-doorway.jpg",
-          "caption": "Ruins of Persepolis"
-        }
-      ],
-      "say": "In the 6th century BCE, Cyrus built the largest empire yet seen. Alexander conquered it, then adopted its ways. And Persia's heirs were Rome's only true equals.",
-      "speak": "In the sixth century BCE, Cyrus built the largest empire yet seen. Alexander conquered it, then adopted its ways. And Persia's heirs were Rome's only true equals."
-    },
-    {
-      "type": "quote",
-      "text": "Two centuries of silence.",
-      "who": "Abdolhossein Zarrinkoob",
-      "role": "Iranian historian, on the Arab conquest",
-      "say": "Then, the deepest rupture. In the 7th century, the Sasanian empire fell to Arab armies. Language, faith and rulers all changed. One historian called it two centuries of silence.",
-      "speak": "Then, the deepest rupture. In the seventh century, the Sasanian empire fell to Arab armies. Language, faith and rulers all changed. One historian called it two centuries of silence.",
-      "bg": "media/ir-gate-dusk.jpg"
-    },
-    {
-      "type": "flow",
-      "kicker": "Act three · Survival",
-      "title": "Even the words remember",
-      "nodes": [
-        "Pars",
-        "Fars",
-        "Farsi"
-      ],
-      "base": "Zoroastrians who fled to India kept the old word: Parsi",
-      "say": "Arabic has no P sound, so Pars became Fars, and Persian became Farsi. But the Zoroastrians who fled to India kept the older word. They are still called Parsis."
-    },
-    {
-      "type": "list",
-      "kicker": "The conqueror is absorbed",
-      "title": "Iran reshaped its rulers",
-      "items": [
-        "Persians ran the Abbasid Caliphate",
-        "Scholars saved and grew Greek science",
-        "Seljuk Turks ruled as Persian kings",
-        "Mongol khans governed through Iranians"
-      ],
-      "say": "And Iran didn't die. It reshaped Islam itself. Persians ran the Abbasid Caliphate. Turkic and Mongol conquerors became Persian kings. Again and again, the conqueror was absorbed."
-    },
-    {
-      "type": "flow",
-      "kicker": "Act four · Renewal",
-      "title": "The Safavid synthesis",
-      "nodes": [
-        "Safavids",
-        "Twelver Shi'ism",
-        "A firewall against the Ottomans"
-      ],
-      "base": "Faith fused with sovereignty: the blueprint of modern Iran",
-      "say": "The Safavids completed the restoration. Twelver Shi'ism became the state faith and a geopolitical firewall against Sunni rivals. Faith fused with sovereignty: the blueprint of modern Iran."
-    },
-    {
-      "type": "timeline",
-      "kicker": "Act five · The modern clash",
-      "title": "Sovereignty, tested",
-      "items": [
-        {
-          "when": "1800s",
-          "what": "Britain, Russia dominate"
-        },
-        {
-          "when": "1935",
-          "what": "Renamed Iran"
-        },
-        {
-          "when": "1953",
-          "what": "Mossadegh toppled"
-        },
-        {
-          "when": "1979",
-          "what": "Revolution",
-          "hot": true
-        }
-      ],
-      "say": "In the 1800s, Britain and Russia hollowed Iran out. In 1935, Persia became Iran. In 1953, an Anglo-American coup toppled Mossadegh. Then came 1979, and revolution.",
-      "speak": "In the eighteen hundreds, Britain and Russia hollowed Iran out. In nineteen thirty-five, Persia became Iran. In nineteen fifty-three, an Anglo-American coup toppled Mossadegh. Then came nineteen seventy-nine, and revolution.",
-      "bg": "media/ir-rally.jpg"
-    },
-    {
-      "type": "collage",
-      "kicker": "After 1979",
-      "title": "A revolution hardens",
-      "photos": [
-        {
-          "src": "media/ir-mural.jpg",
-          "caption": "An anti-US mural"
-        },
-        {
-          "src": "media/ir-rally.jpg",
-          "caption": "Posters of Khamenei and Khomeini at a rally"
-        },
-        {
-          "src": "media/ir-posters.jpg",
-          "caption": "Supporters hold up portraits"
-        }
-      ],
-      "say": "The revolution hardened into a coercive state, increasingly run by the Revolutionary Guards."
-    },
-    {
-      "type": "map",
-      "kicker": "Strategic depth",
-      "title": "The 'Shia crescent'",
-      "view": [
-        28,
-        62,
-        10,
-        42
-      ],
-      "pins": [
-        {
-          "lon": 51.39,
-          "lat": 35.69,
-          "label": "Tehran"
-        },
-        {
-          "lon": 44.36,
-          "lat": 33.31,
-          "label": "Iraq"
-        },
-        {
-          "lon": 36.29,
-          "lat": 33.51,
-          "label": "Syria",
-          "side": "left"
-        },
-        {
-          "lon": 35.5,
-          "lat": 33.89,
-          "label": "Lebanon",
-          "side": "left"
-        },
-        {
-          "lon": 44.2,
-          "lat": 15.35,
-          "label": "Yemen"
-        }
-      ],
-      "say": "Abroad, Iran built allies from Iraq to Lebanon to Yemen, to keep its wars far from home.",
-      "bg": "media/ir-rubble.jpg"
-    },
-    {
-      "type": "list",
-      "kicker": "Why India is watching",
-      "title": "Two ancient civilisations",
-      "items": [
-        "Sanskrit and Avestan are linguistic cousins",
-        "Shahanshah and Chakravarti",
-        "The Parsis of India"
-      ],
-      "say": "For India, this is not a distant story. Sanskrit and Avestan are linguistic cousins. Shahanshah meets Chakravarti. And the Parsis carry pre-Islamic Iran in India to this day."
-    },
-    {
-      "type": "cutout",
-      "src": "media/ir-rider.jpg",
-      "kicker": "What comes next",
-      "title": "Silence, or renewal?",
-      "say": "Now, with the Gulf a tinderbox, Iran faces overwhelming pressure again. History offers two paths: a long silence, or a profound renewal. Because Iran measures history in centuries, not regimes."
-    },
-    {
-      "type": "outro",
-      "title": "Source: Niti Shastra, 'From Persia to Iran'",
-      "say": "Watch more explainers on Raisina Wire."
+     "lon": 52.9,
+     "lat": 29.9,
+     "label": "Pars"
     }
-  ]
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Pars gave Persia its name. But Persia was never the whole of Iran.",
+   "text": "Persia was never | the whole of Iran",
+   "hl": [
+    "never"
+   ]
+  },
+  {
+   "type": "flow",
+   "say": "When one kingdom rose, it didn't abolish the others. It ruled over them.",
+   "para": true,
+   "kicker": "An idea of empire",
+   "title": "Rule over, not erase",
+   "nodes": [
+    "A kingdom rises",
+    "Others survive",
+    "It rules over them"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "That gave the world the Shahanshah: the King of Kings.",
+   "text": "Shahanshah: | King of Kings",
+   "hl": [
+    "Kings"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "An idea echoed in India: Rajadhiraja, and Chakravarti.",
+   "text": "Rajadhiraja. | Chakravarti.",
+   "hl": [
+    "Chakravarti."
+   ]
+  },
+  {
+   "type": "doc",
+   "say": "In the Iranian imagination, empire was not the annihilation of difference, but the orchestration of plurality.",
+   "kicker": "Navroop Singh and Himja Parekh · Niti Shastra",
+   "text": "\"Empire was not annihilation of difference but orchestration of plurality.\"",
+   "hl": "orchestration of plurality",
+   "at": "orchestration"
+  },
+  {
+   "type": "snap",
+   "src": "media/ir-gate-lamassu.jpg",
+   "say": "In the 6th century BCE, Cyrus built the largest empire the world had yet seen.",
+   "para": true,
+   "frame": "full",
+   "marks": [
+    {
+     "kind": "label",
+     "x": 0.06,
+     "y": 0.15,
+     "text": "Cyrus: the largest empire yet",
+     "color": "red",
+     "at": "largest"
+    }
+   ],
+   "speak": "In the sixth century B C E, Cyrus built the largest empire the world had yet seen."
+  },
+  {
+   "type": "kinetic",
+   "say": "Alexander conquered it. Then he adopted its ways.",
+   "text": "Alexander conquered it, | then adopted its ways",
+   "hl": [
+    "adopted"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Persia's heirs became Rome's only true equals.",
+   "text": "Rome's only | true equals",
+   "hl": [
+    "equals."
+   ]
+  },
+  {
+   "type": "snap",
+   "src": "media/ir-gate-dusk.jpg",
+   "say": "Then came the deepest rupture.",
+   "para": true,
+   "frame": "full"
+  },
+  {
+   "type": "kinetic",
+   "say": "In the 7th century, the Sasanian empire fell to Arab armies.",
+   "text": "7th century: | the Sasanians fall",
+   "hl": [
+    "fall"
+   ],
+   "speak": "In the seventh century, the Sasanian empire fell to Arab armies."
+  },
+  {
+   "type": "kinetic",
+   "say": "Language, faith and rulers all changed.",
+   "text": "Language. Faith. Rulers. | All changed.",
+   "hl": [
+    "changed."
+   ]
+  },
+  {
+   "type": "doc",
+   "say": "One historian called what followed two centuries of silence.",
+   "kicker": "Abdolhossein Zarrinkoob · Iranian historian",
+   "text": "\"Two centuries of silence.\"",
+   "hl": "silence",
+   "at": "two"
+  },
+  {
+   "type": "flow",
+   "say": "Arabic has no P sound. So Pars became Fars, and Persian became Farsi.",
+   "para": true,
+   "kicker": "A lost letter",
+   "title": "Pars to Fars",
+   "nodes": [
+    "Pars",
+    "Fars",
+    "Farsi"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "But the Zoroastrians who fled to India kept the older word.",
+   "text": "Those who fled to India | kept the old word",
+   "hl": [
+    "India"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "They are still called Parsis.",
+   "text": "Parsis",
+   "hl": [
+    "Parsis."
+   ],
+   "size": 0.2
+  },
+  {
+   "type": "kinetic",
+   "say": "And Iran didn't die. It reshaped Islam itself.",
+   "para": true,
+   "text": "Iran reshaped | Islam itself",
+   "hl": [
+    "reshaped"
+   ]
+  },
+  {
+   "type": "list",
+   "say": "Persians ran the Abbasid Caliphate. Turkic and Mongol conquerors became Persian kings.",
+   "kicker": "The conqueror absorbed",
+   "title": "Again and again",
+   "items": [
+    "Persians run the Abbasid Caliphate",
+    "Turkic rulers turn Persian",
+    "Mongol conquerors become Persian kings"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Again and again, the conqueror was absorbed.",
+   "text": "The conqueror | was absorbed",
+   "hl": [
+    "absorbed."
+   ]
+  },
+  {
+   "type": "snap",
+   "src": "media/ir-doorway.jpg",
+   "say": "The Safavids completed the restoration.",
+   "para": true,
+   "frame": "full"
+  },
+  {
+   "type": "flow",
+   "say": "Twelver Shi'ism became the state faith: a firewall against Sunni rivals.",
+   "kicker": "The Safavids",
+   "title": "Faith fused with sovereignty",
+   "nodes": [
+    "Twelver Shi'ism",
+    "State faith",
+    "Firewall vs Sunni rivals"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Faith fused with the state: the blueprint of modern Iran.",
+   "text": "The blueprint of | modern Iran",
+   "hl": [
+    "blueprint"
+   ]
+  },
+  {
+   "type": "timeline",
+   "say": "In the 1800s, Britain and Russia hollowed Iran out. In 1935, Persia became Iran.",
+   "para": true,
+   "kicker": "Modern Iran",
+   "title": "A century of pressure",
+   "items": [
+    {
+     "when": "1800s",
+     "what": "Britain and Russia"
+    },
+    {
+     "when": "1935",
+     "what": "Persia becomes Iran",
+     "hot": true
+    },
+    {
+     "when": "1953",
+     "what": "Coup topples Mossadegh"
+    },
+    {
+     "when": "1979",
+     "what": "Revolution"
+    }
+   ],
+   "speak": "In the eighteen-hundreds, Britain and Russia hollowed Iran out. In nineteen thirty-five, Persia became Iran."
+  },
+  {
+   "type": "snap",
+   "src": "media/ir-mural.jpg",
+   "say": "In 1953, an Anglo-American coup toppled Mossadegh. Then came 1979, and revolution.",
+   "frame": "full",
+   "marks": [
+    {
+     "kind": "label",
+     "x": 0.06,
+     "y": 0.15,
+     "text": "1953: coup",
+     "at": "coup"
+    },
+    {
+     "kind": "label",
+     "x": 0.06,
+     "y": 0.27,
+     "text": "1979: revolution",
+     "color": "red",
+     "at": "revolution."
+    }
+   ],
+   "speak": "In nineteen fifty-three, an Anglo-American coup toppled Mossadegh. Then came nineteen seventy-nine, and revolution."
+  },
+  {
+   "type": "snap",
+   "src": "media/ir-posters.jpg",
+   "say": "The revolution hardened into a coercive state, increasingly run by the Revolutionary Guards.",
+   "marks": [
+    {
+     "kind": "label",
+     "x": 0.06,
+     "y": 0.85,
+     "text": "Revolutionary Guards",
+     "color": "red",
+     "at": "guards."
+    }
+   ]
+  },
+  {
+   "type": "map",
+   "say": "Abroad, Iran built allies from Iraq to Lebanon to Yemen, to keep its wars far from home.",
+   "kicker": "Forward defence",
+   "title": "Allies across the region",
+   "view": [
+    30,
+    62,
+    12,
+    38
+   ],
+   "pins": [
+    {
+     "lon": 44.4,
+     "lat": 33.3,
+     "label": "Iraq"
+    },
+    {
+     "lon": 35.5,
+     "lat": 33.9,
+     "label": "Lebanon",
+     "side": "left"
+    },
+    {
+     "lon": 44.2,
+     "lat": 15.4,
+     "label": "Yemen"
+    }
+   ]
+  },
+  {
+   "type": "list",
+   "say": "For India, this is not a distant story.",
+   "para": true,
+   "kicker": "The India link",
+   "title": "Old cousins",
+   "items": [
+    "Sanskrit and Avestan: linguistic cousins",
+    "Shahanshah meets Chakravarti",
+    "The Parsis carry pre-Islamic Iran in India"
+   ]
+  },
+  {
+   "type": "snap",
+   "src": "media/ir-rider.jpg",
+   "say": "Now, with the Gulf a tinderbox, Iran faces overwhelming pressure again.",
+   "para": true
+  },
+  {
+   "type": "kinetic",
+   "say": "History offers two paths: a long silence, or a profound renewal.",
+   "text": "A long silence, | or renewal?",
+   "hl": [
+    "renewal?"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Because Iran measures history in centuries, not regimes.",
+   "text": "Centuries, | not regimes",
+   "hl": [
+    "Centuries,"
+   ],
+   "cut": "zoom"
+  },
+  {
+   "type": "outro",
+   "say": "Watch more explainers on Raisina Wire.",
+   "title": "More explainers"
+  }
+ ]
 }
