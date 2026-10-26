@@ -1310,3 +1310,51 @@ body.sv-open{overflow:hidden}
   .home>.lead-grid>.side-stack{order:4;margin-top:30px}
   .home>.lead-grid>.live-rail{order:5;margin-top:22px}
 }
+
+/* ---------- Fresh news ---------- */
+/* "New stories" pill: dark glass under the menu bar; tapping it brings the stories in. */
+.new-pill{position:fixed;left:50%;top:calc(78px + env(safe-area-inset-top));z-index:45;display:flex;align-items:center;gap:2px;padding:4px;border-radius:999px;
+  background:linear-gradient(180deg,rgba(28,34,52,.94),rgba(12,16,28,.94));color:#fff;backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 0 0 1px rgba(255,255,255,.06),0 18px 40px -10px rgba(15,20,34,.55);
+  transform:translate(-50%,-140%);opacity:0;transition:transform .45s cubic-bezier(.2,.9,.25,1.15),opacity .3s;pointer-events:none}
+.new-pill.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+.new-pill .np-go{display:flex;align-items:center;gap:10px;padding:7px 14px 7px 9px;border:0;border-radius:999px;background:none;color:inherit;font:inherit;cursor:pointer;text-align:left}
+.new-pill .np-go>svg{width:28px;height:28px;padding:6px;border-radius:50%;background:var(--red);box-shadow:0 4px 12px rgba(184,20,31,.5);animation:np-bob 1.6s ease-in-out infinite}
+.new-pill .np-go .dot-live{width:10px;height:10px;margin:0 9px}
+.new-pill b{display:block;font:700 13.5px/1.2 var(--sans)}
+.new-pill small{display:block;font:500 11px/1.3 var(--sans);color:rgba(255,255,255,.66)}
+.new-pill .np-go:hover b{color:#ffd9a8}
+.new-pill .np-x{width:30px;height:30px;margin-right:2px;border:0;border-radius:50%;background:rgba(255,255,255,.08);color:rgba(255,255,255,.75);font-size:17px;line-height:1;cursor:pointer}
+.new-pill .np-x:hover{background:rgba(255,255,255,.16);color:#fff}
+@keyframes np-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+body.is-reading .new-pill{top:calc(18px + env(safe-area-inset-top))}
+@media(prefers-reduced-motion:reduce){.new-pill{transition:opacity .2s}.new-pill .np-go>svg{animation:none}}
+:root[data-theme=dark] .new-pill{background:linear-gradient(180deg,rgba(246,247,250,.96),rgba(228,232,240,.96));color:var(--ink);box-shadow:0 18px 40px -10px rgba(0,0,0,.6)}
+:root[data-theme=dark] .new-pill small{color:rgba(15,20,34,.6)}
+:root[data-theme=dark] .new-pill .np-x{background:rgba(15,20,34,.08);color:rgba(15,20,34,.7)}
+
+/* "Updated … ago": tap to refresh */
+.fresh-btn{display:inline-flex;align-items:center;gap:5px;margin-left:12px;padding:3px 9px;border:1px solid rgba(15,20,34,.1);border-radius:999px;background:rgba(255,255,255,.55);color:var(--muted);font:600 11.5px var(--sans);cursor:pointer;white-space:nowrap}
+.fresh-btn:hover{color:var(--ink);border-color:rgba(15,20,34,.22)}
+.fresh-btn.spin svg{animation:fresh-spin .8s linear infinite}
+@keyframes fresh-spin{to{transform:rotate(360deg)}}
+:root[data-theme=dark] .fresh-btn{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12)}
+@media(max-width:760px){#wireStatus{display:none}.fresh-btn{margin-left:0}}
+
+/* Pull to refresh in the installed app */
+.ptr{position:fixed;left:50%;top:calc(-40px + env(safe-area-inset-top));z-index:60;display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:#fff;color:var(--red);box-shadow:0 8px 24px rgba(15,20,34,.18);transform:translate(-50%,0);opacity:0;pointer-events:none}
+.ptr .ptr-mark{display:block;width:26px;height:26px;font-size:26px}
+.ptr .ptr-mark svg{width:100%;height:100%}
+.ptr .ptr-mark .mark-tri{display:none}
+.ptr.ready{background:var(--red);color:#fff}
+.ptr.spin{opacity:1;transition:transform .2s}
+.ptr.spin .ptr-mark{animation:fresh-spin .9s linear infinite}
+:root[data-theme=dark] .ptr{background:#1b2131}
+
+/* Stories since the last visit */
+.new-tag{display:inline-block;margin-right:7px;padding:1px 6px;border-radius:4px;background:var(--red);color:#fff;font:700 9.5px/1.5 var(--sans);letter-spacing:.6px;text-transform:uppercase;vertical-align:1px}
+.caught-up{grid-column:1/-1;display:flex;align-items:center;gap:12px;margin:6px 0;color:var(--muted);font:600 13px var(--sans)}
+.caught-up:before,.caught-up:after{content:"";flex:1;height:1px;background:rgba(15,20,34,.14)}
+.caught-up small{font:500 11px var(--mono);letter-spacing:.6px;text-transform:uppercase}
+:root[data-theme=dark] .caught-up:before,:root[data-theme=dark] .caught-up:after{background:rgba(255,255,255,.14)}
+@media(max-width:760px){.fresh-btn{padding:3px 8px;font-size:11px;flex-shrink:0}}
