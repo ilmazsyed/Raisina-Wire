@@ -39,6 +39,7 @@ function shape(cfg, raw) {
 export async function liveResults(env, row) {
   let cfg; try { cfg = JSON.parse(row.results || ""); } catch { return null; }
   if (!cfg || typeof cfg !== "object") return null;
+  if (cfg.kind === "conflict") return conflict(cfg, row);
   if (cfg.feed === "tse" && /^https:\/\/resultados\.tse\.jus\.br\//.test(cfg.url || "")) {
     try {
       const res = await fetch(cfg.url, { cf: { cacheTtl: 15, cacheEverything: true }, headers: { "user-agent": "RaisinaWire/1.0 (+https://raisinawire.calibrex.org)" } });
@@ -56,4 +57,18 @@ export async function liveResults(env, row) {
   return { ...shape(cfg, { reporting: num(d.reporting), updatedAt: d.updatedAt || row.updated_at, final: !!d.final,
     candidates: (d.candidates || []).map(c => ({ key: norm(c.name), full: c.name, party: c.party || "", votes: num(c.votes), pct: num(c.pct), elected: !!c.elected })),
     nulls: num(d.nulls), blanks: num(d.blanks), turnout: num(d.turnout) }), live: false };
+}
+
+// War and conflict tracker: a day counter from the start date, casualties by front (each figure with
+// its source and the date it was reported), key dates, and a one-line status. The desk updates the
+// figures with `live-results` as new official counts come in; the day count runs on its own.
+//   { kind: "conflict", title, started: "2026-02-28", startLabel, status, note,
+//     fronts: [{ name, killed, injured, source, asOf, color }], dates: [{ date, label }] }
+function conflict(cfg, row) {
+  const n = v => v == null || v === "" ? null : num(v);
+  const fronts = (cfg.fronts || []).map(f => ({ name: String(f.name || ""), killed: n(f.killed), injured: n(f.injured), source: String(f.source || ""), asOf: String(f.asOf || ""), color: String(f.color || "") }));
+  return { kind: "conflict", title: cfg.title || "Conflict tracker", started: cfg.started || null, startLabel: cfg.startLabel || "", status: cfg.status || "", note: cfg.note || "",
+    fronts, dates: (cfg.dates || []).map(d => ({ date: String(d.date || ""), label: String(d.label || "") })),
+    killed: fronts.reduce((t, f) => t + (f.killed || 0), 0), injured: fronts.reduce((t, f) => t + (f.injured || 0), 0),
+    updatedAt: cfg.updatedAt || row.updated_at || null };
 }
