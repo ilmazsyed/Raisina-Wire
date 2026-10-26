@@ -12,6 +12,8 @@ import m0010 from "../migrations/0010_community_language.sql";
 import m0011 from "../migrations/0011_machine_translation.sql";
 import m0012 from "../migrations/0012_live_images.sql";
 import m0013 from "../migrations/0013_live_results.sql";
+import m0014 from "../migrations/0014_audience.sql";
+import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { liveResults } from "./results.js";
 import { handleTts } from "./tts.js";
 import { editions } from "./editions.js";
@@ -66,7 +68,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -730,6 +732,18 @@ async function api(request, env, ctx) {
     return json({ images: results.map(r => ({ ...r, url: `/media/${r.id}.${r.mime.split("/")[1].replace("jpeg", "jpg")}` })) }, 200, { "cache-control": "no-store" });
   }
 
+  // ---- Audience events from readers' browsers (src/audience.js); daily totals only
+  if (url.pathname === "/api/m" && request.method === "POST") {
+    if (!BOT_UA.test(request.headers.get("user-agent") || "")) {
+      const b = await request.json().catch(() => null);
+      if (b && typeof b === "object") await recordEvent(env, b).catch(e => console.log("audience", e.message));
+    }
+    return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
+  }
+  if (url.pathname === "/api/admin/audience" && request.method === "GET") {
+    if (!isStaff(await currentUser(request, env))) return err("Editor access required.", 403);
+    return json(await audienceReport(env, url.searchParams.get("days")), 200, { "cache-control": "no-store" });
+  }
   // ---- Story views (no cookies: one count per story per browser session, bots ignored)
   if (/^\/api\/views\/[^/]+$/.test(url.pathname) && request.method === "POST") {
     const slug = decodeURIComponent(url.pathname.split("/").pop());
@@ -784,12 +798,15 @@ async function api(request, env, ctx) {
     const b = await request.json().catch(() => ({}));
     if (!pushEndpointOk(env, b.endpoint) || String(b.endpoint).length > 1000) return err("This browser’s push service isn’t supported.");
     const user = await currentUser(request, env);
+    const known = await env.DB.prepare("SELECT 1 FROM push_subscriptions WHERE endpoint=?").bind(b.endpoint).first();
     await env.DB.prepare("INSERT INTO push_subscriptions (endpoint,user_id) VALUES (?,?) ON CONFLICT(endpoint) DO UPDATE SET user_id=COALESCE(excluded.user_id,user_id)").bind(b.endpoint, user?.id || null).run();
+    if (!known) await countPush(env, true);
     return json({ ok: true }, 201, { "cache-control": "no-store" });
   }
   if (url.pathname === "/api/push/unsubscribe" && request.method === "POST") {
     const b = await request.json().catch(() => ({}));
-    await env.DB.prepare("DELETE FROM push_subscriptions WHERE endpoint=?").bind(String(b.endpoint || "")).run();
+    const gone = await env.DB.prepare("DELETE FROM push_subscriptions WHERE endpoint=?").bind(String(b.endpoint || "")).run();
+    if (gone.meta?.changes) await countPush(env, false);
     return json({ ok: true }, 200, { "cache-control": "no-store" });
   }
   if (url.pathname === "/api/alerts" && request.method === "GET") {
@@ -840,7 +857,7 @@ async function api(request, env, ctx) {
 
   if (url.pathname === "/api/admin/overview" && request.method === "GET") {
     const user = await currentUser(request,env);
-    if (!allowedRoles(user,["admin"])) return err("Administrator access required.",403);
+    if (!isStaff(user)) return err("Editor access required.",403);   // leads are for administrators only
     const [members, articles, drafts, leads, discussions, events] = await Promise.all([
       env.DB.prepare("SELECT COUNT(*) AS n FROM users").first(),
       env.DB.prepare("SELECT COUNT(*) AS n FROM articles WHERE status='published'").first(),
@@ -850,7 +867,7 @@ async function api(request, env, ctx) {
       env.DB.prepare("SELECT COUNT(*) AS n FROM events WHERE status='published'").first()
     ]);
     const subscribers = await env.DB.prepare("SELECT COUNT(*) AS n FROM push_subscriptions").first();
-    return json({members:members.n,published:articles.n,drafts:drafts.n,leads:leads.n,discussions:discussions.n,events:events.n,subscribers:subscribers.n,generatedAt:new Date().toISOString()},200,{"cache-control":"no-store"});
+    return json({members:members.n,published:articles.n,drafts:drafts.n,leads:user.role==="admin"?leads.n:null,discussions:discussions.n,events:events.n,subscribers:subscribers.n,generatedAt:new Date().toISOString()},200,{"cache-control":"no-store"});
   }
 
 

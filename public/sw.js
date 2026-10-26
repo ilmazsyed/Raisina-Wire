@@ -45,7 +45,9 @@ self.addEventListener("push", event => {
 });
 self.addEventListener("notificationclick", event => {
   event.notification.close();
-  const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  const target = new URL(event.notification.data?.url || "/", self.location.origin);
+  target.searchParams.set("utm_source", "push");   // counted as a visit from an alert (control room → Audience)
+  const url = target.href;
   event.waitUntil((async () => {
     const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     const win = wins.find(w => new URL(w.url).origin === self.location.origin);

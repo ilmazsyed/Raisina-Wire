@@ -49,6 +49,68 @@ const store = {
   get(key, fallback) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; } },
   set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private mode */ } }
 };
+/* ---------- Audience: anonymous daily counts for the control room (src/audience.js) ----------
+   Returning readers, app installs, reading time and where readers arrive from. The browser
+   remembers only its first and last visit dates; the server keeps daily totals, nothing else. */
+const beacon = b => { try { const body = JSON.stringify(b); if (!navigator.sendBeacon?.("/api/m", new Blob([body], { type: "application/json" }))) fetch("/api/m", { method: "POST", body, keepalive: true, headers: { "content-type": "application/json" } }).catch(() => {}); } catch { /* never in the way */ } };
+const istDay = (t = Date.now()) => new Date(t + 5.5 * 3600e3).toISOString().slice(0, 10);
+const dayNum = d => Math.round(Date.parse(d) / 864e5);
+const platformOf = () => /iPhone|iPad|iPod/.test(navigator.userAgent) ? "ios" : /Android/.test(navigator.userAgent) ? "android" : "desktop";
+const REFERRERS = [["whatsapp", /whatsapp|^wa\.me/], ["email", /^mail\.|outlook\.|webmail/], ["news", /news\.google/], ["facebook", /facebook\.|^fb\.|^m\.me$/], ["instagram", /instagram\./], ["x", /^t\.co$|twitter\.|^x\.com$/],
+  ["linkedin", /linkedin\.|^lnkd\.in$/], ["telegram", /^t\.me$|telegram\./], ["youtube", /youtube\.|^youtu\.be$/], ["reddit", /reddit\./], ["google", /(^|\.)google\./], ["bing", /bing\.|duckduckgo\.|yahoo\./]];
+function arrivalSource() {
+  const tag = new URLSearchParams(location.search).get("utm_source");
+  if (tag) { const t = tag.toLowerCase(); return ["twitter"].includes(t) ? "x" : t; }
+  let host = "";
+  try { const ref = new URL(document.referrer); host = ref.protocol === "android-app:" ? ref.hostname.replace(/^com\./, "") : ref.hostname.replace(/^www\./, ""); } catch { return "direct"; }
+  if (!host || host === location.hostname) return "direct";
+  return (REFERRERS.find(([, re]) => re.test(host)) || ["other"])[0];
+}
+function trackVisit() {
+  const pending = store.get("rw-read-pending", null);
+  if (pending) { beacon(pending); try { localStorage.removeItem("rw-read-pending"); } catch { /* storage off */ } }
+  const today = istDay(), first = store.get("rw-first", null), last = store.get("rw-last-day", null);
+  const src = arrivalSource(), tagged = new URLSearchParams(location.search).has("utm_source");
+  let fresh = false; try { fresh = !sessionStorage.getItem("rw-arrived"); sessionStorage.setItem("rw-arrived", "1"); } catch { fresh = true; }
+  if (fresh || tagged) beacon({ t: "arrive", src });
+  if (tagged) { const u = new URL(location.href); [...u.searchParams.keys()].filter(k => k.startsWith("utm_")).forEach(k => u.searchParams.delete(k)); history.replaceState(history.state, "", u.pathname + u.search + u.hash); }
+  if (last !== today) {
+    const firstDay = first || today, monday = istDay(Date.parse(firstDay) - ((new Date(firstDay).getUTCDay() + 6) % 7) * 864e5);
+    const week = Math.floor((dayNum(today) - dayNum(monday)) / 7), weekly = store.get("rw-last-week", -1) !== week;
+    beacon({ t: "visit", returning: !!first, gap: last ? dayNum(today) - dayNum(last) : 0, app: isStandaloneApp(), lang,
+      dev: /iPad|Tablet/i.test(navigator.userAgent) ? "tablet" : /Mobi|Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop", ...(weekly ? { cohort: monday, week } : {}) });
+    store.set("rw-last-day", today); store.set("rw-last-week", week); if (!first) store.set("rw-first", today);
+  }
+  // An installed app's first launch counts as an install (iPhone has no install event).
+  if (isStandaloneApp() && !store.get("rw-installed", false)) { store.set("rw-installed", true); beacon({ t: "install", platform: platformOf() }); }
+}
+const isStandaloneApp = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+// Reading time: seconds while the page is visible and the reader has moved in the last 30 s.
+// The read in progress is also kept on the device, and sent on the next visit if the page was
+// closed before it could be sent (phones often close tabs without warning).
+let reading = null;
+function startRead(kind, slug, el) {
+  endRead();
+  reading = { kind, slug, el, s: 0, done: false, last: Date.now() };
+  reading.timer = setInterval(() => {
+    if (!reading || document.visibilityState !== "visible" || Date.now() - reading.last > 30e3) return;
+    reading.s++;
+    const box = typeof reading.el === "string" ? document.querySelector(reading.el) : null;
+    if (box && box.getBoundingClientRect().bottom <= innerHeight + 40) reading.done = true;
+    if (reading.s >= 5 && reading.s % 3 === 0) store.set("rw-read-pending", { t: "read", kind: reading.kind, slug: reading.slug, s: reading.s, done: reading.done });
+  }, 1000);
+}
+function endRead() {
+  if (!reading) return;
+  clearInterval(reading.timer);
+  if (reading.s >= 5) beacon({ t: "read", kind: reading.kind, slug: reading.slug, s: reading.s, done: reading.done });
+  try { localStorage.removeItem("rw-read-pending"); } catch { /* storage off */ }
+  reading = null;
+}
+["scroll", "pointerdown", "keydown", "touchstart", "mousemove", "wheel"].forEach(ev => addEventListener(ev, () => { if (reading) reading.last = Date.now(); }, { passive: true }));
+addEventListener("pagehide", endRead);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") endRead(); });
+
 function saveForLater(item) {
   const saved = store.get("rw-saved", []);
   if (!saved.some(s => s.href === item.href)) saved.unshift({ ...item, savedAt: new Date().toISOString() });
@@ -284,6 +346,7 @@ const DEFAULT_TITLE = "Raisina Wire — India’s strategic briefing on geopolit
 let routeSeq = 0;
 async function route({ restoreY = null } = {}) {
   const r = parseRoute(), seq = ++routeSeq;
+  endRead();
   if (restoreY === null) jump(0);
   document.title = DEFAULT_TITLE;
   renderNav(r);
@@ -603,6 +666,7 @@ function translationNote(a, original) {
 // One view per story per browser session; nothing is stored about the reader.
 function countView(a) {
   if (a.status !== "published" || a.scheduled) return;
+  startRead("story", a.slug, ".reader-article .prose");
   try { const k = `rw-v:${a.slug}`; if (sessionStorage.getItem(k)) return; sessionStorage.setItem(k, "1"); } catch { /* storage off: still count */ }
   fetch(`/api/views/${encodeURIComponent(a.slug)}`, { method: "POST", keepalive: true }).catch(() => {});
 }
@@ -627,10 +691,13 @@ const SHARE_ICONS = {
   share: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg>`,
   link: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>`
 };
-function shareLinks(text, url) {
-  const t = encodeURIComponent(text), u = encodeURIComponent(url), tu = encodeURIComponent(`${text} ${url}`);
-  return [["whatsapp", "WhatsApp", `https://wa.me/?text=${tu}`], ["x", "X", `https://twitter.com/intent/tweet?text=${t}&url=${u}`], ["facebook", "Facebook", `https://www.facebook.com/sharer/sharer.php?u=${u}`], ["linkedin", "LinkedIn", `https://www.linkedin.com/sharing/share-offsite/?url=${u}`],
-    ["telegram", "Telegram", `https://t.me/share/url?url=${u}&text=${t}`], ["mail", "Email", `mailto:?subject=${t}&body=${tu}`]];
+// Shared links carry utm_source, so visits from WhatsApp (which hides where readers came from)
+// are counted in the control room. The site removes the tag from the address on arrival.
+function tagged(url, src) { try { const u = new URL(url, location.origin); if (u.origin !== location.origin) return url; u.searchParams.set("utm_source", src); u.searchParams.set("utm_medium", "share"); return u.href; } catch { return url; } }
+function shareLinks(text, raw) {
+  const t = encodeURIComponent(text), link = src => encodeURIComponent(tagged(raw, src)), tu = src => encodeURIComponent(`${text} ${tagged(raw, src)}`);
+  return [["whatsapp", "WhatsApp", `https://wa.me/?text=${tu("whatsapp")}`], ["x", "X", `https://twitter.com/intent/tweet?text=${t}&url=${link("x")}`], ["facebook", "Facebook", `https://www.facebook.com/sharer/sharer.php?u=${link("facebook")}`], ["linkedin", "LinkedIn", `https://www.linkedin.com/sharing/share-offsite/?url=${link("linkedin")}`],
+    ["telegram", "Telegram", `https://t.me/share/url?url=${link("telegram")}&text=${t}`], ["mail", "Email", `mailto:?subject=${t}&body=${tu("email")}`]];
 }
 // Where a video or short is shared to: the Watch page opens it (a short in the player).
 const mediaUrl = m => `${location.origin}${withLang("/watch")}?v=${encodeURIComponent(m.id)}`;
@@ -651,11 +718,11 @@ function openSharePop(title, url) {
 }
 function closeSharePop() { const p = $("#sharePop"); if (p) p.hidden = true; }
 async function shareOut(title, url) {
-  if (navigator.share) { try { await navigator.share({ title, text: title, url }); } catch { /* cancelled */ } return; }
+  if (navigator.share) { try { await navigator.share({ title, text: title, url: tagged(url, "share") }); } catch { /* cancelled */ } return; }
   openSharePop(title, url);
 }
 function shareBlock(title, href, url = location.origin + withLang(href)) {
-  return `<div class="share-row"><span class="meta">Share</span><button class="share-btn share-native" type="button" data-action="share-native" data-title="${esc(title)}" data-url="${esc(url)}" aria-label="Share">${SHARE_ICONS.share}</button>${shareLinks(title, url).map(([k, label, link]) => `<a class="share-btn share-${k}" href="${link}" target="_blank" rel="noopener" aria-label="Share on ${label}">${SHARE_ICONS[k]}</a>`).join("")}<button class="share-btn" type="button" data-action="copy-link" data-url="${esc(url)}" aria-label="Copy link">${SHARE_ICONS.link}</button></div>`;
+  return `<div class="share-row"><span class="meta">Share</span><button class="share-btn share-native" type="button" data-action="share-native" data-title="${esc(title)}" data-url="${esc(url)}" aria-label="Share">${SHARE_ICONS.share}</button>${shareLinks(title, url).map(([k, label, link]) => `<a class="share-btn share-${k}" href="${link}" target="_blank" rel="noopener" aria-label="Share on ${label}">${SHARE_ICONS[k]}</a>`).join("")}<button class="share-btn" type="button" data-action="copy-link" data-url="${esc(tagged(url, "link"))}" aria-label="Copy link">${SHARE_ICONS.link}</button></div>`;
 }
 // Select text in a story to share it as a quote, with a link that jumps to that passage.
 function quoteShare() {
@@ -1014,6 +1081,7 @@ async function viewExternal(r) {
     return;
   }
   $(".reader-bar .badge").textContent = `${site} · Excerpt`;
+  startRead("wire", `wire:${host}`, "#extArticle .prose");
   $(".reader-bar .original-btn .lbl").textContent = `Original on ${site}`;
   $("#extArticle").innerHTML = `<div class="kicker">${esc(known.category || site)}</div><h1>${esc(title)}</h1>
     ${data.description ? `<p class="dek">${esc(data.description)}</p>` : ""}
@@ -1115,8 +1183,8 @@ async function onAction(e) {
     await shareOut(el.dataset.title, el.dataset.url);
   }
   if (a === "share") {
-    const data = { title: el.dataset.title, url: location.href };
-    try { if (navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(location.href); toast("Link copied."); } } catch { /* cancelled */ }
+    const data = { title: el.dataset.title, url: tagged(location.href, "share") };
+    try { if (navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(tagged(location.href, "link")); toast("Link copied."); } } catch { /* cancelled */ }
   }
   if (a === "ticker-toggle") { const paused = $(".ticker").classList.toggle("paused"); el.setAttribute("aria-pressed", String(paused)); el.setAttribute("aria-label", paused ? "Play headlines" : "Pause headlines"); }
   if (a === "home-group") { state.homeGroup = el.dataset.group; renderHomeMarkets(); }
@@ -1266,6 +1334,7 @@ async function viewCoverage(r) {
     </div></div>`;
   };
   await render(true);
+  if (parseRoute().arg === slug) startRead("live", `live:${slug}`, ".coverage-feed");
   coverageTimer = setInterval(() => { if (!document.hidden) render(false); }, 30e3);
   if ($("#resultsCounter")) {
     await loadResults(slug);
@@ -1737,7 +1806,7 @@ async function installPWA() {
   if (outcome !== "accepted") store.set("rw-install-dismissed", Date.now());
 }
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); state.installPrompt = e; setTimeout(() => showInstallSheet(), 8000); });
-window.addEventListener("appinstalled", () => { $("#installSheet").hidden = true; toast("Raisina Wire is installed. Find it on your home screen."); });
+window.addEventListener("appinstalled", () => { if (!store.get("rw-installed", false)) { store.set("rw-installed", true); beacon({ t: "install", platform: platformOf() }); } $("#installSheet").hidden = true; toast("Raisina Wire is installed. Find it on your home screen."); });
 if (isIOS() && !isStandalone()) setTimeout(() => showInstallSheet(), 15000);
 document.documentElement.classList.toggle("standalone", isStandalone());
 
@@ -1795,6 +1864,7 @@ articlesReady = loadArticles();
 userReady = fetch("/api/auth/me").then(r => r.json()).then(async d => { state.user = d.user || null; if (state.user) await loadTopics(); }).catch(() => {});
 renderShell();
 startTranslator(document.body); // draws the interface in Hindi or Bengali
+trackVisit();
 watchScroll();
 maybeSuggestLanguage();
 // Links from before clean URLs (#/edition/slug) still work.

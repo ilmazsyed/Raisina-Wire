@@ -183,3 +183,32 @@ td .row-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .lt-state{font:500 11px var(--mono,monospace);opacity:.75}.lt-state.good{color:#137a55}.lt-state.warn{color:#b4332a}.lang-tabs .on .lt-state{color:#fff}
 .lang-pane [lang=hi],.lang-pane [lang=bn]{font-family:"Tiro Devanagari Hindi","Tiro Bangla",Mukta,"Hind Siliguri",system-ui;font-size:16px;line-height:1.6}
 .tr-help{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0 16px}.tr-help small{color:var(--muted,#596173)}
+
+/* Audience */
+.aud-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.metric-card .delta{display:block;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600}
+.metric-card .delta.up{color:var(--good)}.metric-card .delta.down{color:var(--bad)}
+.legend{display:flex;gap:14px;font-size:12px;font-weight:700;color:var(--ink-2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.chart-wrap{position:relative;overflow-x:auto;margin-top:12px}
+.aud-chart{display:block;width:100%;min-width:560px;height:220px}
+.aud-chart text{font:500 10px var(--mono);fill:var(--muted)}
+.aud-chart .base{stroke:rgba(15,20,34,.18);stroke-width:1}
+.aud-chart .bar.hover rect:not(.hit){opacity:.82}
+.chart-wrap .tip{position:absolute;z-index:2;max-width:230px;padding:8px 10px;border-radius:10px;background:var(--ink);color:#fff;font-size:12px;line-height:1.4;pointer-events:none;box-shadow:0 8px 24px rgba(15,20,34,.2)}
+.table-view{margin-top:12px}.table-view summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--ink-2)}
+.table-view table,.table-scroll table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+.table-view th,.table-view td,.table-scroll th,.table-scroll td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.table-scroll{overflow-x:auto}
+.hbars{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:9px}
+.hbars li{display:grid;grid-template-columns:minmax(110px,160px) 1fr auto;align-items:center;gap:10px;font-size:13px}
+.hbars i{display:block;height:10px;border-radius:4px;background:rgba(15,20,34,.05);overflow:hidden}
+.hbars em{display:block;height:100%;border-radius:0 4px 4px 0;background:#2a78d6}
+.hbars b{font:500 12px var(--mono);white-space:nowrap}.hbars small{color:var(--muted)}
+.cohort .cell{text-align:center;font:500 12px var(--mono);border-left:2px solid #fff}
+.cohort .cell.na{color:var(--muted);background:none}
+.cohort .num{font:500 12px var(--mono)}
+@media(max-width:700px){.hbars li{grid-template-columns:96px 1fr auto}}
+.layout>*,#view,.panel,.split>*{min-width:0}
+.xaxis{display:flex;justify-content:space-between;min-width:560px;margin-top:6px;font:500 11px var(--mono);color:var(--muted)}
+.aud-chart{height:200px}
