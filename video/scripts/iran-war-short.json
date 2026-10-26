@@ -1,117 +1,170 @@
 {
-  "slug": "iran-war-short",
-  "title": "The Iran war in 60 seconds",
-  "series": "Explained",
-  "formats": [
-    "9x16"
-  ],
-  "pace": 1.7,
-  "captionChars": 34,
-  "ticker": "The Iran war in 60 seconds: strikes, Hormuz, a ceasefire that cracked",
-  "scenes": [
+ "slug": "iran-war-short",
+ "title": "The Iran war in 60 seconds",
+ "series": "Explained",
+ "style": "vox",
+ "formats": [
+  "9x16"
+ ],
+ "captionChars": 30,
+ "scenes": [
+  {
+   "type": "snap",
+   "src": "media/iw-chador-smoke.jpg",
+   "say": "Eight months of war.",
+   "frame": "full"
+  },
+  {
+   "type": "kinetic",
+   "say": "A supreme leader killed. A strait choked.",
+   "text": "Leader killed. | Strait choked.",
+   "hl": [
+    "choked."
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Here's the Iran war in 60 seconds.",
+   "text": "The Iran war | in 60 seconds",
+   "hl": [
+    "60"
+   ],
+   "speak": "Here's the Iran war in sixty seconds."
+  },
+  {
+   "type": "number",
+   "say": "28 February: the US and Israel launch nearly 900 strikes in 12 hours.",
+   "prefix": "~",
+   "value": 900,
+   "label": "Strikes in 12 hours",
+   "bg": "media/iw-tehran-smoke-1.jpg",
+   "cut": "zoom",
+   "speak": "The twenty-eighth of February: the US and Israel launch nearly nine hundred strikes in twelve hours."
+  },
+  {
+   "type": "kinetic",
+   "say": "Supreme Leader Ali Khamenei is killed.",
+   "text": "Khamenei | killed",
+   "hl": [
+    "killed"
+   ]
+  },
+  {
+   "type": "snap",
+   "src": "media/ir-rally.jpg",
+   "say": "But the regime hardens. His son Mojtaba takes over.",
+   "frame": "full",
+   "marks": [
     {
-      "type": "cutout",
-      "src": "media/iw-chador-smoke.jpg",
-      "kicker": "Explained · Iran war",
-      "title": "The Iran war in 60 seconds",
-      "say": "Eight months of war. A supreme leader killed, a strait choked, a region on the edge. Here it is, in sixty seconds."
-    },
-    {
-      "type": "number",
-      "kicker": "28 February",
-      "value": 900,
-      "prefix": "~",
-      "label": "US and Israeli strikes in 12 hours",
-      "bg": "media/iw-tehran-smoke-1.jpg",
-      "say": "28 February: the US and Israel launch nearly 900 strikes in 12 hours. Supreme Leader Ali Khamenei is killed.",
-      "speak": "The twenty-eighth of February: the US and Israel launch nearly nine hundred strikes in twelve hours. Supreme Leader Ali Khamenei is killed."
-    },
-    {
-      "type": "flow",
-      "kicker": "The regime holds",
-      "title": "A harder line",
-      "nodes": [
-        "Khamenei killed",
-        "Son Mojtaba takes over",
-        "Guards in charge"
-      ],
-      "bg": "media/ir-rally.jpg",
-      "say": "But the regime hardens. His son Mojtaba takes over, and the Revolutionary Guards run the war."
-    },
-    {
-      "type": "photo",
-      "src": "media/iw-ships.jpg",
-      "style": "duotone",
-      "focus": 0.5,
-      "focusV": 0.5,
-      "title": "Hormuz choked",
-      "say": "Iran hits back across the Gulf and chokes Hormuz. Oil jumps from 70 dollars to over 100. Asia runs short of fuel.",
-      "speak": "Iran hits back across the Gulf and chokes Hormuz. Oil jumps from seventy dollars to over a hundred. Asia runs short of fuel."
-    },
-    {
-      "type": "number",
-      "kicker": "The second front",
-      "value": 1100000,
-      "inr": true,
-      "label": "displaced in Lebanon by late March",
-      "bg": "media/iw-rubble-shovels.jpg",
-      "say": "Hezbollah joins from Lebanon. Israel invades the south, and more than 11 lakh people flee their homes.",
-      "speak": "Hezbollah joins from Lebanon. Israel invades the south, and more than eleven lakh people flee their homes."
-    },
-    {
-      "type": "timeline",
-      "kicker": "Ceasefire, cracked",
-      "title": "Peace that didn't hold",
-      "items": [
-        {
-          "when": "April",
-          "what": "Ceasefire"
-        },
-        {
-          "when": "June",
-          "what": "A deal to end the war"
-        },
-        {
-          "when": "July",
-          "what": "Truce collapses",
-          "hot": true
-        }
-      ],
-      "bg": "media/iw-rubble-flags.jpg",
-      "say": "An April ceasefire. A June deal to end the war. By July, it had collapsed over ships in Hormuz."
-    },
-    {
-      "type": "stats",
-      "kicker": "The toll",
-      "title": "By official counts",
-      "items": [
-        {
-          "value": 4389,
-          "label": "killed in Lebanon",
-          "inr": true
-        },
-        {
-          "value": 3468,
-          "label": "killed in Iran",
-          "inr": true
-        }
-      ],
-      "hot": 0,
-      "say": "More than 4,000 dead in Lebanon. Nearly 3,500 in Iran. Millions displaced.",
-      "speak": "More than four thousand dead in Lebanon. Nearly three and a half thousand in Iran. Millions displaced."
-    },
-    {
-      "type": "photo",
-      "src": "media/iw-flags.jpg",
-      "focus": 0.5,
-      "focusV": 0.5,
-      "title": "War again?",
-      "say": "Now, with elections in Israel and the US, the threats are back. And India is watching Hormuz."
-    },
-    {
-      "type": "outro",
-      "title": "Watch the full explainer",
-      "say": "Watch the full explainer on Raisina Wire."
+     "kind": "label",
+     "x": 0.08,
+     "y": 0.2,
+     "text": "Mojtaba Khamenei",
+     "at": "mojtaba"
     }
-  ]
+   ]
+  },
+  {
+   "type": "snap",
+   "src": "media/iw-ships.jpg",
+   "say": "Iran chokes the Strait of Hormuz. Traffic falls 90 per cent.",
+   "marks": [
+    {
+     "kind": "circle",
+     "x": 0.48,
+     "y": 0.43,
+     "r": 0.12,
+     "at": "hormuz."
+    },
+    {
+     "kind": "label",
+     "x": 0.3,
+     "y": 0.85,
+     "text": "−90% traffic",
+     "color": "red",
+     "at": "falls"
+    }
+   ],
+   "speak": "Iran chokes the Strait of Hormuz. Traffic falls ninety per cent."
+  },
+  {
+   "type": "versus",
+   "say": "Oil jumps from 70 dollars to over 100.",
+   "a": {
+    "prefix": "$",
+    "value": 70,
+    "label": "Before"
+   },
+   "b": {
+    "prefix": "$",
+    "value": 103,
+    "label": "March"
+   },
+   "at": "over",
+   "speak": "Oil jumps from seventy dollars to over a hundred."
+  },
+  {
+   "type": "kinetic",
+   "say": "India feels the squeeze.",
+   "hl": [
+    "India"
+   ]
+  },
+  {
+   "type": "number",
+   "say": "Hezbollah joins. In Lebanon, 11 lakh people flee.",
+   "value": 1100000,
+   "inr": true,
+   "suffix": "+",
+   "label": "Displaced in Lebanon",
+   "bg": "media/iw-rubble-flags.jpg",
+   "speak": "Hezbollah joins. In Lebanon, eleven lakh people flee."
+  },
+  {
+   "type": "kinetic",
+   "say": "April: a ceasefire. June: a deal. July: it collapses.",
+   "text": "Ceasefire. Deal. | Collapse.",
+   "hl": [
+    "Collapse."
+   ]
+  },
+  {
+   "type": "stats",
+   "say": "More than 4,000 dead in Lebanon. Nearly 3,500 in Iran.",
+   "title": "By official counts",
+   "items": [
+    {
+     "value": 4389,
+     "inr": true,
+     "label": "Lebanon"
+    },
+    {
+     "value": 3468,
+     "inr": true,
+     "label": "Iran"
+    }
+   ],
+   "hot": 0,
+   "speak": "More than four thousand dead in Lebanon. Nearly three and a half thousand in Iran."
+  },
+  {
+   "type": "snap",
+   "src": "media/iw-flags.jpg",
+   "say": "Now, with elections in Israel and the US, the threats are back.",
+   "frame": "full"
+  },
+  {
+   "type": "kinetic",
+   "say": "Will the oil keep flowing?",
+   "hl": [
+    "flowing?"
+   ],
+   "cut": "zoom"
+  },
+  {
+   "type": "outro",
+   "say": "Watch the full explainer on Raisina Wire.",
+   "title": "Watch the full explainer"
+  }
+ ]
 }

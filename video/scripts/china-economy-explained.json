@@ -1,31 +1,527 @@
 {
-  "slug": "china-economy-explained",
-  "title": "Why China can't fix its broken economy",
-  "series": "Explained",
-  "formats": ["16x9"],
-  "pace": 1.6,
-  "captionChars": 38,
-  "ticker": "Why China can't fix its broken economy: the spending gap, the property hole, and the goods flooding the world",
-  "scenes": [
-    {"type":"cutout","src":"media/cn-xi-summit.jpg","kicker":"Explained · China","title":"Why China can't fix its broken economy","say":"China's economy grew 4.5 per cent last quarter. On paper, that's fine. But underneath sits a problem Beijing has struggled with for years: Chinese people are not spending enough money.","speak":"China's economy grew four and a half per cent last quarter. On paper, that's fine. But underneath sits a problem Beijing has struggled with for years: Chinese people are not spending enough money."},
-    {"type":"share","kicker":"The spending gap","value":56,"ringLabel":"of GDP","title":"Consumption in China","detail":"In most economies it is 70% or more","bg":"media/cn-shoppers.jpg","say":"Consumption makes up only about 56 per cent of China's economy. In most countries, it is 70 per cent or more.","speak":"Consumption makes up only about fifty-six per cent of China's economy. In most countries, it is seventy per cent or more."},
-    {"type":"bars","kicker":"Lower than Japan's worst","title":"Consumption, share of GDP","items":[{"label":"Most economies","value":70,"display":"70%+"},{"label":"Japan, 1990s slump","value":66,"display":"~66%"},{"label":"China today","value":56,"display":"~56%","hot":true}],"max":80,"say":"That is about 10 points lower than Japan's was in the 1990s, at the very worst of its lost decade. No major economy in the past 100 years has spent so little of what it makes.","speak":"That is about ten points lower than Japan's was in the nineteen-nineties, at the very worst of its lost decade. No major economy in the past hundred years has spent so little of what it makes."},
-    {"type":"photo","src":"media/cn-snail-dragon.jpg","style":"kenburns","focus":0.45,"focusV":0.4,"title":"A model running out of road","say":"Why does it matter? Because low spending is a warning light. It says the model that powered China's rise, build, invest, export, is running out of road."},
-    {"type":"timeline","kicker":"Growth","title":"From double digits to under 5%","items":[{"when":"Early 2000s","what":"10%+ a year"},{"when":"Q2 2026","what":"4.3%, a 3-year low","hot":true},{"when":"Q3 2026","what":"4.5%"}],"bg":"media/cn-xi-bars.jpg","say":"Growth topped 10 per cent a year in the early 2000s. This spring it fell to 4.3 per cent, a three-year low, before edging back to 4.5.","speak":"Growth topped ten per cent a year in the early two-thousands. This spring it fell to four point three per cent, a three-year low, before edging back to four point five."},
-    {"type":"stats","kicker":"Factories vs shoppers","title":"First nine months of 2026","items":[{"value":5.9,"decimals":1,"suffix":"%","label":"Manufacturing growth, Q3"},{"value":1.1,"decimals":1,"suffix":"%","label":"Retail sales growth"},{"value":0.9,"decimals":1,"suffix":"%","label":"Consumer prices, Sept"}],"hot":1,"say":"The numbers show the imbalance. Manufacturing grew 5.9 per cent in the last quarter. Retail sales grew just 1.1 per cent this year. The factories are running. The shoppers are not.","speak":"The numbers show the imbalance. Manufacturing grew five point nine per cent in the last quarter. Retail sales grew just one point one per cent this year. The factories are running. The shoppers are not."},
-    {"type":"photo","src":"media/cn-estate.jpg","style":"parallax","focus":0.5,"focusV":0.5,"title":"The property hole","say":"The biggest drag is housing. For years, a flat was where Chinese families kept their savings. Then the property market broke."},
-    {"type":"number","kicker":"Real estate","prefix":"-","value":20.6,"decimals":1,"suffix":"%","label":"Property investment, Jan–Sept 2026","bg":"media/cn-estate.jpg","say":"Investment in property fell 20.6 per cent in the first nine months of this year. Construction shrank. Home prices in the biggest cities are still lower than a year ago.","speak":"Investment in property fell twenty point six per cent in the first nine months of this year. Construction shrank. Home prices in the biggest cities are still lower than a year ago."},
-    {"type":"flow","kicker":"The trap","title":"Why families hold back","nodes":["Home values fall","Families feel poorer","They save, not spend"],"bg":"media/cn-shoppers.jpg","say":"When the main thing you own keeps losing value, you feel poorer. So you save more, and spend less. That deepens the slump."},
-    {"type":"flow","kicker":"Too much supply","title":"Where the goods go","nodes":["Weak demand at home","Can't cut output","Export, cheaper"],"bg":"media/cn-yuan-fist.jpg","say":"But China can't simply make less. Cutting production would mean mass layoffs. So what happens to all the extra stuff? It is sold abroad, more and more of it, at lower and lower prices."},
-    {"type":"number","kicker":"Trade surplus, Jan–Sept 2026","prefix":"$","value":938,"suffix":" bn","label":"after a record $1.2 trillion in 2025","bg":"media/cn-flag-chart.jpg","say":"Exports rose 16 per cent in the first nine months. The trade surplus hit 938 billion dollars, after a record 1.2 trillion last year.","speak":"Exports rose sixteen per cent in the first nine months. The trade surplus hit nine hundred and thirty-eight billion dollars, after a record one point two trillion last year."},
-    {"type":"photo","src":"media/cn-yuan-fist.jpg","style":"duotone","focus":0.6,"focusV":0.6,"title":"'Dumping'","say":"The technical term for selling abroad below fair value is dumping. And from Europe to Asia, countries say China's surplus is killing their factories."},
-    {"type":"stats","kicker":"India's bill","title":"India–China trade, 2025-26","items":[{"prefix":"$","value":131.6,"decimals":1,"suffix":" bn","label":"Imports from China"},{"prefix":"$","value":19.5,"decimals":1,"suffix":" bn","label":"Exports to China"},{"prefix":"$","value":112,"suffix":" bn","label":"Deficit"}],"hot":2,"say":"India feels it directly. Last financial year, India bought 131.6 billion dollars of goods from China and sold it 19.5 billion. A gap of about 112 billion.","speak":"India feels it directly. Last financial year, India bought a hundred and thirty-one point six billion dollars of goods from China and sold it nineteen point five billion. A gap of about a hundred and twelve billion."},
-    {"type":"list","kicker":"India pushes back","title":"Anti-dumping probes in 2026","items":["Electrical steel","Forklifts","Caprolactam","Penicillin G","Montelukast"],"say":"India's trade remedies office has opened a string of anti-dumping investigations into Chinese goods this year, from electrical steel and forklifts to chemicals and drug ingredients."},
-    {"type":"photo","src":"media/cn-xi-tightrope.jpg","style":"kenburns","focus":0.6,"focusV":0.6,"title":"Beijing's balancing act","say":"Beijing knows the problem. Fixing it means shifting money from the state and factories to households. That is a delicate balancing act."},
-    {"type":"number","kicker":"China's 2030 goal","value":60,"suffix":" trillion yuan","label":"Retail sales target, from 50.1 trillion in 2025","bg":"media/cn-shoppers.jpg","say":"In July, China set a goal of 60 trillion yuan in retail sales by 2030, up from 50.1 trillion last year, and promised to significantly raise household spending's share of the economy.","speak":"In July, China set a goal of sixty trillion yuan in retail sales by twenty-thirty, up from fifty point one trillion last year, and promised to significantly raise household spending's share of the economy."},
-    {"type":"quote","text":"Transitioning to a consumption-led growth model should be the overarching priority.","who":"IMF Executive Board","role":"On China, February 2026","bg":"media/cn-flag-chart.jpg","say":"The IMF agrees. It says moving to growth led by consumption should be China's overarching priority. But targets alone don't change how worried families spend."},
-    {"type":"list","kicker":"What to watch","title":"For India","items":["Cheap imports keep rising","Pressure on Indian factories","More trade defence","A bigger Chinese market, if spending grows"],"say":"For India, the stakes run both ways. If China's shoppers stay home, cheaper goods keep arriving and Indian factories feel the squeeze. If they start spending, China could become a bigger market for Indian exports."},
-    {"type":"cutout","src":"media/cn-xi-summit.jpg","kicker":"The bottom line","title":"China's problem is everyone's problem","side":"left","say":"China's spending gap is no longer just China's problem. Until its people buy more, the world will keep buying what they don't."},
-    {"type":"outro","title":"Raisina Wire","url":"raisinawire.calibrex.org","say":"Read the full story on Raisina Wire."}
-  ]
+ "slug": "china-economy-explained",
+ "title": "Why China can't fix its broken economy",
+ "series": "Explained",
+ "style": "vox",
+ "formats": [
+  "16x9"
+ ],
+ "captionChars": 40,
+ "scenes": [
+  {
+   "type": "kinetic",
+   "say": "China's economy grew 4.5 per cent last quarter.",
+   "text": "China grew | 4.5%",
+   "hl": [
+    "4.5%"
+   ],
+   "speak": "China's economy grew four and a half per cent last quarter."
+  },
+  {
+   "type": "kinetic",
+   "say": "On paper, that's fine.",
+   "hl": [
+    "fine."
+   ]
+  },
+  {
+   "type": "snap",
+   "src": "media/cn-shoppers.jpg",
+   "say": "But underneath is a problem Beijing can't fix: Chinese people aren't spending enough.",
+   "frame": "full",
+   "marks": [
+    {
+     "kind": "circle",
+     "x": 0.5,
+     "y": 0.75,
+     "r": 0.15,
+     "at": "chinese"
+    },
+    {
+     "kind": "label",
+     "x": 0.06,
+     "y": 0.45,
+     "text": "Not spending enough",
+     "color": "red",
+     "at": "spending"
+    }
+   ]
+  },
+  {
+   "type": "title",
+   "say": "Why China can't fix its broken economy.",
+   "kicker": "Explained · China",
+   "title": "Why China can't fix its broken economy",
+   "cut": "zoom"
+  },
+  {
+   "type": "share",
+   "say": "Consumption makes up only about 56 per cent of China's economy.",
+   "para": true,
+   "kicker": "The spending gap",
+   "value": 56,
+   "ringLabel": "of GDP",
+   "title": "Consumption in China",
+   "speak": "Consumption makes up only about fifty-six per cent of China's economy."
+  },
+  {
+   "type": "versus",
+   "say": "In most economies, it's 70 per cent or more.",
+   "kicker": "Consumption, share of GDP",
+   "a": {
+    "value": 56,
+    "suffix": "%",
+    "label": "China"
+   },
+   "b": {
+    "value": 70,
+    "suffix": "%+",
+    "label": "Most economies"
+   },
+   "at": "70",
+   "speak": "In most economies, it's seventy per cent or more."
+  },
+  {
+   "type": "kinetic",
+   "say": "That's about 10 points below Japan in the 1990s, at the worst of its lost decade.",
+   "text": "Below Japan | in its lost decade",
+   "hl": [
+    "Japan"
+   ],
+   "speak": "That's about ten points below Japan in the nineteen-nineties, at the worst of its lost decade."
+  },
+  {
+   "type": "kinetic",
+   "say": "No major economy in 100 years has spent so little of what it makes.",
+   "text": "Lowest in | 100 years",
+   "hl": [
+    "100"
+   ],
+   "speak": "No major economy in a hundred years has spent so little of what it makes."
+  },
+  {
+   "type": "snap",
+   "src": "media/cn-snail-dragon.jpg",
+   "say": "Why does it matter? Because low spending is a warning light.",
+   "para": true,
+   "marks": [
+    {
+     "kind": "label",
+     "x": 0.55,
+     "y": 0.15,
+     "text": "A warning light",
+     "color": "red",
+     "at": "warning"
+    }
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "The model that built China's rise, build, invest, export, is running out of road.",
+   "text": "Build. Invest. Export. | Running out of road.",
+   "hl": [
+    "road."
+   ]
+  },
+  {
+   "type": "timeline",
+   "say": "Growth topped 10 per cent in the early 2000s. This spring, it hit a three-year low.",
+   "kicker": "Growth",
+   "title": "From double digits to under 5%",
+   "items": [
+    {
+     "when": "Early 2000s",
+     "what": "10%+ a year"
+    },
+    {
+     "when": "Q2 2026",
+     "what": "4.3%, a 3-year low",
+     "hot": true
+    },
+    {
+     "when": "Q3 2026",
+     "what": "4.5%"
+    }
+   ],
+   "speak": "Growth topped ten per cent in the early two-thousands. This spring, it hit a three-year low."
+  },
+  {
+   "type": "snap",
+   "src": "media/cn-xi-bars.jpg",
+   "say": "And debt has climbed to alarming levels.",
+   "frame": "full",
+   "marks": [
+    {
+     "kind": "arrow",
+     "from": [
+      0.2,
+      0.25
+     ],
+     "to": [
+      0.75,
+      0.85
+     ],
+     "bend": -0.1,
+     "at": "climbed"
+    }
+   ]
+  },
+  {
+   "type": "versus",
+   "say": "Factories are humming: manufacturing grew 5.9 per cent. Retail sales? Just 1.1.",
+   "para": true,
+   "kicker": "2026",
+   "a": {
+    "value": 5.9,
+    "decimals": 1,
+    "suffix": "%",
+    "label": "Manufacturing growth, Q3"
+   },
+   "b": {
+    "value": 1.1,
+    "decimals": 1,
+    "suffix": "%",
+    "label": "Retail sales growth, Jan–Sept"
+   },
+   "at": "retail",
+   "speak": "Factories are humming: manufacturing grew five point nine per cent. Retail sales? Just one point one."
+  },
+  {
+   "type": "kinetic",
+   "say": "The factories are running. The shoppers are not.",
+   "text": "Factories: running. | Shoppers: not.",
+   "hl": [
+    "not."
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Consumer prices rose just 0.9 per cent in September. Barely any inflation, because barely any demand.",
+   "text": "Prices: +0.9% | Demand: barely",
+   "hl": [
+    "barely"
+   ],
+   "speak": "Consumer prices rose just zero point nine per cent in September. Barely any inflation, because barely any demand."
+  },
+  {
+   "type": "snap",
+   "src": "media/cn-estate.jpg",
+   "say": "The biggest drag is housing, where Chinese families kept their savings.",
+   "para": true,
+   "marks": [
+    {
+     "kind": "circle",
+     "x": 0.45,
+     "y": 0.32,
+     "r": 0.16,
+     "at": "housing,"
+    },
+    {
+     "kind": "label",
+     "x": 0.06,
+     "y": 0.12,
+     "text": "Family savings",
+     "at": "savings."
+    }
+   ]
+  },
+  {
+   "type": "number",
+   "say": "Property investment fell 20.6 per cent this year.",
+   "prefix": "-",
+   "value": 20.6,
+   "decimals": 1,
+   "suffix": "%",
+   "label": "Real-estate investment, January to September 2026",
+   "bg": "media/cn-estate.jpg",
+   "speak": "Property investment fell twenty point six per cent this year."
+  },
+  {
+   "type": "snap",
+   "src": "media/cn-estate.jpg",
+   "say": "Construction is shrinking. Home prices in the big cities are still lower than a year ago.",
+   "frame": "full",
+   "marks": [
+    {
+     "kind": "label",
+     "x": 0.06,
+     "y": 0.75,
+     "text": "Prices still falling",
+     "color": "red",
+     "at": "prices"
+    }
+   ]
+  },
+  {
+   "type": "number",
+   "say": "Overall investment in cities fell 7.2 per cent.",
+   "prefix": "-",
+   "value": 7.2,
+   "decimals": 1,
+   "suffix": "%",
+   "label": "Urban fixed-asset investment, January to September 2026",
+   "speak": "Overall investment in cities fell seven point two per cent."
+  },
+  {
+   "type": "kinetic",
+   "say": "When your flat loses value, you feel poorer. You save more. You spend less.",
+   "text": "Feel poorer. | Save more. | Spend less.",
+   "hl": [
+    "less."
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "And that deepens the slump.",
+   "hl": [
+    "slump."
+   ]
+  },
+  {
+   "type": "snap",
+   "src": "media/cn-yuan-fist.jpg",
+   "say": "But China can't just make less. That would mean mass layoffs.",
+   "para": true,
+   "marks": [
+    {
+     "kind": "box",
+     "x": 0.71,
+     "y": 0.7,
+     "w": 0.2,
+     "h": 0.18,
+     "at": "make"
+    },
+    {
+     "kind": "label",
+     "x": 0.06,
+     "y": 0.12,
+     "text": "Mass layoffs",
+     "color": "red",
+     "at": "layoffs."
+    }
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "So the extra goods go abroad. More and more, cheaper and cheaper.",
+   "text": "More and more. | Cheaper and cheaper.",
+   "hl": [
+    "cheaper."
+   ]
+  },
+  {
+   "type": "number",
+   "say": "Exports rose 16 per cent in nine months.",
+   "prefix": "+",
+   "value": 16.4,
+   "decimals": 1,
+   "suffix": "%",
+   "label": "Exports, January to September 2026, in yuan",
+   "bg": "media/cn-flag-chart.jpg",
+   "speak": "Exports rose sixteen per cent in nine months."
+  },
+  {
+   "type": "number",
+   "say": "The trade surplus hit 938 billion dollars, after a record 1.2 trillion last year.",
+   "prefix": "$",
+   "value": 938,
+   "suffix": " bn",
+   "label": "Trade surplus, January to September 2026",
+   "cut": "zoom",
+   "speak": "The trade surplus hit nine hundred and thirty-eight billion dollars, after a record one point two trillion last year."
+  },
+  {
+   "type": "snap",
+   "src": "media/cn-flag-chart.jpg",
+   "say": "Selling abroad below fair value is called dumping.",
+   "frame": "full",
+   "marks": [
+    {
+     "kind": "label",
+     "x": 0.3,
+     "y": 0.85,
+     "text": "“Dumping”",
+     "color": "red",
+     "at": "dumping."
+    }
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "From Europe to Asia, countries say it's killing their factories.",
+   "text": "Europe to Asia: | it's killing our factories",
+   "hl": [
+    "killing"
+   ]
+  },
+  {
+   "type": "versus",
+   "say": "India feels it directly. Last year it bought 131.6 billion dollars of goods from China, and sold it 19.5.",
+   "para": true,
+   "kicker": "India–China trade, 2025-26",
+   "a": {
+    "prefix": "$",
+    "value": 131.6,
+    "decimals": 1,
+    "suffix": " bn",
+    "label": "Imports from China"
+   },
+   "b": {
+    "prefix": "$",
+    "value": 19.5,
+    "decimals": 1,
+    "suffix": " bn",
+    "label": "Exports to China"
+   },
+   "hot": 0,
+   "at": "sold",
+   "speak": "India feels it directly. Last year it bought a hundred and thirty-one point six billion dollars of goods from China, and sold it nineteen point five."
+  },
+  {
+   "type": "number",
+   "say": "A gap of about 112 billion dollars.",
+   "prefix": "$",
+   "value": 112,
+   "suffix": " bn",
+   "label": "India's trade deficit with China, 2025-26",
+   "speak": "A gap of about a hundred and twelve billion dollars."
+  },
+  {
+   "type": "list",
+   "say": "India has opened a string of anti-dumping probes, from steel to drug ingredients.",
+   "kicker": "India pushes back",
+   "title": "Anti-dumping probes in 2026",
+   "items": [
+    "Electrical steel",
+    "Forklifts",
+    "Caprolactam",
+    "Penicillin G",
+    "Montelukast"
+   ]
+  },
+  {
+   "type": "snap",
+   "src": "media/cn-yuan-fist.jpg",
+   "frame": "full",
+   "say": "India's only maker of penicillin G says it had to cut prices just to match Chinese imports.",
+   "marks": [
+    {
+     "kind": "label",
+     "x": 0.06,
+     "y": 0.15,
+     "text": "Forced to cut prices",
+     "color": "red",
+     "at": "cut"
+    }
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Subsidies can pay for new factories. They can't set the price of imports.",
+   "text": "Subsidies build plants. | They can't set prices.",
+   "hl": [
+    "prices."
+   ]
+  },
+  {
+   "type": "snap",
+   "src": "media/cn-xi-tightrope.jpg",
+   "say": "Beijing knows the problem. Fixing it means shifting money from the state to households.",
+   "para": true,
+   "frame": "full",
+   "marks": [
+    {
+     "kind": "circle",
+     "x": 0.62,
+     "y": 0.45,
+     "r": 0.12,
+     "at": "beijing"
+    },
+    {
+     "kind": "label",
+     "x": 0.06,
+     "y": 0.15,
+     "text": "A balancing act",
+     "at": "shifting"
+    }
+   ]
+  },
+  {
+   "type": "number",
+   "say": "In July it set a target: 60 trillion yuan in retail sales by 2030.",
+   "value": 60,
+   "suffix": " trillion yuan",
+   "label": "Retail sales target for 2030, up from 50.1 trillion in 2025",
+   "speak": "In July it set a target: sixty trillion yuan in retail sales by twenty-thirty."
+  },
+  {
+   "type": "kinetic",
+   "say": "It also promised to significantly raise household spending's share of the economy.",
+   "text": "Households' share: | 'significantly' higher",
+   "hl": [
+    "higher"
+   ]
+  },
+  {
+   "type": "doc",
+   "say": "The IMF agrees.",
+   "kicker": "IMF Executive Board · February 2026",
+   "text": "\"Transitioning to a consumption-led growth model should be the overarching priority.\"",
+   "hl": "overarching priority",
+   "at": 0.4
+  },
+  {
+   "type": "kinetic",
+   "say": "But targets don't change how worried families spend.",
+   "text": "Targets don't change | worried families",
+   "hl": [
+    "worried"
+   ]
+  },
+  {
+   "type": "snap",
+   "src": "media/cn-xi-summit.jpg",
+   "say": "For India, it cuts both ways.",
+   "para": true,
+   "frame": "full"
+  },
+  {
+   "type": "kinetic",
+   "say": "If China's shoppers stay home, cheap imports keep coming.",
+   "text": "Shoppers stay home: | cheap imports",
+   "hl": [
+    "cheap"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "If they start spending, China becomes a bigger market for India.",
+   "text": "They spend: | a bigger market",
+   "hl": [
+    "market"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "India's exports to China already rose by more than a third last year.",
+   "text": "Exports to China: | up a third",
+   "hl": [
+    "third"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "China's spending gap is no longer just China's problem.",
+   "text": "China's problem | is everyone's",
+   "hl": [
+    "everyone's"
+   ],
+   "cut": "zoom"
+  },
+  {
+   "type": "outro",
+   "say": "Read the full story on Raisina Wire.",
+   "title": "Read the full story"
+  }
+ ]
 }

@@ -1,19 +1,142 @@
 {
-  "slug": "china-economy-short",
-  "title": "China's spending problem in 60 seconds",
-  "series": "Explained",
-  "formats": ["9x16"],
-  "pace": 1.7,
-  "captionChars": 34,
-  "ticker": "China's spending problem in 60 seconds: why its people won't buy, and why the world pays",
-  "scenes": [
-    {"type":"cutout","src":"media/cn-xi-summit.jpg","kicker":"Explained · China","title":"China's spending problem","say":"China's economy has a huge problem. Its people aren't spending. Here's why that matters, in 60 seconds.","speak":"China's economy has a huge problem. Its people aren't spending. Here's why that matters, in sixty seconds."},
-    {"type":"share","kicker":"The gap","value":56,"ringLabel":"of GDP","title":"Consumption in China","detail":"Most economies: 70%+","bg":"media/cn-shoppers.jpg","say":"Consumption is just 56 per cent of China's economy. Most countries are at 70 or more. Even Japan, at its worst in the 1990s, was 10 points higher.","speak":"Consumption is just fifty-six per cent of China's economy. Most countries are at seventy or more. Even Japan, at its worst in the nineteen-nineties, was ten points higher."},
-    {"type":"timeline","kicker":"Growth","title":"Slowing down","items":[{"when":"2000s","what":"10%+"},{"when":"2026","what":"Under 5%","hot":true}],"bg":"media/cn-xi-bars.jpg","say":"Growth has slid from over 10 per cent to under 5.","speak":"Growth has slid from over ten per cent to under five."},
-    {"type":"photo","src":"media/cn-estate.jpg","style":"duotone","focus":0.5,"focusV":0.5,"title":"Property: -20.6%","say":"The property crash hit family savings. Property investment is down 20.6 per cent this year. So families save, and don't spend.","speak":"The property crash hit family savings. Property investment is down twenty point six per cent this year. So families save, and don't spend."},
-    {"type":"number","kicker":"Trade surplus, 9 months","prefix":"$","value":938,"suffix":" bn","label":"Jan–Sept 2026","bg":"media/cn-yuan-fist.jpg","say":"But factories keep running. The extra goods go abroad, cheaper and cheaper. China's trade surplus hit 938 billion dollars in nine months.","speak":"But factories keep running. The extra goods go abroad, cheaper and cheaper. China's trade surplus hit nine hundred and thirty-eight billion dollars in nine months."},
-    {"type":"number","kicker":"India's deficit with China","prefix":"$","value":112,"suffix":" bn","label":"2025-26","bg":"media/cn-flag-chart.jpg","say":"India's trade gap with China is about 112 billion dollars, and India has opened a wave of anti-dumping probes.","speak":"India's trade gap with China is about a hundred and twelve billion dollars, and India has opened a wave of anti-dumping probes."},
-    {"type":"photo","src":"media/cn-xi-tightrope.jpg","focus":0.6,"focusV":0.6,"title":"Beijing's balancing act","say":"Beijing wants retail sales of 60 trillion yuan by 2030. Getting families to spend is the hard part.","speak":"Beijing wants retail sales of sixty trillion yuan by twenty-thirty. Getting families to spend is the hard part."},
-    {"type":"outro","title":"Watch the full explainer","say":"Watch the full explainer on Raisina Wire."}
-  ]
+ "slug": "china-economy-short",
+ "title": "China's spending problem in 60 seconds",
+ "series": "Explained",
+ "style": "vox",
+ "formats": [
+  "9x16"
+ ],
+ "captionChars": 30,
+ "scenes": [
+  {
+   "type": "snap",
+   "src": "media/cn-shoppers.jpg",
+   "say": "China has a spending problem.",
+   "frame": "full",
+   "marks": [
+    {
+     "kind": "circle",
+     "x": 0.5,
+     "y": 0.75,
+     "r": 0.16,
+     "at": "spending"
+    }
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Here's why it matters, in 60 seconds.",
+   "text": "Why it matters | in 60 seconds",
+   "hl": [
+    "60"
+   ],
+   "speak": "Here's why it matters, in sixty seconds."
+  },
+  {
+   "type": "versus",
+   "say": "Consumption is 56 per cent of China's economy. Most countries: 70 or more.",
+   "a": {
+    "value": 56,
+    "suffix": "%",
+    "label": "China"
+   },
+   "b": {
+    "value": 70,
+    "suffix": "%+",
+    "label": "Most economies"
+   },
+   "at": "most",
+   "speak": "Consumption is fifty-six per cent of China's economy. Most countries: seventy or more."
+  },
+  {
+   "type": "kinetic",
+   "say": "Even Japan at its worst was 10 points higher.",
+   "text": "Lower than | Japan's worst",
+   "hl": [
+    "Japan's"
+   ],
+   "speak": "Even Japan at its worst was ten points higher."
+  },
+  {
+   "type": "number",
+   "say": "Property investment is down 20.6 per cent.",
+   "prefix": "-",
+   "value": 20.6,
+   "decimals": 1,
+   "suffix": "%",
+   "label": "Real-estate investment, 2026",
+   "bg": "media/cn-estate.jpg",
+   "speak": "Property investment is down twenty point six per cent."
+  },
+  {
+   "type": "kinetic",
+   "say": "Families feel poorer. They save. They don't spend.",
+   "text": "Save. | Don't spend.",
+   "hl": [
+    "spend."
+   ]
+  },
+  {
+   "type": "snap",
+   "src": "media/cn-yuan-fist.jpg",
+   "say": "But the factories keep running.",
+   "marks": [
+    {
+     "kind": "box",
+     "x": 0.71,
+     "y": 0.7,
+     "w": 0.2,
+     "h": 0.18,
+     "at": "factories"
+    }
+   ]
+  },
+  {
+   "type": "number",
+   "say": "The extra goods go abroad. A 938 billion dollar trade surplus in nine months.",
+   "prefix": "$",
+   "value": 938,
+   "suffix": " bn",
+   "label": "Trade surplus, Jan–Sept 2026",
+   "cut": "zoom",
+   "speak": "The extra goods go abroad. A nine hundred and thirty-eight billion dollar trade surplus in nine months."
+  },
+  {
+   "type": "number",
+   "say": "India's trade gap with China: about 112 billion dollars.",
+   "prefix": "$",
+   "value": 112,
+   "suffix": " bn",
+   "label": "India's deficit with China, 2025-26",
+   "speak": "India's trade gap with China: about a hundred and twelve billion dollars."
+  },
+  {
+   "type": "kinetic",
+   "say": "India is pushing back with anti-dumping probes.",
+   "text": "Anti-dumping | probes",
+   "hl": [
+    "probes."
+   ]
+  },
+  {
+   "type": "snap",
+   "src": "media/cn-xi-tightrope.jpg",
+   "say": "Beijing wants 60 trillion yuan in retail sales by 2030.",
+   "frame": "full",
+   "speak": "Beijing wants sixty trillion yuan in retail sales by twenty-thirty."
+  },
+  {
+   "type": "kinetic",
+   "say": "Getting families to spend is the hard part.",
+   "text": "The hard part: | getting families to spend",
+   "hl": [
+    "spend"
+   ]
+  },
+  {
+   "type": "outro",
+   "say": "Watch the full explainer on Raisina Wire.",
+   "title": "Watch the full explainer"
+  }
+ ]
 }
