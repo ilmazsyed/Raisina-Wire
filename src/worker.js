@@ -14,6 +14,7 @@ import m0012 from "../migrations/0012_live_images.sql";
 import m0013 from "../migrations/0013_live_results.sql";
 import m0014 from "../migrations/0014_audience.sql";
 import m0015 from "../migrations/0015_guest_writers.sql";
+import m0016 from "../migrations/0016_media_full.sql";
 import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { liveResults } from "./results.js";
@@ -70,7 +71,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -489,13 +490,20 @@ async function api(request, env, ctx) {
     // "short" is a vertical (9:16) video: story bubbles on the homepage and Shorts on Watch.
     const type=["video","short","image","gallery","audio","embed"].includes(b.mediaType)?b.mediaType:"video";
     const status=b.status==="published"?"published":"draft", id=randomId();
-    await env.DB.prepare("INSERT INTO media_items (id,title,description,media_type,media_url,thumbnail_url,category,status,author_id,published_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id,title,String(b.description||"").slice(0,2000),type,mediaUrl,String(b.thumbnailUrl||"").slice(0,1500),String(b.category||"Geopolitics").slice(0,50),status,user.id,status==="published"?new Date().toISOString():null).run();
+    await env.DB.prepare("INSERT INTO media_items (id,title,description,media_type,media_url,thumbnail_url,category,status,author_id,published_at,full_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(id,title,String(b.description||"").slice(0,2000),type,mediaUrl,String(b.thumbnailUrl||"").slice(0,1500),String(b.category||"Geopolitics").slice(0,50),status,user.id,status==="published"?new Date().toISOString():null,String(b.fullId||"").slice(0,64)).run();
     return json({ok:true,id},201,{"cache-control":"no-store"});
   }
   if (url.pathname.startsWith("/api/admin/media/") && request.method === "PUT") {
     const user = await currentUser(request, env);
     if (!isStaff(user)) return err("Editor access required.", 403);
     const id = decodeURIComponent(url.pathname.split("/").pop()), b = await request.json().catch(() => ({}));
+    // Linking a short to its full video, without touching its status.
+    if (b.fullId !== undefined && b.status === undefined) {
+      const res = await env.DB.prepare("UPDATE media_items SET full_id=?, updated_at=? WHERE id=?").bind(String(b.fullId || "").slice(0, 64), new Date().toISOString(), id).run();
+      if (!res.meta.changes) return err("Media item not found.", 404);
+      await audit(env, user, "media.link", "media_item", id, { fullId: b.fullId });
+      return json({ ok: true }, 200, { "cache-control": "no-store" });
+    }
     const status = b.status === "published" ? "published" : "draft";
     const res = await env.DB.prepare("UPDATE media_items SET status=?, published_at=CASE WHEN ?='published' THEN COALESCE(published_at,?) ELSE published_at END, updated_at=? WHERE id=?").bind(status, status, new Date().toISOString(), new Date().toISOString(), id).run();
     if (!res.meta.changes) return err("Media item not found.", 404);
@@ -611,7 +619,7 @@ async function api(request, env, ctx) {
     return json({item,updates:updates.results});
   }
   if (url.pathname === "/api/media" && request.method === "GET") {
-    const rows=await env.DB.prepare("SELECT id,title,description,media_type AS mediaType,media_url AS mediaUrl,thumbnail_url AS thumbnailUrl,category,published_at AS publishedAt FROM media_items WHERE status='published' ORDER BY published_at DESC LIMIT 50").all();
+    const rows=await env.DB.prepare("SELECT id,title,description,media_type AS mediaType,media_url AS mediaUrl,thumbnail_url AS thumbnailUrl,category,published_at AS publishedAt,full_id AS fullId FROM media_items WHERE status='published' ORDER BY published_at DESC LIMIT 50").all();
     return json({items:rows.results});
   }
 
