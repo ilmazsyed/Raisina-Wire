@@ -429,12 +429,12 @@ function viewHome() {
       <aside class="live-rail glass" aria-label="Live wire"><div class="live-title"><b><span class="dot-live"></span>Live wire</b><span class="muted" style="font-size:12px" id="railUpdated"></span></div><div id="rail"></div><a class="link-gold" href="/live" style="display:block;margin-top:16px;font-size:13px">All live updates →</a></aside>
     </div>
 
+    <section id="videoBand" class="band band-explainers" aria-labelledby="videoBandTitle" hidden></section>
+
     <section class="briefing glass band" aria-labelledby="briefingTitle"><div class="briefing-head"><span class="kicker">The Briefing</span><h2 id="briefingTitle">What you need to know</h2><span class="meta">${new Date().toLocaleDateString(LOCALE, { ...IST, weekday: "long", day: "numeric", month: "long" })} · From the live wire</span></div><ol class="briefing-list" id="briefingList"></ol></section>
 
     <section class="band"><div class="section-head"><h2>From the Raisina Wire desk</h2><a class="link-gold" href="/editions">All stories →</a></div>
       <div class="card-grid">${rest.slice(3, 7).map(e => edCard(e)).join("")}</div></section>
-
-    <section id="videoBand" class="band" aria-labelledby="videoBandTitle" hidden></section>
 
     ${joinBand()}
 

@@ -1298,3 +1298,15 @@ body.sv-open{overflow:hidden}
 .media-card.flash{animation:cardflash 2.2s ease}
 @keyframes cardflash{0%,40%{box-shadow:0 0 0 3px var(--red),var(--glass-shadow)}100%{box-shadow:var(--glass-shadow)}}
 .coverage-feed time .edited{display:block;margin-top:2px;font:500 10.5px var(--mono);color:var(--muted)}
+
+/* Explainers sit right under the lead story. On phones the lead grid opens up so they come
+   straight after the top story, before the rest of the latest stories. */
+.band-explainers{margin-top:44px}
+@media(max-width:760px){
+  .home>*{order:6}
+  .home>.lead-grid{display:contents}
+  .home>.lead-grid>.hero{order:2;margin-top:14px}
+  .home>#videoBand{order:3;margin-top:30px}
+  .home>.lead-grid>.side-stack{order:4;margin-top:30px}
+  .home>.lead-grid>.live-rail{order:5;margin-top:22px}
+}
