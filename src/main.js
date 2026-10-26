@@ -1248,14 +1248,17 @@ function renderTicker() {
 }
 async function loadCoverage() {
   try {
-    const d = await fetch(`/api/live${lang !== "en" ? `?lang=${lang}` : ""}`).then(r => r.ok ? r.json() : { items: [] });
-    const before = state.coverage && new Set(state.coverage.map(c => c.id));
-    state.coverage = d.items || [];
-    const started = before ? state.coverage.filter(c => !before.has(c.id)) : [];
+    const d = await fetch(`/api/live${lang !== "en" ? `?lang=${lang}` : ""}`).then(r => r.ok ? r.json() : null);
+    if (!d) throw new Error("live");
+    // Only coverage that went live after this page opened counts as new (a first answer from the
+    // offline copy, or one that failed, must not make running coverage look new).
+    const before = state.coverageSeen && new Set(state.coverage.map(c => c.id));
+    state.coverage = d.items || []; state.coverageSeen = true;
+    const started = before ? state.coverage.filter(c => !before.has(c.id) && Date.parse(c.startedAt) > PAGE_OPENED - 60e3) : [];
     if (started.length) { state.newLive = started[0]; showNewPill(); }
     state.coverageLead = state.coverage[0] ? await fetch(`/api/live/${encodeURIComponent(state.coverage[0].slug)}${lang !== "en" ? `?lang=${lang}` : ""}`).then(r => r.ok ? r.json() : null) : null;
     if (state.coverageLead?.item?.hasResults) state.coverageLead.results = await fetch(`/api/live/${encodeURIComponent(state.coverageLead.item.slug)}/results`).then(r => r.ok ? r.json() : null).catch(() => null);
-  } catch { state.coverage = []; state.coverageLead = null; }
+  } catch { state.coverage ||= []; } // keep what is shown when a refresh fails
   renderTicker(); renderLiveBanner(); renderNav(parseRoute());
 }
 let bannerTimer;
@@ -1849,6 +1852,7 @@ async function submitLead(e) {
 }
 /* ---------- Fresh news: the "new stories" pill, pull to refresh, "Updated … ago" ---------- */
 // Stories published since the reader's previous visit get a small "New" tag.
+const PAGE_OPENED = Date.now();
 const prevSeen = store.get("rw-seen-stories", 0); store.set("rw-seen-stories", Date.now());
 const isNewStory = e => prevSeen > 0 && Date.parse(e.publishedAt || e.date) > prevSeen;
 const newTag = e => isNewStory(e) ? `<span class="new-tag">New</span>` : "";

@@ -17,7 +17,14 @@ const HOME_TEXT = {
 
 const SITE = "Raisina Wire";
 const TAGLINE = "India’s strategic briefing";
-const SITE_DESCRIPTION = "Raisina Wire is an independent Indian news and analysis platform on geopolitics, national security, diplomacy and markets: original editions by Ilmaz Syed, a live news wire, a market board and a members’ community.";
+const SITE_DESCRIPTION = "Raisina Wire is an independent Indian news and analysis platform on geopolitics, national security, defence, diplomacy and markets, in English, Hindi and Bengali: original editions by Ilmaz Syed, live coverage, video explainers, a live news wire, a market board and a members’ community.";
+// The share card for each language (tools/og draws them).
+const OG_IMAGE = { en: "/og-image.jpg", hi: "/og-image-hi.jpg", bn: "/og-image-bn.jpg" };
+const OG_ALT = {
+  en: "Raisina Wire — India’s strategic briefing, in English, Hindi and Bengali, in light and dark mode",
+  hi: "Raisina Wire — भारत की रणनीतिक ब्रीफिंग, अंग्रेजी, हिन्दी और बांग्ला में",
+  bn: "Raisina Wire — ভারতের কৌশলগত ব্রিফিং, ইংরেজি, হিন্দি আর বাংলায়"
+};
 const NEWSLETTER = "https://www.linkedin.com/newsletters/raisina-wire-7418787153549238272";
 const LIVE_CATS = ["India", "Security", "Diplomacy", "Markets", "Energy", "World"];
 
@@ -31,8 +38,22 @@ const fmtDate = (iso, lang = "en") => iso ? new Date(iso).toLocaleDateString(LOC
 
 export const origin = (request, env) => String(env.SITE_URL || new URL(request.url).origin).replace(/\/+$/, "");
 
+// A video for Google's video results: its page, thumbnail, file and upload date.
+function videoLd(o, m, ctx = true) {
+  const media = /^https?:/.test(m.mediaUrl || "") ? m.mediaUrl : abs(o, m.mediaUrl || "");
+  const yt = String(m.mediaUrl || "").match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
+  return { ...(ctx ? { "@context": "https://schema.org" } : {}), "@type": "VideoObject", name: clip(m.title, 100), description: clip(m.description || `${m.mediaType === "short" ? "A short" : "An explainer"} from the Raisina Wire desk.`, 300),
+    thumbnailUrl: [m.thumb ? (/^https?:/.test(m.thumb) ? m.thumb : o + m.thumb) : `${o}/og-image.jpg`], uploadDate: lastmodIso(m.publishedAt),
+    url: `${o}/watch?v=${encodeURIComponent(m.id)}`, ...(yt ? { embedUrl: `https://www.youtube.com/embed/${yt[1]}` } : { contentUrl: media }),
+    publisher: { "@id": `${o}/#organization` }, inLanguage: "en-IN", isFamilyFriendly: true };
+}
+const lastmodIso = d => { const t = Date.parse(String(d || "").replace(" ", "T") + (/[zZ+]/.test(String(d)) ? "" : "Z")); return Number.isNaN(t) ? new Date().toISOString() : new Date(t).toISOString(); };
 function organization(o) {
   return { "@type": "NewsMediaOrganization", "@id": `${o}/#organization`, name: SITE, url: `${o}/`,
+    alternateName: ["रायसीना वायर", "রাইসিনা ওয়্যার", "RaisinaWire"], slogan: TAGLINE, description: SITE_DESCRIPTION,
+    knowsLanguage: ["en-IN", "hi-IN", "bn-IN"], foundingDate: "2026", foundingLocation: { "@type": "Place", name: "New Delhi, India" },
+    areaServed: { "@type": "Country", name: "India" }, publishingPrinciples: `${o}/about`, actionableFeedbackPolicy: `${o}/grievance`,
+    image: { "@type": "ImageObject", url: `${o}/og-image.jpg`, width: 1200, height: 630 },
     logo: { "@type": "ImageObject", url: `${o}/icon-512.png`, width: 512, height: 512 }, sameAs: [NEWSLETTER],
     founder: { "@type": "Person", "@id": `${o}/author/ilmaz-syed#person`, name: "Ilmaz Syed" } };
 }
@@ -81,7 +102,7 @@ async function pageFor(path, url, env, o, lang = "en") {
   if (!section) {
     const stories = await listPublished(env, { limit: 30 });
     return {
-      title: `${SITE} — ${TAGLINE} on geopolitics, security and markets`,
+      title: `${SITE} — India news, geopolitics, defence & markets in English, Hindi and Bengali`,
       description: SITE_DESCRIPTION,
       ld: [{ "@context": "https://schema.org", "@graph": [organization(o),
         { "@type": "WebSite", "@id": `${o}/#website`, url: `${o}/`, name: SITE, description: SITE_DESCRIPTION, inLanguage: "en-IN", publisher: { "@id": `${o}/#organization` },
@@ -178,12 +199,17 @@ async function pageFor(path, url, env, o, lang = "en") {
   }
   // A shared video or short (/watch?v=id): its own title and picture in link previews.
   if (section === "watch" && url.searchParams.get("v")) {
-    const m = await env.DB.prepare("SELECT id,title,description,media_type AS mediaType,thumbnail_url AS thumb FROM media_items WHERE id=? AND status='published'").bind(url.searchParams.get("v")).first();
-    if (m) return { canonicalPath: "/watch", ogUrl: `${o}${lang === "en" ? "" : `/${lang}`}/watch?v=${encodeURIComponent(m.id)}`, type: "video.other",
+    const m = await env.DB.prepare("SELECT id,title,description,media_type AS mediaType,media_url AS mediaUrl,thumbnail_url AS thumb,published_at AS publishedAt FROM media_items WHERE id=? AND status='published'").bind(url.searchParams.get("v")).first();
+    if (m) return { canonicalPath: "/watch", ld: [videoLd(o, m)], ogUrl: `${o}${lang === "en" ? "" : `/${lang}`}/watch?v=${encodeURIComponent(m.id)}`, type: "video.other",
       title: `${m.title} · ${SITE}`, ogTitle: m.title, description: clip(m.description || `${m.mediaType === "short" ? "A short" : "An explainer"} from the Raisina Wire desk.`, 200),
       image: m.thumb ? (/^https?:/.test(m.thumb) ? m.thumb : o + m.thumb) : undefined, body: `<h1>${esc(m.title)}</h1>${m.description ? `<p>${esc(m.description)}</p>` : ""}` };
   }
-  if (section === "watch") return { title: `Watch and listen: video and audio briefings · ${SITE}`, description: "Video, audio and image briefings from the Raisina Wire desk.", body: `<h1>Watch and listen</h1>` };
+  if (section === "watch") {
+    const { results: vids } = await env.DB.prepare("SELECT id,title,description,media_type AS mediaType,media_url AS mediaUrl,thumbnail_url AS thumb,published_at AS publishedAt FROM media_items WHERE status='published' AND media_type IN ('video','short') ORDER BY published_at DESC LIMIT 50").all();
+    return { title: `Video explainers and shorts on India and the world · ${SITE}`, description: "Video explainers and vertical shorts from the Raisina Wire desk on geopolitics, security, diplomacy and markets.",
+      ld: [{ "@context": "https://schema.org", "@type": "ItemList", itemListElement: vids.filter(v => v.thumb).map((v, i) => ({ "@type": "ListItem", position: i + 1, item: videoLd(o, v, false) })) }],
+      body: `<h1>Video explainers and shorts</h1><ul>${vids.map(v => `<li><a href="/watch?v=${encodeURIComponent(v.id)}">${esc(v.title)}</a>${v.description ? ` — ${esc(clip(v.description, 160))}` : ""}</li>`).join("")}</ul>` };
+  }
 
   if (section === "community") {
     const { results } = await env.DB.prepare("SELECT p.id,p.title,p.topic,p.created_at AS createdAt,u.display_name AS author FROM community_posts p JOIN users u ON u.id=p.user_id WHERE p.status='published' ORDER BY p.created_at DESC LIMIT 50").all();
@@ -243,11 +269,13 @@ export async function renderPage(request, env, ensureSchema) {
   const alternates = page.alternates || (page.canonicalPath ? [] : ["en", ...LANGS]);
   const canonical = o + (page.canonicalPath || (full === "/" ? "/" : full));
   const hreflang = alternates.length > 1 ? [...alternates.map(l => `<link rel="alternate" hreflang="${LOCALES[l]}" href="${esc(o + prefixed(l, path))}">`), `<link rel="alternate" hreflang="x-default" href="${esc(o + path)}">`] : [];
-  const image = page.image || `${o}/og-image.jpg`;
+  const image = page.image || `${o}${OG_IMAGE[lang]}`, card = !page.image;
   const head = [
     `<link rel="canonical" href="${esc(canonical)}">`, ...hreflang,
     ...(lang !== "en" ? [`<meta property="og:locale" content="${LOCALES[lang].replace("-", "_")}">`] : []),
     `<meta property="og:url" content="${esc(page.ogUrl || canonical)}">`,
+    ...["en", ...LANGS].filter(l => l !== lang).map(l => `<meta property="og:locale:alternate" content="${LOCALES[l].replace("-", "_")}">`),
+    ...(card ? [`<meta property="og:image:type" content="image/jpeg">`] : [`<meta property="og:image:secure_url" content="${esc(image)}">`]),
     `<meta name="twitter:title" content="${esc(page.ogTitle || page.title)}">`,
     `<meta name="twitter:description" content="${esc(page.description)}">`,
     ...(page.article ? [`<meta property="article:published_time" content="${esc(page.article.published)}">`, `<meta property="article:modified_time" content="${esc(page.article.modified)}">`,
@@ -265,6 +293,9 @@ export async function renderPage(request, env, ensureSchema) {
     .on('meta[property="og:type"]', set("content", page.type || "website"))
     .on('meta[property="og:image"]', set("content", image))
     .on('meta[name="twitter:image"]', set("content", image))
+    .on('meta[property="og:image:alt"]', set("content", card ? OG_ALT[lang] : page.ogTitle || page.title))
+    .on('meta[property="og:image:width"]', { element(el) { if (!card) el.remove(); } })
+    .on('meta[property="og:image:height"]', { element(el) { if (!card) el.remove(); } })
     .on('meta[name="robots"]', set("content", page.noindex ? "noindex" : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"))
     .on("head", { element(el) { el.append(head, { html: true }); } })
     .on("#app", { element(el) { el.setInnerContent(ssrShell(page.contentLang ? `<div lang="${page.contentLang}">${page.body}</div>` : page.body), { html: true }); } })
@@ -286,6 +317,9 @@ export async function sitemap(request, env, ensureSchema) {
   const stories = await listPublished(env, { limit: 5000 });
   const { results: posts } = await env.DB.prepare("SELECT id,created_at FROM community_posts WHERE status='published' ORDER BY created_at DESC LIMIT 1000").all();
   const { results: cover } = await env.DB.prepare("SELECT slug,updated_at FROM live_coverage WHERE status IN ('live','ended') ORDER BY updated_at DESC LIMIT 500").all();
+  const { results: vids } = await env.DB.prepare("SELECT id,title,description,media_type AS mediaType,media_url AS mediaUrl,thumbnail_url AS thumb,published_at AS publishedAt FROM media_items WHERE status='published' AND media_type IN ('video','short') AND thumbnail_url<>'' ORDER BY published_at DESC LIMIT 200").all();
+  // Explainers and shorts as a video sitemap on the Watch page.
+  const videoXml = vids.map(v => { const d = videoLd(o, v, false); return `<video:video><video:thumbnail_loc>${xml(d.thumbnailUrl[0])}</video:thumbnail_loc><video:title>${xml(d.name)}</video:title><video:description>${xml(d.description)}</video:description>${d.contentUrl ? `<video:content_loc>${xml(d.contentUrl)}</video:content_loc>` : `<video:player_loc>${xml(d.embedUrl)}</video:player_loc>`}<video:publication_date>${d.uploadDate}</video:publication_date><video:family_friendly>yes</video:family_friendly></video:video>`; }).join("");
   const newest = stories[0]?.publishedAt;
   // Hindi and Bengali versions that exist, each listed with its alternates.
   const tr = Object.fromEntries(await Promise.all(LANGS.map(async l => [l, await articleTranslations(env, l, stories)])));
@@ -295,7 +329,7 @@ export async function sitemap(request, env, ensureSchema) {
   const bare = p => p.replace(/^\/(hi|bn)(?=\/|$)/, "") || "/";
   const urls = [
     ["/", newest, "hourly", "1.0"], ["/editions", newest, "daily", "0.9"], ["/live", "", "always", "0.8"], ["/markets", "", "always", "0.7"],
-    ...LIVE_CATS.map(c => [`/live/${c}`, "", "always", "0.5"]), ["/community", "", "daily", "0.7"], ["/events", "", "daily", "0.6"], ["/watch", "", "weekly", "0.5"], ["/about", "", "monthly", "0.5"], ...LEGAL_ORDER.map(([k]) => [`/${k}`, "", "yearly", "0.2"]),
+    ...LIVE_CATS.map(c => [`/live/${c}`, "", "always", "0.5"]), ["/community", "", "daily", "0.7"], ["/events", "", "daily", "0.6"], ["/watch", "", "daily", "0.7"], ["/about", "", "monthly", "0.5"], ...LEGAL_ORDER.map(([k]) => [`/${k}`, "", "yearly", "0.2"]),
     ...WRITERS.map(w => [`/author/${w.key}`, newest, "weekly", "0.6"]),
     ...(await allTags(env)).map(t => [`/tag/${t.slug}`, newest, "weekly", "0.5"]),
     ...LANGS.flatMap(l => [[`/${l}`, newest, "hourly", "0.9"], [`/${l}/editions`, newest, "daily", "0.7"]]),
@@ -304,8 +338,8 @@ export async function sitemap(request, env, ensureSchema) {
     ...cover.map(c => [`/coverage/${encodeURIComponent(c.slug)}`, c.updated_at, "hourly", "0.6"]),
     ...posts.map(p => [`/discussion/${encodeURIComponent(p.id)}`, p.created_at, "weekly", "0.4"])
   ];
-  return xmlResponse(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:xhtml="http://www.w3.org/1999/xhtml">
-${urls.map(([p, m, f, pr, s, langs]) => `<url><loc>${xml(o + p)}</loc>${lastmod(m) ? `<lastmod>${lastmod(m)}</lastmod>` : ""}<changefreq>${f}</changefreq><priority>${pr}</priority>${alt(bare(p), langs)}${s ? `<image:image><image:loc>${xml(abs(o, s.heroUrl || s.image))}</image:loc></image:image>` : ""}</url>`).join("\n")}
+  return xmlResponse(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+${urls.map(([p, m, f, pr, s, langs]) => `<url><loc>${xml(o + p)}</loc>${lastmod(m) ? `<lastmod>${lastmod(m)}</lastmod>` : ""}<changefreq>${f}</changefreq><priority>${pr}</priority>${alt(bare(p), langs)}${s ? `<image:image><image:loc>${xml(abs(o, s.heroUrl || s.image))}</image:loc></image:image>` : ""}${p === "/watch" ? videoXml : ""}</url>`).join("\n")}
 </urlset>`);
 }
 
