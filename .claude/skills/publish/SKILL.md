@@ -70,7 +70,10 @@ Options:
   won't load, ask the user to paste the text. Never invent facts, quotes, figures or names; if
   something matters and isn't in the source, leave it out or flag it to the user.
 - Write an original piece. Don't copy the source's sentences; quote sparingly, in quotation
-  marks, attributed. Credit the publisher in the text and set `sourceUrl` to the link.
+  marks, attributed to the person who said them. Set `sourceUrl` to the link: it is kept in
+  the control room for the desk's records and is never shown to readers (no "Original" button,
+  no source links on stories or live updates). Don't link to or name the source publication in
+  the text.
 - House style: Indian English spelling, crisp news-analysis voice, India's security, diplomacy
   and markets lens. Lead with what happened and why it matters to India. Short paragraphs.
   Dates as "24 October 2026", times in IST.

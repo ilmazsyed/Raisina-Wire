@@ -113,12 +113,11 @@ async function pageFor(path, url, env, o, lang = "en") {
         { "@type": a.kind === "edition" ? "AnalysisNewsArticle" : "NewsArticle", "@id": `${o}${here}#article`, mainEntityOfPage: `${o}${here}`, url: `${o}${here}`,
           headline: clip(a.title, 110), description, image: [image], datePublished: a.publishedAt, dateModified: a.updatedAt || a.publishedAt,
           author: [personLd(o, w)], publisher: { "@id": `${o}/#organization` }, articleSection: a.category, keywords: [...a.tags, a.category, "India"].filter(Boolean).join(", "),
-          wordCount: words, inLanguage: LOCALES[lang], isAccessibleForFree: true, ...(translated ? { translationOfWork: { "@id": `${o}${a.href}#article` } } : a.sourceUrl ? { isBasedOn: a.sourceUrl } : {}) },
+          wordCount: words, inLanguage: LOCALES[lang], isAccessibleForFree: true, ...(translated ? { translationOfWork: { "@id": `${o}${a.href}#article` } } : {}) },
         organization(o), breadcrumbs(o, [["Home", prefixed(lang, "/")], crumb, [a.title, here]])] }],
       body: `<article><p class="ssr-kicker">${esc(a.topic)}</p><h1>${esc(a.title)}</h1>${a.dek ? `<p class="ssr-dek">${esc(a.dek)}</p>` : ""}
         <p class="ssr-byline">${lang === "en" ? "By " : ""}<a href="${prefixed(lang, `/author/${w.key}`)}">${esc(w.name)}</a> · <time datetime="${esc(a.publishedAt)}">${fmtDate(a.publishedAt, lang)}</time>${lang === "en" ? ` · ${a.readMinutes} min read` : ""}</p>
-        <img src="${esc(a.heroUrl || a.image)}" alt="" width="1600" height="1000">${blocksHTML(blocks)}
-        ${a.sourceUrl ? `<p><a href="${esc(a.sourceUrl)}" rel="noopener">Read the original</a></p>` : ""}</article>`
+        <img src="${esc(a.heroUrl || a.image)}" alt="" width="1600" height="1000">${blocksHTML(blocks)}</article>`
     };
   }
 
