@@ -10,10 +10,12 @@
   "ticker": "From Airyana Vaeja to the Islamic Republic: the long civilisational arc of Persia and Iran",
   "scenes": [
     {
-      "type": "title",
-      "kicker": "Explained · Iran",
+      "type": "photo",
+      "src": "media/ir-illustration.jpg",
+      "focus": 0.5,
+      "focusV": 0.5,
       "title": "From Persia to Iran",
-      "sub": "Empires fall. Civilisations remember.",
+      "source": "Illustration",
       "say": "Empires come and go. Iran has outlasted almost all of them. To see why it still unsettles the world's great powers, start at the very beginning."
     },
     {
@@ -23,7 +25,8 @@
       "label": "kingdoms, bound by language, ritual and belief, not by one ruler",
       "source": "Middle Persian tradition, via Niti Shastra",
       "say": "Middle Persian tradition speaks of as many as 240 kingdoms on the Iranian plateau. They were bound not by one ruler, but by language, ritual and a shared cosmos.",
-      "speak": "Middle Persian tradition speaks of as many as two hundred and forty kingdoms on the Iranian plateau. They were bound not by one ruler, but by language, ritual and a shared cosmos."
+      "speak": "Middle Persian tradition speaks of as many as two hundred and forty kingdoms on the Iranian plateau. They were bound not by one ruler, but by language, ritual and a shared cosmos.",
+      "bg": "media/ir-persepolis-sunset.jpg"
     },
     {
       "type": "map",
@@ -81,22 +84,21 @@
       "say": "In the Iranian imagination, empire was not the annihilation of difference, but the orchestration of plurality."
     },
     {
-      "type": "timeline",
+      "type": "collage",
       "kicker": "Act two · Empire",
-      "title": "Conquered, but never erased",
-      "items": [
+      "title": "Persepolis: an imperial voice",
+      "photos": [
         {
-          "when": "6th c. BCE",
-          "what": "Cyrus founds the Achaemenid Empire",
-          "hot": true
+          "src": "media/ir-gate.jpg",
+          "caption": "Gate of All Nations, Persepolis"
         },
         {
-          "when": "Alexander",
-          "what": "Adopts Persian court and rule"
+          "src": "media/ir-gate-lamassu.jpg",
+          "caption": "Guardian figures at the gate"
         },
         {
-          "when": "Parthians, Sasanians",
-          "what": "Rome's only true peers"
+          "src": "media/ir-doorway.jpg",
+          "caption": "Ruins of Persepolis"
         }
       ],
       "say": "In the 6th century BCE, Cyrus built the largest empire yet seen. Alexander conquered it, then adopted its ways. And Persia's heirs were Rome's only true equals.",
@@ -108,7 +110,8 @@
       "who": "Abdolhossein Zarrinkoob",
       "role": "Iranian historian, on the Arab conquest",
       "say": "Then, the deepest rupture. In the 7th century, the Sasanian empire fell to Arab armies. Language, faith and rulers all changed. One historian called it two centuries of silence.",
-      "speak": "Then, the deepest rupture. In the seventh century, the Sasanian empire fell to Arab armies. Language, faith and rulers all changed. One historian called it two centuries of silence."
+      "speak": "Then, the deepest rupture. In the seventh century, the Sasanian empire fell to Arab armies. Language, faith and rulers all changed. One historian called it two centuries of silence.",
+      "bg": "media/ir-gate-dusk.jpg"
     },
     {
       "type": "flow",
@@ -170,7 +173,28 @@
         }
       ],
       "say": "In the 1800s, Britain and Russia hollowed Iran out. In 1935, Persia became Iran. In 1953, an Anglo-American coup toppled Mossadegh. Then came 1979, and revolution.",
-      "speak": "In the eighteen hundreds, Britain and Russia hollowed Iran out. In nineteen thirty-five, Persia became Iran. In nineteen fifty-three, an Anglo-American coup toppled Mossadegh. Then came nineteen seventy-nine, and revolution."
+      "speak": "In the eighteen hundreds, Britain and Russia hollowed Iran out. In nineteen thirty-five, Persia became Iran. In nineteen fifty-three, an Anglo-American coup toppled Mossadegh. Then came nineteen seventy-nine, and revolution.",
+      "bg": "media/ir-rally.jpg"
+    },
+    {
+      "type": "collage",
+      "kicker": "After 1979",
+      "title": "A revolution hardens",
+      "photos": [
+        {
+          "src": "media/ir-mural.jpg",
+          "caption": "An anti-US mural"
+        },
+        {
+          "src": "media/ir-rally.jpg",
+          "caption": "Posters of Khamenei and Khomeini at a rally"
+        },
+        {
+          "src": "media/ir-posters.jpg",
+          "caption": "Supporters hold up portraits"
+        }
+      ],
+      "say": "The revolution hardened into a coercive state, increasingly run by the Revolutionary Guards."
     },
     {
       "type": "map",
@@ -211,7 +235,8 @@
           "label": "Yemen"
         }
       ],
-      "say": "The revolution hardened into a coercive state, increasingly run by the Revolutionary Guards. Abroad, it built allies from Iraq to Lebanon to Yemen, to keep its wars far from home."
+      "say": "Abroad, Iran built allies from Iraq to Lebanon to Yemen, to keep its wars far from home.",
+      "bg": "media/ir-rubble.jpg"
     },
     {
       "type": "list",
@@ -225,15 +250,10 @@
       "say": "For India, this is not a distant story. Sanskrit and Avestan are linguistic cousins. Shahanshah meets Chakravarti. And the Parsis carry pre-Islamic Iran in India to this day."
     },
     {
-      "type": "flow",
+      "type": "cutout",
+      "src": "media/ir-rider.jpg",
       "kicker": "What comes next",
       "title": "Silence, or renewal?",
-      "nodes": [
-        "Overwhelming pressure",
-        "Retreat and remember",
-        "Or harden and renew"
-      ],
-      "base": "Iran measures history in centuries, not regimes",
       "say": "Now, with the Gulf a tinderbox, Iran faces overwhelming pressure again. History offers two paths: a long silence, or a profound renewal. Because Iran measures history in centuries, not regimes."
     },
     {

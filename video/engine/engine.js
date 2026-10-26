@@ -450,8 +450,8 @@
       return u => {
         const ps = (s.photos || []).map(p => typeof p === 'string' ? { src: p } : p).filter(p => IMG[p.src]), n = ps.length; if (!n) return;
         const tx = V ? W / 2 : pad(), align = V ? 'center' : 'left';
-        if (s.kicker) kicker(s.kicker, tx, H * (V ? .12 : .14), u, C.red, align);
-        if (s.title) { ctx.font = font('serif', M * .062, 600); ctx.fillStyle = C.ink; riseText(s.title, tx, H * (V ? .12 : .14) + M * .085, V ? W * .84 : W * .8, M * .07, u - .2, { align }); }
+        if (s.kicker) kicker(s.kicker, tx, H * (V ? .15 : .17), u, C.red, align);
+        if (s.title) { ctx.font = font('serif', M * .062, 600); ctx.fillStyle = C.ink; riseText(s.title, tx, H * (V ? .15 : .17) + M * .085, V ? W * .84 : W * .8, M * .07, u - .2, { align }); }
         const cw = V ? W * .62 : Math.min(W * .3, W * .82 / n), chh = cw * .72, cur = now(n);
         const order = [...ps.keys()].sort((a, b) => (a === cur) - (b === cur));
         for (const i of order) {

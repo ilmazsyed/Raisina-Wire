@@ -2,42 +2,66 @@
   "slug": "persia-to-iran-short",
   "title": "Persia to Iran in 50 seconds",
   "series": "Explained",
-  "formats": ["9x16"],
+  "formats": [
+    "9x16"
+  ],
   "pace": 1.7,
   "captionChars": 34,
   "ticker": "From Persia to Iran: the civilisation that refuses to forget",
   "scenes": [
     {
-      "type": "title",
-      "kicker": "Explained · Iran",
+      "type": "photo",
+      "src": "media/ir-gate-lamassu.jpg",
+      "focus": 0.5,
+      "focusV": 0.5,
       "title": "Why Iran never forgets",
-      "sub": "Persia to Iran in 50 seconds",
+      "source": "Persepolis",
       "say": "Empires fall. Iran remembers. Here's the whole story in under a minute."
     },
     {
       "type": "flow",
       "kicker": "The big idea",
       "title": "The King of Kings",
-      "nodes": ["240 kingdoms", "One overlord", "Shahanshah"],
+      "nodes": [
+        "240 kingdoms",
+        "One overlord",
+        "Shahanshah"
+      ],
       "say": "It began as 240 kingdoms bound by language and faith. When one rose, it ruled the rest without erasing them: the Shahanshah, the King of Kings.",
-      "speak": "It began as two hundred and forty kingdoms bound by language and faith. When one rose, it ruled the rest without erasing them: the Shahanshah, the King of Kings."
+      "speak": "It began as two hundred and forty kingdoms bound by language and faith. When one rose, it ruled the rest without erasing them: the Shahanshah, the King of Kings.",
+      "bg": "media/ir-persepolis-sunset.jpg"
     },
     {
       "type": "timeline",
       "kicker": "Conquered, never erased",
       "title": "Every conqueror was absorbed",
       "items": [
-        { "when": "Alexander", "what": "Adopted Persian rule" },
-        { "when": "Arabs", "what": "'Two centuries of silence'", "hot": true },
-        { "when": "Turks, Mongols", "what": "Became Persian kings" }
+        {
+          "when": "Alexander",
+          "what": "Adopted Persian rule"
+        },
+        {
+          "when": "Arabs",
+          "what": "'Two centuries of silence'",
+          "hot": true
+        },
+        {
+          "when": "Turks, Mongols",
+          "what": "Became Persian kings"
+        }
       ],
-      "say": "Alexander conquered it, and adopted its ways. The Arab conquest brought two centuries of silence. Turks and Mongols came, and became Persian kings."
+      "say": "Alexander conquered it, and adopted its ways. The Arab conquest brought two centuries of silence. Turks and Mongols came, and became Persian kings.",
+      "bg": "media/ir-gate-dusk.jpg"
     },
     {
       "type": "flow",
       "kicker": "Even the words remember",
       "title": "Pars, Fars, Parsi",
-      "nodes": ["Pars", "Fars", "Farsi"],
+      "nodes": [
+        "Pars",
+        "Fars",
+        "Farsi"
+      ],
       "base": "India's Parsis kept the old word",
       "say": "Arabic has no P, so Pars became Fars. But the Zoroastrians who fled to India kept the old name: Parsi."
     },
@@ -46,18 +70,29 @@
       "kicker": "The modern clash",
       "title": "Sovereignty, tested",
       "items": [
-        { "when": "1935", "what": "Persia becomes Iran" },
-        { "when": "1953", "what": "Coup topples Mossadegh" },
-        { "when": "1979", "what": "Islamic Revolution", "hot": true }
+        {
+          "when": "1935",
+          "what": "Persia becomes Iran"
+        },
+        {
+          "when": "1953",
+          "what": "Coup topples Mossadegh"
+        },
+        {
+          "when": "1979",
+          "what": "Islamic Revolution",
+          "hot": true
+        }
       ],
       "say": "1935: Persia becomes Iran. 1953: a coup topples its elected leader. 1979: revolution.",
-      "speak": "Nineteen thirty-five: Persia becomes Iran. Nineteen fifty-three: a coup topples its elected leader. Nineteen seventy-nine: revolution."
+      "speak": "Nineteen thirty-five: Persia becomes Iran. Nineteen fifty-three: a coup topples its elected leader. Nineteen seventy-nine: revolution.",
+      "bg": "media/ir-rally.jpg"
     },
     {
-      "type": "flow",
+      "type": "cutout",
+      "src": "media/ir-rider.jpg",
       "kicker": "What comes next",
       "title": "Silence, or renewal?",
-      "nodes": ["Pressure", "Silence", "Or renewal"],
       "say": "Now, under pressure again, Iran faces a choice it has faced before: silence, or renewal. It measures history in centuries."
     },
     {
