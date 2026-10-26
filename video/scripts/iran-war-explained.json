@@ -141,30 +141,17 @@
      "text": "Currency collapse",
      "color": "red",
      "at": "currency"
-    },
-    {
-     "kind": "circle",
-     "x": 0.42,
-     "y": 0.55,
-     "r": 0.14,
-     "at": "protests"
     }
    ]
   },
   {
-   "type": "snap",
-   "src": "media/iw-protest-fire.jpg",
+   "type": "kinetic",
    "say": "On 8 January, security forces opened fire.",
-   "marks": [
-    {
-     "kind": "circle",
-     "x": 0.45,
-     "y": 0.3,
-     "r": 0.1,
-     "at": "fire."
-    }
-   ],
-   "speak": "On the eighth of January, security forces opened fire."
+   "speak": "On the eighth of January, security forces opened fire.",
+   "text": "8 January: | security forces open fire",
+   "hl": [
+    "fire"
+   ]
   },
   {
    "type": "number",
@@ -226,20 +213,13 @@
    ]
   },
   {
-   "type": "snap",
-   "src": "media/iw-rubble-shovels.jpg",
+   "type": "kinetic",
    "say": "One strike hit a girls' school near Bandar Abbas. About 170 people died.",
-   "marks": [
-    {
-     "kind": "label",
-     "x": 0.05,
-     "y": 0.12,
-     "text": "~170 killed at a girls' school",
-     "color": "red",
-     "at": "170"
-    }
-   ],
-   "speak": "One strike hit a girls' school near Bandar Abbas. About a hundred and seventy people died."
+   "speak": "One strike hit a girls' school near Bandar Abbas. About a hundred and seventy people died.",
+   "text": "A girls' school: | about 170 killed",
+   "hl": [
+    "170"
+   ]
   },
   {
    "type": "kinetic",
@@ -328,19 +308,11 @@
    ]
   },
   {
-   "type": "snap",
-   "src": "media/iw-tehran-smoke-3.jpg",
+   "type": "kinetic",
    "say": "On day two, drones hit Dubai airport. Flights across the Gulf stopped.",
-   "frame": "full",
-   "marks": [
-    {
-     "kind": "label",
-     "x": 0.06,
-     "y": 0.2,
-     "text": "Day 2: Dubai airport hit",
-     "color": "red",
-     "at": "dubai"
-    }
+   "text": "Day 2: | Dubai airport hit",
+   "hl": [
+    "Dubai"
    ]
   },
   {

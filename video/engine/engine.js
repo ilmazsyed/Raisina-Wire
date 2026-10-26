@@ -839,8 +839,9 @@
       const sc = timing.scenes[i], u = t - sc.start, end = sc.start + sc.dur;
       const nextCut = i + 1 < built.length ? cutOf(i + 1) : 'cut', myCut = cutOf(i);
       const outLen = nextCut === 'cut' ? 0 : TR;
-      if (t < sc.start || t >= end + outLen) continue;
-      const entering = myCut !== 'cut' && u < TR, leaving = t >= end;
+      const last = i === built.length - 1;
+      if (t < sc.start || (t >= end + outLen && !last)) continue;
+      const entering = myCut !== 'cut' && u < TR, leaving = t >= end && !last;   // the last shot holds to the end
       if (!entering && !leaving) { sceneInto(i, t); continue; }
       sceneInto(i, t, LCTX);
       ctx.save();
