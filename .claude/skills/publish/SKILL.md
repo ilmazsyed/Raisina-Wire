@@ -147,8 +147,12 @@ that change. Unpublish: `{"status":"draft"}`. Archive: `{"status":"archived"}`. 
 Unpublish: `media-status <id> draft`.
 
 **Explainer video** (when the user asks for an explainer, video or Vox-style animation of a story):
-write a script for the engine in `video/` (read `video/README.md` for scene types), 60–120 seconds,
-8–12 scenes, facts only from the source, numbers as numerals in `say` with a spelt-out `speak`.
+write a script for the engine in `video/` (read `video/README.md`), facts only from the source, numbers
+as numerals in `say` with a spelt-out `speak`. Always use `"style": "vox"` (the editor's house style):
+one Indian-English female narrator, one sentence per shot (2–5 seconds; a 3-minute film is about 45–55
+shots, a 1-minute short about 15–18), a hook in the first 5 seconds, kinetic type for key lines, photos
+as `snap` clippings with hand-drawn `marks` on what the narrator names, `number`/`versus` for figures,
+`doc` for quotes and documents, and varied cuts. Never leave a static card on screen for long.
 Show the script (scene list and narration) and get a go-ahead, then
 `npm run video -- video/scripts/<slug>.json`, check stills, and send the MP4s to the user to watch.
 The files ship with the site: commit `public/videos/<slug>-*` and the script on a branch, open a PR,
