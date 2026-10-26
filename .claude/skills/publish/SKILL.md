@@ -149,6 +149,10 @@ and once it is merged and deployed publish both cuts with `media`: the 16:9 cut 
 `video` (it joins the Explainers carousel on the homepage) and the 9:16 cut with `mediaType`
 `short` (a story bubble on the homepage and Vertical shorts on Watch). `mediaUrl` is
 `/videos/<slug>-16x9.mp4` (or `-9x16.mp4`) and `thumbnailUrl` the matching `.jpg`.
+Publish the 16:9 cut first and pass its id as `fullId` when publishing the short: when the short
+ends, the player shows a card that stays on screen, offering "Watch the full video". Link an existing
+short with `media-link <shortId> <fullId>`. A short may also be its own tighter 9:16 script (about 45–60
+seconds) instead of the full film in vertical; use its own `formats: ["9x16"]`.
 **Photos in explainers:** the user may send up to six photos for an explainer. Confirm they have the
 rights and what each one shows (for captions), save them in `video/scripts/media/`, and spread them
 through the film between the motion graphics. Use the clearest portrait as a `cutout` title (the
