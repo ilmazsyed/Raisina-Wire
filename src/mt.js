@@ -111,9 +111,9 @@ export async function translateFields(env, lang, items, fields, opts) {
 }
 
 // A story body (plain text: paragraphs, "# " headings, "- " or "1. " list lines), line by line.
-export async function translateBody(env, lang, body) {
+export async function translateBody(env, lang, body, opts) {
   const lines = String(body || "").split("\n");
   const parts = lines.map(l => l.match(/^(\s*(?:#{1,3}\s+|[-•*]\s+|\d+\.\s+)?)(.*)$/));
-  const res = await translateTexts(env, lang, parts.map(m => m[2]));
+  const res = await translateTexts(env, lang, parts.map(m => m[2]), opts);
   return parts.map((m, i) => m[1] + res[i]).join("\n");
 }

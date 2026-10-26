@@ -299,9 +299,9 @@ async function mtLive(env, lang, item, updates) {
   updates.forEach((u, i) => { if (bodies[i] !== u.body) { u.body = bodies[i]; u.mt = true; } });
 }
 // Stories without an editor's translation: machine-translated, and marked so the reader says so.
-async function mtArticles(env, lang, list) {
+async function mtArticles(env, lang, list, opts) {
   if (!list.length || !mtReady(env)) return;
-  await translateFields(env, lang, list, ["title", "dek", "topic", "heroCaption"]);
+  await translateFields(env, lang, list, ["title", "dek", "topic", "heroCaption"], opts);
   for (const a of list) {
     if (a.body !== undefined) { const b = await translateBody(env, lang, a.body); if (b !== a.body) { a.body = b; a.mt = true; } }
     if (a.mt) { a.lang = lang; a.machine = true; }
@@ -631,7 +631,13 @@ async function api(request, env, ctx) {
     const list = await listPublished(env, { writerKey: WRITERS.some(x => x.key === w) ? w : null, tag: url.searchParams.get("tag"), limit: 300 });
     const lang = reqLang(url);
     const out = await localiseArticles(env, lang, list);
-    if (lang) await mtArticles(env, lang, out.filter(a => a.lang === "en"));
+    // Readers get what is already translated at once; new stories are translated in the
+    // background (and by the cron) and switch over on the next refresh.
+    if (lang) {
+      const todo = out.filter(a => a.lang === "en");
+      ctx.waitUntil(mtArticles(env, lang, todo.map(a => ({ ...a }))).catch(() => {}));
+      await mtArticles(env, lang, todo, { cacheOnly: true });
+    }
     return json({ articles: out.map(hideSource) });
   }
   if (url.pathname === "/api/tags" && request.method === "GET") {
@@ -645,8 +651,15 @@ async function api(request, env, ctx) {
     if (!isPublic(a) && !isStaff(await currentUser(request, env))) return err("Article not found.", 404);
     const lang = reqLang(url);
     const [localised] = await localiseArticles(env, lang, [a]);
-    if (lang && localised.lang === "en") await mtArticles(env, lang, [localised]);
-    return json({ article: hideSource(localised) }, 200, { "cache-control": isPublic(a) ? "no-cache" : "no-store" });
+    let article = localised;
+    if (lang && localised.lang === "en" && mtReady(env)) {
+      // A few seconds to translate a story nobody has opened in this language yet; if it takes
+      // longer the English is shown (marked) and the translation finishes in the background.
+      const copy = { ...localised }, job = mtArticles(env, lang, [copy]);
+      ctx.waitUntil(job.catch(() => {}));
+      article = await Promise.race([job.then(() => copy, () => localised), new Promise(r => setTimeout(() => r(null), 4000))]) || { ...localised, translating: true };
+    }
+    return json({ article: hideSource(article) }, 200, { "cache-control": isPublic(a) ? "no-cache" : "no-store" });
   }
 
   // About and the legal pages in Hindi or Bengali (English when no current translation exists).

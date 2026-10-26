@@ -41,6 +41,7 @@ function sparkline(points = [], cls = "flat", w = 120, h = 26) {
 const ICON_X = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
 const ICON_CHECK = `<svg class="ck" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>`;
 const ICON_LOCK = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold-ink)" stroke-width="2" aria-hidden="true" style="flex-shrink:0;margin-top:2px"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`;
+const ICON_REFRESH = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v4.5h-4.5"/></svg>`;
 const ICON_INFO = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold-ink)" stroke-width="2" aria-hidden="true" style="flex-shrink:0;margin-top:2px"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>`;
 const img = (src, alt = "") => src ? `<img class="img-cover" src="${esc(src)}" alt="${esc(alt)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-hide-on-error>` : "";
 
@@ -189,7 +190,7 @@ function renderShell() {
   </div></div>
   <header class="wrap">
     <div class="utility">
-      <div class="utility-left"><span id="today"></span><span id="wireStatus"><span class="dot-ok"></span>Connecting to the live wire…</span></div>
+      <div class="utility-left"><span id="today"></span><span id="wireStatus"><span class="dot-ok"></span>Connecting to the live wire…</span><button class="fresh-btn" id="freshBtn" type="button" data-action="refresh-all" aria-label="Refresh the news">${ICON_REFRESH}<span id="freshText">Updated just now</span></button></div>
       <div class="utility-right">
         <details class="lang-menu" id="langMenu"><summary class="icon-btn lang-btn" aria-label="Language" title="Language">${ICON_GLOBE}<span lang="${lang}">${LANGUAGES[lang].short}</span></summary>
           <div class="lang-pop glass" id="langPop" data-no-tr role="menu">${languageLinks()}</div></details>
@@ -347,6 +348,8 @@ let routeSeq = 0;
 async function route({ restoreY = null } = {}) {
   const r = parseRoute(), seq = ++routeSeq;
   endRead();
+  if (state.pendingArticles) { state.articles = state.pendingArticles; state.pendingArticles = null; }
+  hideNewPill();
   if (restoreY === null) jump(0);
   document.title = DEFAULT_TITLE;
   renderNav(r);
@@ -391,7 +394,7 @@ function watchScroll() {
 const edHref = e => e.href || `/edition/${e.slug}`;
 const wireHref = i => `/read?u=${encodeURIComponent(i.url)}`;
 function edCard(e, { dek = false } = {}) {
-  return `<a class="ed-card glass" href="${edHref(e)}"><div class="thumb">${img(e.image)}</div><span class="body"><span class="kicker">${esc(e.topic)}</span><h3>${esc(e.title)}</h3>${dek ? `<p>${esc(e.dek)}</p>` : ""}<span class="meta">${esc(e.author || AUTHOR.name)} · ${shortDate(e.date)} · ${e.readMinutes} min</span></span></a>`;
+  return `<a class="ed-card glass" href="${edHref(e)}"><div class="thumb">${img(e.image)}</div><span class="body"><span class="kicker">${newTag(e)}${esc(e.topic)}</span><h3>${esc(e.title)}</h3>${dek ? `<p>${esc(e.dek)}</p>` : ""}<span class="meta">${esc(e.author || AUTHOR.name)} · ${shortDate(e.date)} · ${e.readMinutes} min</span></span></a>`;
 }
 function marketRow(q) {
   const ch = quoteChange(q);
@@ -417,7 +420,7 @@ function viewHome() {
 
     <div class="lead-grid">
       <section class="side-stack" aria-label="More from Raisina Wire"><div class="kicker">Raisina Wire · Newest</div>
-        ${rest.slice(0, 3).map(e => `<a class="side-item" href="${edHref(e)}"><div class="thumb">${img(e.image)}</div><span class="kicker">${esc(e.topic)}</span><h3>${esc(e.title)}</h3><span class="meta">${esc(e.author)} · ${shortDate(e.date)}</span></a>`).join("")}
+        ${rest.slice(0, 3).map(e => `<a class="side-item" href="${edHref(e)}"><div class="thumb">${img(e.image)}</div><span class="kicker">${newTag(e)}${esc(e.topic)}</span><h3>${esc(e.title)}</h3><span class="meta">${esc(e.author)} · ${shortDate(e.date)}</span></a>`).join("")}
       </section>
       <article class="hero">${img(lead.image, "")}
         <div class="hero-card glass">
@@ -557,7 +560,7 @@ function renderCommunity() {
 /* ---------- Editions ---------- */
 function viewEditions() {
   $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Raisina Wire</div><h1>Every story</h1><p>Editions and analysis from ${WRITERS.map(w => `<a href="/author/${w.key}">${esc(w.name)}</a>`).join(" and ")}, newest first. Every story reads in full here; editions link to the original on LinkedIn.</p></div><a class="btn btn-light" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Subscribe on LinkedIn ↗</a></div>
-  <div class="archive-grid">${stories().map(e => edCard(e, { dek: true })).join("")}</div></div>`;
+  <div class="archive-grid">${(() => { const list = stories(), cut = list.findIndex(e => !isNewStory(e)); return list.map((e, i) => (i === cut && cut > 0 ? `<div class="caught-up"><span>You’re up to date</span><small>Stories you may have seen</small></div>` : "") + edCard(e, { dek: true })).join(""); })()}</div></div>`;
 }
 
 let bodiesPromise;
@@ -660,6 +663,7 @@ function translationNote(a, original) {
   if (lang === "en") return "";
   const here = withLang(a.href || location.pathname);
   if (original) return `<p class="tr-note" lang="${LOCALE}">${tr("You are reading the English original.")} <a href="${here}">${tr(lang === "hi" ? "Read this story in Hindi" : "Read this story in Bengali")}</a></p>`;
+  if (a.translating) return `<p class="tr-note" lang="${LOCALE}">${tr(lang === "hi" ? "The Hindi version of this story is being prepared. Here it is in English for now." : "The Bengali version of this story is being prepared. Here it is in English for now.")}</p>`;
   if (a.lang === lang) return `<p class="tr-note" lang="${LOCALE}">${tr(a.machine ? "Translated automatically from English" : "Translated from English")} · <a href="${here}?orig=1">${tr("Read the English original")}</a></p>`;
   return `<p class="tr-note" lang="${LOCALE}">${tr(lang === "hi" ? "This story is not available in Hindi yet. Here it is in English." : "This story is not available in Bengali yet. Here it is in English.")}</p>`;
 }
@@ -976,6 +980,8 @@ function unreadAlerts() { const seen = store.get("rw-alerts-seen", 0); return (s
 function renderAlertsPanel() {
   const n = unreadAlerts();
   $$(".icon-btn[data-action=alerts]").forEach(b => { b.dataset.count = n > 9 ? "9+" : n || ""; b.setAttribute("aria-label", n ? `Alerts, ${n} new` : "Alerts"); });
+  // The unread count on the home-screen icon of the installed app, where the phone supports it.
+  try { (n ? navigator.setAppBadge?.(n) : navigator.clearAppBadge?.())?.catch?.(() => {}); } catch { /* not supported */ }
   const panel = $("#alertsPanel"); if (!panel || panel.hidden) return;
   const device = state.pushOn ? ""
     : `<div class="ap-device"><span><b>Get these on your ${isIOS() || /Android/i.test(navigator.userAgent) ? "phone" : "device"}</b><small>${pushSupported() ? "One tap to allow notifications." : isIOS() && !isStandalone() ? "Add Raisina Wire to your Home Screen first." : "This browser can’t show notifications."}</small></span><button class="btn btn-red btn-sm" type="button" data-action="alerts-on">Turn on</button></div>`;
@@ -1178,6 +1184,13 @@ async function onAction(e) {
   if (a === "text-smaller") setTextScale(-0.1);
   if (a === "text-larger") setTextScale(0.1);
   if (a === "save") { try { saveForLater(JSON.parse(el.dataset.item)); } catch { /* malformed */ } }
+  if (a === "refresh-all") { e.preventDefault(); refreshAll(); }
+  if (a === "apply-new") {
+    e.preventDefault(); hideNewPill();
+    if (state.pendingArticles) { state.articles = state.pendingArticles; state.pendingArticles = null; }
+    rerenderStories(); scrollTo({ top: 0, behavior: "smooth" });
+  }
+  if (a === "dismiss-new") { e.preventDefault(); hideNewPill(); }
   if (a === "share-native") {
     e.preventDefault();
     await shareOut(el.dataset.title, el.dataset.url);
@@ -1236,7 +1249,10 @@ function renderTicker() {
 async function loadCoverage() {
   try {
     const d = await fetch(`/api/live${lang !== "en" ? `?lang=${lang}` : ""}`).then(r => r.ok ? r.json() : { items: [] });
+    const before = state.coverage && new Set(state.coverage.map(c => c.id));
     state.coverage = d.items || [];
+    const started = before ? state.coverage.filter(c => !before.has(c.id)) : [];
+    if (started.length) { state.newLive = started[0]; showNewPill(); }
     state.coverageLead = state.coverage[0] ? await fetch(`/api/live/${encodeURIComponent(state.coverage[0].slug)}${lang !== "en" ? `?lang=${lang}` : ""}`).then(r => r.ok ? r.json() : null) : null;
     if (state.coverageLead?.item?.hasResults) state.coverageLead.results = await fetch(`/api/live/${encodeURIComponent(state.coverageLead.item.slug)}/results`).then(r => r.ok ? r.json() : null).catch(() => null);
   } catch { state.coverage = []; state.coverageLead = null; }
@@ -1376,12 +1392,24 @@ function stories() {
 // Guest writers come from the control room; bylines wait briefly for them.
 const writersReady = fetch("/api/writers").then(r => r.ok ? r.json() : null).then(d => { if (d?.writers) setGuestWriters(d.writers.filter(w => w.guest)); }).catch(() => {});
 let articlesSettled = false;
-async function loadArticles() {
-  try { const r = await fetch(`/api/articles${lang !== "en" ? `?lang=${lang}` : ""}`); if (r.ok) state.articles = (await r.json()).articles || []; } catch { /* keep what we have */ }
+// Background refreshes never swap stories under the reader: new ones wait behind the "new
+// stories" pill (or the next page change); corrections to stories already shown apply quietly.
+async function loadArticles({ apply = false } = {}) {
+  let list = null;
+  try { const r = await fetch(`/api/articles${lang !== "en" ? `?lang=${lang}` : ""}`); if (r.ok) list = (await r.json()).articles || []; } catch { /* keep what we have */ }
   const first = !articlesSettled; articlesSettled = true;
-  if (first) return; // the first load is awaited by route() instead
-  const page = parseRoute().page; // refresh lists that show stories, without moving the reader
-  if (page === "home") viewHome(); else if (page === "editions") viewEditions(); else if (page === "author") viewAuthor(parseRoute());
+  if (list) markFresh();
+  if (first) { if (list) state.articles = list; return; } // the first load is awaited by route() instead
+  if (!list) return;
+  const known = new Set((state.articles || []).map(a => a.id));
+  const fresh = list.filter(a => !known.has(a.id) && !(state.dismissedNew || new Set()).has(a.id));
+  if (apply || !state.articles?.length) { state.articles = list; state.pendingArticles = null; rerenderStories(); return; }
+  if (fresh.length) { state.pendingArticles = list; showNewPill(); return; }
+  state.articles = list; // same stories, maybe newly translated: shown on the next page change
+}
+function rerenderStories() {
+  const r = parseRoute(); // refresh lists that show stories
+  if (r.page === "home") viewHome(); else if (r.page === "editions") viewEditions(); else if (r.page === "author") viewAuthor(r);
 }
 // Article text from the control room: blank lines separate paragraphs; "## " starts a heading;
 // "- " or "• " lines are bullets; "1. " lines are numbered points.
@@ -1730,7 +1758,7 @@ function renderSearchResults() {
 async function loadWire() {
   try {
     const r = await fetch(`/api/wire${lang !== "en" ? `?lang=${lang}` : ""}`); if (!r.ok) throw new Error();
-    state.wire = await r.json(); state.wireError = false;
+    state.wire = await r.json(); state.wireError = false; markFresh();
     state.wire.items.forEach(i => wireIndex.set(i.url, i));
     $("#wireStatus").innerHTML = r.headers.get("x-rw-offline")
       ? `<span class="dot-live"></span>Offline copy · live wire as of ${clock(state.wire.updatedAt)} IST`
@@ -1818,6 +1846,63 @@ async function submitLead(e) {
     const d = await r.json(); if (!r.ok) throw new Error(d.error || "Could not submit");
     msg.textContent = d.message || "Request received."; form.reset();
   } catch (err) { msg.textContent = err.message; }
+}
+/* ---------- Fresh news: the "new stories" pill, pull to refresh, "Updated … ago" ---------- */
+// Stories published since the reader's previous visit get a small "New" tag.
+const prevSeen = store.get("rw-seen-stories", 0); store.set("rw-seen-stories", Date.now());
+const isNewStory = e => prevSeen > 0 && Date.parse(e.publishedAt || e.date) > prevSeen;
+const newTag = e => isNewStory(e) ? `<span class="new-tag">New</span>` : "";
+function markFresh() { state.freshAt = Date.now(); renderFresh(); }
+function renderFresh() {
+  const el = $("#freshText"); if (!el || !state.freshAt) return;
+  const m = Math.floor((Date.now() - state.freshAt) / 60e3), at = clock(new Date(state.freshAt).toISOString());
+  const full = m < 1 ? "Updated just now" : m < 60 ? `Updated ${m} min ago` : `Updated at ${at}`;
+  // Phones have room for only a few characters next to the buttons.
+  el.textContent = matchMedia("(max-width: 760px)").matches ? (m < 1 ? "Now" : m < 60 ? `${m}m` : at) : full;
+  $("#freshBtn").title = tr(full);
+}
+function showNewPill() {
+  const known = new Set((state.articles || []).map(a => a.id));
+  const n = (state.pendingArticles || []).filter(a => !known.has(a.id)).length, live = state.newLive;
+  if (!n && !live) return;
+  let pill = $("#newPill");
+  if (!pill) {
+    pill = document.createElement("div"); pill.id = "newPill"; pill.className = "new-pill"; pill.setAttribute("role", "status");
+    document.body.append(pill);
+  }
+  const label = n ? (n === 1 ? "1 new story" : `${n} new stories`) : "Live coverage has started";
+  pill.innerHTML = `<button type="button" class="np-go" data-action="apply-new">${live ? `<span class="dot-live"></span>` : `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`}<span><b>${label}</b><small>Tap to refresh</small></span></button><button type="button" class="np-x" data-action="dismiss-new" aria-label="Dismiss">×</button>`;
+  pill.hidden = false; requestAnimationFrame(() => pill.classList.add("show"));
+  clearTimeout(showNewPill.timer); showNewPill.timer = setTimeout(hideNewPill, 60e3);
+}
+function hideNewPill() { const p = $("#newPill"); if (!p) return; p.classList.remove("show"); state.newLive = null; }
+async function refreshAll({ quiet = false } = {}) {
+  const btn = $("#freshBtn"); btn?.classList.add("spin");
+  await Promise.allSettled([loadArticles({ apply: true }), loadWire(), loadCoverage(), loadMarkets(), loadMedia(), loadAlerts()]);
+  btn?.classList.remove("spin");
+  if (!quiet) toast("You’re up to date.");
+}
+// The installed app has no browser pull-to-refresh, so it gets its own, with the Raisina dome.
+function pullToRefresh() {
+  if (!isStandaloneApp() || !("ontouchstart" in window)) return;
+  const el = document.createElement("div"); el.className = "ptr"; el.setAttribute("aria-hidden", "true"); el.innerHTML = brandMark("ptr-mark");
+  document.body.append(el);
+  let y0 = null, dy = 0, busy = false;
+  const pull = () => Math.min(dy * 0.5, 96);
+  const reset = () => { el.classList.remove("spin", "ready"); el.style.transform = ""; el.style.opacity = ""; };
+  addEventListener("touchstart", e => { if (busy || scrollY > 2 || e.touches.length > 1 || document.body.classList.contains("sv-open") || e.target.closest("dialog,.modal,.sheet,.alerts-panel")) return; y0 = e.touches[0].clientY; dy = 0; }, { passive: true });
+  addEventListener("touchmove", e => {
+    if (y0 == null) return;
+    dy = Math.max(0, e.touches[0].clientY - y0);
+    if (scrollY > 2) { y0 = null; reset(); return; }
+    el.style.transform = `translate(-50%, ${pull()}px) rotate(${dy * 1.6}deg)`; el.style.opacity = Math.min(1, pull() / 48); el.classList.toggle("ready", pull() >= 64);
+  }, { passive: true });
+  addEventListener("touchend", async () => {
+    if (y0 == null) return; y0 = null;
+    if (pull() < 64) return reset();
+    busy = true; el.classList.add("spin"); el.style.transform = "translate(-50%, 64px)";
+    await refreshAll(); busy = false; reset();
+  });
 }
 function toast(message) { const t = $("#toast"); t.textContent = message; t.classList.add("show"); clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove("show"), 3200); }
 
@@ -1924,5 +2009,13 @@ setInterval(() => { if (!document.hidden) loadArticles(); }, 5 * 60e3);
 fetch("/api/config").then(r => r.json()).then(c => { if (c.linkedinUrl) $("#linkedinLink").href = c.linkedinUrl; }).catch(() => {});
 setInterval(() => { if (!document.hidden) loadWire(); }, 120e3);
 setInterval(() => { if (!document.hidden) loadMarkets(); }, 60e3);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { loadWire(); loadMarkets(); } });
+// Back on screen after a while (a phone woken up, the app reopened): fetch the news at once.
+let hiddenAt = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  loadWire(); loadMarkets();
+  if (Date.now() - hiddenAt > 30e3) { loadArticles(); loadCoverage(); loadAlerts(); }
+});
+pullToRefresh();
+setInterval(renderFresh, 30e3);
 }
