@@ -18,8 +18,8 @@ film takes about 3 minutes per format on 4 CPUs.
 `engine/engine.html?preview&spec=../out/<slug>/spec.json&format=16x9`; click to play, drag to scrub.
 
 ## What keeps it moving
-- The camera never stops: every scene drifts and pushes in slowly, and punches in on each new
-  caption line, so the shot changes every two or three seconds.
+- The camera never stops: every scene pushes in slowly and smoothly, one way only. There are no
+  punches, pulses or wobbles, so the frame never throbs.
 - Items appear as the anchor reaches them: list points, flow boxes, timeline stops, stat cards,
   bars and map pins are spread across the narration, and the one being read is highlighted.
 - Quotes light up word by word as they are read; numbers burst when the count lands; maps fly
