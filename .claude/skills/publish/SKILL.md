@@ -156,6 +156,11 @@ and once it is merged and deployed publish both cuts with `media`: the 16:9 cut 
 `video` (it joins the Explainers carousel on the homepage) and the 9:16 cut with `mediaType`
 `short` (a story bubble on the homepage and Vertical shorts on Watch). `mediaUrl` is
 `/videos/<slug>-16x9.mp4` (or `-9x16.mp4`) and `thumbnailUrl` the matching `.jpg`.
+"Deployed" means the file loads as video: `curl -s -o /dev/null -w "%{content_type}" -r 0-10 https://raisinawire.calibrex.org/videos/<slug>-16x9.mp4`
+prints `video/mp4` (a missing file returns the site's HTML page with status 200). If it still isn't
+there 10 minutes after the merge, the Cloudflare build is stuck or was skipped: tell the user to retry
+the build of the latest `main` commit in Workers & Pages → raisina-wire → Deployments (retrying an
+older row rebuilds that older commit).
 Publish the 16:9 cut first and pass its id as `fullId` when publishing the short: when the short
 ends, the player shows a card that stays on screen, offering "Watch the full video". Link an existing
 short with `media-link <shortId> <fullId>`. A short may also be its own tighter 9:16 script (about 45–60
