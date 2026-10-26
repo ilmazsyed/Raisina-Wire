@@ -578,5 +578,7 @@ export default {
   "New": "নতুন",
   "The Hindi version of this story is being prepared. Here it is in English for now.": "এই খবরের হিন্দি সংস্করণ তৈরি হচ্ছে। আপাতত ইংরেজিতে পড়ুন।",
   "The Bengali version of this story is being prepared. Here it is in English for now.": "এই খবরের বাংলা সংস্করণ তৈরি হচ্ছে। আপাতত ইংরেজিতে পড়ুন।",
-  "Now": "এইমাত্র",
+  "Now": "এখন",
+  "Live coverage started": "লাইভ কভারেজ শুরু",
+  "Refresh": "রিফ্রেশ",
 };

@@ -580,4 +580,6 @@ export default {
   "The Hindi version of this story is being prepared. Here it is in English for now.": "इस खबर का हिन्दी संस्करण तैयार हो रहा है। फिलहाल इसे अंग्रेजी में पढ़ें।",
   "The Bengali version of this story is being prepared. Here it is in English for now.": "इस खबर का बांग्ला संस्करण तैयार हो रहा है। फिलहाल इसे अंग्रेजी में पढ़ें।",
   "Now": "अभी",
+  "Live coverage started": "लाइव कवरेज शुरू",
+  "Refresh": "रिफ्रेश",
 };

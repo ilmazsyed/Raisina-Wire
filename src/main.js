@@ -1870,8 +1870,8 @@ function showNewPill() {
     pill = document.createElement("div"); pill.id = "newPill"; pill.className = "new-pill"; pill.setAttribute("role", "status");
     document.body.append(pill);
   }
-  const label = n ? (n === 1 ? "1 new story" : `${n} new stories`) : "Live coverage has started";
-  pill.innerHTML = `<button type="button" class="np-go" data-action="apply-new">${live ? `<span class="dot-live"></span>` : `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`}<span><b>${label}</b><small>Tap to refresh</small></span></button><button type="button" class="np-x" data-action="dismiss-new" aria-label="Dismiss">×</button>`;
+  const label = n ? (n === 1 ? "1 new story" : `${n} new stories`) : "Live coverage started";
+  pill.innerHTML = `<button type="button" class="np-go" data-action="apply-new">${live && !n ? `<span class="dot-live"></span>` : `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`}<span><b>${label}</b><small>Refresh</small></span></button><button type="button" class="np-x" data-action="dismiss-new" aria-label="Dismiss">×</button>`;
   pill.hidden = false; requestAnimationFrame(() => pill.classList.add("show"));
   clearTimeout(showNewPill.timer); showNewPill.timer = setTimeout(hideNewPill, 60e3);
 }
