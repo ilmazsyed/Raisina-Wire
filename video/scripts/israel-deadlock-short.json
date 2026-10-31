@@ -1,0 +1,183 @@
+{
+ "slug": "israel-deadlock-short",
+ "title": "Israel's deadlock in 60 seconds",
+ "series": "Explained",
+ "style": "vox",
+ "formats": [
+  "9x16"
+ ],
+ "captionChars": 30,
+ "scenes": [
+  {
+   "type": "snap",
+   "src": "media/il-ballot.jpg",
+   "frame": "full",
+   "say": "Israel voted. Nobody won."
+  },
+  {
+   "type": "cutout",
+   "src": "media/il-netanyahu-hand.jpg",
+   "kicker": "In 60 seconds",
+   "title": "Israel's deadlock",
+   "say": "Here's what it means for India, in 60 seconds.",
+   "speak": "Here's what it means for India, in sixty seconds."
+  },
+  {
+   "type": "number",
+   "say": "You need 61 of 120 seats to govern.",
+   "value": 61,
+   "suffix": " / 120",
+   "label": "Seats for a majority",
+   "speak": "You need sixty-one of a hundred and twenty seats to govern.",
+   "cut": "zoom",
+   "bg": "media/il-seat-chart-bg.jpg"
+  },
+  {
+   "type": "bars",
+   "say": "Netanyahu's bloc won 53. The opposition, 48. Arab-led parties, a record 19.",
+   "title": "Nobody reaches 61",
+   "items": [
+    {
+     "label": "Netanyahu bloc",
+     "value": 53,
+     "hot": true
+    },
+    {
+     "label": "Opposition",
+     "value": 48
+    },
+    {
+     "label": "Arab-led parties",
+     "value": 19
+    }
+   ],
+   "max": 61,
+   "speak": "Netanyahu's bloc won fifty-three. The opposition, forty-eight. Arab-led parties, a record nineteen.",
+   "bg": "media/il-seat-chart-bg.jpg"
+  },
+  {
+   "type": "versus",
+   "say": "His bloc fell from 68 seats.",
+   "a": {
+    "value": 68,
+    "label": "Before"
+   },
+   "b": {
+    "value": 53,
+    "label": "Now"
+   },
+   "at": "68",
+   "speak": "His bloc fell from sixty-eight seats."
+  },
+  {
+   "type": "kinetic",
+   "say": "Opposition plus Arab parties makes 67. But key leaders refuse to rely on Arab parties.",
+   "text": "48 + 19 = 67 | but…",
+   "hl": [
+    "67"
+   ],
+   "speak": "Opposition plus Arab parties makes sixty-seven. But key leaders refuse to rely on Arab parties."
+  },
+  {
+   "type": "list",
+   "say": "So: Netanyahu tries first, a unity deal, defections, or another election.",
+   "title": "Four ways out",
+   "items": [
+    "Netanyahu tries first",
+    "Unity government",
+    "Defections",
+    "Another election"
+   ],
+   "cut": "whip"
+  },
+  {
+   "type": "snap",
+   "src": "media/il-netanyahu-whisper.jpg",
+   "frame": "full",
+   "marks": [
+    {
+     "kind": "label",
+     "x": 0.08,
+     "y": 0.15,
+     "text": "Weaker. Not finished.",
+     "color": "red",
+     "at": "weaker."
+    }
+   ],
+   "say": "Netanyahu is weaker. Not finished."
+  },
+  {
+   "type": "kinetic",
+   "say": "As caretaker, he still makes the security calls on Iran.",
+   "text": "He still makes | the Iran calls",
+   "hl": [
+    "Iran"
+   ],
+   "para": true,
+   "bg": "media/il-posters.jpg"
+  },
+  {
+   "type": "snap",
+   "src": "media/il-eisenkot-rally.jpg",
+   "frame": "full",
+   "marks": [
+    {
+     "kind": "circle",
+     "x": 0.47,
+     "y": 0.43,
+     "r": 0.1,
+     "at": "eisenkot,"
+    }
+   ],
+   "say": "And his rival, ex-army chief Gadi Eisenkot, is just as hard on Iran and Hamas."
+  },
+  {
+   "type": "kinetic",
+   "say": "Why India cares: ties now run from drones to AI, water and space.",
+   "text": "Drones. AI. | Water. Space.",
+   "hl": [
+    "AI."
+   ],
+   "para": true
+  },
+  {
+   "type": "doc",
+   "say": "In February 2026, they became a Special Strategic Partnership.",
+   "kicker": "February 2026",
+   "text": "Special Strategic Partnership for Peace, Innovation and Prosperity",
+   "hl": "Special Strategic Partnership",
+   "speak": "In February twenty twenty-six, they became a Special Strategic Partnership."
+  },
+  {
+   "type": "kinetic",
+   "say": "A new face won't undo that.",
+   "text": "A new face | won't undo it",
+   "hl": [
+    "won't"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "But a new Israel-Iran war would hit India's oil, fast.",
+   "text": "War with Iran = | an oil shock for India",
+   "hl": [
+    "oil",
+    "shock"
+   ],
+   "cut": "zoom"
+  },
+  {
+   "type": "kinetic",
+   "say": "So India walks two tracks: close to Israel, open to the Arabs and Iran.",
+   "text": "Two tracks",
+   "hl": [
+    "Two"
+   ]
+  },
+  {
+   "type": "outro",
+   "say": "Watch the full explainer on Raisina Wire.",
+   "title": "Watch the full explainer"
+  }
+ ]
+}
