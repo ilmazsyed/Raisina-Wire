@@ -1292,7 +1292,7 @@ function liveTile(lead) {
     <span class="lb-body">
       <span class="lb-meta">Live coverage · ${lead.updates.length} update${lead.updates.length === 1 ? "" : "s"}${latest ? ` · ${ago(latest.createdAt)}` : ""}</span>
       <span class="lb-title">${esc(lead.item.title)}</span>
-      ${race || (latest ? `<span class="lb-latest"><time>${clock(latest.createdAt)}</time>${esc(latest.body)}</span>` : "")}
+      ${race || (latest ? `<span class="lb-latest"><time>${clock(latest.createdAt)}</time>${esc(String(latest.body).replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/\*\*|__|`|^#+\s*/gm, ""))}</span>` : "")}
     </span>
     <span class="lb-go">Follow live <span aria-hidden="true">→</span></span></a>`;
 }
