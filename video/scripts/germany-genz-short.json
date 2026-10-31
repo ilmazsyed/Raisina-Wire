@@ -1,0 +1,25 @@
+{
+ "slug": "germany-genz-short",
+ "title": "Germany's Gen Z protests in 60 seconds",
+ "series": "Explained",
+ "style": "vox",
+ "formats": ["9x16"],
+ "captionChars": 30,
+ "scenes": [
+  {"type": "snap", "src": "media/gz-sign.jpg", "frame": "full", "say": "Don't spend on war. Spend on people.", "marks": [{"kind": "circle", "x": 0.2, "y": 0.72, "r": 0.16, "at": "people."}]},
+  {"type": "cutout", "src": "media/gz-sign.jpg", "kicker": "In 60 seconds", "title": "Germany's Gen Z revolt", "say": "Germany's Gen Z protests, in 60 seconds.", "speak": "Germany's Gen Z protests, in sixty seconds."},
+  {"type": "number", "say": "31 October: rallies planned in 34 cities.", "value": 34, "label": "Cities with rallies", "bg": "media/gz-reichstag-snow.jpg", "speak": "The thirty-first of October: rallies planned in thirty-four cities.", "cut": "zoom"},
+  {"type": "versus", "say": "In Berlin, police count 5,000. Organisers claim up to 11,000.", "a": {"value": 5000, "inr": true, "label": "Police"}, "b": {"value": 11000, "inr": true, "label": "Organisers"}, "at": "organisers", "speak": "In Berlin, police count five thousand. Organisers claim up to eleven thousand."},
+  {"type": "list", "say": "Their demands: money for schools, affordable living, and no compulsory military service.", "title": "The demands", "items": ["Money for schools", "Affordable living", "No compulsory service"], "cut": "whip"},
+  {"type": "doc", "say": "One placard: flunked the PISA test, passed the military medical.", "kicker": "On a placard", "text": "Flunked the PISA test but passed the military medical", "hl": "passed the military medical", "speak": "One placard: flunked the pisa test, passed the military medical."},
+  {"type": "kinetic", "say": "Germany is rearming, and its economy is struggling to grow.", "text": "Rearming. | Not growing.", "hl": ["Rearming."], "para": true},
+  {"type": "kinetic", "say": "But officials warn extremists are trying to hijack the movement.", "text": "Hijacked?", "hl": ["Hijacked?"], "bg": "media/gz-gate-flags.jpg"},
+  {"type": "kinetic", "say": "Berlin readies 1,500 police. Shops board up.", "text": "1,500 police. | Shops boarded.", "hl": ["1,500"], "speak": "Berlin readies fifteen hundred police. Shops board up."},
+  {"type": "photo", "src": "media/gz-gate-crowd.jpg", "style": "duotone", "title": "Peaceful in Berlin", "say": "Berlin stays peaceful through the afternoon."},
+  {"type": "kinetic", "say": "In Cologne, police call off the march.", "text": "Cologne: | called off", "hl": ["off"], "cut": "zoom"},
+  {"type": "kinetic", "say": "Organisers insist: we want to fight peacefully.", "text": "\"We want to fight | peacefully\"", "hl": ["peacefully\""]},
+  {"type": "kinetic", "say": "From Serbia to France, it's a European wave.", "text": "A European | wave", "hl": ["wave"], "para": true},
+  {"type": "kinetic", "say": "And as Europe rearms, the generation asked to serve is pushing back.", "text": "The generation | asked to serve", "hl": ["serve"]},
+  {"type": "outro", "say": "Watch the full explainer on Raisina Wire.", "title": "Watch the full explainer"}
+ ]
+}

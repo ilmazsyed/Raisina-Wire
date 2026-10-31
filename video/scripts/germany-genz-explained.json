@@ -1,0 +1,513 @@
+{
+ "slug": "germany-genz-explained",
+ "title": "Germany's Gen Z protests, explained",
+ "series": "Explained",
+ "style": "vox",
+ "formats": [
+  "16x9"
+ ],
+ "captionChars": 40,
+ "scenes": [
+  {
+   "type": "snap",
+   "src": "media/gz-sign.jpg",
+   "frame": "full",
+   "say": "Don't spend on war. Spend on people.",
+   "marks": [
+    {
+     "kind": "underline",
+     "x": 0.04,
+     "y": 0.86,
+     "w": 0.3,
+     "at": "people."
+    }
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "That's the message from Germany's youngest voters.",
+   "text": "Germany's | youngest voters",
+   "hl": [
+    "youngest"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "And it's landing just as Berlin rearms.",
+   "text": "Just as | Berlin rearms",
+   "hl": [
+    "rearms"
+   ],
+   "cut": "zoom"
+  },
+  {
+   "type": "cutout",
+   "src": "media/gz-sign.jpg",
+   "kicker": "Explained",
+   "title": "Germany's Gen Z revolt",
+   "say": "So who are they, what do they want, and why does it matter?"
+  },
+  {
+   "type": "kinetic",
+   "say": "31 October. Halloween.",
+   "text": "31 October",
+   "kicker": "Saturday",
+   "speak": "The thirty-first of October. Halloween.",
+   "para": true
+  },
+  {
+   "type": "photo",
+   "src": "media/gz-reichstag-nein.jpg",
+   "style": "duotone",
+   "title": "Young Germans take to the streets",
+   "say": "Young Germans take to the streets."
+  },
+  {
+   "type": "map",
+   "say": "Rallies are planned in 34 cities, from Berlin to Frankfurt and Munich.",
+   "kicker": "Gen Z regelt",
+   "title": "34 cities",
+   "view": [
+    4,
+    16,
+    46.5,
+    55.5
+   ],
+   "pins": [
+    {
+     "lon": 13.4,
+     "lat": 52.5,
+     "label": "Berlin"
+    },
+    {
+     "lon": 8.7,
+     "lat": 50.1,
+     "label": "Frankfurt",
+     "side": "left"
+    },
+    {
+     "lon": 11.6,
+     "lat": 48.1,
+     "label": "Munich"
+    },
+    {
+     "lon": 6.96,
+     "lat": 50.94,
+     "label": "Cologne",
+     "side": "left"
+    }
+   ],
+   "speak": "Rallies are planned in thirty-four cities, from Berlin to Frankfurt and Munich.",
+   "cut": "whip"
+  },
+  {
+   "type": "number",
+   "say": "Organisers say more than 1,60,000 people are expected.",
+   "value": 160000,
+   "inr": true,
+   "suffix": "+",
+   "label": "Expected, say organisers",
+   "bg": "media/gz-reichstag-snow.jpg",
+   "speak": "Organisers say more than one lakh sixty thousand people are expected."
+  },
+  {
+   "type": "kinetic",
+   "say": "The group behind it: Gen Z regelt. Roughly, Gen Z takes charge.",
+   "text": "Gen Z regelt | = Gen Z takes charge",
+   "hl": [
+    "takes",
+    "charge"
+   ],
+   "speak": "The group behind it: Gen Z regelt. Roughly, Gen Z takes charge."
+  },
+  {
+   "type": "photo",
+   "src": "media/gz-gate-crowd.jpg",
+   "style": "parallax",
+   "title": "The Brandenburg Gate",
+   "say": "In Berlin, crowds gather at the Brandenburg Gate.",
+   "para": true
+  },
+  {
+   "type": "versus",
+   "say": "Police count about 5,000. Organisers claim up to 11,000.",
+   "a": {
+    "value": 5000,
+    "inr": true,
+    "label": "Police estimate"
+   },
+   "b": {
+    "value": 11000,
+    "inr": true,
+    "label": "Organisers' claim"
+   },
+   "at": "organisers",
+   "kicker": "Berlin crowd",
+   "speak": "Police count about five thousand. Organisers claim up to eleven thousand."
+  },
+  {
+   "type": "kinetic",
+   "say": "So what do they want?",
+   "text": "What do | they want?",
+   "hl": [
+    "want?"
+   ],
+   "para": true,
+   "cut": "zoom"
+  },
+  {
+   "type": "list",
+   "say": "More money for schools and climate. Affordable living. And no compulsory military service.",
+   "kicker": "The demands",
+   "title": "Three asks",
+   "items": [
+    "Money for schools and climate",
+    "Affordable living costs",
+    "No compulsory military service"
+   ]
+  },
+  {
+   "type": "doc",
+   "say": "One placard: flunked the PISA test, but passed the military medical.",
+   "kicker": "On a placard",
+   "text": "Flunked the PISA test but passed the military medical",
+   "hl": "passed the military medical",
+   "speak": "One placard: flunked the pisa test, but passed the military medical."
+  },
+  {
+   "type": "doc",
+   "say": "Another: money for social causes instead of war.",
+   "kicker": "On a placard",
+   "text": "Money for social causes instead of war",
+   "hl": "instead of war"
+  },
+  {
+   "type": "quote",
+   "say": "An 18-year-old in Munich, addressing Chancellor Friedrich Merz: the government offers nothing but cuts.",
+   "text": "The government has offered no response to our concerns other than to continue making cuts.",
+   "who": "Steve, 18",
+   "role": "Due to speak at a Munich rally",
+   "bg": "media/gz-reichstag-nein.jpg",
+   "speak": "An eighteen-year-old in Munich, addressing Chancellor Friedrich Merz: the government offers nothing but cuts."
+  },
+  {
+   "type": "kinetic",
+   "say": "We will keep assembling, he says, until you stop ignoring us.",
+   "text": "Until you stop | ignoring us",
+   "hl": [
+    "ignoring"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Why now? Germany is struggling to grow.",
+   "text": "Why now?",
+   "hl": [
+    "now?"
+   ],
+   "para": true
+  },
+  {
+   "type": "flow",
+   "say": "Baby boomers retire. The workforce shrinks. Pensions and services come under strain.",
+   "kicker": "The squeeze",
+   "title": "An ageing economy",
+   "nodes": [
+    "Boomers retire",
+    "Workforce shrinks",
+    "Pensions strained"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "And the money is heading to the army.",
+   "text": "The money goes | to the army",
+   "hl": [
+    "army"
+   ],
+   "cut": "whip"
+  },
+  {
+   "type": "kinetic",
+   "say": "With a debate on bringing back mandatory service.",
+   "text": "Mandatory | service?",
+   "hl": [
+    "service?"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "But the protests come with a warning.",
+   "text": "A warning",
+   "hl": [
+    "warning"
+   ],
+   "kicker": "Part two",
+   "para": true
+  },
+  {
+   "type": "doc",
+   "say": "The interior ministry says parts of the far-left extremist scene joined the mobilisation.",
+   "kicker": "Federal interior ministry",
+   "text": "Parts of the far-left extremist scene and groups linked to foreign extremist movements have joined efforts to mobilise support.",
+   "hl": "far-left extremist scene",
+   "source": "Federal interior ministry"
+  },
+  {
+   "type": "kinetic",
+   "say": "So do some groups linked to foreign extremist movements.",
+   "text": "Foreign extremist | links",
+   "hl": [
+    "Foreign"
+   ]
+  },
+  {
+   "type": "number",
+   "say": "Berlin readies about 1,500 police officers.",
+   "value": 1500,
+   "inr": true,
+   "label": "Police officers in Berlin",
+   "bg": "media/gz-gate-flags.jpg",
+   "speak": "Berlin readies about fifteen hundred police officers."
+  },
+  {
+   "type": "kinetic",
+   "say": "Shops on the Kurfürstendamm board up their windows.",
+   "text": "Shops | boarded up",
+   "hl": [
+    "boarded"
+   ],
+   "speak": "Shops on the Kurfürstendamm board up their windows."
+  },
+  {
+   "type": "quote",
+   "say": "Hesse's interior minister recalls France: looting, burning houses, attacks on police.",
+   "text": "We all have those images from France in our minds - looting, burning houses, burning police vehicles.",
+   "who": "Roman Poseck",
+   "role": "Interior minister, Hesse"
+  },
+  {
+   "type": "kinetic",
+   "say": "France, he says, must not be a model.",
+   "text": "France must not | be a model",
+   "hl": [
+    "not"
+   ],
+   "cut": "zoom"
+  },
+  {
+   "type": "doc",
+   "say": "Berlin warns extremists want to recast it as a fight against democracy itself.",
+   "kicker": "Berlin interior department",
+   "text": "Legitimate civil society protest is thereby supposed to be reinterpreted as a struggle against the rule of law and liberal democracy.",
+   "hl": "struggle against the rule of law"
+  },
+  {
+   "type": "kinetic",
+   "say": "So, on the day, what happened?",
+   "text": "On the day",
+   "hl": [
+    "day"
+   ],
+   "para": true
+  },
+  {
+   "type": "kinetic",
+   "say": "At the Brandenburg Gate, it stays peaceful through the afternoon.",
+   "text": "Berlin: | peaceful",
+   "hl": [
+    "peaceful"
+   ],
+   "bg": "media/gz-gate-crowd.jpg"
+  },
+  {
+   "type": "kinetic",
+   "say": "In Cologne, police call off the march after masked participants set off pyrotechnics.",
+   "text": "Cologne: | march called off",
+   "hl": [
+    "called",
+    "off"
+   ],
+   "cut": "whip"
+  },
+  {
+   "type": "kinetic",
+   "say": "And an evening march in Berlin is disowned by the organisers.",
+   "text": "An evening march, | disowned",
+   "hl": [
+    "disowned"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Who's really behind it? That's contested too.",
+   "text": "Who leads it?",
+   "hl": [
+    "leads"
+   ],
+   "kicker": "Part three",
+   "para": true
+  },
+  {
+   "type": "kinetic",
+   "say": "The former spokesperson quit, doubting it would stay peaceful.",
+   "text": "Spokesperson | quits",
+   "hl": [
+    "quits"
+   ]
+  },
+  {
+   "type": "doc",
+   "say": "The national school-student body keeps its distance, and plans its own protest on 20 November.",
+   "kicker": "BSK, school-student body",
+   "text": "We are distancing ourselves from 'Gen Z regelt,' but not from the students themselves, who have legitimate concerns.",
+   "hl": "legitimate concerns",
+   "source": "Amy Kirchhoff, secretary-general",
+   "speak": "The national school-student body keeps its distance, and plans its own protest on the twentieth of November."
+  },
+  {
+   "type": "quote",
+   "say": "A 16-year-old co-organiser: we want to fight peacefully for our cause.",
+   "text": "We want to fight peacefully for our cause.",
+   "who": "Konrad Schmitz, 16",
+   "role": "Co-organiser, Wuppertal",
+   "speak": "A sixteen-year-old co-organiser: we want to fight peacefully for our cause."
+  },
+  {
+   "type": "quote",
+   "say": "Co-founder Akram Selo, 18: they think we want to copy the French.",
+   "text": "They think we want to copy the French; they think we want to destroy the country.",
+   "who": "Akram Selo, 18",
+   "role": "Co-founder, Gen Z regelt",
+   "speak": "Co-founder Akram Selo, eighteen: they think we want to copy the French."
+  },
+  {
+   "type": "kinetic",
+   "say": "Germany isn't alone.",
+   "text": "Not alone",
+   "hl": [
+    "alone"
+   ],
+   "kicker": "Part four",
+   "para": true
+  },
+  {
+   "type": "map",
+   "say": "In Serbia, students helped unseat a long-time leader at the ballot box. In France, protests turned to riots.",
+   "kicker": "A European wave",
+   "title": "Gen Z protests, 2026",
+   "view": [
+    -10,
+    25,
+    36,
+    56
+   ],
+   "pins": [
+    {
+     "lon": 20.5,
+     "lat": 44.8,
+     "label": "Serbia"
+    },
+    {
+     "lon": 2.35,
+     "lat": 48.86,
+     "label": "France",
+     "side": "left"
+    },
+    {
+     "lon": 13.4,
+     "lat": 52.5,
+     "label": "Germany"
+    }
+   ]
+  },
+  {
+   "type": "list",
+   "say": "On the same Saturday, rallies are reported in the Netherlands, Italy and Spain.",
+   "kicker": "Same Saturday",
+   "title": "Also marching",
+   "items": [
+    "Netherlands",
+    "Italy",
+    "Spain"
+   ],
+   "cut": "whip"
+  },
+  {
+   "type": "kinetic",
+   "say": "So why does this matter beyond Germany?",
+   "text": "Why it matters",
+   "hl": [
+    "matters"
+   ],
+   "para": true
+  },
+  {
+   "type": "kinetic",
+   "say": "Europe is spending more on defence. Germany is at the centre of that push.",
+   "text": "Europe rearms. | Germany leads.",
+   "hl": [
+    "Germany"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Now the cost is being argued on the street.",
+   "text": "The cost, | argued on the street",
+   "hl": [
+    "street"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "By the very generation that would be asked to serve.",
+   "text": "By those asked | to serve",
+   "hl": [
+    "serve"
+   ],
+   "cut": "zoom"
+  },
+  {
+   "type": "kinetic",
+   "say": "For India, which watches Europe's rearmament closely, it's a test of how durable that push is.",
+   "text": "A test of | Europe's rearmament",
+   "hl": [
+    "test"
+   ]
+  },
+  {
+   "type": "collage",
+   "kicker": "Berlin",
+   "title": "Guns or classrooms?",
+   "photos": [
+    {
+     "src": "media/gz-reichstag-nein.jpg",
+     "caption": "A 'NEIN.' placard in Berlin"
+    },
+    {
+     "src": "media/gz-gate-crowd.jpg",
+     "caption": "Crowds at the Brandenburg Gate"
+    },
+    {
+     "src": "media/gz-reichstag-snow.jpg",
+     "caption": "Protesters outside the Reichstag"
+    }
+   ],
+   "say": "Concessions on schools and living costs, or a harder line on security?"
+  },
+  {
+   "type": "kinetic",
+   "say": "Berlin's answer will shape Europe's rearmament.",
+   "text": "Berlin's answer",
+   "hl": [
+    "answer"
+   ],
+   "cut": "zoom"
+  },
+  {
+   "type": "outro",
+   "say": "Read the full story on Raisina Wire.",
+   "title": "Read the full story"
+  }
+ ]
+}
