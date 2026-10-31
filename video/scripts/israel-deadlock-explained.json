@@ -9,12 +9,10 @@
  "captionChars": 40,
  "scenes": [
   {
-   "type": "kinetic",
-   "say": "Israel voted. Nobody won.",
-   "text": "Israel voted. | Nobody won.",
-   "hl": [
-    "Nobody"
-   ]
+   "type": "snap",
+   "src": "media/il-ballot.jpg",
+   "frame": "full",
+   "say": "Israel voted. Nobody won."
   },
   {
    "type": "number",
@@ -22,7 +20,8 @@
    "value": 53,
    "label": "Netanyahu bloc, of 120 seats",
    "speak": "Benjamin Netanyahu's bloc: fifty-three seats.",
-   "cut": "zoom"
+   "cut": "zoom",
+   "bg": "media/il-seat-chart-bg.jpg"
   },
   {
    "type": "kinetic",
@@ -34,17 +33,19 @@
    ]
   },
   {
-   "type": "title",
-   "say": "So what does Israel's deadlock mean for India, Iran and Gaza?",
+   "type": "cutout",
+   "src": "media/il-netanyahu-hand.jpg",
    "kicker": "Explained",
-   "title": "Israel's election deadlock",
-   "sub": "What it means for India, Iran and Gaza"
+   "title": "Israel's deadlock",
+   "side": "right",
+   "say": "So what does Israel's deadlock mean for India, Iran and Gaza?"
   },
   {
-   "type": "kinetic",
+   "type": "photo",
+   "src": "media/il-posters.jpg",
+   "style": "parallax",
+   "title": "27 October",
    "say": "Israelis went to the polls on 27 October.",
-   "text": "27 October",
-   "kicker": "Election day",
    "speak": "Israelis went to the polls on the twenty-seventh of October.",
    "para": true
   },
@@ -110,15 +111,31 @@
     }
    ],
    "max": 61,
-   "speak": "Netanyahu's Likud-led bloc won fifty-three. The opposition, forty-eight. Arab-led parties, a record nineteen."
+   "speak": "Netanyahu's Likud-led bloc won fifty-three. The opposition, forty-eight. Arab-led parties, a record nineteen.",
+   "bg": "media/il-seat-chart-bg.jpg"
   },
   {
-   "type": "kinetic",
-   "say": "Netanyahu ran as the man who steered Israel through the wars.",
-   "text": "The wartime leader",
-   "hl": [
-    "wartime"
-   ]
+   "type": "snap",
+   "src": "media/il-netanyahu-whisper.jpg",
+   "frame": "clip",
+   "marks": [
+    {
+     "kind": "circle",
+     "x": 0.53,
+     "y": 0.45,
+     "r": 0.13,
+     "at": "netanyahu"
+    },
+    {
+     "kind": "label",
+     "x": 0.56,
+     "y": 0.86,
+     "text": "The wartime leader",
+     "color": "red",
+     "at": "steered"
+    }
+   ],
+   "say": "Netanyahu ran as the man who steered Israel through the wars."
   },
   {
    "type": "versus",
@@ -194,12 +211,27 @@
    "cut": "whip"
   },
   {
-   "type": "kinetic",
-   "say": "Gadi Eisenkot is a former chief of Israel's army.",
-   "text": "Gadi Eisenkot | ex-army chief",
-   "hl": [
-    "army"
-   ]
+   "type": "snap",
+   "src": "media/il-eisenkot-rally.jpg",
+   "frame": "clip",
+   "marks": [
+    {
+     "kind": "circle",
+     "x": 0.47,
+     "y": 0.43,
+     "r": 0.1,
+     "at": "eisenkot"
+    },
+    {
+     "kind": "label",
+     "x": 0.3,
+     "y": 0.85,
+     "text": "Ex-army chief",
+     "color": "red",
+     "at": "army."
+    }
+   ],
+   "say": "Gadi Eisenkot is a former chief of Israel's army."
   },
   {
    "type": "number",
@@ -277,7 +309,8 @@
    "say": "Eisenkot has ruled out serving under him.",
    "kicker": "Eisenkot",
    "text": "Ruled out serving under Netanyahu.",
-   "hl": "Ruled out"
+   "hl": "Ruled out",
+   "bg": "media/il-eisenkot-rally.jpg"
   },
   {
    "type": "kinetic",
@@ -387,12 +420,11 @@
    "source": "Reuters"
   },
   {
-   "type": "kinetic",
+   "type": "photo",
+   "src": "media/il-netanyahu-hand.jpg",
+   "style": "duotone",
+   "title": "The caretaker question",
    "say": "The real unknown? What Netanyahu does as caretaker.",
-   "text": "The caretaker | question",
-   "hl": [
-    "caretaker"
-   ],
    "cut": "zoom"
   },
   {
@@ -401,7 +433,8 @@
    "text": "He still makes | the security calls",
    "hl": [
     "security"
-   ]
+   ],
+   "bg": "media/il-netanyahu-whisper.jpg"
   },
   {
    "type": "list",
@@ -571,12 +604,24 @@
    ]
   },
   {
-   "type": "kinetic",
-   "say": "The bottom line: Israel's voters settled nothing.",
-   "text": "Voters settled | nothing",
-   "hl": [
-    "nothing"
+   "type": "collage",
+   "kicker": "The bottom line",
+   "title": "Voters settled nothing",
+   "photos": [
+    {
+     "src": "media/il-ballot.jpg",
+     "caption": "Casting a ballot"
+    },
+    {
+     "src": "media/il-posters.jpg",
+     "caption": "Campaign posters"
+    },
+    {
+     "src": "media/il-eisenkot-rally.jpg",
+     "caption": "Gadi Eisenkot at a rally"
+    }
    ],
+   "say": "The bottom line: Israel's voters settled nothing.",
    "para": true
   },
   {
