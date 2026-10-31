@@ -1361,3 +1361,26 @@ body.is-reading .new-pill{top:calc(18px + env(safe-area-inset-top))}
 @media(max-width:760px){html:is([data-lang=hi],[data-lang=bn]) #freshText{display:none}html:is([data-lang=hi],[data-lang=bn]) .fresh-btn{width:30px;height:30px;padding:0;justify-content:center;border-radius:50%}html:is([data-lang=hi],[data-lang=bn]) .fresh-btn svg{width:14px;height:14px}}
 /* Phones and tablets swipe the explainer carousel; the arrow buttons are for mouse users only. */
 @media(hover:none),(max-width:760px){.carousel-btn{display:none}}
+
+/* ---------- Several live coverages: a carousel on the home page, a grid on the Live page ---------- */
+.lb-carousel{position:relative}
+.lb-head{display:flex;align-items:center;justify-content:space-between;margin:0 2px 8px}
+.lb-now{display:inline-flex;align-items:center;gap:8px;font:600 11px var(--mono);letter-spacing:1.4px;text-transform:uppercase;color:var(--live)}
+.lb-count{font:500 11px var(--mono);letter-spacing:1px;color:var(--muted)}
+.lb-track{display:grid;grid-auto-flow:column;grid-auto-columns:100%;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain}
+.lb-track::-webkit-scrollbar{display:none}
+.lb-slide{scroll-snap-align:start;display:grid}
+.lb-slide .live-banner{height:100%}
+.lb-dots{display:flex;justify-content:center;gap:6px;margin-top:10px}
+.lb-dots button{width:7px;height:7px;padding:0;border:0;border-radius:999px;background:rgba(15,20,34,.22);cursor:pointer;transition:width .25s,background .25s}
+.lb-dots button.on{width:20px;background:var(--live)}
+:root[data-theme=dark] .lb-dots button{background:rgba(255,255,255,.25)}
+:root[data-theme=dark] .lb-dots button.on{background:var(--live)}
+@media(max-width:760px){.lb-track{grid-auto-columns:90%;gap:10px}}
+
+.live-now{margin-top:26px}
+.live-now .section-head h2{display:flex;align-items:center;gap:12px}
+.live-now .section-head h2 .dot-live{width:12px;height:12px}
+.live-now-grid{display:grid;gap:14px}
+.live-now-grid .live-banner{min-height:150px}
+@media(min-width:1100px){.live-now-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.live-now-grid .live-banner{grid-template-columns:200px minmax(0,1fr)}.live-now-grid .lb-go{position:absolute;top:12px;right:12px;margin:0;padding:7px 12px;font-size:12px}.live-now-grid .lb-body{padding-right:20px}}

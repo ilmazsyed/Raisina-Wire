@@ -26,6 +26,8 @@ export const patterns = [
   [/^Updated (\d+) min ago$/, m => `${n(m[1])} মিনিট আগে আপডেট`],
   [/^Updated at (.+)$/, m => `${m[1]}-এ আপডেট`],
   [/^(\d+) new stories$/, m => `${n(m[1])}টি নতুন খবর`],
+  [/^(\d+) live coverages$/, m => `${n(m[1])}টি লাইভ কভারেজ`],
+  [/^(\d+) live now$/, m => `${n(m[1])}টি এখন লাইভ`],
   [/^refreshes every (\d+) seconds$/, m => `প্রতি ${n(m[1])} সেকেন্ডে আপডেট`],
   [/^refreshes every (\d+) minutes$/, m => `প্রতি ${n(m[1])} মিনিটে আপডেট`],
   [/^Sources: (.+?)\.(?: Temporarily unavailable: (.+)\.)?$/, m => `সূত্র: ${m[1] === "none reachable" ? "কোনওটিই পাওয়া যাচ্ছে না" : m[1]}।${m[2] ? ` আপাতত পাওয়া যাচ্ছে না: ${m[2]}।` : ""}`],
@@ -581,4 +583,7 @@ export default {
   "Now": "এখন",
   "Live coverage started": "লাইভ কভারেজ শুরু",
   "Refresh": "রিফ্রেশ",
+  "Live now": "এখন লাইভ",
+  "1 live coverage": "১টি লাইভ কভারেজ",
+  "Follow live": "লাইভ দেখুন",
 };

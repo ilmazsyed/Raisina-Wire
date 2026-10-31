@@ -10,7 +10,7 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const esc = (s = "") => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const IST = { timeZone: "Asia/Kolkata" };
 
-const state = { articles: [], media: null, coverage: [], coverageLead: null, user: null, wire: null, wireError: false, markets: null, marketsError: false, community: null, events: null, installPrompt: null, homeGroup: "india", topics: [] };
+const state = { articles: [], media: null, coverage: [], coverageAll: [], coverageLead: null, user: null, wire: null, wireError: false, markets: null, marketsError: false, community: null, events: null, installPrompt: null, homeGroup: "india", topics: [] };
 const wireIndex = new Map(); // url -> wire item, so the reader can show a headline while it loads
 
 /* ---------- Formatting ---------- */
@@ -1112,10 +1112,10 @@ function renderExtAside() {
 const CATS = ["All", "India", "Security", "Diplomacy", "Markets", "Energy", "World"];
 function viewLive(r) {
   const cat = CATS.includes(r.arg) ? r.arg : "All";
-  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker" style="display:flex;align-items:center;gap:8px"><span class="dot-live"></span>Live wire</div><h1>${cat === "All" ? "Latest from the wire" : cat}</h1><p>Headlines from named publishers, newest first. Open any story in the reader, with a link to the original.</p></div><span class="muted" id="liveUpdated" style="font-size:13px"></span></div>
+  $("#view").innerHTML = `<div class="wrap">${cat === "All" ? `<section id="liveNow" class="live-now" aria-label="Live now" hidden></section>` : ""}<div class="page-head"><div><div class="kicker" style="display:flex;align-items:center;gap:8px"><span class="dot-live"></span>Live wire</div><h1>${cat === "All" ? "Latest from the wire" : cat}</h1><p>Headlines from named publishers, newest first. Open any story in the reader, with a link to the original.</p></div><span class="muted" id="liveUpdated" style="font-size:13px"></span></div>
     <div class="chips" style="margin-top:20px">${CATS.map(c => `<a class="chip" href="/live${c === "All" ? "" : `/${c}`}" aria-pressed="${c === cat}">${c}</a>`).join("")}</div>
     <div class="live-list" id="liveList" data-cat="${cat}"></div><div class="sources" id="liveSources"></div></div>`;
-  renderLiveList();
+  renderLiveNow(); renderLiveList();
 }
 function renderLiveList() {
   const host = $("#liveList"); if (!host) return;
@@ -1259,28 +1259,29 @@ async function loadCoverage() {
     state.coverage = d.items || []; state.coverageSeen = true;
     const started = before ? state.coverage.filter(c => !before.has(c.id) && Date.parse(c.startedAt) > PAGE_OPENED - 60e3) : [];
     if (started.length) { state.newLive = started[0]; showNewPill(); }
-    state.coverageLead = state.coverage[0] ? await fetch(`/api/live/${encodeURIComponent(state.coverage[0].slug)}${lang !== "en" ? `?lang=${lang}` : ""}`).then(r => r.ok ? r.json() : null) : null;
-    if (state.coverageLead?.item?.hasResults) state.coverageLead.results = await fetch(`/api/live/${encodeURIComponent(state.coverageLead.item.slug)}/results`).then(r => r.ok ? r.json() : null).catch(() => null);
+    // Every coverage that is live right now (up to eight), each with its updates and counter.
+    const all = await Promise.all(state.coverage.slice(0, 8).map(async c => {
+      const d = await fetch(`/api/live/${encodeURIComponent(c.slug)}${lang !== "en" ? `?lang=${lang}` : ""}`).then(r => r.ok ? r.json() : null).catch(() => null);
+      if (d?.item?.hasResults) d.results = await fetch(`/api/live/${encodeURIComponent(d.item.slug)}/results`).then(r => r.ok ? r.json() : null).catch(() => null);
+      return d;
+    }));
+    state.coverageAll = all.filter(d => d?.item && d.item.status === "live");
+    state.coverageLead = state.coverageAll[0] || null;
   } catch { state.coverage ||= []; } // keep what is shown when a refresh fails
-  renderTicker(); renderLiveBanner(); renderNav(parseRoute());
+  renderTicker(); renderLiveBanner(); renderLiveNow(); renderNav(parseRoute());
 }
 let bannerTimer;
-function renderLiveBanner() {
-  const host = $("#liveBanner"); if (!host) return;
-  const lead = state.coverageLead;
-  clearInterval(bannerTimer);
-  if (!lead?.item) { host.innerHTML = ""; host.hidden = true; return; }
-  host.hidden = false;
+// One live coverage as a broadcast tile: the coverage photo with a blinking LIVE tab, the headline,
+// then either the results counter (election or war coverage) or the latest update, and a button.
+function liveTile(lead) {
   const href = `/coverage/${encodeURIComponent(lead.item.slug)}`, latest = lead.updates[0], r = lead.results;
   const pic = lead.item.imageUrl && /^(https?:|\/media\/)/.test(lead.item.imageUrl) ? lead.item.imageUrl : "";
-  // A compact broadcast tile: the coverage photo with a blinking LIVE tab, the headline, then either
-  // the results race (election coverage) or the latest update, and a button. The full coverage is one tap away.
   const war = r?.kind === "conflict" ? `<span class="lb-war">${r.started ? `<b class="lb-day">Day ${warDay(r.started)}</b>` : ""}<span><b>${fmtN(r.killed)}+</b> killed${r.injured ? ` · <b>${fmtN(r.injured)}+</b> injured` : ""}</span><small>${esc(r.fronts.map(f => f.name).join(" · "))}</small></span>` : "";
   const race = war || (r?.candidates?.length ? `<span class="lb-race">
       <span class="lb-race-names">${r.candidates.slice(0, 2).map(c => `<span style="--c:${esc(c.color || "#fff")}"><b>${esc(c.name)}</b> ${c.pct.toFixed(2)}%</span>`).join("")}</span>
       ${r.candidates.length >= 2 ? `<span class="lb-split">${r.candidates.slice(0, 2).map(c => `<i style="flex-basis:${c.pct}%;background:${esc(c.color || "#fff")}"></i>`).join("")}<em></em></span>` : ""}
       <small>${r.winner ? `${esc(r.winner)} wins` : `${r.reporting.toFixed(1)}% counted${r.source ? ` · ${esc(r.source.replace(/\s*\(.*\)/, ""))}` : ""}`}</small></span>` : "");
-  host.innerHTML = `<a class="live-banner ${pic ? "has-img" : "no-img"}" href="${href}">
+  return `<a class="live-banner ${pic ? "has-img" : "no-img"}" href="${href}">
     <span class="lb-media" aria-hidden="true">${pic ? `<img src="${esc(pic)}" alt="" decoding="async">` : `<span class="lb-glow"></span>`}<span class="live-tab"><span class="pulse"></span>Live</span></span>
     <span class="lb-body">
       <span class="lb-meta">Live coverage · ${lead.updates.length} update${lead.updates.length === 1 ? "" : "s"}${latest ? ` · ${ago(latest.createdAt)}` : ""}</span>
@@ -1288,11 +1289,57 @@ function renderLiveBanner() {
       ${race || (latest ? `<span class="lb-latest"><time>${clock(latest.createdAt)}</time>${esc(latest.body)}</span>` : "")}
     </span>
     <span class="lb-go">Follow live <span aria-hidden="true">→</span></span></a>`;
-  if (lead.item.hasResults) bannerTimer = setInterval(async () => {
-    if (!$("#liveBanner") || document.hidden) return;
-    const fresh = await fetch(`/api/live/${encodeURIComponent(lead.item.slug)}/results`).then(x => x.ok ? x.json() : null).catch(() => null);
-    if (fresh && state.coverageLead === lead) { lead.results = fresh; renderLiveBanner(); }
+}
+// Results counters refresh every 20 seconds while they are on screen.
+function refreshLiveCounters(redraw) {
+  clearInterval(bannerTimer);
+  const counted = (state.coverageAll || []).filter(d => d.item.hasResults);
+  if (counted.length) bannerTimer = setInterval(async () => {
+    if (document.hidden) return;
+    await Promise.all(counted.map(async d => { const fresh = await fetch(`/api/live/${encodeURIComponent(d.item.slug)}/results`).then(x => x.ok ? x.json() : null).catch(() => null); if (fresh) d.results = fresh; }));
+    redraw();
   }, 20e3);
+}
+// Home: one live coverage is a single tile; several become a swipeable carousel (the next one
+// peeks in), with dots, "1 / 3", and a gentle advance every 8 s that stops once the reader touches it.
+let liveSlide = 0, liveAuto = true;
+function renderLiveBanner() {
+  const host = $("#liveBanner"); if (!host) return;
+  const all = state.coverageAll || [];
+  if (!all.length) { host.innerHTML = ""; host.hidden = true; clearInterval(bannerTimer); return; }
+  host.hidden = false;
+  if (all.length === 1) { host.innerHTML = liveTile(all[0]); refreshLiveCounters(renderLiveBanner); return; }
+  const keep = host.querySelector(".lb-track")?.scrollLeft || 0;
+  host.innerHTML = `<div class="lb-carousel" aria-roledescription="carousel" aria-label="Live now">
+    <div class="lb-head"><span class="lb-now"><span class="dot-live"></span>${all.length} live now</span><span class="lb-count" aria-live="polite">${Math.min(liveSlide, all.length - 1) + 1} / ${all.length}</span></div>
+    <div class="lb-track">${all.map((d, i) => `<div class="lb-slide" role="group" aria-roledescription="slide" aria-label="${i + 1} of ${all.length}">${liveTile(d)}</div>`).join("")}</div>
+    <div class="lb-dots">${all.map((_, i) => `<button type="button" class="${i === liveSlide ? "on" : ""}" data-slide="${i}" aria-label="Live coverage ${i + 1}"></button>`).join("")}</div></div>`;
+  const track = host.querySelector(".lb-track");
+  track.scrollLeft = keep;
+  const slideW = () => track.querySelector(".lb-slide").getBoundingClientRect().width + 12;
+  const show = i => { liveSlide = (i + all.length) % all.length; track.scrollTo({ left: liveSlide * slideW(), behavior: "smooth" }); };
+  const sync = () => {
+    liveSlide = Math.min(all.length - 1, Math.round(track.scrollLeft / slideW()));
+    host.querySelectorAll(".lb-dots button").forEach((b, i) => b.classList.toggle("on", i === liveSlide));
+    const c = host.querySelector(".lb-count"); if (c) c.textContent = `${liveSlide + 1} / ${all.length}`;
+  };
+  track.addEventListener("scroll", () => { clearTimeout(track.t); track.t = setTimeout(sync, 80); }, { passive: true });
+  ["pointerdown", "touchstart", "wheel", "keydown"].forEach(ev => track.addEventListener(ev, () => { liveAuto = false; }, { passive: true }));
+  host.querySelectorAll("[data-slide]").forEach(b => b.addEventListener("click", () => { liveAuto = false; show(+b.dataset.slide); }));
+  clearInterval(renderLiveBanner.auto);
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) renderLiveBanner.auto = setInterval(() => {
+    const r = track.getBoundingClientRect();
+    if (liveAuto && !document.hidden && track.isConnected && r.top < innerHeight && r.bottom > 0) show(liveSlide + 1);
+  }, 8000);
+  refreshLiveCounters(renderLiveBanner);
+}
+// The Live page: every live coverage first, then the live wire.
+function renderLiveNow() {
+  const host = $("#liveNow"); if (!host) return;
+  const all = state.coverageAll || [];
+  host.hidden = !all.length;
+  host.innerHTML = all.length ? `<div class="section-head"><h2><span class="dot-live"></span>Live now</h2><span class="meta">${all.length === 1 ? "1 live coverage" : `${all.length} live coverages`}</span></div>
+    <div class="live-now-grid">${all.map(liveTile).join("")}</div>` : "";
 }
 /* Live results counter (election coverage): its own 10-second poll, numbers tween between counts. */
 let resultsTimer, resultsHTML = "", resultsPrev = {};
