@@ -1,0 +1,606 @@
+{
+ "slug": "israel-deadlock-explained",
+ "title": "Israel's election deadlock, explained",
+ "series": "Explained",
+ "style": "vox",
+ "formats": [
+  "16x9"
+ ],
+ "captionChars": 40,
+ "scenes": [
+  {
+   "type": "kinetic",
+   "say": "Israel voted. Nobody won.",
+   "text": "Israel voted. | Nobody won.",
+   "hl": [
+    "Nobody"
+   ]
+  },
+  {
+   "type": "number",
+   "say": "Benjamin Netanyahu's bloc: 53 seats.",
+   "value": 53,
+   "label": "Netanyahu bloc, of 120 seats",
+   "speak": "Benjamin Netanyahu's bloc: fifty-three seats.",
+   "cut": "zoom"
+  },
+  {
+   "type": "kinetic",
+   "say": "And the ripples reach New Delhi.",
+   "text": "The ripples reach | New Delhi",
+   "hl": [
+    "New",
+    "Delhi"
+   ]
+  },
+  {
+   "type": "title",
+   "say": "So what does Israel's deadlock mean for India, Iran and Gaza?",
+   "kicker": "Explained",
+   "title": "Israel's election deadlock",
+   "sub": "What it means for India, Iran and Gaza"
+  },
+  {
+   "type": "kinetic",
+   "say": "Israelis went to the polls on 27 October.",
+   "text": "27 October",
+   "kicker": "Election day",
+   "speak": "Israelis went to the polls on the twenty-seventh of October.",
+   "para": true
+  },
+  {
+   "type": "kinetic",
+   "say": "The first national vote since the Hamas attack of 7 October 2023.",
+   "text": "First vote since | 7 October 2023",
+   "hl": [
+    "7",
+    "October",
+    "2023"
+   ],
+   "speak": "The first national vote since the Hamas attack of the seventh of October, twenty twenty-three."
+  },
+  {
+   "type": "list",
+   "say": "And the wars that followed, in Gaza, Lebanon and Iran.",
+   "kicker": "Since then",
+   "title": "Three wars",
+   "items": [
+    "Gaza",
+    "Lebanon",
+    "Iran"
+   ],
+   "cut": "whip"
+  },
+  {
+   "type": "kinetic",
+   "say": "Turnout was close to 78 per cent. A record.",
+   "text": "~78% turnout",
+   "hl": [
+    "78%"
+   ],
+   "speak": "Turnout was close to seventy-eight per cent. A record."
+  },
+  {
+   "type": "number",
+   "say": "To govern, you need 61 of the Knesset's 120 seats.",
+   "value": 61,
+   "suffix": " / 120",
+   "label": "Seats needed for a majority",
+   "speak": "To govern, you need sixty-one of the Knesset's hundred and twenty seats.",
+   "para": true
+  },
+  {
+   "type": "bars",
+   "say": "Netanyahu's Likud-led bloc won 53. The opposition, 48. Arab-led parties, a record 19.",
+   "kicker": "Knesset result",
+   "title": "Nobody reaches 61",
+   "items": [
+    {
+     "label": "Netanyahu bloc",
+     "value": 53,
+     "hot": true
+    },
+    {
+     "label": "Eisenkot opposition",
+     "value": 48
+    },
+    {
+     "label": "Arab-led parties",
+     "value": 19
+    }
+   ],
+   "max": 61,
+   "speak": "Netanyahu's Likud-led bloc won fifty-three. The opposition, forty-eight. Arab-led parties, a record nineteen."
+  },
+  {
+   "type": "kinetic",
+   "say": "Netanyahu ran as the man who steered Israel through the wars.",
+   "text": "The wartime leader",
+   "hl": [
+    "wartime"
+   ]
+  },
+  {
+   "type": "versus",
+   "say": "Voters didn't fully buy it. His bloc fell from 68 seats to 53.",
+   "a": {
+    "value": 68,
+    "label": "Last Knesset"
+   },
+   "b": {
+    "value": 53,
+    "label": "Now"
+   },
+   "at": "53.",
+   "kicker": "Netanyahu bloc",
+   "speak": "Voters didn't fully buy it. His bloc fell from sixty-eight seats to fifty-three."
+  },
+  {
+   "type": "kinetic",
+   "say": "But the opposition didn't win either.",
+   "text": "Neither did | the opposition",
+   "hl": [
+    "Neither"
+   ],
+   "cut": "zoom"
+  },
+  {
+   "type": "kinetic",
+   "say": "So, how does this end? There are four ways out.",
+   "text": "Four ways out",
+   "hl": [
+    "Four"
+   ],
+   "speak": "So, how does this end? There are four ways out.",
+   "para": true
+  },
+  {
+   "type": "kinetic",
+   "say": "One: Netanyahu stays on as caretaker, and gets the first shot.",
+   "text": "1. Netanyahu | tries first",
+   "kicker": "Option one",
+   "hl": [
+    "first"
+   ],
+   "speak": "One: Netanyahu stays on as caretaker, and gets the first shot."
+  },
+  {
+   "type": "flow",
+   "say": "President Isaac Herzog meets the parties, then picks someone to try.",
+   "kicker": "How it works",
+   "title": "Forming a government",
+   "nodes": [
+    "Herzog consults parties",
+    "Picks a candidate",
+    "Coalition talks"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Talks could drag on for rounds. If nobody gets there, Israelis vote again.",
+   "text": "No deal? | Vote again.",
+   "hl": [
+    "again."
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Two: an Eisenkot government.",
+   "text": "2. Eisenkot",
+   "kicker": "Option two",
+   "hl": [
+    "Eisenkot"
+   ],
+   "cut": "whip"
+  },
+  {
+   "type": "kinetic",
+   "say": "Gadi Eisenkot is a former chief of Israel's army.",
+   "text": "Gadi Eisenkot | ex-army chief",
+   "hl": [
+    "army"
+   ]
+  },
+  {
+   "type": "number",
+   "say": "The sums work. 48 opposition seats plus 19 Arab seats make 67.",
+   "value": 67,
+   "label": "48 opposition + 19 Arab-led seats",
+   "speak": "The sums work. Forty-eight opposition seats plus nineteen Arab seats make sixty-seven."
+  },
+  {
+   "type": "kinetic",
+   "say": "The politics don't.",
+   "text": "The politics | don't.",
+   "hl": [
+    "don't."
+   ],
+   "cut": "zoom"
+  },
+  {
+   "type": "doc",
+   "say": "Naftali Bennett and Avigdor Liberman both refuse to rely on Arab parties, as partners or outside backers.",
+   "kicker": "The catch",
+   "text": "Bennett and Liberman: no reliance on Arab parties, as partners or as outside backers.",
+   "hl": "no reliance on Arab parties",
+   "source": "Their stated positions"
+  },
+  {
+   "type": "share",
+   "say": "Still, Arab citizens are about a fifth of Israel's population. Their bloc now has real leverage.",
+   "value": 20,
+   "ringLabel": "of Israelis",
+   "title": "Arab citizens",
+   "detail": "Record 19 seats",
+   "speak": "Still, Arab citizens are about a fifth of Israel's population. Their bloc now has real leverage."
+  },
+  {
+   "type": "kinetic",
+   "say": "Three: a unity government.",
+   "text": "3. Unity government",
+   "kicker": "Option three",
+   "hl": [
+    "Unity"
+   ],
+   "cut": "whip"
+  },
+  {
+   "type": "flow",
+   "say": "Likud and some opposition parties could reach a majority together.",
+   "kicker": "On paper",
+   "title": "Likud + opposition",
+   "nodes": [
+    "Likud",
+    "Some opposition parties",
+    "61+"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "But Netanyahu would have to loosen his grip on his far-right and ultra-Orthodox allies.",
+   "text": "Netanyahu drops | far-right allies?",
+   "hl": [
+    "far-right"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "And the opposition would drop its main promise: ending his time in office.",
+   "text": "Opposition drops | its main promise?",
+   "hl": [
+    "main",
+    "promise?"
+   ]
+  },
+  {
+   "type": "doc",
+   "say": "Eisenkot has ruled out serving under him.",
+   "kicker": "Eisenkot",
+   "text": "Ruled out serving under Netanyahu.",
+   "hl": "Ruled out"
+  },
+  {
+   "type": "kinetic",
+   "say": "Four: defections, or yet another election.",
+   "text": "4. Defections | or another vote",
+   "kicker": "Option four",
+   "hl": [
+    "another"
+   ],
+   "cut": "whip"
+  },
+  {
+   "type": "list",
+   "say": "Until then, budgets, laws and security policy are stuck.",
+   "kicker": "On hold",
+   "title": "Stuck until a deal",
+   "items": [
+    "Budgets",
+    "Legislation",
+    "Security policy"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "The upshot: Netanyahu is weaker. Not finished.",
+   "text": "Weaker. | Not finished.",
+   "hl": [
+    "Not",
+    "finished."
+   ],
+   "cut": "zoom"
+  },
+  {
+   "type": "kinetic",
+   "say": "Now, Iran, Gaza and the region.",
+   "text": "Iran. Gaza. | The region.",
+   "kicker": "Part two",
+   "para": true
+  },
+  {
+   "type": "map",
+   "say": "Israel is still in a standoff with Iran. Lebanon is tense, and the West Bank is simmering.",
+   "kicker": "The neighbourhood",
+   "title": "A standoff",
+   "view": [
+    28,
+    60,
+    22,
+    40
+   ],
+   "pins": [
+    {
+     "lon": 35.2,
+     "lat": 31.8,
+     "label": "Israel",
+     "side": "left"
+    },
+    {
+     "lon": 51.4,
+     "lat": 35.7,
+     "label": "Iran"
+    },
+    {
+     "lon": 35.5,
+     "lat": 33.9,
+     "label": "Lebanon",
+     "side": "left"
+    }
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Swap the prime minister, and you may not swap the strategy.",
+   "text": "New PM ≠ | new strategy",
+   "hl": [
+    "≠"
+   ]
+  },
+  {
+   "type": "list",
+   "say": "Eisenkot is a hardliner on Iran and Hamas, and opposes a Palestinian state.",
+   "kicker": "Eisenkot's line",
+   "title": "Same hard line",
+   "items": [
+    "Tough on Iran",
+    "Tough on Hamas",
+    "Against Palestinian statehood"
+   ]
+  },
+  {
+   "type": "list",
+   "say": "He differs on running the state, coalition deals and army exemptions for the ultra-Orthodox.",
+   "kicker": "Where he differs",
+   "title": "Mostly at home",
+   "items": [
+    "How government is run",
+    "Coalition deals",
+    "Ultra-Orthodox army exemptions"
+   ]
+  },
+  {
+   "type": "doc",
+   "say": "Analysts quoted by Reuters expect any Israeli leader to stay in step with Washington, if Donald Trump resumes strikes on Iran.",
+   "kicker": "Analysts, via Reuters",
+   "text": "Any Israeli leader is expected to stay broadly in step with Washington if Trump resumes military action against Tehran.",
+   "hl": "in step with Washington",
+   "source": "Reuters"
+  },
+  {
+   "type": "kinetic",
+   "say": "The real unknown? What Netanyahu does as caretaker.",
+   "text": "The caretaker | question",
+   "hl": [
+    "caretaker"
+   ],
+   "cut": "zoom"
+  },
+  {
+   "type": "kinetic",
+   "say": "He still makes the security calls.",
+   "text": "He still makes | the security calls",
+   "hl": [
+    "security"
+   ]
+  },
+  {
+   "type": "list",
+   "say": "A flare-up with Iran could rally voters, force a unity deal, or bring a longer war.",
+   "kicker": "If Iran flares",
+   "title": "Three outcomes",
+   "items": [
+    "Voters rally",
+    "A unity government",
+    "Retaliation, a longer war"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "On Gaza, neither man budges. Hamas must be disarmed.",
+   "text": "Hamas must be | disarmed",
+   "hl": [
+    "disarmed"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "And no new consensus on Palestinian statehood.",
+   "text": "No consensus | on statehood",
+   "hl": [
+    "No"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "So why is India watching so closely?",
+   "text": "Why India | is watching",
+   "kicker": "Part three",
+   "hl": [
+    "India"
+   ],
+   "para": true
+  },
+  {
+   "type": "list",
+   "say": "The ties go far beyond weapons: joint production, AI, cybersecurity, farming, water, space and trade.",
+   "kicker": "India-Israel",
+   "title": "Beyond arms",
+   "items": [
+    "Joint production",
+    "AI and cybersecurity",
+    "Farming and water",
+    "Space and trade"
+   ],
+   "cut": "whip"
+  },
+  {
+   "type": "timeline",
+   "say": "A defence pact in November 2025. Then Narendra Modi's visit in February 2026.",
+   "kicker": "India-Israel",
+   "title": "Building up",
+   "items": [
+    {
+     "when": "Nov 2025",
+     "what": "Defence cooperation memorandum"
+    },
+    {
+     "when": "Feb 2026",
+     "what": "Modi visits Israel",
+     "hot": true
+    }
+   ],
+   "speak": "A defence pact in November twenty twenty-five. Then Narendra Modi's visit in February twenty twenty-six."
+  },
+  {
+   "type": "doc",
+   "say": "The ties became a Special Strategic Partnership for Peace, Innovation and Prosperity.",
+   "kicker": "February 2026",
+   "text": "Special Strategic Partnership for Peace, Innovation and Prosperity",
+   "hl": "Special Strategic Partnership"
+  },
+  {
+   "type": "kinetic",
+   "say": "The Modi-Netanyahu friendship made it visible. It doesn't depend on it.",
+   "text": "Built over years, | not one friendship",
+   "hl": [
+    "years,"
+   ]
+  },
+  {
+   "type": "list",
+   "say": "India leans on Israel for air defence, surveillance, drones and precision weapons.",
+   "kicker": "Defence at the core",
+   "title": "What India buys",
+   "items": [
+    "Air defence",
+    "Surveillance",
+    "Drones",
+    "Precision weapons"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Next: making them together, in India.",
+   "text": "Next: co-production",
+   "hl": [
+    "co-production"
+   ]
+  },
+  {
+   "type": "map",
+   "say": "But the Gulf is where India is exposed: its energy, its trade routes, its huge diaspora.",
+   "kicker": "India's exposure",
+   "title": "Energy and trade routes",
+   "view": [
+    30,
+    82,
+    10,
+    40
+   ],
+   "pins": [
+    {
+     "lon": 35.2,
+     "lat": 31.8,
+     "label": "Israel",
+     "side": "left"
+    },
+    {
+     "lon": 56.3,
+     "lat": 26.6,
+     "label": "The Gulf"
+    },
+    {
+     "lon": 51.4,
+     "lat": 35.7,
+     "label": "Iran"
+    },
+    {
+     "lon": 77.2,
+     "lat": 28.6,
+     "label": "New Delhi"
+    }
+   ],
+   "cut": "zoom"
+  },
+  {
+   "type": "kinetic",
+   "say": "A new Israel-Iran war could hit oil prices, and India would feel it fast.",
+   "text": "War = oil shock | for India",
+   "hl": [
+    "oil",
+    "shock"
+   ]
+  },
+  {
+   "type": "list",
+   "say": "And plans like the IMEC corridor and I2U2 need calm to work.",
+   "kicker": "At risk",
+   "title": "Plans that need calm",
+   "items": [
+    "India-Middle East-Europe Corridor",
+    "I2U2"
+   ],
+   "speak": "And plans like the eye-mek corridor and eye-two-you-two need calm to work."
+  },
+  {
+   "type": "kinetic",
+   "say": "So India walks two tracks: closer to Israel, open to the Arab world and Iran.",
+   "text": "Two tracks",
+   "hl": [
+    "Two"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "The bottom line: Israel's voters settled nothing.",
+   "text": "Voters settled | nothing",
+   "hl": [
+    "nothing"
+   ],
+   "para": true
+  },
+  {
+   "type": "kinetic",
+   "say": "The next government may sound different. The threats won't change.",
+   "text": "New tone. | Same threats.",
+   "hl": [
+    "Same"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "For India, the test isn't who sits in the chair, but how both navigate a rough neighbourhood.",
+   "text": "Not who rules, | but the neighbourhood",
+   "hl": [
+    "neighbourhood"
+   ],
+   "cut": "zoom"
+  },
+  {
+   "type": "outro",
+   "say": "Read the full analysis on Raisina Wire.",
+   "title": "Read the full analysis",
+   "url": "raisinawire.calibrex.org"
+  }
+ ]
+}
