@@ -36,6 +36,16 @@ export async function recordEvent(env, b) {
     q.push(bump(env, day, "arrival", pick(b.src, SOURCES, "other")));
   } else if (b.t === "install") {
     q.push(bump(env, day, "install", pick(b.platform, PLATFORMS, "desktop")));
+  } else if (b.t === "tv") {         // Raisina TV: a viewer (once a day) and minutes watched
+    const sec = Math.round(Number(b.s));
+    if (b.first === true) q.push(bump(env, day, "tv", "viewers"));
+    if (sec >= 1 && sec <= 600) q.push(bump(env, day, "tv", "seconds", sec));
+  } else if (b.t === "play") {       // an explainer started, on TV or on the Watch page
+    const id = String(b.id || "");
+    if (/^[\w-]{6,64}$/.test(id)) q.push(bump(env, day, "play", id));
+  } else if (b.t === "ad") {         // an ad shown, and whether it played to the end
+    const id = String(b.id || "");
+    if (/^[\w-]{6,64}$/.test(id)) q.push(bump(env, day, b.done === true ? "addone" : "adimp", id));
   } else if (b.t === "read") {
     const slug = String(b.slug || "").slice(0, 160), kind = pick(b.kind, KINDS, ""), s = Math.round(Number(b.s));
     if (!slug || !kind || !(s >= 5)) return;   // under five seconds is a bounce, not a read
@@ -75,6 +85,8 @@ export async function audienceReport(env, days = 30) {
   }
   const pair = (metric, dim) => ({ now: total(rows.results, metric, dim), before: total(prev.results, metric, dim) });
 
+  const { results: vt } = await env.DB.prepare("SELECT id,title FROM media_items").all();
+  const videoTitles = new Map(vt.map(v => [v.id, v.title]));
   const names = new Map([...titles.results.map(t => [t.slug, t.title]), ...coverage.results.map(c => [`live:${c.slug}`, c.title])]);
   const read = reading.results.map(r => ({ slug: r.slug, kind: r.kind, title: names.get(r.slug) || r.slug.replace(/^(wire|live):/, ""), reads: r.reads, avgSeconds: Math.round(r.seconds / Math.max(r.reads, 1)), finishedPct: Math.round(100 * r.finished / Math.max(r.reads, 1)), minutes: Math.round(r.seconds / 60) }));
   const readTotals = read.reduce((a, r) => ({ reads: a.reads + r.reads, seconds: a.seconds + r.avgSeconds * r.reads }), { reads: 0, seconds: 0 });
@@ -91,8 +103,11 @@ export async function audienceReport(env, days = 30) {
       arrivals: pair("arrival"), social: { now: SOCIAL.reduce((a, d) => a + total(rows.results, "arrival", d), 0), before: SOCIAL.reduce((a, d) => a + total(prev.results, "arrival", d), 0) },
       whatsapp: pair("arrival", "whatsapp"),
       subscribers: subs?.n || 0,
-      reads: readTotals.reads, avgReadSeconds: Math.round(readTotals.seconds / Math.max(readTotals.reads, 1))
+      reads: readTotals.reads, avgReadSeconds: Math.round(readTotals.seconds / Math.max(readTotals.reads, 1)),
+      tvViewers: pair("tv", "viewers"), tvMinutes: { now: Math.round(total(rows.results, "tv", "seconds") / 60), before: Math.round(total(prev.results, "tv", "seconds") / 60) },
+      adImpressions: pair("adimp"), adCompletes: pair("addone")
     },
+    topVideos: Object.entries(breakdown(rows.results, "play")).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([id, plays]) => ({ id, plays, title: videoTitles.get(id) || id })),
     series,
     sources: breakdown(rows.results, "arrival"),
     devices: breakdown(rows.results, "device"),

@@ -1,5 +1,6 @@
 import "./style.css";
 import { editions, NEWSLETTER_URL, AUTHOR } from "./editions.js";
+import { initTV, dockTV, mountPreview, loadTV, tvFeed, tvNow } from "./tv.js";
 import { brandMark, skyline, tribar, wordmark } from "./brand.js";
 import { WRITERS, writer, setGuestWriters } from "./writers.js";
 import { ABOUT, LEGAL, LEGAL_ORDER, LEGAL_UPDATED } from "./legal.js";
@@ -170,6 +171,7 @@ const NAV = [
   ["Today", "/", r => r.page === "home"],
   ["Raisina Wire", "/editions", r => ["editions", "edition", "article"].includes(r.page)],
   ["Live", "/live", r => r.page === "live" && !r.arg],
+  ["TV", "/tv", r => r.page === "tv"],
   ["India", "/live/India", r => r.page === "live" && r.arg === "India"],
   ["Security", "/live/Security", r => r.page === "live" && r.arg === "Security"],
   ["Markets", "/markets", r => r.page === "markets"],
@@ -310,7 +312,7 @@ function renderShell() {
 }
 
 function renderNav(route) {
-  $("#siteNav").innerHTML = `<a class="nav-brand" href="/" aria-label="Raisina Wire home" tabindex="-1">${brandMark()}<span class="wordmark">${wordmark()}</span></a>` + NAV.map(([label, href, active]) => `<a href="${href}"${active(route) ? ' aria-current="page"' : ""}>${label === "Live" && state.coverage.length ? `<span class="nav-live" aria-label="Live coverage running"></span>` : ""}${label}</a>`).join("")
+  $("#siteNav").innerHTML = `<a class="nav-brand" href="/" aria-label="Raisina Wire home" tabindex="-1">${brandMark()}<span class="wordmark">${wordmark()}</span></a>` + NAV.map(([label, href, active]) => `<a href="${href}"${active(route) ? ' aria-current="page"' : ""}>${(label === "Live" && state.coverage.length) || label === "TV" ? `<span class="nav-live" aria-label="${label === "TV" ? "On air" : "Live coverage running"}"></span>` : ""}${label}</a>`).join("")
     + `<button class="search-btn" type="button" data-action="search" aria-label="Search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>`;
   $("#siteNav").dispatchEvent(new Event("scroll"));
 }
@@ -342,7 +344,7 @@ function interceptLinks(e) {
   a.closest("dialog")?.close();
   navigate(href);
 }
-const views = { about: viewAbout, ...Object.fromEntries(LEGAL_ORDER.map(([k]) => [k, viewLegal])), coverage: viewCoverage, home: viewHome, editions: viewEditions, edition: viewStory, article: viewStory, author: viewAuthor, tag: viewTag, my: viewMy, read: viewExternal, live: viewLive, markets: viewMarkets, community: viewCommunity, discussion: viewDiscussion, events: viewEvents, watch: viewWatch, account: viewAccount, saved: viewSaved, search: viewSearch };
+const views = { tv: viewTV, about: viewAbout, ...Object.fromEntries(LEGAL_ORDER.map(([k]) => [k, viewLegal])), coverage: viewCoverage, home: viewHome, editions: viewEditions, edition: viewStory, article: viewStory, author: viewAuthor, tag: viewTag, my: viewMy, read: viewExternal, live: viewLive, markets: viewMarkets, community: viewCommunity, discussion: viewDiscussion, events: viewEvents, watch: viewWatch, account: viewAccount, saved: viewSaved, search: viewSearch };
 const DEFAULT_TITLE = "Raisina Wire — India’s strategic briefing on geopolitics, security and markets";
 let routeSeq = 0;
 async function route({ restoreY = null } = {}) {
@@ -367,6 +369,7 @@ async function route({ restoreY = null } = {}) {
   main.classList.remove("view-enter"); void main.offsetWidth; main.classList.add("view-enter");
   await view(r);
   if (seq !== routeSeq) return; // a newer navigation took over
+  dockTV(); // Raisina TV: into this page's slot, the mini-player, or off
   updateProgress();
   if (restoreY !== null) requestAnimationFrame(() => jump(restoreY)); else jump(0);
 }
@@ -1187,6 +1190,9 @@ async function onAction(e) {
   if (a === "text-smaller") setTextScale(-0.1);
   if (a === "text-larger") setTextScale(0.1);
   if (a === "save") { try { saveForLater(JSON.parse(el.dataset.item)); } catch { /* malformed */ } }
+  if (a === "w-open") { e.preventDefault(); if (matchMedia("(hover: hover) and (pointer: fine)").matches) openCinema(el.dataset.id, el.dataset.list); else openDetail(el.dataset.id, el.dataset.list); }
+  if (a === "w-play") { e.preventDefault(); openCinema(el.dataset.id, el.dataset.list); }
+  if (a === "w-cat") { e.preventDefault(); document.querySelectorAll("[data-action=w-cat]").forEach(c => c.setAttribute("aria-pressed", String(c === el))); filterWatch($("#wSearch")?.value, el.dataset.cat); }
   if (a === "refresh-all") { e.preventDefault(); refreshAll(); }
   if (a === "apply-new") {
     e.preventDefault(); hideNewPill();
@@ -1647,6 +1653,8 @@ function shortBubbles(list) {
   return list.map((m, i) => `<button class="short-bubble${seen.has(m.id) ? " seen" : ""}" type="button" data-action="short" data-index="${i}" aria-label="Play: ${esc(m.title)}">
     <span class="short-ring"><span class="short-face">${img(m.thumbnailUrl, "")}</span></span><span class="short-name">${esc(m.title)}</span></button>`).join("");
 }
+// The first bubble in the shorts row opens Raisina TV.
+const tvBubble = () => `<a class="short-bubble tv-bubble" href="/tv" aria-label="Raisina TV, live"><span class="short-ring tv-ring"><span class="short-face tv-face">${brandMark("tv-face-mark")}<span class="tv-face-live">LIVE</span></span></span><span class="short-name">Raisina TV</span></a>`;
 function videoCard(m) {
   return `<article class="vcard"><div class="vcard-media" data-video="${esc(m.id)}"><button class="vcard-play" type="button" data-action="play-video" data-id="${esc(m.id)}" aria-label="Play: ${esc(m.title)}">${img(m.thumbnailUrl, "")}<span class="play-badge" aria-hidden="true"></span></button></div>
     <div class="vcard-body"><span class="kicker">${esc(m.category || "Explainer")}</span><h3>${esc(m.title)}</h3>${m.description ? `<p>${esc(m.description)}</p>` : ""}${shareBtn(m.title, mediaUrl(m))}</div></article>`;
@@ -1656,13 +1664,17 @@ function renderHomeMedia() {
   if (rail) {
     const list = shorts();
     rail.hidden = !list.length;
-    rail.innerHTML = list.length ? `<div class="shorts-head"><span class="kicker">Shorts</span><a class="link-gold" href="/watch#shorts">All shorts →</a></div><div class="shorts-row">${shortBubbles(list)}</div>` : "";
+    const tv = tvFeed()?.on && tvFeed().playlist.length;
+    rail.hidden = !list.length && !tv;
+    rail.innerHTML = list.length || tv ? `<div class="shorts-head"><span class="kicker">Shorts</span><a class="link-gold" href="/watch#shorts">All shorts →</a></div><div class="shorts-row">${tv ? tvBubble() : ""}${shortBubbles(list)}</div>` : "";
   }
   if (band) {
     const films = (state.media || []).filter(isFilm);
     band.hidden = !films.length;
     band.innerHTML = films.length ? `<div class="section-head"><h2 id="videoBandTitle">Explainers</h2><div class="carousel-nav"><button class="carousel-btn" type="button" data-action="carousel" data-dir="-1" aria-label="Previous videos">‹</button><button class="carousel-btn" type="button" data-action="carousel" data-dir="1" aria-label="Next videos">›</button><a class="link-gold" href="/watch">Watch all →</a></div></div>
+      <div id="tvPreview" class="tv-preview-host" hidden></div>
       <div class="vcarousel" tabindex="0" aria-label="Explainer videos">${films.map(videoCard).join("")}</div>` : "";
+    const host = $("#tvPreview"); if (host) mountPreview(host);
   }
 }
 function playInline(id) {
@@ -1757,22 +1769,198 @@ function mediaEmbed(m) {
   if (/\.(mp4|webm)(\?|$)/i.test(u)) return `<div class="media-frame"><video controls preload="none" src="${esc(u)}"${m.thumbnailUrl ? ` poster="${esc(m.thumbnailUrl)}"` : ""}></video></div>`;
   return `${m.thumbnailUrl ? `<div class="media-frame">${img(m.thumbnailUrl, m.title)}</div>` : ""}<a class="btn btn-light btn-sm" href="${esc(u)}" target="_blank" rel="noreferrer">Open ↗</a>`;
 }
+/* ---------- Raisina TV page ---------- */
+function viewTV() {
+  document.title = `Raisina TV — live · Raisina Wire`;
+  $("#view").innerHTML = `<div class="tvpage"><div class="wrap"><div class="tvpage-grid">
+    <div id="tvSlot" class="tv-slot"></div>
+    <aside class="tv-side glass" id="tvSide" aria-live="polite"></aside></div></div></div>`;
+  renderTVSide();
+}
+function renderTVSide() {
+  const host = $("#tvSide") || $("#wOnAir"); if (!host) return;
+  const f = tvFeed(), now = tvNow();
+  if (!f) { host.innerHTML = `<div class="skeleton" style="height:220px"></div>`; return; }
+  const k = now ? f.playlist.findIndex(v => v.id === now.id) : 0, next = [1, 2, 3, 4].map(n => f.playlist[(k + n) % f.playlist.length]).filter((v, i, a) => v && v !== now && a.indexOf(v) === i);
+  host.innerHTML = `<div class="tvs-k"><span class="dot-live"></span>Raisina TV · LIVE</div>
+    ${now ? `<span class="kicker">${esc(now.category || "Explainer")}</span><h1>${esc(now.title)}</h1>${now.description ? `<p>${esc(now.description)}</p>` : ""}` : `<h1>${esc(tr("Raisina TV"))}</h1>`}
+    ${next.length ? `<div class="tvs-next"><span class="meta">Up next</span>${next.map(v => `<a class="tvs-item" href="/watch?v=${encodeURIComponent(v.id)}"><span class="thumb">${img(v.thumb, "")}</span><b>${esc(v.title)}</b></a>`).join("")}</div>` : ""}
+    ${host.id === "wOnAir" ? `<a class="btn btn-red" href="/tv">Open Raisina TV ↗</a>` : `<a class="link-gold" href="/watch">All explainers on Watch →</a>`}`;
+}
+document.addEventListener("tvchange", () => { renderTVSide(); if (parseRoute().page === "home") renderHomeMedia(); });
+
+/* ---------- Watch: a Netflix-style library around Raisina TV ---------- */
 let openedShared = null;
+const CAT_NAMES = { Geopolitics: "Geopolitics", Security: "Security & defence", Markets: "Economy & markets", India: "India", World: "World", Diplomacy: "Diplomacy", Energy: "Energy", Analysis: "Analysis" };
+const progressOf = () => store.get("rw-watch-progress", {});
+const durations = () => store.get("rw-durations", {});
+const fmtDur = s => s ? (s >= 60 ? `${Math.round(s / 60)} min` : `${Math.round(s)} s`) : "";
+const ytId = m => String(m?.mediaUrl || "").match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/)?.[1];
+const thumbOf = m => m.thumbnailUrl || (ytId(m) ? `https://i.ytimg.com/vi/${ytId(m)}/hqdefault.jpg` : "");
+function wCard(m, list) {
+  const p = progressOf()[m.id], d = durations()[m.id];
+  return `<button class="w-card" type="button" data-action="w-open" data-id="${esc(m.id)}" data-list="${esc(list)}">
+    <span class="w-thumb">${img(thumbOf(m), "")}${d ? `<span class="w-dur">${fmtDur(d)}</span>` : ytId(m) ? "" : `<span class="w-dur" data-dur="${esc(m.id)}" hidden></span>`}${p && p.d ? `<span class="w-prog"><i style="width:${Math.min(100, 100 * p.t / p.d).toFixed(1)}%"></i></span>` : ""}<span class="w-play" aria-hidden="true"></span></span>
+    <span class="w-meta"><span class="kicker">${esc(CAT_NAMES[m.category] || m.category || "Explainer")}</span><b>${esc(m.title)}</b></span></button>`;
+}
+function wRow(key, title, items, extra = "") {
+  if (!items.length) return "";
+  state.wLists[key] = items.map(m => m.id);
+  return `<section class="w-row" data-row="${esc(key)}"${extra}><div class="w-row-head"><h2>${esc(title)}</h2><span class="meta">${items.length}</span></div>
+    <div class="w-rail">${items.map(m => wCard(m, key)).join("")}</div></section>`;
+}
 function viewWatch() {
-  const all = state.media, list = all && shorts(), items = all && all.filter(m => !isShort(m));
-  $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Watch &amp; listen</div><h1>Video, audio and images</h1><p>Briefings and explainers from the Raisina Wire desk.</p></div></div>
-  ${list && list.length ? `<section class="watch-shorts" id="shorts" aria-labelledby="shortsTitle"><div class="section-head"><h2 id="shortsTitle">Vertical shorts</h2></div><div class="shorts-grid">${list.map((m, i) => `<button class="short-tile" type="button" data-action="short" data-index="${i}" aria-label="Play: ${esc(m.title)}">${img(m.thumbnailUrl, "")}<span class="play-badge" aria-hidden="true"></span><span class="short-tile-title">${esc(m.title)}</span></button>`).join("")}</div></section>
-  <div class="section-head" style="margin-top:34px"><h2>Videos, audio and images</h2></div>` : ""}
-  <div class="media-grid">${items == null ? `<div class="skeleton" style="height:300px"></div>` : items.length ? items.map(m => `<article class="glass media-card" id="m-${esc(m.id)}">${mediaEmbed(m)}<div class="body"><span class="kicker">${esc(m.category || m.mediaType)}</span><h3>${esc(m.title)}</h3>${m.description ? `<p>${esc(m.description)}</p>` : ""}<span class="meta">${m.publishedAt ? shortDate(m.publishedAt) : ""}</span>${shareBtn(m.title, mediaUrl(m))}</div></article>`).join("") : `<div class="empty">Nothing published yet. Video and audio briefings will appear here.</div>`}</div></div>`;
-  // A shared link (/watch?v=id) opens that short in the player, or scrolls to that video.
+  const all = state.media, sh = all ? shorts() : [], films = all ? all.filter(isFilm) : [], others = all ? all.filter(m => !isShort(m) && !isFilm(m)) : [];
+  state.wLists = {};
+  const prog = progressOf();
+  const cont = films.filter(m => prog[m.id] && prog[m.id].d && prog[m.id].t / prog[m.id].d > 0.04 && prog[m.id].t / prog[m.id].d < 0.94).sort((a, b) => prog[b.id].at - prog[a.id].at);
+  const lastId = Object.entries(prog).sort((a, b) => b[1].at - a[1].at)[0]?.[0], last = films.find(m => m.id === lastId);
+  const because = last ? films.filter(m => m.id !== last.id && m.category === last.category && !(prog[m.id]?.t / prog[m.id]?.d > 0.94)) : [];
+  const byCat = {};
+  films.forEach(m => (byCat[m.category || "More"] ||= []).push(m));
+  const cats = Object.entries(byCat).filter(([, l]) => l.length >= 2).sort((a, b) => b[1].length - a[1].length);
+  const more = Object.entries(byCat).filter(([, l]) => l.length < 2).flatMap(([, l]) => l);
+  const popular = films.filter(m => m.plays > 0).sort((a, b) => b.plays - a.plays).slice(0, 12);
+  $("#view").innerHTML = `<div class="watch">
+    <section class="w-hero"><div class="wrap"><div class="w-hero-grid"><div id="tvSlot" class="tv-slot"></div><aside class="w-onair tv-side glass" id="wOnAir" aria-live="polite"></aside></div></div></section>
+    <div class="wrap">
+      ${all == null ? `<div class="skeleton" style="height:260px;margin-top:30px"></div>` : `
+      <div class="w-tools"><div class="chips" role="tablist">${["All", ...cats.map(([c]) => c)].map(c => `<button class="chip" type="button" data-action="w-cat" data-cat="${esc(c)}" aria-pressed="${c === "All"}">${esc(c === "All" ? "All" : CAT_NAMES[c] || c)}</button>`).join("")}</div>
+        <label class="w-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input type="search" id="wSearch" placeholder="Search explainers" aria-label="Search explainers"></label></div>
+      <div id="wRows">
+        ${sh.length ? `<section class="w-row w-shorts" id="shorts"><div class="w-row-head"><h2>Shorts</h2><span class="meta">${sh.length}</span></div><div class="w-rail">${sh.map((m, i) => `<button class="w-short" type="button" data-action="short" data-index="${i}" aria-label="Play: ${esc(m.title)}">${img(m.thumbnailUrl, "")}<span class="play-badge" aria-hidden="true"></span><b>${esc(m.title)}</b></button>`).join("")}</div></section>` : ""}
+        ${wRow("continue", "Continue watching", cont)}
+        ${wRow("latest", "Latest explainers", films.slice(0, 14))}
+        ${last && because.length ? wRow("because", `Because you watched ${last.title.length > 40 ? last.title.slice(0, 38) + "…" : last.title}`, because) : ""}
+        ${cats.map(([c, l]) => wRow(`cat:${c}`, CAT_NAMES[c] || c, l, ` data-cat="${esc(c)}"`)).join("")}
+        ${wRow("popular", "Most watched", popular)}
+        ${wRow("more", "More explainers", more)}
+        ${others.length ? `<section class="w-row" data-row="other"><div class="w-row-head"><h2>Audio, images and more</h2><span class="meta">${others.length}</span></div><div class="media-grid">${others.map(m => `<article class="glass media-card" id="m-${esc(m.id)}">${mediaEmbed(m)}<div class="body"><span class="kicker">${esc(m.category || m.mediaType)}</span><h3>${esc(m.title)}</h3>${m.description ? `<p>${esc(m.description)}</p>` : ""}${shareBtn(m.title, mediaUrl(m))}</div></article>`).join("")}</div></section>` : ""}
+      </div><div id="wResults" class="w-results" hidden></div>
+      ${!films.length && !sh.length && !others.length ? `<div class="empty">Nothing published yet. Explainers will appear here.</div>` : ""}`}
+    </div></div>`;
+  renderTVSide();
+  $("#wSearch")?.addEventListener("input", e => filterWatch(e.target.value));
+  watchDurations(); watchHover();
+  // A shared link (/watch?v=id) opens that short in the player, or plays that explainer.
   const want = parseRoute().params.get("v");
   if (want && all && openedShared !== want) {
     openedShared = want;
-    const k = list.findIndex(m => m.id === want);
+    const k = sh.findIndex(m => m.id === want);
     if (k >= 0) openShorts(k);
-    else { const card = document.getElementById(`m-${want}`); if (card) { card.scrollIntoView({ block: "center" }); card.classList.add("flash"); if (parseRoute().params.get("play")) card.querySelector("video")?.play().catch(() => {}); } }
+    else if (films.some(m => m.id === want)) openCinema(want, "latest");
   }
+  dockTV(); // the page was redrawn: put Raisina TV back in its slot
 }
+function filterWatch(q, cat) {
+  const rows = $("#wRows"), res = $("#wResults"); if (!rows) return;
+  q = (q || "").trim().toLowerCase();
+  const films = (state.media || []).filter(isFilm);
+  if (!q && (!cat || cat === "All")) { rows.hidden = false; res.hidden = true; return; }
+  const hits = films.filter(m => (!cat || cat === "All" || m.category === cat) && (!q || `${m.title} ${m.description || ""}`.toLowerCase().includes(q)));
+  state.wLists.results = hits.map(m => m.id);
+  rows.hidden = true; res.hidden = false;
+  res.innerHTML = hits.length ? `<div class="w-grid">${hits.map(m => wCard(m, "results")).join("")}</div>` : `<div class="empty">No explainers match.</div>`;
+  watchDurations(); watchHover();
+}
+// Lengths are read from each video file once (only its header) and remembered on the device.
+function watchDurations() {
+  const io = new IntersectionObserver(entries => entries.forEach(e => {
+    if (!e.isIntersecting) return; io.unobserve(e.target);
+    const id = e.target.dataset.dur, m = (state.media || []).find(x => x.id === id); if (!m) return;
+    const v = document.createElement("video"); v.preload = "metadata"; v.muted = true; v.src = m.mediaUrl;
+    v.addEventListener("loadedmetadata", () => { const d = durations(); d[id] = Math.round(v.duration); store.set("rw-durations", d); document.querySelectorAll(`[data-dur="${CSS.escape(id)}"]`).forEach(x => { x.textContent = fmtDur(d[id]); x.hidden = false; }); v.removeAttribute("src"); v.load(); }, { once: true });
+  }), { rootMargin: "200px" });
+  document.querySelectorAll(".w-dur[data-dur]").forEach(x => io.observe(x));
+}
+// Computers: hovering a card enlarges it and plays a silent preview.
+function watchHover() {
+  if (!matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+  document.querySelectorAll(".w-card:not([data-hover])").forEach(c => {
+    c.dataset.hover = "1";
+    let t;
+    c.addEventListener("mouseenter", () => { t = setTimeout(() => {
+      const m = (state.media || []).find(x => x.id === c.dataset.id); if (!m || ytId(m) || c.querySelector("video")) return;
+      const v = document.createElement("video"); v.muted = true; v.playsInline = true; v.loop = true; v.src = m.mediaUrl; v.className = "w-hover-vid";
+      c.querySelector(".w-thumb").append(v); v.play().catch(() => {});
+    }, 550); });
+    c.addEventListener("mouseleave", () => { clearTimeout(t); c.querySelector(".w-hover-vid")?.remove(); });
+  });
+}
+// Phones: a tap opens a detail panel first; computers play straight away.
+function openDetail(id, list) {
+  const m = (state.media || []).find(x => x.id === id); if (!m) return;
+  let el = $("#wDetail");
+  if (!el) { el = document.createElement("dialog"); el.id = "wDetail"; el.className = "w-detail glass"; document.body.append(el); el.addEventListener("click", e => { if (e.target === el || e.target.closest("[data-close]")) el.close(); }); }
+  const d = durations()[id];
+  el.innerHTML = `<div class="w-detail-media">${img(thumbOf(m), "")}<button class="modal-close" type="button" data-close aria-label="Close">×</button></div>
+    <div class="w-detail-body"><span class="kicker">${esc(CAT_NAMES[m.category] || m.category || "Explainer")}${d ? ` · ${fmtDur(d)}` : ""}</span><h2>${esc(m.title)}</h2>${m.description ? `<p>${esc(m.description)}</p>` : ""}
+    <div class="w-detail-actions"><button class="btn btn-red" type="button" data-action="w-play" data-id="${esc(id)}" data-list="${esc(list)}">▶ Play</button>${shareBtn(m.title, mediaUrl(m), "btn btn-light")}</div></div>`;
+  el.showModal();
+}
+// The cinema player: big, dark, with "Up next in 5…" at the end like a streaming service.
+function openCinema(id, list) {
+  const m = (state.media || []).find(x => x.id === id); if (!m) return;
+  $("#wDetail")?.close?.();
+  pauseTVForCinema();
+  let el = $("#cinema");
+  if (!el) {
+    el = document.createElement("div"); el.id = "cinema"; el.className = "cinema"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true");
+    el.innerHTML = `<div class="cin-top"><span class="cin-title"></span><button class="cin-x" type="button" aria-label="Close">×</button></div><video class="cin-video" controls playsinline></video><div class="cin-next" hidden></div>`;
+    document.body.append(el);
+    const v = el.querySelector("video");
+    el.querySelector(".cin-x").addEventListener("click", closeCinema);
+    document.addEventListener("keydown", e => { if (!el.hidden && e.key === "Escape") closeCinema(); });
+    let saved = 0;
+    v.addEventListener("timeupdate", () => {
+      const c = state.cinema; if (!c || !v.duration) return;
+      if (Date.now() - saved > 3000) { saved = Date.now(); const p = progressOf(); p[c.id] = { t: Math.round(v.currentTime), d: Math.round(v.duration), at: Date.now() }; store.set("rw-watch-progress", Object.fromEntries(Object.entries(p).sort((a, b) => b[1].at - a[1].at).slice(0, 60))); }
+      if (v.duration - v.currentTime < 7 && !c.offered) offerNext();
+    });
+    v.addEventListener("loadedmetadata", () => { const d = durations(); d[state.cinema.id] = Math.round(v.duration); store.set("rw-durations", d); });
+  }
+  const v = el.querySelector("video"), ids = (state.wLists?.[list] || (state.media || []).filter(isFilm).map(x => x.id));
+  state.cinema = { id, list, ids, offered: false };
+  el.querySelector(".cin-title").textContent = m.title;
+  el.querySelector(".cin-next").hidden = true;
+  el.querySelector(".cin-frame")?.remove();
+  if (ytId(m)) { // YouTube plays in its own player
+    v.pause(); v.removeAttribute("src"); v.hidden = true;
+    v.insertAdjacentHTML("afterend", `<iframe class="cin-frame" src="https://www.youtube-nocookie.com/embed/${ytId(m)}?autoplay=1" title="${esc(m.title)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`);
+    el.hidden = false; document.body.classList.add("cin-open");
+    beacon({ t: "play", id, src: "watch" });
+    return;
+  }
+  v.hidden = false;
+  const p = progressOf()[id];
+  v.poster = m.thumbnailUrl || ""; v.src = m.mediaUrl;
+  if (p && p.d && p.t / p.d < 0.94 && p.t > 5) v.currentTime = p.t;
+  el.hidden = false; document.body.classList.add("cin-open");
+  v.play().catch(() => {});
+  beacon({ t: "play", id, src: "watch" });
+}
+function offerNext() {
+  const c = state.cinema, el = $("#cinema"); c.offered = true;
+  const nid = c.ids[(c.ids.indexOf(c.id) + 1) % c.ids.length], n = (state.media || []).find(x => x.id === nid);
+  if (!n || nid === c.id) return;
+  const box = el.querySelector(".cin-next");
+  let left = 5;
+  box.innerHTML = `<span class="thumb">${img(n.thumbnailUrl, "")}</span><span><span class="meta">Up next in <b class="cin-n">5</b></span><b>${esc(n.title)}</b></span><span class="cin-next-btns"><button class="btn btn-red btn-sm" type="button" data-go>▶ Play now</button><button class="btn btn-light btn-sm" type="button" data-stay>Cancel</button></span>`;
+  box.hidden = false;
+  clearInterval(offerNext.t);
+  offerNext.t = setInterval(() => { left--; const k = box.querySelector(".cin-n"); if (k) k.textContent = left; if (left <= 0) { clearInterval(offerNext.t); openCinema(nid, c.list); } }, 1000);
+  box.querySelector("[data-go]").onclick = () => { clearInterval(offerNext.t); openCinema(nid, c.list); };
+  box.querySelector("[data-stay]").onclick = () => { clearInterval(offerNext.t); box.hidden = true; };
+}
+function closeCinema() {
+  const el = $("#cinema"); if (!el || el.hidden) return;
+  clearInterval(offerNext.t);
+  const v = el.querySelector("video"); v.pause(); v.removeAttribute("src"); v.load();
+  el.querySelector(".cin-frame")?.remove();
+  el.hidden = true; document.body.classList.remove("cin-open"); state.cinema = null;
+  if (parseRoute().page === "watch") viewWatch();
+}
+function pauseTVForCinema() { document.querySelectorAll("#tvPlayer video").forEach(v => v.pause()); }
 
 /* ---------- Account ---------- */
 function viewAccount() {
@@ -2048,6 +2236,8 @@ articlesReady = loadArticles();
 userReady = fetch("/api/auth/me").then(r => r.json()).then(async d => { state.user = d.user || null; if (state.user) await loadTopics(); }).catch(() => {});
 renderShell();
 startTranslator(document.body); // draws the interface in Hindi or Bengali
+initTV({ beacon, share: shareOut, navigate });
+loadTV().then(() => { if (parseRoute().page === "home") renderHomeMedia(); });
 trackVisit();
 watchScroll();
 maybeSuggestLanguage();

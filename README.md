@@ -81,6 +81,14 @@ Sections: **Overview** (stories, drafts, members, discussions, alert subscribers
 
 Roles are enforced by the API, not just hidden in the page. The built-in admin is `ADMIN_EMAIL` with the `ADMIN_PASSWORD` secret.
 
+### Raisina TV (`/tv`)
+
+A 24×7 channel of the desk's explainers (`media_type` video, uploaded `.mp4`/`.webm`; shorts never play on TV). Each viewer starts with the newest explainer and goes back in time, looping. The broadcast screen has an animated Raisina Wire logo, LIVE and India time, a lower third, an "Up next" card between stories, and a ticker of live updates, Raisina stories and the wire, led by a red BREAKING band when breaking lines are on. Phones start muted ("Tap for sound"; browsers don't allow autoplay with sound). With sound on, TV follows the reader as a floating mini-player; it shows on the lock screen (Media Session), can be cast to a TV (Chromecast/AirPlay) and pauses in the background.
+
+Control room → **Live TV**: on/off; **Break in now** (every viewer cuts to a chosen explainer within ~15 s, with an optional BREAKING NEWS sting; people opening TV more than two minutes later just start normally); breaking ticker lines (many, each on/off); ads (Google Drive "Anyone with the link" share links, converted automatically; keep files under ~100 MB; an ad that won't load is skipped), a break every N minutes of watching (default 12), 1–4 ads per break, skippable after 5 s or not; and the running order ("Use my order": pin to a position, play next, leave out; changes apply at the next switch). Code: `src/tv.js` (player), `src/channel.js` (feed and settings), migration 0018. Plays, TV viewers and minutes, and ad impressions show in Audience.
+
+The Watch page is built around it: Raisina TV as the hero, a shorts carousel, Continue watching, Latest, "Because you watched…", a row per category, Most watched, chips and search, hover previews on computers, a detail panel on phones, and a cinema player with "Up next in 5…".
+
 ### Audience
 
 Returning readers (new vs returning per day, how soon readers come back, weekly retention cohorts), app installs and launches from the home-screen app, notification opt-ins and opt-outs with the current subscriber count, active reading time per story with the share read to the end, and where visits come from (WhatsApp, Facebook, Instagram, X, LinkedIn, Telegram, Google, Google News, email, shared and copied links, notifications, direct), plus devices and languages, for 7, 30 or 90 days with comparisons to the previous period.

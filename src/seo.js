@@ -204,6 +204,7 @@ async function pageFor(path, url, env, o, lang = "en") {
       title: `${m.title} · ${SITE}`, ogTitle: m.title, description: clip(m.description || `${m.mediaType === "short" ? "A short" : "An explainer"} from the Raisina Wire desk.`, 200),
       image: m.thumb ? (/^https?:/.test(m.thumb) ? m.thumb : o + m.thumb) : undefined, body: `<h1>${esc(m.title)}</h1>${m.description ? `<p>${esc(m.description)}</p>` : ""}` };
   }
+  if (section === "tv") return { title: `Raisina TV — live: India and world news explainers, 24×7 · ${SITE}`, description: "Raisina TV plays the desk's latest explainers on geopolitics, security, diplomacy and markets around the clock, with a live news ticker.", body: `<h1>Raisina TV</h1><p>The desk's latest explainers, around the clock, with a live news ticker.</p><p><a href="/watch">All explainers</a></p>` };
   if (section === "watch") {
     const { results: vids } = await env.DB.prepare("SELECT id,title,description,media_type AS mediaType,media_url AS mediaUrl,thumbnail_url AS thumb,published_at AS publishedAt FROM media_items WHERE status='published' AND media_type IN ('video','short') ORDER BY published_at DESC LIMIT 50").all();
     return { title: `Video explainers and shorts on India and the world · ${SITE}`, description: "Video explainers and vertical shorts from the Raisina Wire desk on geopolitics, security, diplomacy and markets.",
@@ -329,7 +330,7 @@ export async function sitemap(request, env, ensureSchema) {
   const bare = p => p.replace(/^\/(hi|bn)(?=\/|$)/, "") || "/";
   const urls = [
     ["/", newest, "hourly", "1.0"], ["/editions", newest, "daily", "0.9"], ["/live", "", "always", "0.8"], ["/markets", "", "always", "0.7"],
-    ...LIVE_CATS.map(c => [`/live/${c}`, "", "always", "0.5"]), ["/community", "", "daily", "0.7"], ["/events", "", "daily", "0.6"], ["/watch", "", "daily", "0.7"], ["/about", "", "monthly", "0.5"], ...LEGAL_ORDER.map(([k]) => [`/${k}`, "", "yearly", "0.2"]),
+    ...LIVE_CATS.map(c => [`/live/${c}`, "", "always", "0.5"]), ["/community", "", "daily", "0.7"], ["/events", "", "daily", "0.6"], ["/watch", "", "daily", "0.7"], ["/tv", "", "hourly", "0.7"], ["/about", "", "monthly", "0.5"], ...LEGAL_ORDER.map(([k]) => [`/${k}`, "", "yearly", "0.2"]),
     ...WRITERS.map(w => [`/author/${w.key}`, newest, "weekly", "0.6"]),
     ...(await allTags(env)).map(t => [`/tag/${t.slug}`, newest, "weekly", "0.5"]),
     ...LANGS.flatMap(l => [[`/${l}`, newest, "hourly", "0.9"], [`/${l}/editions`, newest, "daily", "0.7"]]),
@@ -385,4 +386,4 @@ ${stories.map(s => `<item><title>${xml(s.title)}</title><link>${o}${s.href}</lin
 
 // Paths the Worker renders as HTML pages (the rest are app-only views or static files), tested
 // without the /hi or /bn prefix.
-export const PAGE_PATTERN = /^\/(?:$|editions\/?$|(?:edition|article|author|tag|discussion|coverage)\/[^/]+\/?$|live(?:\/[^/]+)?\/?$|markets\/?$|community\/?$|events\/?$|watch\/?$|(?:about|terms|privacy|disclaimer|copyright|community-guidelines|grievance)\/?$)/;
+export const PAGE_PATTERN = /^\/(?:$|editions\/?$|(?:edition|article|author|tag|discussion|coverage)\/[^/]+\/?$|live(?:\/[^/]+)?\/?$|markets\/?$|community\/?$|events\/?$|watch\/?$|tv\/?$|(?:about|terms|privacy|disclaimer|copyright|community-guidelines|grievance)\/?$)/;
