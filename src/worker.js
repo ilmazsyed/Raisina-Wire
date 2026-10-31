@@ -300,6 +300,8 @@ async function mtLive(env, lang, item, updates) {
   const bodies = await Promise.all(updates.map(u => translateBody(env, lang, u.body)));
   updates.forEach((u, i) => { if (bodies[i] !== u.body) { u.body = bodies[i]; u.mt = true; } });
 }
+// Ticker text without the editor's formatting marks (**bold**, [links](…), # headings).
+const plainText = t => String(t || "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/\*\*|__|`|^#+\s*/gm, "").replace(/\s+/g, " ").trim();
 // Raisina TV's feed: running order, ad settings, breaking lines, the ticker and the break-in switch.
 async function tvFeed(env, ctx, lang) {
   const settings = await tvSettings(env);
@@ -311,7 +313,7 @@ async function tvFeed(env, ctx, lang) {
   const wire = await cached(`wire${lang}`, 90e3, () => wireIn(env, ctx, lang)).catch(() => ({ items: [] }));
   if (lang) { await translateFields(env, lang, playlist, ["title", "description"], { cacheOnly: true }); await translateFields(env, lang, live, ["title", "latest"], { cacheOnly: true }); }
   const ticker = [
-    ...live.map(c => ({ kind: "live", text: c.latest ? `${c.title}: ${String(c.latest).replace(/\s+/g, " ").slice(0, 160)}` : c.title, href: `/coverage/${encodeURIComponent(c.slug)}` })),
+    ...live.map(c => ({ kind: "live", text: c.latest ? `${c.title}: ${plainText(c.latest).slice(0, 160)}` : c.title, href: `/coverage/${encodeURIComponent(c.slug)}` })),
     ...stories.slice(0, 6).map(a => ({ kind: "story", text: a.title, href: a.href })),
     ...(wire.items || []).slice(0, 12).map(i => ({ kind: "wire", text: i.title, source: i.source }))
   ];
