@@ -28,6 +28,13 @@ const ICONS = {
   pause: icon('<path d="M8 5v14M16 5v14" stroke-width="3"/>')
 };
 const DOME = (cls = "sq-dome") => markDome(cls, 3.4);
+// The on-screen bug, in the style of the shorts' logo: the app icon, RAISINA WIRE, and LIVE under it.
+// It sits exactly over the logo printed in the explainers and stays on screen through everything.
+const BUG = `<span class="tv-logo" aria-label="Raisina Wire Live"><span class="tv-app">${markDome("tv-dome", 4)}<span class="tv-app-tri"><i></i><i></i><i></i></span></span><span class="tv-bug-t"><span class="tv-word">RAISINA <b>WIRE</b></span><span class="tv-bug-live"><span class="pulse"></span>LIVE</span></span></span>`;
+// A broadcast studio backdrop: deep crimson and navy, slow light ribbons and a turning globe grid.
+const GLOBE = `<svg class="bx-globe" viewBox="-100 -100 200 200" aria-hidden="true"><circle r="96"/>${[20, 45, 70, 90].map(r => `<ellipse rx="${r}" ry="96"/>`).join("")}${[-64, -32, 0, 32, 64].map(y => `<ellipse cy="${y}" rx="${Math.round(Math.sqrt(96 * 96 - y * y))}" ry="${Math.round(Math.sqrt(96 * 96 - y * y) * 0.18)}"/>`).join("")}</svg>`;
+const STUDIO = `<span class="bx-bg" aria-hidden="true"><i class="bx-r1"></i><i class="bx-r2"></i><i class="bx-r3"></i>${GLOBE}<i class="bx-grain"></i></span>`;
+const dateNow = () => new Date().toLocaleDateString(LOCALE, { ...IST, weekday: "long", day: "numeric", month: "long" });
 const TRI = `<span class="sq-tri"><i></i><i></i><i></i></span>`;
 const clockNow = () => new Date().toLocaleTimeString(LOCALE, { ...IST, hour: "2-digit", minute: "2-digit", hour12: false });
 
@@ -37,7 +44,7 @@ let idx = 0, mode = "idle", engaged = false, sinceAd = 0, adQueue = [], adIdx = 
 let lastTick = 0, unsent = 0, pollTimer = 0, clockTimer = 0, wasPaused = false, startedAt = 0;
 let seqToken = 0, paused = false, sinceFull = 0, setCursor = 0, shortCursor = 0, stingCursor = 0, lastBulletin = -1, inputOn = null;
 // Tests only (localStorage rw-tv-debug): make the next switch an ad break, poll at once, inspect.
-if (ls.get("rw-tv-debug", false)) window.__tv = { adNow: () => { sinceAd = 1e9; }, fullNext: () => { sinceFull = 99; }, poll: () => load(), state: () => ({ mode, idx, paused, src: video?.currentSrc, seq: root?.querySelector(".tv-seq")?.dataset.kind || "", input: inputOn?.id || null }) };
+if (ls.get("rw-tv-debug", false)) window.__tv = { adNow: () => { sinceAd = 1e9; }, fullNext: () => { sinceFull = 99; }, bulletinNext: () => { forceBulletin = true; sinceFull = 99; }, poll: () => load(), state: () => ({ mode, idx, paused, src: video?.currentSrc, seq: root?.querySelector(".tv-seq")?.dataset.kind || "", input: inputOn?.id || null }) };
 
 export function initTV(d) { deps = d; }
 export const tvFeed = () => feed;
@@ -68,8 +75,7 @@ function build() {
       <video class="tv-video" playsinline muted preload="auto" x-webkit-airplay="allow"></video>
       <div class="tv-input" hidden></div>
       <div class="tv-seq" hidden aria-live="polite"></div>
-      <div class="tv-top"><span class="tv-logo" aria-label="Raisina Wire TV">${markDome("tv-dome", 4)}<span class="tv-word">RAISINA<b> WIRE</b></span><span class="tv-tri"><i></i><i></i><i></i></span></span>
-        <span class="tv-grow"></span><span class="tv-live"><span class="pulse"></span>LIVE</span><span class="tv-clock" aria-hidden="true"></span></div>
+      <div class="tv-top">${BUG}<span class="tv-clock" aria-hidden="true"></span></div>
       <div class="tv-lower" hidden><span class="tv-cat"></span><b class="tv-title"></b></div>
       <div class="tv-ad" hidden><span class="tv-ad-k">${esc(tr("Advertisement"))}</span><span class="tv-ad-n"></span><button type="button" class="tv-ad-skip" hidden>${esc(tr("Skip ad"))} ›</button></div>
       <div class="tv-paused" aria-hidden="true">${ICONS.pause}</div>
@@ -165,7 +171,7 @@ function wait(ms, tok) {
 function renderTicker() {
   if (!root || !feed) return;
   const br = root.querySelector(".tv-tk-break"), track = root.querySelector(".tv-tk-track");
-  br.hidden = !feed.breaking.length;
+  br.hidden = false;
   br.textContent = tr("BREAKING");
   const label = { live: tr("LIVE"), story: "RAISINA WIRE", wire: "" };
   const items = [
@@ -327,14 +333,19 @@ async function promo(tok) {
     <span class="pm-end" style="--d:12.6s">${DOME("pm-dome")}<b>RAISINA <em>WIRE</em></b><span>raisinawire.calibrex.org</span>${TRI}</span>`);
   await wait(15000, tok); stop(0.8);
 }
-// Top of the hour: a 5-second countdown into the bulletin.
+// Top of the hour: a 5-second countdown into the bulletin, a ring of 60 ticks filling up.
 async function countdown(tok) {
   const stop = score({ sting: true });
-  showSeq("count", `<span class="cd-k">${esc(tr("Raisina TV"))} · ${esc(hourLabel())}</span><b class="cd-n">5</b>`);
+  const ticks = Array.from({ length: 60 }, (_, k) => `<line x1="0" y1="-92" x2="0" y2="${k % 5 ? -84 : -78}" transform="rotate(${k * 6})" style="--k:${k}"/>`).join("");
+  showSeq("count", `${STUDIO}<span class="cd-wrap"><svg class="cd-ring" viewBox="-100 -100 200 200" aria-hidden="true">${ticks}</svg>
+    <span class="cd-c"><small>RAISINA WIRE</small><b>${esc(hourLabel())}</b><em>${esc(tr("BULLETIN"))}</em></span></span>
+    <span class="cd-sub">${esc(dateNow())} · <b class="cd-n">5</b></span>`);
   for (let n = 5; n >= 1; n--) { const b = seqEl().querySelector(".cd-n"); if (b) { b.textContent = n; b.classList.remove("tick"); void b.offsetWidth; b.classList.add("tick"); } if (!await wait(1000, tok)) break; }
   stop(0.4);
 }
+let forceBulletin = false;
 function bulletinDue() {
+  if (forceBulletin) { forceBulletin = false; return true; }
   const d = new Date(Date.now() + 5.5 * 3600e3), h = d.getUTCHours(), m = d.getUTCMinutes();
   if (h !== lastBulletin && m < 20) { lastBulletin = h; return true; }
   return false;
@@ -353,18 +364,34 @@ function pickSets() {
   for (let k = 0; out.length < want && k * 5 < feed.ticker.length; k++) out.push({ topic: "Latest", items: feed.ticker.slice(k * 5, k * 5 + 5).map(t => ({ text: t.text, source: t.source })) });
   return out.slice(0, want);
 }
+// A picture for a set: its first story picture, else one of the site's own (as a fallback layer).
+function setPic(st, i) {
+  const own = feed.promo || [], img = st.items?.find(h => h.img)?.img;
+  const fallback = own.length ? own[(setCursor * 3 + i) % own.length] : "";
+  return [img, fallback].filter(Boolean);
+}
+const picStyle = (urls, css = "") => urls.length ? ` style="background-image:${urls.map(u => `url('${esc(String(u).replace(/'/g, "%27"))}')`).join(",")};${css}"` : (css ? ` style="${css}"` : "");
 async function newsUpdate(tok, bulletin) {
   const sets = pickSets(), per = (feed.seq?.setSeconds || 7) * 1000;
   if (!sets.length) return;
-  const stop = score({ sting: true, bed: 2.2 + sets.length * per / 1000 });
-  showSeq("nu", `<span class="nu-title">${DOME("nu-dome")}<b>${bulletin ? esc(tr("BULLETIN")) : esc(tr("NEWS UPDATE"))}</b><span>${bulletin ? `${esc(hourLabel())} · ` : ""}${esc(clockNow())} IST</span></span>`);
-  if (!await wait(2200, tok)) return stop(0.3);
+  const stop = score({ sting: true, bed: 3 + sets.length * per / 1000 });
+  const label = bulletin ? tr("BULLETIN") : tr("NEWS UPDATE");
+  // Title card.
+  showSeq("nu", `${STUDIO}<span class="bx-card"><span class="bx-k"><span class="pulse"></span>RAISINA WIRE · ${esc(tr("LIVE"))}</span>
+    <b class="bx-big">${esc(label)}${bulletin ? ` <em>${esc(hourLabel())}</em>` : ""}</b><span class="bx-line"></span>
+    <span class="bx-meta">${esc(dateNow())} · ${esc(clockNow())} IST</span></span>`);
+  if (!await wait(3000, tok)) return stop(0.3);
   for (let i = 0; i < sets.length; i++) {
-    const st = sets[i];
-    showSeq("nu", `<span class="nu-head"><span class="nu-topic${st.live ? " live" : ""}">${st.live ? `<span class="pulse"></span>` : ""}${esc(tr(st.topic))}</span><span class="nu-n">${i + 1} / ${sets.length}</span></span>
-      ${st.markets ? `<span class="nu-mkts">${st.markets.map((q, k) => `<span class="nu-mkt" style="--i:${k}"><small>${esc(tr(q.label))}</small><b>${Number(q.value).toLocaleString(LOCALE, { maximumFractionDigits: q.value < 100 ? 2 : 0 })}</b><em class="${q.pct >= 0 ? "up" : "down"}">${q.pct >= 0 ? "▲" : "▼"} ${Math.abs(q.pct ?? 0).toFixed(2)}%</em></span>`).join("")}</span>`
-      : `<ol class="nu-list">${st.items.slice(0, 5).map((h, k) => `<li style="--i:${k}"><b>${esc(h.text)}</b>${h.source ? `<small>${esc(h.source)}</small>` : ""}</li>`).join("")}</ol>`}
-      <span class="nu-bar" style="--t:${per}ms"></span>`);
+    const st = sets[i], items = (st.items || []).slice(0, 5), slot = Math.max(700, (per - 1000) / Math.max(items.length, 1));
+    const pic = st.markets ? [] : setPic(st, i);
+    const prog = sets.map((_, k) => `<i class="${k < i ? "done" : k === i ? "on" : ""}"${k === i ? ` style="--t:${per}ms"` : ""}></i>`).join("");
+    const body = st.markets
+      ? `<span class="bx-mkts">${st.markets.map((q, k) => `<span class="bx-mkt" style="--i:${k}"><small>${esc(tr(q.label))}</small><b>${Number(q.value).toLocaleString(LOCALE, { maximumFractionDigits: q.value < 100 ? 2 : 0 })}</b><em class="${q.pct >= 0 ? "up" : "down"}">${q.pct >= 0 ? "▲" : "▼"} ${Math.abs(q.pct ?? 0).toFixed(2)}%</em></span>`).join("")}</span>`
+      : `<ol class="bx-list" style="--slot:${Math.round(slot)}ms">${items.map((h, k) => `<li style="--i:${k}"><span class="bx-no">${k + 1}</span><span class="bx-h"><b>${esc(h.text)}</b>${h.source ? `<small>${esc(h.source)}</small>` : ""}</span></li>`).join("")}</ol>`;
+    showSeq("nu", `${STUDIO}${pic.length ? `<span class="bx-pic"><span class="bx-pic-i"${picStyle(pic)}></span></span>` : ""}
+      <span class="bx-panel${pic.length ? "" : " wide"}"><span class="bx-head">
+        <span class="bx-strap"><span class="bx-seg">${esc(label)}</span><span class="bx-topic${st.live ? " live" : ""}${st.pin ? " pin" : ""}">${st.live ? `<span class="pulse"></span>` : ""}${esc(tr(st.topic))}</span></span>
+        <span class="bx-prog">${prog}</span></span>${body}</span>`);
     if (!await wait(per, tok)) return stop(0.3);
   }
   stop(0.8);

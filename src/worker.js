@@ -320,18 +320,22 @@ async function tvFeed(env, ctx, lang) {
   const clipText = (t, n) => { if (t.length <= n) return t; const c = t.slice(0, n), end = Math.max(c.lastIndexOf(". "), c.lastIndexOf("? "), c.lastIndexOf("! ")); return end > n * 0.5 ? c.slice(0, end + 1) : `${c.slice(0, c.lastIndexOf(" ")).replace(/[,;:\s]+$/, "")}…`; };
   // News Update: headline sets by topic, five each (the desk's stories first, then the wire).
   const byTopic = new Map();
-  for (const h of [...stories.map(a => ({ t: a.title, c: a.category, src: "Raisina Wire" })), ...(wire.items || []).map(i => ({ t: i.title, c: i.category, src: i.source }))]) {
+  const okImg = u => u && /^(https:|\/)/.test(u) ? u : null;
+  for (const h of [...stories.map(a => ({ t: a.title, c: a.category, src: "Raisina Wire", img: okImg(a.heroUrl || a.imageUrl || a.image) })), ...(wire.items || []).map(i => ({ t: i.title, c: i.category, src: i.source, img: okImg(i.image) }))]) {
     if (!h.c || !h.t) continue;
     const l = byTopic.get(h.c) || []; if (l.length < 5 && !l.some(x => x.t === h.t)) l.push(h); byTopic.set(h.c, l);
   }
-  const sets = [...byTopic.entries()].filter(([, l]) => l.length >= 5).map(([topic, l]) => ({ topic, items: l.map(x => ({ text: x.t, source: x.src })) }));
+  const sets = [...byTopic.entries()].filter(([, l]) => l.length >= 5).map(([topic, l]) => ({ topic, items: l.map(x => ({ text: x.t, source: x.src, ...(x.img ? { img: x.img } : {}) })) }));
   if (liveUps.length >= 3) sets.unshift({ topic: "Live", live: true, items: liveUps.map(u => ({ text: clipText(plainText(u.body), 150), source: String(u.title || "").split(/[:;—|]/)[0].trim().slice(0, 28) })) });
   const input = inputs.find(i => i.onAir && i.source);
+  // The breaking ticker runs from the live wires: the latest from each live coverage, then the
+  // newest wire headlines (the editor's breaking lines lead it, added in the player).
   const ticker = [
-    ...live.map(c => ({ kind: "live", text: c.latest ? `${c.title}: ${plainText(c.latest).slice(0, 160)}` : c.title, href: `/coverage/${encodeURIComponent(c.slug)}` })),
-    ...stories.slice(0, 6).map(a => ({ kind: "story", text: a.title, href: a.href })),
-    ...(wire.items || []).slice(0, 12).map(i => ({ kind: "wire", text: i.title, source: i.source }))
+    ...live.map(c => ({ kind: "live", text: c.latest ? `${String(c.title || "").split(/[:;—|]/)[0].trim()}: ${clipText(plainText(c.latest), 160)}` : c.title, href: `/coverage/${encodeURIComponent(c.slug)}` })),
+    ...[...(wire.items || [])].sort((a, b) => String(b.publishedAt || "").localeCompare(String(a.publishedAt || ""))).slice(0, 24).map(i => ({ kind: "wire", text: i.title, source: i.source }))
   ];
+  // If the wire can't be reached, the desk's own latest stories keep the ticker running.
+  if (ticker.length < 8) ticker.push(...stories.slice(0, 8).map(a => ({ kind: "story", text: a.title, href: a.href })));
   return { on: settings.on, every: settings.every, perBreak: settings.perBreak, skippable: settings.skippable, force: settings.force || null,
     playlist: playlist.map(v => ({ id: v.id, title: v.title, description: v.description, category: v.category, src: v.mediaUrl, thumb: v.thumbnailUrl, publishedAt: v.publishedAt })),
     ads: ads.filter(a => a.src).map(a => ({ id: a.id, title: a.title, src: a.src })), breaking: breaking.map(b => b.text), ticker,
