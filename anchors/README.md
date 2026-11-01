@@ -36,6 +36,14 @@ anchor carries an on-screen "AI" label.
   line without a recording shows as a caption. Lines whose words change are said in a fixed form,
   with the words on screen: "Breaking news. Here is what we know." over the breaking story, and
   "We're bringing you live visuals now." over the live input's caption.
+- **Live reads:** the breaking story and the live caption are also read in full, in the same voice
+  ("Breaking news. {line}", "We're bringing you live visuals of {caption}"). Kokoro can't run on the
+  live site, so these are recorded in the editor's browser: whenever the control room's Raisina TV
+  page is open, it records any line the channel is waiting for (breaking lines on air, the last
+  break-in headline, every live input) and uploads it to D1 (`src/anchorrecord.js`). The first
+  time, the browser downloads the voice model, about 90 MB, from Hugging Face. Until a read is
+  recorded, Tara says the fixed line above. The blended voice the browser uses is
+  `public/anchors/<key>-voice.bin` (the same blend as the recordings).
 - **Who is ready:** only anchors listed in `READY` in `src/anchors.js` go on air. For now that is
   Tara alone: she presents every hour, and introduces Ilmaz's Editor's Picks as "Today's Editor's
   Pick". To add an anchor, render their faces (below), put the files in `public/anchors/`, and add

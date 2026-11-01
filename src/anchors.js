@@ -49,6 +49,21 @@ export const FIXED = {
   live: "We're bringing you live visuals now."
 };
 const camFor = (who, it) => who === "ilmaz" ? it.cam : it.cam.replace(/^My pick today\.\s*/, "Today's Editor's Pick. ");
+// Live reads: the breaking story and the live caption in the anchor's own words. Recorded in the
+// editor's browser from the control room (src/anchorrecord.js) and kept in D1; until a read is
+// recorded the anchor says the fixed line with the words on screen.
+export const READ = {
+  breaking: t => `Breaking news. ${end(clip(t, 220))}`,
+  live: t => `We're bringing you live visuals of ${end(clip(t, 120))}`
+};
+// The live reads to record now, for each anchor on air: every breaking line on air, the last
+// break-in's headline, and every live input (so a cut is voiced the moment it happens).
+export async function liveReads({ breaking = [], inputs = [], force = null }) {
+  const texts = [...new Set([...breaking.map(READ.breaking), ...(force?.text ? [READ.breaking(force.text)] : []), ...inputs.map(i => READ.live(i.title))])];
+  const out = [];
+  for (const k of READY.filter(k => ROTA.includes(k))) for (const t of texts) out.push({ id: await lineId(k, t), anchor: k, voice: ANCHORS[k].voice, voiceFile: `/anchors/${k}-voice.bin`, text: t });
+  return out;
+}
 // Every line an anchor can say (for recording): the intros, both ways for the Editor's Picks, and
 // the fixed lines, including a bulletin line for each hour.
 export function allLines(anchor) {
@@ -59,7 +74,7 @@ export function allLines(anchor) {
 
 // Everything the anchors say on the channel right now (English channel only).
 // playlist: [{ id, src, editorPick }]; input: the live input on air; breaking: the editor's lines.
-export async function anchorLines({ playlist, input, breaking, force, now = Date.now() }) {
+export async function anchorLines({ playlist, input, breaking, force, voiced = new Set(), now = Date.now() }) {
   const duty = onDuty(now), h = istHour(now);
   const intros = {};
   for (const v of playlist) {
@@ -71,11 +86,16 @@ export async function anchorLines({ playlist, input, breaking, force, now = Date
     if (cam && vo && out) intros[v.id] = { anchor: who, pick: Boolean(v.editorPick), cam, vo, out };
   }
   const brk = force?.breaking ? (force.text || breaking[0] || "") : (breaking[0] || "");
-  // The breaking story and the live caption go on screen; the anchor says the fixed line.
+  // The breaking story and the live caption: read in full once recorded (live reads), otherwise
+  // the fixed line. Either way the words are on screen.
+  const read = async (text, fixed, show) => {
+    const l = await line(duty, text);
+    return voiced.has(l.id) ? { ...l, audio: `/api/tv/voice/${l.id}`, show } : { ...await line(duty, fixed), show };
+  };
   const [news, bulletin, headlines, breakingLine, live] = await Promise.all([
     line(duty, FIXED.news), line(duty, FIXED.bulletin(h)), line(duty, FIXED.headlines),
-    brk ? line(duty, FIXED.breaking).then(l => ({ ...l, show: end(clip(brk, 220)) })) : null,
-    input ? line(duty, FIXED.live).then(l => ({ ...l, show: clip(input.title, 120) })) : null
+    brk ? read(READ.breaking(brk), FIXED.breaking, end(clip(brk, 220))) : null,
+    input ? read(READ.live(input.title), FIXED.live, clip(input.title, 120)) : null
   ]);
   return {
     duty, roster: Object.fromEntries(Object.entries(ANCHORS).map(([k, a]) => [k, { name: a.name, role: a.role }])),
