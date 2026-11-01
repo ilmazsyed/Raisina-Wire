@@ -4,12 +4,12 @@
 const DEFAULTS = { on: true, every: 12, perBreak: 1, skippable: false, manual: false, force: null, seq: {}, pinset: null };
 // Between videos: a short 5–7 s transition, and every `fullEvery` videos the full package
 // (stinger, 15 s promo, News Update). Built-in music themes can be switched off one by one.
-export const SEQ_DEFAULTS = { stinger: true, promo: true, news: true, fullEvery: 2, sets: 3, setSeconds: 7, music: true, hourly: true, themes: { pulse: true, bright: true, cinema: true, beat: true } };
+export const SEQ_DEFAULTS = { stinger: true, promo: true, news: true, fullEvery: 2, sets: 3, setSeconds: 7, music: true, hourly: true, anchors: true, themes: { pulse: true, bright: true, cinema: true, beat: true } };
 const cleanSeq = v => {
   const o = { ...SEQ_DEFAULTS, ...(v && typeof v === "object" ? v : {}) };
   return { stinger: !!o.stinger, promo: !!o.promo, news: !!o.news, fullEvery: Math.min(Math.max(Math.round(Number(o.fullEvery)) || 2, 1), 6),
     sets: Math.min(Math.max(Math.round(Number(o.sets)) || 3, 3), 5), setSeconds: Math.min(Math.max(Math.round(Number(o.setSeconds)) || 7, 5), 12),
-    music: !!o.music, hourly: !!o.hourly, themes: Object.fromEntries(Object.keys(SEQ_DEFAULTS.themes).map(k => [k, o.themes?.[k] !== false])) };
+    music: !!o.music, hourly: !!o.hourly, anchors: o.anchors !== false, themes: Object.fromEntries(Object.keys(SEQ_DEFAULTS.themes).map(k => [k, o.themes?.[k] !== false])) };
 };
 // A headline set the desk writes itself (e.g. "Election results"); it leads the next News Update.
 const cleanPinset = v => {
