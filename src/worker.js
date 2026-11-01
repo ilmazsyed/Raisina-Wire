@@ -323,7 +323,7 @@ async function tvFeed(env, ctx, lang) {
     const l = byTopic.get(h.c) || []; if (l.length < 5 && !l.some(x => x.t === h.t)) l.push(h); byTopic.set(h.c, l);
   }
   const sets = [...byTopic.entries()].filter(([, l]) => l.length >= 5).map(([topic, l]) => ({ topic, items: l.map(x => ({ text: x.t, source: x.src })) }));
-  if (liveUps.length >= 3) sets.unshift({ topic: "Live", live: true, items: liveUps.map(u => ({ text: plainText(u.body).slice(0, 150), source: u.title })) });
+  if (liveUps.length >= 3) sets.unshift({ topic: "Live", live: true, items: liveUps.map(u => ({ text: plainText(u.body).slice(0, 150), source: String(u.title || "").split(/[:;—|]/)[0].trim().slice(0, 28) })) });
   const input = inputs.find(i => i.onAir && i.source);
   const ticker = [
     ...live.map(c => ({ kind: "live", text: c.latest ? `${c.title}: ${plainText(c.latest).slice(0, 160)}` : c.title, href: `/coverage/${encodeURIComponent(c.slug)}` })),
