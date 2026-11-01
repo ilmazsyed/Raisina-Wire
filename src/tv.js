@@ -384,6 +384,24 @@ function setPic(st, i) {
   return [img, fallback].filter(Boolean);
 }
 const picStyle = (urls, css = "") => urls.length ? ` style="background-image:${urls.map(u => `url('${esc(String(u).replace(/'/g, "%27"))}')`).join(",")};${css}"` : (css ? ` style="${css}"` : "");
+const listHtml = (its, start, slot) => `<ol class="bx-list" style="--slot:${Math.round(slot)}ms">${its.map((h, k) => `<li style="--i:${k}"><span class="bx-no">${start + k + 1}</span><span class="bx-h"><b>${esc(h.text)}</b>${h.source || h.at ? `<small>${esc([h.source, h.at ? ago(h.at) : ""].filter(Boolean).join(" · "))}</small>` : ""}</span></li>`).join("")}</ol>`;
+// Shrinks the headline text in small steps (to 77%, or 92% on phones) until the list fits; false if it never does.
+function fitList(ol) {
+  const panel = ol?.closest(".bx-panel"); if (!panel) return true;
+  const floor = ol.clientWidth < 460 ? 0.92 : 0.77; // phones: split rather than shrink
+  for (let fs = 1; fs >= floor; fs -= 0.04) { panel.style.setProperty("--fs", fs.toFixed(2)); if (ol.scrollHeight <= ol.clientHeight + 1) return true; }
+  return false;
+}
+// Splits a set's headlines into screens that each fit in full, measured in the live layout.
+function paginate(items) {
+  const pages = []; let rest = items.slice();
+  while (rest.length) {
+    let n = rest.length;
+    for (; n > 1; n--) { const ol = seqEl().querySelector(".bx-list"); if (!ol) break; ol.outerHTML = listHtml(rest.slice(0, n), 0, 1000); if (fitList(seqEl().querySelector(".bx-list"))) break; }
+    pages.push(rest.slice(0, n)); rest = rest.slice(n);
+  }
+  return pages;
+}
 async function newsUpdate(tok, bulletin, over = null) {
   const sets = over?.sets || pickSets(), per = (feed.seq?.setSeconds || 7) * 1000;
   if (!sets.length) return;
@@ -400,12 +418,21 @@ async function newsUpdate(tok, bulletin, over = null) {
     const prog = sets.map((_, k) => `<i class="${k < i ? "done" : k === i ? "on" : ""}"${k === i ? ` style="--t:${per}ms"` : ""}></i>`).join("");
     const body = st.markets
       ? `<span class="bx-mkts">${st.markets.map((q, k) => `<span class="bx-mkt" style="--i:${k}"><small>${esc(tr(q.label))}</small><b>${Number(q.value).toLocaleString(LOCALE, { maximumFractionDigits: q.value < 100 ? 2 : 0 })}</b><em class="${q.pct >= 0 ? "up" : "down"}">${q.pct >= 0 ? "▲" : "▼"} ${Math.abs(q.pct ?? 0).toFixed(2)}%</em></span>`).join("")}</span>`
-      : `<ol class="bx-list" style="--slot:${Math.round(slot)}ms">${items.map((h, k) => `<li style="--i:${k}"><span class="bx-no">${k + 1}</span><span class="bx-h"><b>${esc(h.text)}</b>${h.source || h.at ? `<small>${esc([h.source, h.at ? ago(h.at) : ""].filter(Boolean).join(" · "))}</small>` : ""}</span></li>`).join("")}</ol>`;
+      : listHtml(items, 0, slot);
     showSeq("nu", `${STUDIO}${pic.length ? `<span class="bx-pic"><span class="bx-pic-i"${picStyle(pic)}></span></span>` : ""}
       <span class="bx-panel${pic.length ? "" : " wide"}"><span class="bx-head">
         <span class="bx-strap"><span class="bx-seg">${esc(label)}</span><span class="bx-topic${st.live ? " live" : ""}${st.pin ? " pin" : ""}">${st.live ? `<span class="pulse"></span>` : ""}${esc(tr(st.topic))}</span></span>
         <span class="bx-prog">${prog}</span></span>${body}</span>`);
-    if (!await wait(per, tok)) return stop(0.3);
+    if (st.markets) { if (!await wait(per, tok)) return stop(0.3); continue; }
+    // Every headline in full: the text steps down a little if it must, and if five still don't
+    // fit (phones) the set splits into screens that share the set's time.
+    const pages = paginate(items);
+    for (let pg = 0, start = 0; pg < pages.length; start += pages[pg].length, pg++) {
+      const n = pages[pg].length, ms = per * n / items.length;
+      const ol = seqEl().querySelector(".bx-list");
+      if (ol) { ol.outerHTML = listHtml(pages[pg], start, Math.max(600, (ms - 900) / n)); fitList(seqEl().querySelector(".bx-list")); }
+      if (!await wait(ms, tok)) return stop(0.3);
+    }
   }
   stop(0.8);
 }
