@@ -24,7 +24,7 @@ import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { liveResults } from "./results.js";
 import { handleTts } from "./tts.js";
-import { anchorLines, liveReads, READ } from "./anchors.js";
+import { anchorLines, liveReads, READ, spoken } from "./anchors.js";
 // Every headline Raisina TV can show (the anchor reads them): breaking lines, Breaking Headlines,
 // the News Update sets and the desk's own set.
 const tvHeads = ({ breaking = [], recent = [], sets = [], pinset = null }) => [...new Set([...breaking, ...recent.map(r => r.text), ...sets.flatMap(st => (st.items || []).map(i => i.text)), ...(pinset?.on ? pinset.items : [])].filter(Boolean))];
@@ -1068,7 +1068,7 @@ async function api(request, env, ctx) {
     const reads = await liveReads({ breaking: (await tvBreaking(env)).map(b => b.text), inputs: (await tvInputs(env)).filter(i => i.source), force: settings.force, heads: tvHeads({ breaking: f.breaking, recent: f.recent, sets: f.sets, pinset: settings.pinset }) });
     const have = reads.length ? new Set((await env.DB.prepare(`SELECT key FROM tts_audio WHERE key IN (${reads.map(() => "?").join(",")})`).bind(...reads.map(r => r.id)).all()).results.map(r => r.key)) : new Set();
     const todo = settings.seq.anchors === false ? [] : reads.filter(r => !have.has(r.id));
-    if (request.method === "GET") return json({ todo }, 200, { "cache-control": "no-store" });
+    if (request.method === "GET") return json({ todo: todo.map(r => ({ ...r, say: spoken(r.text) })) }, 200, { "cache-control": "no-store" });
     // Only a read the channel needs, as a WAV or MP3 file of reasonable size.
     const id = url.pathname.slice(20), r = todo.find(x => x.id === id) || reads.find(x => x.id === id);
     if (!r) return err("That line isn't needed on air.", 404);

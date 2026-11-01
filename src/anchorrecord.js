@@ -72,7 +72,7 @@ export function recordLiveReads(status = () => {}) {
     for (const [i, job] of todo.entries()) {
       status(`Recording the anchor's live read ${i + 1} of ${todo.length}: “${job.text}”`);
       const voice = `b_rw_${job.anchor}_1`; // bump the number when a voice blend changes (the browser caches voices by name)
-      const a = await withVoice(voice, job.voiceFile, () => t.generate(job.text, { voice, speed: SPEED }));
+      const a = await withVoice(voice, job.voiceFile, () => t.generate(job.say || job.text, { voice, speed: SPEED }));
       const body = wav(await polish(trim(a.audio), a.sampling_rate), a.sampling_rate);
       const up = await fetch(`/api/admin/tv/voice/${job.id}`, { method: "PUT", body, headers: { "content-type": "audio/wav" } });
       if (!up.ok) throw new Error((await up.json().catch(() => ({}))).error || "Upload failed.");

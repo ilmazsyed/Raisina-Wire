@@ -274,6 +274,16 @@ function playStory(i) {
 // over the explainer's opening pictures (muted), back on camera for the hand-off, then the film
 // from the start. Without an intro (or with anchors off) the explainer just plays.
 const anchorsOn = () => Boolean(anchor && feed?.anchors && feed.seq?.anchors !== false);
+// The anchor introduces herself ("Hello and welcome… My name is Tara, and you're watching Raisina
+// Wire Live") when TV starts, when a new anchor takes over, and when she's back on screen after
+// half an hour. Resolves false if a newer sequence took over.
+let helloWho = "", helloAt = 0;
+async function hello(key, tok) {
+  const h = feed?.anchors?.lines?.hello;
+  if (!anchorsOn() || !h || h.anchor !== key || (helloWho === key && Date.now() - helloAt < 30 * 60e3)) return true;
+  helloWho = key; helloAt = Date.now();
+  return anchor.say(h, () => tok === seqToken);
+}
 async function introStory(i) {
   if (!feed?.playlist.length) return playStory(i);
   const n = ((i % feed.playlist.length) + feed.playlist.length) % feed.playlist.length, v = feed.playlist[n];
@@ -286,7 +296,7 @@ async function introStory(i) {
   prefetchLines([it.vo, it.out]);
   const who = { key: it.anchor, roster: feed.anchors.roster, pick: it.pick ? tr("EDITOR’S PICK") : "" };
   anchor.shot("cam", who);
-  if (!await anchor.say(it.cam, alive)) return;
+  if (!await hello(it.anchor, tok) || !await anchor.say(it.cam, alive)) return;
   // Voice over: the explainer's pictures one after another with a Raisina Wire wipe (the film
   // itself waits at its first frame, so it starts cleanly afterwards).
   const pics = TV_INTRO_PICS[String(v.src || "").split("?")[0]] || [v.thumb].filter(Boolean);
@@ -488,7 +498,7 @@ async function newsUpdate(tok, bulletin, over = null) {
   // The anchor introduces it from a window beside the title card.
   const al = feed.anchors?.lines, aLine = !anchorsOn() ? null : over ? al?.headlines : bulletin ? al?.bulletin : al?.news;
   if (aLine) { root.classList.add("anchor-pip"); anchor.shot("pip", { key: aLine.anchor, roster: feed.anchors.roster }); }
-  const ok = (await Promise.all([wait(3000, tok), aLine ? anchor.say(aLine, () => tok === seqToken) : true])).every(Boolean);
+  const ok = (await Promise.all([wait(3000, tok), aLine ? hello(aLine.anchor, tok).then(h => h && anchor.say(aLine, () => tok === seqToken)) : true])).every(Boolean);
   if (aLine) { anchor.hide(); root.classList.remove("anchor-pip"); }
   if (!ok) return stop(0.3);
   for (let i = 0; i < sets.length; i++) {
@@ -694,7 +704,7 @@ export function stopTV() {
   if (inputOn) { const box = root.querySelector(".tv-input"); box.hls?.destroy?.(); box.innerHTML = ""; box.hidden = true; inputOn = null; }
   video.pause(); video.removeAttribute("src"); video.load();
   if (paused) setPaused(false);
-  mode = "idle"; engaged = false; wantSound = false; armed = false;
+  mode = "idle"; engaged = false; wantSound = false; armed = false; helloWho = ""; // a fresh start says hello again
   clearInterval(pollTimer); clearInterval(clockTimer);
   root.classList.remove("mini"); document.body.classList.remove("tv-mini-on");
   root.remove();
