@@ -1,0 +1,99 @@
+{
+ "slug": "gaza-schools-short",
+ "title": "Gaza's walk to school in 60 seconds",
+ "series": "Explained",
+ "style": "vox",
+ "formats": [
+  "9x16"
+ ],
+ "captionChars": 30,
+ "scenes": [
+  {
+   "type": "snap",
+   "src": "media/gz-outdoor-class.jpg",
+   "say": "Gaza's children are back at school.",
+   "frame": "full"
+  },
+  {
+   "type": "kinetic",
+   "say": "And being killed on the way.",
+   "text": "Killed on | the way",
+   "hl": [
+    "way"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Classes resumed on 19 September, after nearly three years of war.",
+   "text": "Back at school: | 19 September",
+   "hl": [
+    "19"
+   ],
+   "speak": "Classes resumed on the nineteenth of September, after nearly three years of war."
+  },
+  {
+   "type": "kinetic",
+   "say": "On 17 October, 14-year-old Mohammed Hamad was killed by a strike on his way home.",
+   "speak": "On the seventeenth of October, fourteen-year-old Mohammed Hamad was killed by a strike on his way home.",
+   "text": "Mohammed, 14: | killed on the way home",
+   "hl": [
+    "killed"
+   ],
+   "bg": "media/gz-family-photo.jpg"
+  },
+  {
+   "type": "number",
+   "say": "In one week, 10 children and a teacher were killed.",
+   "value": 10,
+   "label": "Children killed, 18–24 October",
+   "bg": "media/gz-rubble-family.jpg",
+   "speak": "In one week, ten children and a teacher were killed."
+  },
+  {
+   "type": "versus",
+   "say": "Israel now controls more than 65 per cent of Gaza, the UN says, up from 53.",
+   "a": {
+    "value": 53,
+    "suffix": "%",
+    "label": "Agreed"
+   },
+   "b": {
+    "value": 65,
+    "suffix": "%+",
+    "label": "Now"
+   },
+   "at": "up",
+   "speak": "Israel now controls more than sixty-five per cent of Gaza, the U N says, up from fifty-three."
+  },
+  {
+   "type": "number",
+   "say": "At least 66 children have been killed near that line.",
+   "value": 66,
+   "label": "Children killed near the Yellow Line",
+   "bg": "media/gz-girl-wall.jpg",
+   "speak": "At least sixty-six children have been killed near that line."
+  },
+  {
+   "type": "doc",
+   "say": "A grieving father says it plainly.",
+   "kicker": "Riyad Hamad · father",
+   "text": "\"The child is supposed to bury his father, not the father bury his child.\"",
+   "hl": "father bury his child",
+   "at": 0.3
+  },
+  {
+   "type": "kinetic",
+   "say": "A ceasefire is measured by whether children come home from school.",
+   "text": "Do the children | come home?",
+   "hl": [
+    "home?"
+   ],
+   "cut": "zoom"
+  },
+  {
+   "type": "outro",
+   "say": "Watch the full explainer on Raisina Wire.",
+   "title": "Watch the full explainer"
+  }
+ ]
+}

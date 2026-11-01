@@ -1,0 +1,239 @@
+{
+ "slug": "gaza-schools-explained",
+ "title": "Gaza's children: the walk to school",
+ "series": "Explained",
+ "style": "vox",
+ "formats": [
+  "16x9"
+ ],
+ "captionChars": 40,
+ "scenes": [
+  {
+   "type": "snap",
+   "src": "media/gz-outdoor-class.jpg",
+   "say": "In Gaza, children have gone back to school.",
+   "frame": "full"
+  },
+  {
+   "type": "kinetic",
+   "say": "And they are being killed on the way there.",
+   "text": "Killed on the way | to school",
+   "hl": [
+    "school"
+   ]
+  },
+  {
+   "type": "title",
+   "say": "This is what a ceasefire looks like for Gaza's children.",
+   "kicker": "Explained · Gaza",
+   "title": "Gaza's walk to school",
+   "cut": "zoom"
+  },
+  {
+   "type": "timeline",
+   "say": "The academic year resumed on 19 September, after nearly three years of disruption from the war.",
+   "para": true,
+   "kicker": "Back to class",
+   "title": "A school year, at last",
+   "items": [
+    {
+     "when": "Oct 2025",
+     "what": "Ceasefire"
+    },
+    {
+     "when": "19 Sept 2026",
+     "what": "Classes resume",
+     "hot": true
+    },
+    {
+     "when": "October",
+     "what": "Pupils killed"
+    }
+   ],
+   "speak": "The academic year resumed on the nineteenth of September, after nearly three years of disruption from the war."
+  },
+  {
+   "type": "kinetic",
+   "say": "But the strikes and sniper fire did not stop.",
+   "text": "The strikes | did not stop",
+   "hl": [
+    "stop"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "Mohammed Hamad was 14, an eighth-grader near the top of his class.",
+   "para": true,
+   "text": "Mohammed Hamad, 14: | near the top of his class",
+   "hl": [
+    "14:"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "On 17 October, he walked home from school in Deir el-Balah with his 10-year-old brother, Abdullah.",
+   "text": "17 October: | the walk home",
+   "hl": [
+    "home"
+   ],
+   "speak": "On the seventeenth of October, he walked home from school in Deir el-Balah with his ten-year-old brother, Abdullah."
+  },
+  {
+   "type": "kinetic",
+   "say": "An Israeli strike hit the road. Mohammed was killed. Abdullah survived.",
+   "text": "Mohammed killed. | Abdullah survived.",
+   "hl": [
+    "killed."
+   ]
+  },
+  {
+   "type": "doc",
+   "say": "His father, Riyad, now lives in a tent in Deir el-Balah.",
+   "kicker": "Riyad Hamad · father, 44",
+   "text": "\"He was not just my son, he was my friend.\"",
+   "hl": "my friend",
+   "at": 0.4
+  },
+  {
+   "type": "kinetic",
+   "say": "Abdullah is now afraid to go to school alone.",
+   "text": "Afraid to go | alone",
+   "hl": [
+    "alone"
+   ]
+  },
+  {
+   "type": "number",
+   "say": "Between 18 and 24 October, 10 children and a teacher were killed.",
+   "para": true,
+   "value": 10,
+   "label": "Children aged 6 to 16 killed, 18–24 October, plus a teacher (Gaza Ministry of Education)",
+   "bg": "media/gz-rubble-family.jpg",
+   "speak": "Between the eighteenth and the twenty-fourth of October, ten children and a teacher were killed."
+  },
+  {
+   "type": "list",
+   "say": "Two girls were wounded at morning assembly. Five students were hurt at a university.",
+   "kicker": "The Ministry of Education's list",
+   "title": "At school, not just on the road",
+   "items": [
+    "Muradiya School, Jabalia: 2 girls wounded at assembly",
+    "Islamic University, Gaza City: 5 students injured"
+   ]
+  },
+  {
+   "type": "number",
+   "say": "Since the ceasefire, Israel has killed at least 1,574 Palestinians in Gaza.",
+   "value": 1574,
+   "inr": true,
+   "suffix": "+",
+   "label": "Killed since the October 2025 ceasefire, Gaza Ministry of Health",
+   "cut": "zoom",
+   "speak": "Since the ceasefire, Israel has killed at least one thousand five hundred and seventy-four Palestinians in Gaza."
+  },
+  {
+   "type": "kinetic",
+   "say": "The danger is greatest near the Yellow Line.",
+   "para": true,
+   "text": "The Yellow | Line",
+   "hl": [
+    "Yellow"
+   ]
+  },
+  {
+   "type": "versus",
+   "say": "Under the ceasefire, Israel controlled 53 per cent of Gaza. The UN says it now controls more than 65.",
+   "kicker": "Israeli control of Gaza",
+   "a": {
+    "value": 53,
+    "suffix": "%",
+    "label": "Agreed, October 2025"
+   },
+   "b": {
+    "value": 65,
+    "suffix": "%+",
+    "label": "Now, per the UN"
+   },
+   "at": "now",
+   "speak": "Under the ceasefire, Israel controlled fifty-three per cent of Gaza. The U N says it now controls more than sixty-five."
+  },
+  {
+   "type": "kinetic",
+   "say": "As the line moves west, more homes and tent schools come within range.",
+   "text": "The line moves west. | Schools come within range.",
+   "hl": [
+    "range."
+   ]
+  },
+  {
+   "type": "number",
+   "say": "At least 66 children have been killed close to the line.",
+   "value": 66,
+   "label": "Children killed near the Yellow Line",
+   "bg": "media/gz-girl-wall.jpg",
+   "speak": "At least sixty-six children have been killed close to the line."
+  },
+  {
+   "type": "kinetic",
+   "say": "On 21 October, Suad Abd Rabbo, a fourth-grader, set off for school with her bag and books.",
+   "speak": "On the twenty-first of October, Suad Abd Rabbo, a fourth-grader, set off for school with her bag and books.",
+   "text": "21 October: | Suad Abd Rabbo, fourth grade",
+   "hl": [
+    "Suad"
+   ],
+   "bg": "media/gz-boy-pillow.jpg"
+  },
+  {
+   "type": "kinetic",
+   "say": "Soon after, her sister ran home shouting that Suad had been shot.",
+   "text": "Suad | had been shot",
+   "hl": [
+    "shot"
+   ]
+  },
+  {
+   "type": "doc",
+   "say": "Her mother, Aliaa, remembers.",
+   "kicker": "Aliaa Abd Rabbo · mother",
+   "text": "\"I ran out barefoot. She was bleeding, crying and screaming.\"",
+   "hl": "ran out barefoot",
+   "at": 0.3
+  },
+  {
+   "type": "snap",
+   "src": "media/gz-family-photo.jpg",
+   "say": "For families, every morning is now a choice between school and safety.",
+   "para": true,
+   "frame": "full"
+  },
+  {
+   "type": "doc",
+   "say": "Riyad Hamad again.",
+   "kicker": "Riyad Hamad",
+   "text": "\"The child is supposed to bury his father, not the father bury his child.\"",
+   "hl": "father bury his child",
+   "at": 0.3
+  },
+  {
+   "type": "kinetic",
+   "say": "A ceasefire is measured by whether children come home from school.",
+   "text": "Do the children | come home?",
+   "hl": [
+    "home?"
+   ]
+  },
+  {
+   "type": "kinetic",
+   "say": "In Gaza, too many don't.",
+   "hl": [
+    "don't."
+   ],
+   "cut": "zoom"
+  },
+  {
+   "type": "outro",
+   "say": "Read the full story on Raisina Wire.",
+   "title": "Read the full story"
+  }
+ ]
+}
