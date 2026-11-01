@@ -220,14 +220,18 @@ async function oauthHandle(request,env) {
 
 async function publisherUser(request, env) {
   const header = request.headers.get("Authorization") || "";
+  if (!header.startsWith("Bearer ")) return null;
+  const bearer = header.slice(7).trim();
   const secret = String(env.PUBLISH_TOKEN || "");
-  if (!header.startsWith("Bearer ") || secret.length < 24 || !adminEmail(env)) return null;
-  if ((await sha256(header.slice(7).trim())) !== (await sha256(secret))) { const token=await env.DB.prepare("SELECT users.id,users.email,users.display_name,users.role FROM oauth_access_tokens JOIN users ON users.id=oauth_access_tokens.user_id WHERE oauth_access_tokens.token_hash=? AND oauth_access_tokens.expires_at>? AND oauth_access_tokens.resource=?").bind(await sha256(header.slice(7).trim()),Math.floor(Date.now()/1000),new URL(request.url).origin+"/mcp").first(); return token && ["admin","editor"].includes(token.role) ? token : null; }
-  const find = () => env.DB.prepare("SELECT id,email,display_name,role FROM users WHERE email=?").bind(adminEmail(env)).first();
-  let row = await find();
-  // An empty password hash never verifies; the admin's first password sign-in sets a real one.
-  if (!row) { await env.DB.prepare("INSERT INTO users (id,email,display_name,password_hash,role) VALUES (?,?,?,'','admin')").bind(randomId(), adminEmail(env), "Ilmaz Syed").run(); row = await find(); }
-  return { ...row, role: "admin" };
+  // Preserve the legacy Claude/autopublisher token exactly: same env secret, comparison and admin identity.
+  if (secret.length >= 24 && adminEmail(env) && (await sha256(bearer)) === (await sha256(secret))) {
+    const find = () => env.DB.prepare("SELECT id,email,display_name,role FROM users WHERE email=?").bind(adminEmail(env)).first();
+    let row = await find();
+    if (!row) { await env.DB.prepare("INSERT INTO users (id,email,display_name,password_hash,role) VALUES (?,?,?,?,'admin')").bind(randomId(), adminEmail(env), "Ilmaz Syed", "").run(); row = await find(); }
+    return { ...row, role: "admin" };
+  }
+  const token = await env.DB.prepare("SELECT users.id,users.email,users.display_name,users.role FROM oauth_access_tokens JOIN users ON users.id=oauth_access_tokens.user_id WHERE oauth_access_tokens.token_hash=? AND oauth_access_tokens.expires_at>? AND oauth_access_tokens.resource=?").bind(await sha256(bearer), Math.floor(Date.now()/1000), new URL(request.url).origin + "/mcp").first();
+  return token && ["admin","editor"].includes(token.role) ? token : null;
 }
 async function currentUser(request, env) {
   if (!env.DB) return null;
@@ -479,7 +483,7 @@ async function handleMcp(request, env, ctx) {
   if (request.method === "GET") return new Response("Raisina Wire MCP endpoint. Use Streamable HTTP POST.", {status:405,headers:{"content-type":"text/plain","allow":"POST, OPTIONS"}});
   if (request.method !== "POST") return new Response("Method not allowed",{status:405});
   const user = await currentUser(request, env);
-  if (!isStaff(user)) return err("Publisher authentication failed.",403);
+  if (!isStaff(user)) return json({error:"Publisher authentication required."},401,{"cache-control":"no-store","www-authenticate":'Bearer resource_metadata="' + url.origin + '/.well-known/oauth-protected-resource/mcp", scope="mcp:tools"'});
   const rpc = await request.json().catch(()=>null);
   if (!rpc || rpc.jsonrpc !== "2.0" || typeof rpc.method !== "string") return json({jsonrpc:"2.0",id:rpc?.id??null,error:{code:-32600,message:"Invalid JSON-RPC request"}},400);
   // MCP notifications have no id and must not receive a JSON-RPC response.
