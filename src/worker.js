@@ -316,6 +316,8 @@ async function tvFeed(env, ctx, lang) {
   const markets = await cached("markets", 45e3, marketBoard).catch(() => null);
   const wire = await cached(`wire${lang}`, 90e3, () => wireIn(env, ctx, lang)).catch(() => ({ items: [] }));
   if (lang) { await translateFields(env, lang, playlist, ["title", "description"], { cacheOnly: true }); await translateFields(env, lang, [...live, ...liveUps], ["title", "latest", "body"], { cacheOnly: true }); }
+  // Short enough for one TV line: end at a full sentence if one fits, else at a word, with "…".
+  const clipText = (t, n) => { if (t.length <= n) return t; const c = t.slice(0, n), end = Math.max(c.lastIndexOf(". "), c.lastIndexOf("? "), c.lastIndexOf("! ")); return end > n * 0.5 ? c.slice(0, end + 1) : `${c.slice(0, c.lastIndexOf(" ")).replace(/[,;:\s]+$/, "")}…`; };
   // News Update: headline sets by topic, five each (the desk's stories first, then the wire).
   const byTopic = new Map();
   for (const h of [...stories.map(a => ({ t: a.title, c: a.category, src: "Raisina Wire" })), ...(wire.items || []).map(i => ({ t: i.title, c: i.category, src: i.source }))]) {
@@ -323,7 +325,7 @@ async function tvFeed(env, ctx, lang) {
     const l = byTopic.get(h.c) || []; if (l.length < 5 && !l.some(x => x.t === h.t)) l.push(h); byTopic.set(h.c, l);
   }
   const sets = [...byTopic.entries()].filter(([, l]) => l.length >= 5).map(([topic, l]) => ({ topic, items: l.map(x => ({ text: x.t, source: x.src })) }));
-  if (liveUps.length >= 3) sets.unshift({ topic: "Live", live: true, items: liveUps.map(u => ({ text: plainText(u.body).slice(0, 150), source: String(u.title || "").split(/[:;—|]/)[0].trim().slice(0, 28) })) });
+  if (liveUps.length >= 3) sets.unshift({ topic: "Live", live: true, items: liveUps.map(u => ({ text: clipText(plainText(u.body), 150), source: String(u.title || "").split(/[:;—|]/)[0].trim().slice(0, 28) })) });
   const input = inputs.find(i => i.onAir && i.source);
   const ticker = [
     ...live.map(c => ({ kind: "live", text: c.latest ? `${c.title}: ${plainText(c.latest).slice(0, 160)}` : c.title, href: `/coverage/${encodeURIComponent(c.slug)}` })),
