@@ -386,8 +386,9 @@ async function tvFeed(env, ctx, lang) {
   // Short enough for one TV line: end at a full sentence if one fits, else at a word, with "…".
   const clipText = (t, n) => { if (t.length <= n) return t; const c = t.slice(0, n), end = Math.max(c.lastIndexOf(". "), c.lastIndexOf("? "), c.lastIndexOf("! ")); return end > n * 0.5 ? c.slice(0, end + 1) : `${c.slice(0, c.lastIndexOf(" ")).replace(/[,;:\s]+$/, "")}…`; };
   // A live update for the screen: whole sentences only. The first sentence, plus the next while
-  // they fit in about 200 characters; a very long first sentence is still shown whole.
-  const sentences = t => { const raw = String(t || "").split(/(?<=[.!?]["”’)\]]*)\s+(?=["“‘(]?[A-Z0-9])/), parts = []; for (const p of raw) { if (parts.length && /(?:\b[A-Z]|\b(?:Mr|Mrs|Ms|Dr|St|No|vs|Gen|Lt|Col|Sr|Jr|Rs|approx))\.$/.test(parts[parts.length - 1])) parts[parts.length - 1] += ` ${p}`; else parts.push(p); } let out = ""; for (const p of parts) { if (out && (`${out} ${p}`).length > 200) break; out = out ? `${out} ${p}` : p; } return out.trim(); };
+  // they fit in about 200 characters (the ticker); a very long first sentence is still shown whole.
+  // Headline sets on TV take the first sentence alone (limit 0), so they read at a glance.
+  const sentences = (t, limit = 200) => { const raw = String(t || "").split(/(?<=[.!?]["”’)\]]*)\s+(?=["“‘(]?[A-Z0-9])/), parts = []; for (const p of raw) { if (parts.length && /(?:\b[A-Z]|\b(?:Mr|Mrs|Ms|Dr|St|No|vs|Gen|Lt|Col|Sr|Jr|Rs|approx))\.$/.test(parts[parts.length - 1])) parts[parts.length - 1] += ` ${p}`; else parts.push(p); } let out = ""; for (const p of parts) { if (out && (`${out} ${p}`).length > limit) break; out = out ? `${out} ${p}` : p; } return out.trim(); };
   // Wire headlines without the publisher's own tail (" | The Hindu", " - BBC News"): the source is shown anyway.
   const cleanTitle = (t, src) => { let x = String(t || "").trim().replace(/\s+\|\s*[^|]{0,60}$/, ""); if (src) x = x.replace(new RegExp(`\\s+[-–—]\\s+${String(src).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"), ""); return x.trim() || String(t || "").trim(); };
   // News Update: headline sets by topic, five each (the desk's stories first, then the wire).
@@ -398,7 +399,7 @@ async function tvFeed(env, ctx, lang) {
     const l = byTopic.get(h.c) || []; if (l.length < 5 && !l.some(x => x.t === h.t)) l.push(h); byTopic.set(h.c, l);
   }
   const sets = [...byTopic.entries()].filter(([, l]) => l.length >= 5).map(([topic, l]) => ({ topic, items: l.map(x => ({ text: x.t, source: x.src, ...(x.img ? { img: x.img } : {}) })) }));
-  if (liveUps.length >= 3) sets.unshift({ topic: "Live", live: true, items: liveUps.slice(0, 5).map(u => ({ text: sentences(plainText(u.body)), source: String(u.title || "").split(/[:;—|]/)[0].trim().slice(0, 28) })) });
+  if (liveUps.length >= 3) sets.unshift({ topic: "Live", live: true, items: liveUps.slice(0, 5).map(u => ({ text: sentences(plainText(u.body), 0), source: String(u.title || "").split(/[:;—|]/)[0].trim().slice(0, 28) })) });
   const input = inputs.find(i => i.onAir && i.source);
   // The breaking ticker runs from the live wires, newest first across live coverage and the wire
   // (the editor's breaking lines lead it, added in the player).
@@ -412,7 +413,7 @@ async function tvFeed(env, ctx, lang) {
   ].sort(newest);
   // Breaking Headlines (the opener): the newest ten across live updates and the wire, with times.
   const recent = [
-    ...liveUps.map(u => ({ text: sentences(plainText(u.body)), source: shortTitle(u.title), at: isoAt(u.at), live: true })),
+    ...liveUps.map(u => ({ text: sentences(plainText(u.body), 0), source: shortTitle(u.title), at: isoAt(u.at), live: true })),
     ...wireNew.slice(0, 20).map(i => ({ text: cleanTitle(i.title, i.source), source: i.source, at: i.at, ...(okImg(i.image) ? { img: okImg(i.image) } : {}) }))
   ].filter(x => x.text && x.at).sort(newest).slice(0, 10);
   // If the wire can't be reached, the desk's own latest stories keep the ticker running.

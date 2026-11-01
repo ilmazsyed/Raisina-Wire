@@ -452,10 +452,10 @@ function setPic(st, i) {
 }
 const picStyle = (urls, css = "") => urls.length ? ` style="background-image:${urls.map(u => `url('${esc(String(u).replace(/'/g, "%27"))}')`).join(",")};${css}"` : (css ? ` style="${css}"` : "");
 const listHtml = (its, start, slot, measure = false) => `<ol class="bx-list${measure ? " measure" : ""}" style="--slot:${Math.round(slot)}ms">${its.map((h, k) => `<li style="--i:${k}"><span class="bx-no">${start + k + 1}</span><span class="bx-h"><b>${esc(h.text)}</b>${h.source || h.at ? `<small>${esc([h.source, h.at ? ago(h.at) : ""].filter(Boolean).join(" · "))}</small>` : ""}</span></li>`).join("")}</ol>`;
-// Shrinks the headline text in small steps (to 77%, or 92% on phones) until the list fits; false if it never does.
+// Shrinks the headline text in small steps (to 77%, or 85% on phones) until the list fits; false if it never does.
 function fitList(ol) {
   const panel = ol?.closest(".bx-panel"); if (!panel) return true;
-  const floor = ol.clientWidth < 460 ? 0.92 : 0.77; // phones: split rather than shrink
+  const floor = ol.clientWidth < 460 ? 0.85 : 0.77; // phones: shrink a little, then split
   for (let fs = 1; fs >= floor; fs -= 0.04) { panel.style.setProperty("--fs", fs.toFixed(2)); if (ol.scrollHeight <= ol.clientHeight + 1) return true; }
   return false;
 }
@@ -468,6 +468,9 @@ function paginate(items) {
     for (; n > 1; n--) { const ol = seqEl().querySelector(".bx-list"); if (!ol) break; ol.outerHTML = listHtml(rest.slice(0, n), 0, 1000, true); if (fitList(seqEl().querySelector(".bx-list"))) break; }
     pages.push(rest.slice(0, n)); rest = rest.slice(n);
   }
+  // No lone headline on the last screen: even out 4 + 1 as 3 + 2.
+  const k = pages.length;
+  if (k > 1 && pages[k - 1].length === 1 && pages[k - 2].length > 2) pages[k - 1].unshift(pages[k - 2].pop());
   return pages;
 }
 async function newsUpdate(tok, bulletin, over = null) {
@@ -499,11 +502,13 @@ async function newsUpdate(tok, bulletin, over = null) {
     if (st.markets) { if (!await wait(per, tok)) return stop(0.3); continue; }
     // Every headline in full: the text steps down a little if it must, and if five still don't
     // fit (phones) the set splits into screens that share the set's time.
-    const pages = paginate(items);
+    // Live updates are long sentences: one to a screen, each for its reading time, at a steady
+    // pace (rather than uneven splits). Other sets show together, split only if they must be.
+    const pages = st.live && items.some(h => String(h.text).length > 110) ? items.map(h => [h]) : paginate(items);
     for (let pg = 0, start = 0; pg < pages.length; start += pages[pg].length, pg++) {
       const n = pages[pg].length, chars = pages[pg].reduce((t, h) => t + String(h.text).length, 0);
       // Its share of the set's time, but never less than it takes to read the screen.
-      const ms = pages.length > 1 ? Math.max(per * n / items.length, 1500 + chars * 22) : per;
+      const ms = pages.length > 1 ? Math.min(9000, Math.max(per * n / items.length, 1500 + chars * 22)) : per;
       const ol = seqEl().querySelector(".bx-list");
       if (ol) { ol.outerHTML = listHtml(pages[pg], start, Math.max(600, (ms - 900) / n)); fitList(seqEl().querySelector(".bx-list")); }
       if (!await wait(ms, tok)) return stop(0.3);
