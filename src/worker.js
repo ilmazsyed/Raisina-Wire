@@ -1402,6 +1402,10 @@ export default {
   async scheduled(event, env, ctx) { ctx.waitUntil(scheduled(env)); },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname === "/mcp") {
+      try { return await api(request,env,ctx); }
+      catch (e) { return json({error:"MCP internal error",detail:e.message},500,{"cache-control":"no-store"}); }
+    }
     if (url.pathname.startsWith("/api/")) {
       try { return await api(request,env,ctx); }
       catch (e) { return json({error:"Internal API error",detail:e.message},500,{"cache-control":"no-store"}); }
