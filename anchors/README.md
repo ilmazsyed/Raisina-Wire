@@ -32,6 +32,10 @@ anchor carries an on-screen "AI" label.
   Bharti `Kore`, Vikram `Iapetus`, Ilmaz `Orus` (stand-in until a cloned voice is possible). Each
   line is generated once and kept in D1. Without `GOOGLE_TTS_API_KEY` the anchors still appear, with
   captions instead of a voice.
+- **Who is ready:** only anchors listed in `READY` in `src/anchors.js` go on air. For now that is
+  Tara alone: she presents every hour, and introduces Ilmaz's Editor's Picks as "Today's Editor's
+  Pick". To add an anchor, render their faces (below), put the files in `public/anchors/`, and add
+  their key to `READY`.
 - **Off switch:** control room → Raisina TV → Between videos → AI anchors.
 
 ## Faces (`public/anchors/`)

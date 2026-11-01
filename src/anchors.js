@@ -19,8 +19,13 @@ export const ANCHORS = {
 };
 // The hourly rota, in order. The editor is not on it: he presents only his Editor's Picks.
 export const ROTA = ["tara", "kabir", "bharti", "vikram"];
+// Anchors whose faces are ready (public/anchors/<key>-idle.mp4, -talk.mp4, -mouth.*). Only these go
+// on air: the rota skips the others, and while the editor's face isn't ready his Editor's Picks are
+// introduced by the anchor on duty.
+export const READY = ["tara"];
 const istHour = (now = Date.now()) => new Date(now + 5.5 * 3600e3).getUTCHours();
-export const onDuty = (now = Date.now()) => ROTA[istHour(now) % ROTA.length];
+const onRota = () => { const r = ROTA.filter(k => READY.includes(k)); return r.length ? r : [ROTA[0]]; };
+export const onDuty = (now = Date.now()) => { const r = onRota(); return r[istHour(now) % r.length]; };
 const hourWords = h => `${h % 12 || 12} ${h < 12 ? "AM" : "PM"}`;
 const clip = (t, n) => { const s = String(t || "").replace(/\s+/g, " ").trim(); if (s.length <= n) return s; const c = s.slice(0, n); return `${c.slice(0, c.lastIndexOf(" ")).replace(/[,;:\s]+$/, "")}.`; };
 const end = t => /[.!?…]["”’]?$/.test(t) ? t : `${t}.`;
@@ -38,9 +43,11 @@ export async function anchorLines({ playlist, input, breaking, force, now = Date
   for (const v of playlist) {
     const it = TV_INTROS[String(v.src || "").split("?")[0]];
     if (!it) continue;
-    const who = v.editorPick ? "ilmaz" : duty;
-    const [cam, vo, out] = await Promise.all([line(who, it.cam), line(who, it.vo), line(who, it.out)]);
-    if (cam && vo && out) intros[v.id] = { anchor: who, pick: who === "ilmaz", cam, vo, out };
+    const who = v.editorPick && READY.includes("ilmaz") ? "ilmaz" : duty;
+    // His own picks are written in the first person; another anchor introduces them as his pick.
+    const camText = who === "ilmaz" ? it.cam : it.cam.replace(/^My pick today\.\s*/, "Today's Editor's Pick. ");
+    const [cam, vo, out] = await Promise.all([line(who, camText), line(who, it.vo), line(who, it.out)]);
+    if (cam && vo && out) intros[v.id] = { anchor: who, pick: Boolean(v.editorPick), cam, vo, out };
   }
   const brk = force?.breaking ? (force.text || breaking[0] || "") : (breaking[0] || "");
   const [news, bulletin, headlines, breakingLine, live] = await Promise.all([
