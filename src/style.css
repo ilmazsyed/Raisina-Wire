@@ -1839,3 +1839,33 @@ body.cin-open{overflow:hidden}
 /* Headlines the anchor reads: the highlight follows her voice instead of a timer. */
 .bx-list.voiced li::before{animation:none;transition:opacity .3s,transform .4s cubic-bezier(.2,.9,.2,1)}
 .bx-list.voiced li.reading::before{opacity:1;transform:none}
+
+/* Raisina TV: the cut, a Raisina Wire wipe over every change of shot (src/tv.js cover/reveal).
+   Crimson then navy (with the dome) sweep across, the shot changes under cover, then they sweep
+   off the far side; .d1 runs the other way. */
+.tv-cut{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden;visibility:hidden}
+.tv-cut.in,.tv-cut.out{visibility:visible}
+.tv-cut.d1{transform:scaleX(-1)}
+.tv-cut i{position:absolute;top:-12%;bottom:-12%;left:-16%;right:-16%;transform:translateX(-135%) skewX(-14deg);will-change:transform}
+.tv-cut i:nth-child(1){background:linear-gradient(90deg,#a10f1b,#e0262f)}
+.tv-cut i:nth-child(2){background:linear-gradient(90deg,#0b1020,#141b30);box-shadow:-1.2cqw 0 0 #ff9a3c}
+.tv-cut .cut-dome{position:absolute;left:50%;top:50%;width:clamp(36px,8cqw,150px);height:auto;color:#fff;opacity:0;transform:translate(-50%,-50%) scale(.85)}
+.tv-cut.d1 .cut-dome{transform:translate(-50%,-50%) scale(-.85,.85)}
+.tv-cut.in i:nth-child(1){animation:cut-in .3s cubic-bezier(.7,0,.3,1) both}
+.tv-cut.in i:nth-child(2){animation:cut-in .3s .04s cubic-bezier(.7,0,.3,1) both}
+.tv-cut.in .cut-dome{animation:cut-mark .16s .14s ease-out both}
+.tv-cut.out i:nth-child(2){animation:cut-out .42s cubic-bezier(.6,0,.25,1) both}
+.tv-cut.out i:nth-child(1){animation:cut-out .42s .06s cubic-bezier(.6,0,.25,1) both}
+.tv-cut.out .cut-dome{opacity:0;transition:opacity .12s}
+@keyframes cut-in{from{transform:translateX(-135%) skewX(-14deg)}to{transform:translateX(0) skewX(-14deg)}}
+@keyframes cut-out{from{transform:translateX(0) skewX(-14deg)}to{transform:translateX(135%) skewX(-14deg)}}
+@keyframes cut-mark{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.tv-cut.in i,.tv-cut.out i,.tv-cut.in .cut-dome{animation:none}.tv-cut.in i{transform:none}.tv-cut.out{visibility:hidden}}
+
+/* The Raisina TV ident: the channel poster pushing in, a sheen crossing it. */
+.sq-poster{background:#12060a}
+.sq-poster .ps-img{position:absolute;inset:0;background:center/cover no-repeat;animation:ps-push 3.2s cubic-bezier(.2,.7,.3,1) both}
+.sq-poster .ps-shine{position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.22) 50%,transparent 65%);transform:translateX(-120%);animation:ps-shine 1.4s .5s ease-in-out both;mix-blend-mode:screen}
+@keyframes ps-push{from{transform:scale(1.07)}to{transform:scale(1)}}
+@keyframes ps-shine{to{transform:translateX(120%)}}
+@media (prefers-reduced-motion:reduce){.sq-poster .ps-img,.sq-poster .ps-shine{animation:none}.sq-poster .ps-shine{display:none}}
