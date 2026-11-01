@@ -21,7 +21,7 @@ function loadMouth(key) {
   })).catch(() => null));
 }
 
-export function createAnchor(screen, { isPaused, hearing, label, audioCtx, onSpeak }) {
+export function createAnchor(screen, { isPaused, hearing, label, audioCtx, onSpeak, onBlocked }) {
   const el = document.createElement("div");
   el.className = "tv-anchor"; el.hidden = true; el.setAttribute("aria-live", "polite");
   el.innerHTML = `<div class="ta-cam"><span class="ta-fill"></span>
@@ -88,24 +88,15 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx, onSpe
     lip.raf = requestAnimationFrame(lipLoop);
   }
   // One voice player for every line, unlocked by the viewer's click (phones only let a player
-  // that was started by a tap make sound), so two lines can never play over each other. Once the
-  // channel's audio is running it goes through an analyser (for the lips) and a gain (for mute).
+  // that was started by a tap make sound), so two lines can never play over each other. It plays
+  // as an ordinary media element, never through Web Audio: an iPhone with its silent switch on
+  // mutes Web Audio but not media, which silenced the anchor.
   const voice = new Audio(); voice.preload = "auto";
-  let graph = null;
-  function wire() {
-    if (graph) return graph;
-    const ctx = audioCtx?.();
-    if (!ctx || ctx.state !== "running") return null;
-    try {
-      const src = ctx.createMediaElementSource(voice), an = ctx.createAnalyser(), gain = ctx.createGain();
-      an.fftSize = 1024; an.smoothingTimeConstant = 0;
-      src.connect(an); an.connect(gain); gain.connect(ctx.destination);
-      graph = { an, gain, buf: new Float32Array(an.fftSize) };
-    } catch { graph = null; }
-    return graph;
-  }
-  const SILENCE = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
-  function unlock() { wire(); voice.src = SILENCE; voice.play().then(() => voice.pause()).catch(() => {}); }
+  const graph = null;
+  const wire = () => null;
+  // A tenth of a second of real silence: playing it during the viewer's tap unlocks the player.
+  const SILENCE = "data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==";
+  function unlock() { if (audio) return; voice.src = SILENCE; voice.play().then(() => { if (!audio) voice.pause(); }).catch(() => {}); wire(); }
   function startLip() {
     const g = wire();
     if (!g || !mouth) return false;
@@ -159,7 +150,8 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx, onSpe
           voice.onplaying = () => { if (a !== audio) return; started = true; face(true); onSpeak?.(true); if (lip && !lip.raf) lipLoop(); };
           voice.onended = () => { if (a === audio) finish(true); };
           voice.onerror = () => { if (a === audio) fallback(); };
-          if (!isPaused()) voice.play().catch(() => { if (a === audio) fallback(); });
+          // A browser that still won't play sound: say so (the "Tap for sound" button comes back).
+          if (!isPaused()) voice.play().catch(e => { if (a !== audio) return; if (e?.name === "NotAllowedError") onBlocked?.(); fallback(); });
         }
       } else fallback();
       // Watchdog: reading time runs while there's no audio; a voice that never starts is cut off.
