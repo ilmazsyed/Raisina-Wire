@@ -74,3 +74,9 @@ demand) asks the site what's waiting (`/api/admin/tv/voice-todo`), records it wi
 `video/live_reads.py` and uploads it (kept in D1 for four days). It needs the repository secret
 `RW_PUBLISH_TOKEN`, the same value as the Worker's `PUBLISH_TOKEN`. The control room records too
 while its Raisina TV page is open. A headline not yet recorded is shown on its usual timer.
+
+## Self-introduction
+"Hello and welcome to today's news updates. My name is Tara, and you're watching Raisina Wire Live."
+The anchor says it before her first line when TV starts, when a new anchor takes over, and when
+she's back on screen after half an hour (`hello` in `src/tv.js`, `FIXED.hello` in `src/anchors.js`).
+Names are recorded as they're said ("Raisina" as "Rayseena"): `SAY` in `src/anchors.js`.
