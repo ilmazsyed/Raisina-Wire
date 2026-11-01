@@ -30,7 +30,7 @@ const ICONS = {
 const DOME = (cls = "sq-dome") => markDome(cls, 3.4);
 // The on-screen bug, in the style of the shorts' logo: the app icon, RAISINA WIRE, and LIVE under it.
 // It sits exactly over the logo printed in the explainers and stays on screen through everything.
-const BUG = `<span class="tv-logo" aria-label="Raisina Wire Live"><span class="tv-app">${markDome("tv-dome", 4)}<span class="tv-app-tri"><i></i><i></i><i></i></span></span><span class="tv-bug-t"><span class="tv-word">RAISINA <b>WIRE</b></span><span class="tv-bug-live"><span class="pulse"></span>LIVE</span></span></span>`;
+const BUG = `<span class="tv-logo" aria-label="Raisina Wire, live"><span class="tv-app">${markDome("tv-dome", 4)}<span class="tv-app-tri"><i></i><i></i><i></i></span></span><span class="tv-bug-live"><span class="pulse"></span><b>LIVE</b></span></span>`;
 // A broadcast studio backdrop: deep crimson and navy, slow light ribbons and a turning globe grid.
 const GLOBE = `<svg class="bx-globe" viewBox="-100 -100 200 200" aria-hidden="true"><circle r="96"/>${[20, 45, 70, 90].map(r => `<ellipse rx="${r}" ry="96"/>`).join("")}${[-64, -32, 0, 32, 64].map(y => `<ellipse cy="${y}" rx="${Math.round(Math.sqrt(96 * 96 - y * y))}" ry="${Math.round(Math.sqrt(96 * 96 - y * y) * 0.18)}"/>`).join("")}</svg>`;
 const STUDIO = `<span class="bx-bg" aria-hidden="true"><i class="bx-r1"></i><i class="bx-r2"></i><i class="bx-r3"></i>${GLOBE}<i class="bx-grain"></i></span>`;
@@ -44,7 +44,7 @@ let idx = 0, mode = "idle", engaged = false, sinceAd = 0, adQueue = [], adIdx = 
 let lastTick = 0, unsent = 0, pollTimer = 0, clockTimer = 0, wasPaused = false, startedAt = 0;
 let seqToken = 0, paused = false, sinceFull = 0, setCursor = 0, shortCursor = 0, stingCursor = 0, lastBulletin = -1, inputOn = null;
 // Tests only (localStorage rw-tv-debug): make the next switch an ad break, poll at once, inspect.
-if (ls.get("rw-tv-debug", false)) window.__tv = { adNow: () => { sinceAd = 1e9; }, fullNext: () => { sinceFull = 99; }, bulletinNext: () => { forceBulletin = true; sinceFull = 99; }, poll: () => load(), state: () => ({ mode, idx, paused, src: video?.currentSrc, seq: root?.querySelector(".tv-seq")?.dataset.kind || "", input: inputOn?.id || null }) };
+if (ls.get("rw-tv-debug", false)) window.__tv = { adNow: () => { sinceAd = 1e9; }, fullNext: () => { sinceFull = 99; }, bulletinNext: () => { forceBulletin = true; sinceFull = 99; }, poll: () => load(), openerNext: () => ls.set("rw-tv-last", 0), state: () => ({ mode, idx, paused, src: video?.currentSrc, seq: root?.querySelector(".tv-seq")?.dataset.kind || "", input: inputOn?.id || null }) };
 
 export function initTV(d) { deps = d; }
 export const tvFeed = () => feed;
@@ -98,6 +98,10 @@ function build() {
   video.addEventListener("playing", () => root.classList.add("is-playing"));
   video.addEventListener("pause", () => root.classList.remove("is-playing"));
   root.addEventListener("click", onClick);
+  const screen = root.querySelector(".tv-screen");
+  screen.addEventListener("pointerdown", e => { tapWasHidden = e.pointerType !== "mouse" && !root.classList.contains("ctl-on"); showCtl(); });
+  screen.addEventListener("pointermove", e => { if (e.pointerType === "mouse") showCtl(); });
+  screen.addEventListener("focusin", showCtl);
   // Cast: Chrome's remote playback (Chromecast) or Safari's AirPlay picker.
   const cast = root.querySelector('[data-tv="cast"]');
   if (video.remote?.watchAvailability) video.remote.watchAvailability(a => { cast.hidden = !a; }).catch(() => { cast.hidden = true; });
@@ -112,11 +116,18 @@ function build() {
   return root;
 }
 
+// Controls fade out after 3 seconds and come back on a mouse move or a tap (they stay while paused).
+let ctlTimer = 0, tapWasHidden = false;
+function showCtl() {
+  root.classList.add("ctl-on"); clearTimeout(ctlTimer);
+  ctlTimer = setTimeout(() => { if (!root.querySelector(".tv-ctrls:hover")) root.classList.remove("ctl-on"); }, 3000);
+}
 function onClick(e) {
   const b = e.target.closest("[data-tv], .tv-sound, .tv-ad-skip, .tv-tk-item");
   if (!b) {
     if (!e.target.closest(".tv-screen")) return;
     if (root.classList.contains("mini")) return deps.navigate?.("/tv");
+    if (tapWasHidden) return; // on a phone, the first tap only brings the controls back
     if (!e.target.closest("iframe")) togglePause(); // tap the picture to pause or play
     return;
   }
@@ -183,7 +194,7 @@ function renderTicker() {
   track.innerHTML = `<span class="tv-tk-loop">${items}<span class="tv-tk-sep">●</span></span><span class="tv-tk-loop" aria-hidden="true">${items}<span class="tv-tk-sep">●</span></span>`;
   requestAnimationFrame(() => { const w = track.firstElementChild?.scrollWidth || 1000; track.style.setProperty("--tk-dur", `${Math.max(30, w / 70)}s`); });
 }
-function renderClock() { const c = root?.querySelector(".tv-clock"); if (c) c.textContent = `${clockNow()} IST`; }
+function renderClock() { const c = root?.querySelector(".tv-clock"); if (c) c.textContent = `${new Date().toLocaleDateString(LOCALE, { ...IST, weekday: "short", day: "numeric", month: "short" })} · ${clockNow()} IST`; }
 function lowerThird(cat, title, { live = false, stay = false } = {}) {
   const l = root.querySelector(".tv-lower");
   l.classList.toggle("live", live);
@@ -322,16 +333,18 @@ async function stinger(tok) {
 }
 // The Raisina Wire promo: 15 s of story pictures, slow zooms and quick cuts on the beat, with
 // tagline cards and an end card.
-async function promo(tok) {
-  const pics = shuffle(feed.promo || []).slice(0, 8);
-  const stop = score({ bed: 15 });
-  showSeq("promo", `${pics.map((p, i) => `<span class="pm-slide"${bg(p, `--d:${(i * 1.75).toFixed(2)}s`)}></span>`).join("")}
+// The short version (8 s) opens TV; the full 15 s plays in the breaks between explainers.
+async function promo(tok, secs = 15) {
+  const k = secs / 15, pics = shuffle(feed.promo || []).slice(0, Math.ceil(8 * k) + 1);
+  const stop = score({ bed: secs });
+  const d = t => `--d:${(t * k).toFixed(2)}s`;
+  showSeq("promo", `${pics.map((p, i) => `<span class="pm-slide"${bg(p, `${d(i * 1.75)};animation-duration:${(2.3 * Math.max(k, 0.75)).toFixed(2)}s`)}></span>`).join("")}
     <span class="pm-shade"></span>
-    <span class="pm-card" style="--d:.4s"><b>${esc(tr("India’s strategic briefing"))}</b></span>
-    <span class="pm-card" style="--d:5s"><b>English · हिन्दी · বাংলা</b></span>
-    <span class="pm-card" style="--d:9.4s"><b>${esc(tr("Live · Explainers · Markets · Analysis"))}</b></span>
-    <span class="pm-end" style="--d:12.6s">${DOME("pm-dome")}<b>RAISINA <em>WIRE</em></b><span>raisinawire.calibrex.org</span>${TRI}</span>`);
-  await wait(15000, tok); stop(0.8);
+    <span class="pm-card" style="${d(0.4)}"><b>${esc(tr("India’s strategic briefing"))}</b></span>
+    <span class="pm-card" style="${d(5)}"><b>English · हिन्दी · বাংলা</b></span>
+    ${secs >= 12 ? `<span class="pm-card" style="${d(9.4)}"><b>${esc(tr("Live · Explainers · Markets · Analysis"))}</b></span>` : ""}
+    <span class="pm-end" style="${d(12.6)}">${DOME("pm-dome")}<b>RAISINA <em>WIRE</em></b><span>raisinawire.calibrex.org</span>${TRI}</span>`);
+  await wait(secs * 1000, tok); stop(0.8);
 }
 // Top of the hour: a 5-second countdown into the bulletin, a ring of 60 ticks filling up.
 async function countdown(tok) {
@@ -371,14 +384,14 @@ function setPic(st, i) {
   return [img, fallback].filter(Boolean);
 }
 const picStyle = (urls, css = "") => urls.length ? ` style="background-image:${urls.map(u => `url('${esc(String(u).replace(/'/g, "%27"))}')`).join(",")};${css}"` : (css ? ` style="${css}"` : "");
-async function newsUpdate(tok, bulletin) {
-  const sets = pickSets(), per = (feed.seq?.setSeconds || 7) * 1000;
+async function newsUpdate(tok, bulletin, over = null) {
+  const sets = over?.sets || pickSets(), per = (feed.seq?.setSeconds || 7) * 1000;
   if (!sets.length) return;
   const stop = score({ sting: true, bed: 3 + sets.length * per / 1000 });
-  const label = bulletin ? tr("BULLETIN") : tr("NEWS UPDATE");
+  const label = over?.label || (bulletin ? tr("BULLETIN") : tr("NEWS UPDATE"));
   // Title card.
   showSeq("nu", `${STUDIO}<span class="bx-card"><span class="bx-k"><span class="pulse"></span>RAISINA WIRE · ${esc(tr("LIVE"))}</span>
-    <b class="bx-big">${esc(label)}${bulletin ? ` <em>${esc(hourLabel())}</em>` : ""}</b><span class="bx-line"></span>
+    <b class="bx-big">${esc(over?.card || label)}${bulletin ? ` <em>${esc(hourLabel())}</em>` : ""}</b><span class="bx-line"></span>
     <span class="bx-meta">${esc(dateNow())} · ${esc(clockNow())} IST</span></span>`);
   if (!await wait(3000, tok)) return stop(0.3);
   for (let i = 0; i < sets.length; i++) {
@@ -387,7 +400,7 @@ async function newsUpdate(tok, bulletin) {
     const prog = sets.map((_, k) => `<i class="${k < i ? "done" : k === i ? "on" : ""}"${k === i ? ` style="--t:${per}ms"` : ""}></i>`).join("");
     const body = st.markets
       ? `<span class="bx-mkts">${st.markets.map((q, k) => `<span class="bx-mkt" style="--i:${k}"><small>${esc(tr(q.label))}</small><b>${Number(q.value).toLocaleString(LOCALE, { maximumFractionDigits: q.value < 100 ? 2 : 0 })}</b><em class="${q.pct >= 0 ? "up" : "down"}">${q.pct >= 0 ? "▲" : "▼"} ${Math.abs(q.pct ?? 0).toFixed(2)}%</em></span>`).join("")}</span>`
-      : `<ol class="bx-list" style="--slot:${Math.round(slot)}ms">${items.map((h, k) => `<li style="--i:${k}"><span class="bx-no">${k + 1}</span><span class="bx-h"><b>${esc(h.text)}</b>${h.source ? `<small>${esc(h.source)}</small>` : ""}</span></li>`).join("")}</ol>`;
+      : `<ol class="bx-list" style="--slot:${Math.round(slot)}ms">${items.map((h, k) => `<li style="--i:${k}"><span class="bx-no">${k + 1}</span><span class="bx-h"><b>${esc(h.text)}</b>${h.source || h.at ? `<small>${esc([h.source, h.at ? ago(h.at) : ""].filter(Boolean).join(" · "))}</small>` : ""}</span></li>`).join("")}</ol>`;
     showSeq("nu", `${STUDIO}${pic.length ? `<span class="bx-pic"><span class="bx-pic-i"${picStyle(pic)}></span></span>` : ""}
       <span class="bx-panel${pic.length ? "" : " wide"}"><span class="bx-head">
         <span class="bx-strap"><span class="bx-seg">${esc(label)}</span><span class="bx-topic${st.live ? " live" : ""}${st.pin ? " pin" : ""}">${st.live ? `<span class="pulse"></span>` : ""}${esc(tr(st.topic))}</span></span>
@@ -487,13 +500,38 @@ function inputPause(p) {
 /* ---------- Where the player sits ---------- */
 // Called after every page change: into the page's TV slot if there is one, otherwise a
 // floating mini-player while it's playing with sound (or stopped if nobody was watching).
+const ago = at => { const m = Math.round((Date.now() - Date.parse(at)) / 6e4); if (!(m >= 0)) return ""; return m < 2 ? tr("just now") : m < 60 ? `${m} ${tr("min ago")}` : `${Math.round(m / 60)} ${tr("hr ago")}`; };
+// Breaking Headlines: the editor's breaking lines, then the newest across live coverage and the wire.
+function breakingSets() {
+  const now = new Date().toISOString(), seen = new Set();
+  const items = [...feed.breaking.map(t => ({ text: t, at: now })), ...(feed.recent || []),
+    ...(feed.recent?.length ? [] : feed.ticker.map(t => ({ text: t.text, source: t.source, at: t.at })))]
+    .filter(h => h.text && !seen.has(h.text) && seen.add(h.text)).slice(0, 10);
+  const sets = [];
+  for (let i = 0; i < items.length; i += 5) sets.push({ topic: tr("BREAKING"), live: true, items: items.slice(i, i + 5) });
+  return sets.filter(st => st.items.length >= 3);
+}
+// Opening TV: stinger, the short promo, Breaking Headlines, then the newest explainer. Once a
+// visit: someone back within 30 minutes goes straight to the channel.
+const OPENER_GAP = 30 * 60e3;
+async function opener() {
+  const tok = ++seqToken;
+  mode = "seq"; root.querySelector(".tv-lower").hidden = true;
+  ls.set("rw-tv-last", Date.now());
+  preload(feed.playlist[0]);
+  await stinger(tok);
+  if (tok === seqToken) await promo(tok, 8);
+  const sets = breakingSets();
+  if (tok === seqToken && sets.length) await newsUpdate(tok, false, { sets, label: tr("HEADLINES"), card: tr("BREAKING HEADLINES") });
+  if (tok === seqToken) playStory(0);
+}
 export async function dockTV() {
   const slot = document.getElementById("tvSlot");
   if (slot) {
     build();
     root.classList.remove("mini"); document.body.classList.remove("tv-mini-on");
     if (root.parentElement !== slot) slot.append(root);
-    if (mode === "idle") await startTV();
+    if (mode === "idle") await (starting ||= startTV().finally(() => { starting = null; })); // one start, however many redraws
     else if (!paused && mode === "story" && video.paused && !document.hidden) video.play().catch(() => {});
     return;
   }
@@ -502,6 +540,7 @@ export async function dockTV() {
     if (root.parentElement !== document.body) document.body.append(root);
   } else if (root && mode !== "idle") stopTV();
 }
+let starting = null;
 async function startTV() {
   startedAt = Date.now();
   lastBulletin = new Date(Date.now() + 5.5 * 3600e3).getUTCHours(); // no bulletin the moment TV opens
@@ -510,11 +549,13 @@ async function startTV() {
   offAir(false);
   renderClock(); clearInterval(clockTimer); clockTimer = setInterval(renderClock, 15e3);
   // Every 10 seconds: new explainers, the ticker, break-ins and the live input.
-  clearInterval(pollTimer); pollTimer = setInterval(() => { if (!document.hidden && mode !== "idle") load(); }, 10e3);
+  clearInterval(pollTimer); pollTimer = setInterval(() => { if (!document.hidden && mode !== "idle") { load(); if (!paused) ls.set("rw-tv-last", Date.now()); } }, 10e3);
   syncSound();
-  // Viewers start with the newest explainer, then go back in time.
-  playStory(0);
+  // Viewers start with the opener (once a visit), then the newest explainer, going back in time.
+  const fresh = Date.now() - ls.get("rw-tv-last", 0) > OPENER_GAP && feed.playlist.length && feed.seq?.stinger !== false;
   syncInput();
+  if (inputOn) return; // a live input is on air: viewers join it straight away
+  if (fresh && !(feed.force && Date.now() - Date.parse(feed.force.at) < 120e3)) opener(); else playStory(0);
 }
 export function stopTV() {
   if (!root) return;
