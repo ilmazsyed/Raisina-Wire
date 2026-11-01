@@ -10,6 +10,7 @@ on:
       - "tools/og/shoot.cjs"
       - "anchors/**"
       - "public/anchors/**"
+      - ".github/workflows/raisina-tv-social-card.yml"
 
 permissions:
   contents: write
