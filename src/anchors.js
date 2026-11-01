@@ -54,12 +54,16 @@ const camFor = (who, it) => who === "ilmaz" ? it.cam : it.cam.replace(/^My pick 
 // recorded the anchor says the fixed line with the words on screen.
 export const READ = {
   breaking: t => `Breaking news. ${end(clip(t, 220))}`,
-  live: t => `We're bringing you live visuals of ${end(clip(t, 120))}`
+  live: t => `We're bringing you live visuals of ${end(clip(t, 120))}`,
+  head: t => end(String(t || "").replace(/\s+/g, " ").trim())   // a headline, read as it's shown
 };
 // The live reads to record now, for each anchor on air: every breaking line on air, the last
-// break-in's headline, and every live input (so a cut is voiced the moment it happens).
-export async function liveReads({ breaking = [], inputs = [], force = null }) {
-  const texts = [...new Set([...breaking.map(READ.breaking), ...(force?.text ? [READ.breaking(force.text)] : []), ...inputs.map(i => READ.live(i.title))])];
+// break-in's headline, every live input (so a cut is voiced the moment it happens), and every
+// headline the channel can show (News Update sets, Breaking Headlines), which the anchor reads.
+// Recorded by the GitHub Action "Raisina TV live reads" (video/live_reads.py) every few minutes,
+// or by the control room when it is open.
+export async function liveReads({ breaking = [], inputs = [], force = null, heads = [] }) {
+  const texts = [...new Set([...breaking.map(READ.breaking), ...(force?.text ? [READ.breaking(force.text)] : []), ...inputs.map(i => READ.live(i.title)), ...heads.filter(Boolean).map(READ.head)])];
   const out = [];
   for (const k of READY.filter(k => ROTA.includes(k))) for (const t of texts) out.push({ id: await lineId(k, t), anchor: k, voice: ANCHORS[k].voice, voiceFile: `/anchors/${k}-voice.bin`, text: t });
   return out;

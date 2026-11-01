@@ -24,7 +24,10 @@ import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { liveResults } from "./results.js";
 import { handleTts } from "./tts.js";
-import { anchorLines, liveReads } from "./anchors.js";
+import { anchorLines, liveReads, READ } from "./anchors.js";
+// Every headline Raisina TV can show (the anchor reads them): breaking lines, Breaking Headlines,
+// the News Update sets and the desk's own set.
+const tvHeads = ({ breaking = [], recent = [], sets = [], pinset = null }) => [...new Set([...breaking, ...recent.map(r => r.text), ...sets.flatMap(st => (st.items || []).map(i => i.text)), ...(pinset?.on ? pinset.items : [])].filter(Boolean))];
 import { editions } from "./editions.js";
 import editionBodies from "./edition-bodies.json";
 import seedHi from "./translations/hi.json";
@@ -424,9 +427,12 @@ async function tvFeed(env, ctx, lang) {
   if (!lang && settings.seq.anchors !== false) {
     const srcs = playlist.map(v => String(v.mediaUrl || "").split("?")[0]).filter(Boolean);
     const picks = srcs.length ? new Set((await env.DB.prepare(`SELECT video_url FROM articles WHERE status='published' AND writer='ilmaz-syed' AND video_url IN (${srcs.map(() => "?").join(",")})`).bind(...srcs).all()).results.map(r => r.video_url)) : new Set();
-    const reads = await liveReads({ breaking: breaking.map(b => b.text), inputs: input ? [input] : [], force: settings.force });
+    const heads = tvHeads({ breaking: breaking.map(b => b.text), recent, sets, pinset: settings.pinset });
+    const reads = await liveReads({ breaking: breaking.map(b => b.text), inputs: input ? [input] : [], force: settings.force, heads });
     const voiced = reads.length ? new Set((await env.DB.prepare(`SELECT key FROM tts_audio WHERE key IN (${reads.map(() => "?").join(",")})`).bind(...reads.map(r => r.id)).all()).results.map(r => r.key)) : new Set();
-    anchors = { ...await anchorLines({ playlist: playlist.map(v => ({ id: v.id, src: v.mediaUrl, editorPick: picks.has(String(v.mediaUrl || "").split("?")[0]) })), input, breaking: breaking.map(b => b.text), force: settings.force, voiced }) };
+    // Headlines the anchor has recorded: shown text -> its read.
+    const headReads = Object.fromEntries(heads.map(t => [t, reads.find(r => r.text === READ.head(t) && voiced.has(r.id))]).filter(([, r]) => r).map(([t, r]) => [t, `/api/tv/voice/${r.id}`]));
+    anchors = { ...await anchorLines({ playlist: playlist.map(v => ({ id: v.id, src: v.mediaUrl, editorPick: picks.has(String(v.mediaUrl || "").split("?")[0]) })), input, breaking: breaking.map(b => b.text), force: settings.force, voiced }), reads: headReads };
   }
   return { anchors, on: settings.on, every: settings.every, perBreak: settings.perBreak, skippable: settings.skippable, force: settings.force || null,
     playlist: playlist.map(v => ({ id: v.id, title: v.title, description: v.description, category: v.category, src: v.mediaUrl, thumb: v.thumbnailUrl, publishedAt: v.publishedAt })),
@@ -1058,16 +1064,17 @@ async function api(request, env, ctx) {
   if ((url.pathname === "/api/admin/tv/voice-todo" && request.method === "GET") || (url.pathname.startsWith("/api/admin/tv/voice/") && request.method === "PUT")) {
     const user = await currentUser(request, env);
     if (!isStaff(user)) return err("Editor access required.", 403);
-    const settings = await tvSettings(env);
-    const reads = await liveReads({ breaking: (await tvBreaking(env)).map(b => b.text), inputs: (await tvInputs(env)).filter(i => i.source), force: settings.force });
+    const settings = await tvSettings(env), f = await cached("tv", 5e3, () => tvFeed(env, ctx, ""));
+    const reads = await liveReads({ breaking: (await tvBreaking(env)).map(b => b.text), inputs: (await tvInputs(env)).filter(i => i.source), force: settings.force, heads: tvHeads({ breaking: f.breaking, recent: f.recent, sets: f.sets, pinset: settings.pinset }) });
     const have = reads.length ? new Set((await env.DB.prepare(`SELECT key FROM tts_audio WHERE key IN (${reads.map(() => "?").join(",")})`).bind(...reads.map(r => r.id)).all()).results.map(r => r.key)) : new Set();
     const todo = settings.seq.anchors === false ? [] : reads.filter(r => !have.has(r.id));
     if (request.method === "GET") return json({ todo }, 200, { "cache-control": "no-store" });
-    // Only a read the channel needs, as a WAV file of reasonable size.
+    // Only a read the channel needs, as a WAV or MP3 file of reasonable size.
     const id = url.pathname.slice(20), r = todo.find(x => x.id === id) || reads.find(x => x.id === id);
     if (!r) return err("That line isn't needed on air.", 404);
     const data = new Uint8Array(await request.arrayBuffer());
-    if (data.length < 1000 || data.length > 1.8e6 || String.fromCharCode(...data.slice(0, 4)) !== "RIFF") return err("Send a WAV recording under 1.8 MB.");
+    const head = String.fromCharCode(...data.slice(0, 4)), mp3 = head.startsWith("ID3") || (data[0] === 0xff && (data[1] & 0xe0) === 0xe0);
+    if (data.length < 1000 || data.length > 1.8e6 || !(head === "RIFF" || mp3)) return err("Send a WAV or MP3 recording under 1.8 MB.");
     await env.DB.prepare("INSERT OR REPLACE INTO tts_audio (key,voice,chars,data) VALUES (?,?,?,?)").bind(id, `kokoro:${r.voice}`, r.text.length, data.buffer).run();
     return json({ ok: true }, 200, { "cache-control": "no-store" });
   }
@@ -1469,6 +1476,8 @@ async function serveMedia(request, env, ctx) {
 async function scheduled(env) {
   if (!env.DB) return;
   await ensureSchema(env);
+  // Once an hour: Raisina TV live reads older than four days go (headlines move on; fixed lines are files).
+  if (new Date().getUTCMinutes() === 7) await env.DB.prepare("DELETE FROM tts_audio WHERE voice LIKE 'kokoro:%' AND created_at < datetime('now','-4 days')").run().catch(e => console.log("reads", e.message));
   const { results } = await env.DB.prepare(`SELECT id,slug,title,kind,status,published_at FROM articles WHERE alert_state='pending' AND status='published' AND published_at<=? LIMIT 5`).bind(new Date().toISOString()).all();
   // Each step runs on its own, so one failure can't hold up the others; errors go to the Worker logs.
   const step = async (name, fn) => { try { await fn(); } catch (e) { console.error(`cron ${name} failed:`, e?.stack || e); } };

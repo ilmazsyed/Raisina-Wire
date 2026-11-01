@@ -514,6 +514,21 @@ async function newsUpdate(tok, bulletin, over = null) {
       const ms = pages.length > 1 ? Math.min(9000, Math.max(per * n / items.length, 1500 + chars * 22)) : per;
       const ol = seqEl().querySelector(".bx-list");
       if (ol) { ol.outerHTML = listHtml(pages[pg], start, Math.max(600, (ms - 900) / n)); fitList(seqEl().querySelector(".bx-list")); }
+      // The anchor reads the headlines (each highlighted as she reads it) when they're recorded
+      // and the sound is on; the screen stays up for as long as she takes.
+      const reads = feed.anchors?.reads || {}, voiced = anchorsOn() && engaged && wantSound && pages[pg].every(h => reads[h.text]);
+      if (voiced) {
+        const list = seqEl().querySelector(".bx-list"), rows = [...(list?.querySelectorAll("li") || [])];
+        list?.classList.add("voiced");
+        if (!await wait(700, tok)) return stop(0.3);
+        for (let k = 0; k < pages[pg].length; k++) {
+          const h = pages[pg][k];
+          rows.forEach((r, j) => r.classList.toggle("reading", j === k));
+          if (!await anchor.say({ text: h.text, audio: reads[h.text] }, () => tok === seqToken)) return stop(0.3);
+          if (!await wait(250, tok)) return stop(0.3);
+        }
+        continue;
+      }
       if (!await wait(ms, tok)) return stop(0.3);
     }
   }
