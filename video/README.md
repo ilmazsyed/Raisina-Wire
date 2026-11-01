@@ -100,3 +100,8 @@ Maps are dot maps of land only (Natural Earth coastlines at 0.4°, `engine/land.
 20°W–110°E, 10°S–60°N: Europe, Africa, the Middle East and Asia; plus 95°W–30°W, 25°S–30°N:
 the Caribbean, Central America and northern South America); no borders are drawn. Keep every fact, figure and quote to what the source
 story says, as for articles.
+
+## Raisina TV anchor intros
+Each explainer that plays on Raisina TV gets a 25–30 second anchor intro (written in
+`src/tv-intros.js`, keyed by the 16:9 video file). After adding one, record it:
+`PYTHON=<python with kokoro-onnx> node video/anchor-voices.mjs`. See `anchors/README.md`.

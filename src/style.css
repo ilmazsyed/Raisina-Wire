@@ -1814,3 +1814,5 @@ body.cin-open{overflow:hidden}
   .tv-anchor[data-shot="vo"]:has(.ta-line:not([hidden])) .ta-strap{display:none}
   .tv-screen:has(.tv-anchor[data-shot="vo"] .ta-line:not([hidden])) .tv-lower{visibility:hidden}
 }
+/* A line's own words on screen (the breaking story, the live caption): a headline, not a subtitle. */
+.ta-line.show{font:600 clamp(13px,2.4cqw,42px)/1.25 var(--serif);background:rgba(8,11,20,.88);border-left:.45cqw solid #e0262f}

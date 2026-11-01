@@ -22,8 +22,8 @@ import m0019 from "../migrations/0019_tv_sequences.sql";
 import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { liveResults } from "./results.js";
-import { handleTts, ttsEnabled } from "./tts.js";
-import { anchorLines, anchorVoice } from "./anchors.js";
+import { handleTts } from "./tts.js";
+import { anchorLines } from "./anchors.js";
 import { editions } from "./editions.js";
 import editionBodies from "./edition-bodies.json";
 import seedHi from "./translations/hi.json";
@@ -357,7 +357,7 @@ async function tvFeed(env, ctx, lang) {
   if (!lang && settings.seq.anchors !== false) {
     const srcs = playlist.map(v => String(v.mediaUrl || "").split("?")[0]).filter(Boolean);
     const picks = srcs.length ? new Set((await env.DB.prepare(`SELECT video_url FROM articles WHERE status='published' AND writer='ilmaz-syed' AND video_url IN (${srcs.map(() => "?").join(",")})`).bind(...srcs).all()).results.map(r => r.video_url)) : new Set();
-    anchors = { voice: ttsEnabled(env), ...await anchorLines({ playlist: playlist.map(v => ({ id: v.id, src: v.mediaUrl, editorPick: picks.has(String(v.mediaUrl || "").split("?")[0]) })), input, breaking: breaking.map(b => b.text), force: settings.force }) };
+    anchors = { ...await anchorLines({ playlist: playlist.map(v => ({ id: v.id, src: v.mediaUrl, editorPick: picks.has(String(v.mediaUrl || "").split("?")[0]) })), input, breaking: breaking.map(b => b.text), force: settings.force }) };
   }
   return { anchors, on: settings.on, every: settings.every, perBreak: settings.perBreak, skippable: settings.skippable, force: settings.force || null,
     playlist: playlist.map(v => ({ id: v.id, title: v.title, description: v.description, category: v.category, src: v.mediaUrl, thumb: v.thumbnailUrl, publishedAt: v.publishedAt })),
@@ -978,13 +978,6 @@ async function api(request, env, ctx) {
   if (url.pathname === "/api/tv" && request.method === "GET") {
     const lang = reqLang(url);
     return json(await cached(`tv${lang}`, 5e3, () => tvFeed(env, ctx, lang)), 200, { "cache-control": "no-cache" });
-  }
-  // An anchor's line, voiced (src/anchors.js); only lines the channel has on air are made.
-  if (url.pathname.startsWith("/api/tv/voice/") && request.method === "GET") {
-    const id = url.pathname.slice(14).replace(/\.mp3$/, "");
-    const audio = await anchorVoice(env, id, () => cached("tv", 5e3, () => tvFeed(env, ctx, "")).then(f => f.anchors));
-    if (!audio) return err("No such line.", 404);
-    return new Response(audio, { headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=31536000, immutable" } });
   }
   if (url.pathname.startsWith("/api/admin/tv")) {
     const user = await currentUser(request, env);

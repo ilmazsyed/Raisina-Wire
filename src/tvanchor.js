@@ -8,8 +8,8 @@
 // Lip movement follows the voice: while a line plays, the browser measures its loudness about 60
 // times a second and lays the matching mouth shape over the resting face, so the mouth opens and
 // closes with the words. (When the sound can't be analysed, e.g. before the viewer has tapped for
-// sound, the talking loop plays instead.) Lines are written and voiced on the server
-// (src/anchors.js) and fetched by id.
+// sound, the talking loop plays instead.) Lines are written on the server (src/anchors.js); their
+// voices are Kokoro recordings in public/anchors/voice/.
 //
 // Shots: "cam" the anchor full screen in the studio; "vo" her voice over the pictures, with only
 // the strap on screen; "pip" the anchor in a window beside a title card.
@@ -123,15 +123,17 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx }) {
     return new Promise(res => {
       if (!line?.text) return res(true);
       const cap = el.querySelector(".ta-line");
-      cap.textContent = line.text; cap.hidden = hearing();
-      const words = line.text.split(/\s+/).length, est = 600 + words / 2.55 * 1000;
+      // A line with words of its own on screen (the breaking story, the live caption) always shows
+      // them; otherwise the caption is the line itself, shown when the sound is off.
+      cap.textContent = line.show || line.text; cap.hidden = hearing() && !line.show; cap.classList.toggle("show", Boolean(line.show));
+      const words = Math.max(line.text.split(/\s+/).length, String(line.show || "").split(/\s+/).length), est = 600 + words / 2.55 * 1000;
       let done = false, left = est, last = performance.now(), started = false, waited = 0;
-      const finish = ok => { if (done) return; done = true; face(false); stopAudio(); cap.hidden = true; res(ok); };
+      const finish = ok => { if (done) return; done = true; face(false); stopAudio(); cap.hidden = true; cap.classList.remove("show"); res(ok); };
       const fallback = () => { stopAudio(); started = true; face(true); }; // no voice: reading time, talking loop
       const ctx = audioCtx?.(), measurable = Boolean(ctx && ctx.state === "running" && mouth);
-      if (hearing() || measurable) {
+      if (line.audio && (hearing() || measurable)) {
         stopAudio();
-        audio = new Audio(`/api/tv/voice/${line.id}.mp3`);
+        audio = new Audio(line.audio);
         const a = audio, synced = startLip(a);
         if (!synced && !hearing()) { fallback(); }
         else {
@@ -163,5 +165,5 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx }) {
   return { shot, say, hide, pause, shotNow };
 }
 
-// Warm the server's voice cache and the browser's for lines coming up.
-export function prefetchLines(lines) { for (const l of lines) if (l?.id) fetch(`/api/tv/voice/${l.id}.mp3`, { priority: "low" }).catch(() => {}); }
+// Warm the browser's cache for lines coming up.
+export function prefetchLines(lines) { for (const l of lines) if (l?.audio) fetch(l.audio, { priority: "low" }).catch(() => {}); }
