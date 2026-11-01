@@ -13,11 +13,11 @@ import { TV_INTROS } from "./tv-intros.js";
 import { VOICED } from "./anchor-voices.js";
 
 export const ANCHORS = {
-  tara:   { name: "Tara",       role: "AI Live Anchor", voice: "hf_beta:0.6+bf_isabella:0.4" },
-  kabir:  { name: "Kabir",      role: "AI Live Anchor", voice: "hm_psi:0.55+bm_fable:0.45" },
-  bharti: { name: "Bharti",     role: "AI Live Anchor", voice: "hf_alpha:0.6+bf_emma:0.4" },
-  vikram: { name: "Vikram",     role: "AI Live Anchor", voice: "hm_omega:0.55+bm_george:0.45" },
-  ilmaz:  { name: "Ilmaz Syed", role: "Editor",         voice: "hm_omega:0.5+bm_daniel:0.5" }
+  tara:   { name: "Tara",       role: "News Anchor (AI)", voice: "hf_beta:0.6+bf_isabella:0.4" },
+  kabir:  { name: "Kabir",      role: "News Anchor (AI)", voice: "hm_psi:0.55+bm_fable:0.45" },
+  bharti: { name: "Bharti",     role: "News Anchor (AI)", voice: "hf_alpha:0.6+bf_emma:0.4" },
+  vikram: { name: "Vikram",     role: "News Anchor (AI)", voice: "hm_omega:0.55+bm_george:0.45" },
+  ilmaz:  { name: "Ilmaz Syed", role: "Editor (AI)",         voice: "hm_omega:0.5+bm_daniel:0.5" }
 };
 // The hourly rota, in order. The editor is not on it: he presents only his Editor's Picks.
 export const ROTA = ["tara", "kabir", "bharti", "vikram"];

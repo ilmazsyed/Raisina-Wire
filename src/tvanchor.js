@@ -26,9 +26,9 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx, onSpe
   el.className = "tv-anchor"; el.hidden = true; el.setAttribute("aria-live", "polite");
   el.innerHTML = `<div class="ta-cam"><span class="ta-fill"></span>
       <span class="ta-frame"><video class="ta-v ta-idle" muted playsinline loop preload="auto"></video><video class="ta-v ta-talk" muted playsinline loop preload="auto"></video><canvas class="ta-mouth" aria-hidden="true"></canvas></span></div>
-    <span class="ta-vo" aria-hidden="true"></span>
+    <span class="ta-vo" aria-hidden="true"><i class="ta-vo-pic"></i><i class="ta-vo-pic"></i><i class="ta-wipe"></i></span>
     <span class="ta-pick" hidden></span>
-    <div class="ta-strap"><span class="ta-face"></span><span class="ta-who"><b></b><small></small></span><span class="ta-ai">AI</span><span class="ta-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
+    <div class="ta-aston"><b class="ta-aston-1"></b><span class="ta-aston-2"></span></div>
     <div class="ta-line" hidden></div>`;
   screen.querySelector(".tv-seq").after(el);
   const idle = el.querySelector(".ta-idle"), talk = el.querySelector(".ta-talk"), cv = el.querySelector(".ta-mouth");
@@ -38,9 +38,9 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx, onSpe
     if (who === key) return;
     who = key; mouth = null;
     el.querySelector(".ta-fill").style.backgroundImage = `url('/anchors/${key}.jpg')`;
-    el.querySelector(".ta-face").style.backgroundImage = `url('/anchors/${key}.jpg')`;
-    el.querySelector(".ta-who b").textContent = a?.name || "";
-    el.querySelector(".ta-who small").textContent = label(a?.role || "AI Live Anchor");
+    // The aston, a broadcast lower third: "Tara, Raisina Wire" over "News Anchor (AI)".
+    el.querySelector(".ta-aston-1").textContent = `${a?.name || ""}, Raisina Wire`;
+    el.querySelector(".ta-aston-2").textContent = label(a?.role || "News Anchor (AI)");
     for (const [v, kind] of [[idle, "idle"], [talk, "talk"]]) { v.poster = `/anchors/${key}.jpg`; v.src = file(key, kind); }
     loadMouth(key).then(m => {
       if (who !== key || !m) return;
@@ -106,16 +106,40 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx, onSpe
   }
   function stopLip() { if (!lip) return; cancelAnimationFrame(lip.raf); lip = null; el.classList.remove("lipsync"); }
   // Show the anchor in a shot (cam, vo or pip), with an optional "Editor's Pick" tag.
-  function shot(kind, { key, roster, pick = "", pics = [] } = {}) {
+  function shot(kind, { key, roster, pick = "", pics = [], aston = true } = {}) {
     if (key) setWho(key, roster?.[key]);
     el.dataset.shot = kind;
-    if (kind === "vo") { const v = el.querySelector(".ta-vo"); v.style.backgroundImage = pics.map(u => `url('${String(u).replace(/'/g, "%27")}')`).join(","); v.style.animation = "none"; void v.offsetWidth; v.style.animation = ""; }
+    slides(kind === "vo" ? pics : []);
+    // The aston animates in with each new on-camera shot, holds, and animates out.
+    const t = el.querySelector(".ta-aston"); t.classList.remove("go");
+    if (kind !== "vo" && aston) { void t.offsetWidth; t.classList.add("go"); }
     const p = el.querySelector(".ta-pick"); p.hidden = !pick; p.textContent = pick;
     if (el.hidden) { el.hidden = false; void el.offsetWidth; }
     el.classList.add("on");
     face(speaking);
   }
+  // Voice-over pictures: one after another, each pushing in slowly, changing with a Raisina Wire
+  // wipe (a crimson band and a navy band sweeping across); at least three, looping if the read runs on.
+  let slideT = 0;
+  function slides(pics) {
+    clearInterval(slideT); slideT = 0;
+    const [a, b] = el.querySelectorAll(".ta-vo-pic"), wipe = el.querySelector(".ta-wipe");
+    if (!pics.length) return;
+    const url = u => `url('${String(u).replace(/'/g, "%27")}')`;
+    let i = 0, front = a, back = b;
+    const show = (layer, u) => { layer.style.backgroundImage = url(u); layer.style.animation = "none"; void layer.offsetWidth; layer.style.animation = ""; };
+    show(front, pics[0]); front.classList.add("on"); back.classList.remove("on");
+    pics.slice(1).forEach(u => { const im = new Image(); im.src = u; });
+    if (pics.length < 2) return;
+    slideT = setInterval(() => {
+      if (isPaused()) return;
+      i = (i + 1) % pics.length;
+      wipe.classList.remove("go"); void wipe.offsetWidth; wipe.classList.add("go");
+      setTimeout(() => { show(back, pics[i]); back.classList.add("on"); front.classList.remove("on"); [front, back] = [back, front]; }, 330);
+    }, 3600);
+  }
   function hide() {
+    slides([]);
     stopAudio(); face(false); idle.pause(); talk.pause();
     el.classList.remove("on", "talking"); el.hidden = true; el.dataset.shot = "";
   }

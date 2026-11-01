@@ -12,6 +12,7 @@ import { markDome } from "./brand.js";
 import { tr, lang, LOCALE, withLang } from "./i18n.js";
 import * as music from "./tvaudio.js";
 import { createAnchor, prefetchLines } from "./tvanchor.js";
+import { TV_INTRO_PICS } from "./tv-intro-pics.js";
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const IST = { timeZone: "Asia/Kolkata" };
@@ -286,14 +287,14 @@ async function introStory(i) {
   const who = { key: it.anchor, roster: feed.anchors.roster, pick: it.pick ? tr("EDITOR’S PICK") : "" };
   anchor.shot("cam", who);
   if (!await anchor.say(it.cam, alive)) return;
-  // Voice over: the explainer's cover picture, slowly pushing in (the film itself waits at its
-  // first frame, so it starts cleanly afterwards; phones never have to seek or decode it twice).
-  const md = v.thumb && /^\/videos\/[\w.-]+\.jpg$/.test(v.thumb) ? v.thumb.replace(/\.jpg$/, "-md.webp") : "";
-  anchor.shot("vo", { ...who, pics: [md, v.thumb].filter(Boolean) });
+  // Voice over: the explainer's pictures one after another with a Raisina Wire wipe (the film
+  // itself waits at its first frame, so it starts cleanly afterwards).
+  const pics = TV_INTRO_PICS[String(v.src || "").split("?")[0]] || [v.thumb].filter(Boolean);
+  anchor.shot("vo", { ...who, pics });
   lowerThird(v.category || tr("Explainer"), v.title, { stay: true });
   if (!await anchor.say(it.vo, alive)) return;
   root.querySelector(".tv-lower").hidden = true;
-  anchor.shot("cam", who);
+  anchor.shot("cam", { ...who, aston: false }); // the aston has had its turn at the top
   if (!await anchor.say(it.out, alive)) return;
   if (alive()) playStory(n);
 }
