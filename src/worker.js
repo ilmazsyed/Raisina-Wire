@@ -19,6 +19,7 @@ import m0017 from "../migrations/0017_article_video.sql";
 import m0018 from "../migrations/0018_raisina_tv.sql";
 import { tvSettings, saveTvSettings, setForce, tvPlaylist, tvAds, tvBreaking, saveAd, saveBreaking, saveOrder, tvOrderRows, tvInputs, saveInput, tvMusic, saveMusic } from "./channel.js";
 import m0019 from "../migrations/0019_tv_sequences.sql";
+import m0020 from "../migrations/0020_oauth.sql";
 import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { liveResults } from "./results.js";
@@ -76,7 +77,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0018_raisina_tv.sql", m0018], ["0019_tv_sequences.sql", m0019]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0018_raisina_tv.sql", m0018], ["0019_tv_sequences.sql", m0019], ["0020_oauth.sql", m0020]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -156,11 +157,72 @@ async function refreshWriters(env, force = false) {
 }
 // The autopublisher signs in with "Authorization: Bearer <PUBLISH_TOKEN>" (a Worker secret) and
 // acts as the built-in admin. Tokens shorter than 24 characters are ignored.
+
+// OAuth 2.1 for external MCP clients. The legacy PUBLISH_TOKEN remains independent.
+const oauthB64url = bytes => b64(bytes).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
+const oauthRandom = (n=32) => oauthB64url(crypto.getRandomValues(new Uint8Array(n)));
+const oauthHtml = body => new Response("<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Raisina Wire authorisation</title><style>body{margin:0;background:#0b1220;color:#eef2f7;font:16px system-ui;display:grid;min-height:100vh;place-items:center}.panel{width:min(440px,calc(100% - 40px));padding:30px;border:1px solid #344154;border-radius:18px;background:#111c2d;box-sizing:border-box}h1{font-size:24px}p{color:#bac7d8;line-height:1.5}input{box-sizing:border-box;width:100%;padding:13px;margin:7px 0 14px;border-radius:8px;border:1px solid #526176;background:#0b1220;color:white}button{width:100%;padding:14px;border:0;border-radius:8px;background:#c49a48;color:#111;font-weight:700;font-size:16px;cursor:pointer}</style></head><body><main class=panel>"+body+"</main></body></html>",{headers:{"content-type":"text/html;charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"no-referrer","content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
+const oauthMeta = origin => ({issuer:origin,authorization_endpoint:origin+"/oauth/authorize",token_endpoint:origin+"/oauth/token",registration_endpoint:origin+"/oauth/register",response_types_supported:["code"],grant_types_supported:["authorization_code","refresh_token"],code_challenge_methods_supported:["S256"],token_endpoint_auth_methods_supported:["none"],scopes_supported:["mcp:tools"]});
+async function oauthUser(env,email,password) {
+ const row=await env.DB.prepare("SELECT id,email,display_name,role,password_hash FROM users WHERE email=?").bind(email).first();
+ if(await isAdminLogin(env,email,password)){const hash=await passwordHash(password,oauthRandom(16));if(row)await env.DB.prepare("UPDATE users SET role='admin',password_hash=? WHERE id=?").bind(hash,row.id).run();else await env.DB.prepare("INSERT INTO users (id,email,display_name,password_hash,role) VALUES (?,?,?,?,'admin')").bind(randomId(),email,"Raisina Wire Administrator",hash).run();return await env.DB.prepare("SELECT id,email,display_name,role FROM users WHERE email=?").bind(email).first();}
+ if(!row || !(await verifyPassword(password,row.password_hash)) || !["admin","editor"].includes(row.role))return null;return row;
+}
+async function oauthHandle(request,env) {
+ const u=new URL(request.url),origin=u.origin,path=u.pathname;
+ if(path==="/.well-known/oauth-authorization-server"&&request.method==="GET")return json(oauthMeta(origin),200,{"cache-control":"public, max-age=300"});
+ if((path==="/.well-known/oauth-protected-resource"||path==="/.well-known/oauth-protected-resource/mcp")&&request.method==="GET")return json({resource:origin+"/mcp",authorization_servers:[origin],bearer_methods_supported:["header"],scopes_supported:["mcp:tools"]},200,{"cache-control":"public, max-age=300"});
+ if(path==="/oauth/register"&&request.method==="POST"){
+  const b=await request.json().catch(()=>null),name=String(b?.client_name||"MCP client").slice(0,120),redirects=Array.isArray(b?.redirect_uris)?b.redirect_uris:[];
+  if(!redirects.length||redirects.length>10||redirects.some(x=>typeof x!=="string"||x.length>1000||(!/^https:\/\//.test(x)&&!/^http:\/\/(127\.0\.0\.1|localhost)(:|\/)/.test(x))))return err("Valid redirect_uris are required.",400);
+  const id=oauthRandom(24);await env.DB.prepare("INSERT INTO oauth_clients (client_id,client_name,redirect_uris) VALUES (?,?,?)").bind(id,name,JSON.stringify([...new Set(redirects)])).run();
+  return json({client_id:id,client_name:name,redirect_uris:redirects,token_endpoint_auth_method:"none",grant_types:["authorization_code","refresh_token"],response_types:["code"]},201,{"cache-control":"no-store"});
+ }
+ if(path==="/oauth/authorize"&&request.method==="GET"){
+  const p=u.searchParams,client=await env.DB.prepare("SELECT * FROM oauth_clients WHERE client_id=?").bind(p.get("client_id")||"").first(),redirect=p.get("redirect_uri")||"",resource=p.get("resource")||origin+"/mcp";let allowed=[];try{allowed=JSON.parse(client?.redirect_uris||"[]")}catch{}
+  if(!client||!allowed.includes(redirect)||p.get("response_type")!=="code"||p.get("code_challenge_method")!=="S256"||!/^[A-Za-z0-9_-]{43,128}$/.test(p.get("code_challenge")||"")||resource!==origin+"/mcp"||!p.get("state"))return err("Invalid OAuth authorization request.",400);
+  const fields=["client_id","redirect_uri","response_type","code_challenge","code_challenge_method","state","scope","resource"].map(k=>"<input type=hidden name='"+k+"' value='"+String(p.get(k)||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;")+"'>").join("");
+  return oauthHtml("<h1>Connect Raisina Wire</h1><p>"+client.client_name.replace(/[&<>"]/g,"") +" is requesting access to Raisina Wire editorial tools. Sign in with your staff account and approve to continue.</p><form method=post action=/oauth/authorize>"+fields+"<label>Email</label><input name=email type=email autocomplete=username required><label>Password</label><input name=password type=password autocomplete=current-password required><label><input style='width:auto' type=checkbox name=approve value=yes required> I approve access to Raisina Wire publishing tools.</label><button>Approve and connect</button></form><p>Access is revocable. Your existing Claude publishing token is not changed.</p>");
+ }
+ if(path==="/oauth/authorize"&&request.method==="POST"){
+  const p=await request.formData(),get=k=>String(p.get(k)||""),client=await env.DB.prepare("SELECT * FROM oauth_clients WHERE client_id=?").bind(get("client_id")).first();let redirects=[];try{redirects=JSON.parse(client?.redirect_uris||"[]")}catch{}
+  const redirect=get("redirect_uri"),resource=get("resource");
+  if(!client||!redirects.includes(redirect)||get("response_type")!=="code"||get("code_challenge_method")!=="S256"||!/^[A-Za-z0-9_-]{43,128}$/.test(get("code_challenge"))||resource!==origin+"/mcp"||get("approve")!=="yes"||!get("state"))return err("Invalid OAuth approval request.",400);
+  const email=get("email").trim().toLowerCase(),password=get("password"),ip=request.headers.get("cf-connecting-ip")||"unknown",keys=[["oauth:"+email,8],["ip:"+ip,30]];
+  if(await loginBlocked(env,keys))return err("Too many sign-in attempts. Wait 15 minutes and try again.",429);
+  const user=await oauthUser(env,email,password);
+  if(!user){await recordLoginFailure(env,keys);return oauthHtml("<h1>Sign-in failed</h1><p>Use an administrator or editor account. Please restart the connection from ChatGPT.</p>");}
+  await clearLoginFailures(env,keys);const code=oauthRandom(32),scope=get("scope")||"mcp:tools",now=Math.floor(Date.now()/1000);
+  await env.DB.prepare("INSERT INTO oauth_codes (code_hash,client_id,user_id,redirect_uri,code_challenge,scope,resource,expires_at) VALUES (?,?,?,?,?,?,?,?)").bind(await sha256(code),client.client_id,user.id,redirect,get("code_challenge"),scope,resource,now+300).run();
+  const target=new URL(redirect);target.searchParams.set("code",code);target.searchParams.set("state",get("state"));return Response.redirect(target.toString(),302);
+ }
+ if(path==="/oauth/token"&&request.method==="POST"){
+  const p=await request.formData(),get=k=>String(p.get(k)||""),grant=get("grant_type"),clientId=get("client_id"),client=await env.DB.prepare("SELECT client_id FROM oauth_clients WHERE client_id=?").bind(clientId).first();if(!client)return err("Invalid client.",401);
+  const now=Math.floor(Date.now()/1000),access=oauthRandom(32),refresh=oauthRandom(48),expires=now+3600;
+  if(grant==="authorization_code"){
+   const codeHash=await sha256(get("code")),verifier=get("code_verifier"),row=await env.DB.prepare("SELECT * FROM oauth_codes WHERE code_hash=? AND client_id=?").bind(codeHash,clientId).first();
+   if(!row||row.used_at||row.expires_at<=now||row.redirect_uri!==get("redirect_uri")||! /^[A-Za-z0-9._~-]{43,128}$/.test(verifier))return err("Invalid or expired authorization code.",400);
+   const challenge=oauthB64url(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(verifier)));if(challenge!==row.code_challenge)return err("PKCE verification failed.",400);
+   const used=await env.DB.prepare("UPDATE oauth_codes SET used_at=? WHERE code_hash=? AND used_at IS NULL AND expires_at>?").bind(now,codeHash,now).run();if(!used.meta.changes)return err("Authorization code already used.",400);
+   await env.DB.batch([env.DB.prepare("INSERT INTO oauth_access_tokens (token_hash,client_id,user_id,resource,scope,expires_at) VALUES (?,?,?,?,?,?)").bind(await sha256(access),clientId,row.user_id,row.resource,row.scope,expires),env.DB.prepare("INSERT INTO oauth_refresh_tokens (token_hash,client_id,user_id,resource,scope,expires_at) VALUES (?,?,?,?,?,?,?)").bind(await sha256(refresh),clientId,row.user_id,row.resource,row.scope,now+2592000)]);
+   return json({access_token:access,token_type:"Bearer",expires_in:3600,refresh_token:refresh,scope:row.scope},200,{"cache-control":"no-store","pragma":"no-cache"});
+  }
+  if(grant==="refresh_token"){
+   const oldHash=await sha256(get("refresh_token")),old=await env.DB.prepare("SELECT * FROM oauth_refresh_tokens WHERE token_hash=? AND client_id=? AND revoked_at IS NULL AND expires_at>?").bind(oldHash,clientId,now).first();if(!old)return err("Invalid or expired refresh token.",400);
+   const revoked=await env.DB.prepare("UPDATE oauth_refresh_tokens SET revoked_at=CURRENT_TIMESTAMP WHERE token_hash=? AND revoked_at IS NULL").bind(oldHash).run();if(!revoked.meta.changes)return err("Refresh token already used.",400);
+   await env.DB.batch([env.DB.prepare("INSERT INTO oauth_access_tokens (token_hash,client_id,user_id,resource,scope,expires_at) VALUES (?,?,?,?,?,?)").bind(await sha256(access),clientId,old.user_id,old.resource,old.scope,expires),env.DB.prepare("INSERT INTO oauth_refresh_tokens (token_hash,client_id,user_id,resource,scope,expires_at) VALUES (?,?,?,?,?,?,?)").bind(await sha256(refresh),clientId,old.user_id,old.resource,old.scope,now+2592000)]);
+   return json({access_token:access,token_type:"Bearer",expires_in:3600,refresh_token:refresh,scope:old.scope},200,{"cache-control":"no-store","pragma":"no-cache"});
+  }
+  return err("Unsupported grant_type.",400);
+ }
+ return null;
+}
+
 async function publisherUser(request, env) {
   const header = request.headers.get("Authorization") || "";
   const secret = String(env.PUBLISH_TOKEN || "");
   if (!header.startsWith("Bearer ") || secret.length < 24 || !adminEmail(env)) return null;
-  if ((await sha256(header.slice(7).trim())) !== (await sha256(secret))) return null;
+  if ((await sha256(header.slice(7).trim())) !== (await sha256(secret))) { const token=await env.DB.prepare("SELECT users.id,users.email,users.display_name,users.role FROM oauth_access_tokens JOIN users ON users.id=oauth_access_tokens.user_id WHERE oauth_access_tokens.token_hash=? AND oauth_access_tokens.expires_at>? AND oauth_access_tokens.resource=?").bind(await sha256(header.slice(7).trim()),Math.floor(Date.now()/1000),new URL(request.url).origin+"/mcp").first(); return token && ["admin","editor"].includes(token.role) ? token : null; }
   const find = () => env.DB.prepare("SELECT id,email,display_name,role FROM users WHERE email=?").bind(adminEmail(env)).first();
   let row = await find();
   // An empty password hash never verifies; the admin's first password sign-in sets a real one.
@@ -1438,6 +1500,7 @@ export default {
   async scheduled(event, env, ctx) { ctx.waitUntil(scheduled(env)); },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/oauth/") || url.pathname.startsWith("/.well-known/oauth-")) { try { await ensureSchema(env); const response=await oauthHandle(request,env); if(response)return response; } catch(e) { return err("OAuth service temporarily unavailable.",503); } }
     if (url.pathname === "/mcp") {
       try { return await api(request,env,ctx); }
       catch (e) { return json({error:"MCP internal error",detail:e.message},500,{"cache-control":"no-store"}); }
