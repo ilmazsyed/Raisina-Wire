@@ -44,11 +44,39 @@ let feed = null, root = null, video = null;
 let idx = 0, mode = "idle", engaged = false, sinceAd = 0, adQueue = [], adIdx = ls.get("rw-tv-ad", 0);
 let lastTick = 0, unsent = 0, pollTimer = 0, clockTimer = 0, wasPaused = false, startedAt = 0;
 let anchor = null;      // the AI anchor on screen (src/tvanchor.js)
+// Sound: the viewer's choice (wantSound), and the explainer kept silent under the anchor's voice
+// (voMute). TV starts only from a click, so it starts with sound (armed).
+let wantSound = false, voMute = false, armed = false;
 let seqToken = 0, paused = false, sinceFull = 0, setCursor = 0, shortCursor = 0, stingCursor = 0, lastBulletin = -1, inputOn = null;
 // Tests only (localStorage rw-tv-debug): make the next switch an ad break, poll at once, inspect.
 if (ls.get("rw-tv-debug", false)) window.__tv = { adNow: () => { sinceAd = 1e9; }, fullNext: () => { sinceFull = 99; }, bulletinNext: () => { forceBulletin = true; sinceFull = 99; }, poll: () => load(), openerNext: () => ls.set("rw-tv-last", 0), state: () => ({ mode, idx, paused, src: video?.currentSrc, seq: root?.querySelector(".tv-seq")?.dataset.kind || "", input: inputOn?.id || null }) };
 
-export function initTV(d) { deps = d; }
+export function initTV(d) {
+  deps = d;
+  // Raisina TV never plays by itself: it starts when a live TV icon or link is clicked (header,
+  // menu, shorts, the home page), and that click also lets it play with sound.
+  document.addEventListener("click", e => {
+    const a = e.target.closest?.("a[href]");
+    if (!a || e.button || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    let path = ""; try { path = new URL(a.href, location.href).pathname; } catch { return; }
+    if (/^\/(?:hi\/|bn\/)?tv\/?$/.test(path) && (!root || mode === "idle")) arm();
+  }, true);
+}
+// A click is starting TV: switch the sound on and unlock the players while the click lasts.
+function arm() {
+  build();
+  armed = true; engaged = true; wantSound = true;
+  music.audio(); music.resume();
+  video.muted = false;
+  if (!video.getAttribute("src")) { video.src = "/tv-unlock.mp4"; video.play().then(() => video.pause()).catch(() => {}); }
+  anchor.unlock();
+}
+// Opened without a click (a shared link, a reload): a big play button over the newest explainer.
+async function showStart() {
+  const b = root.querySelector(".tv-start"); b.hidden = false;
+  const f = await loadTV().catch(() => null), v = f?.playlist?.[0];
+  if (v?.thumb) b.querySelector(".tv-start-i").style.backgroundImage = `url('${String(v.thumb).replace(/'/g, "%27")}')`;
+}
 export const tvFeed = () => feed;
 export const tvNow = () => (feed && mode !== "ad" ? feed.playlist[idx] : null);
 
@@ -90,11 +118,12 @@ function build() {
         <button type="button" data-tv="full" aria-label="${esc(tr("Full screen"))}">${ICONS.full}</button>
       </div>
       <div class="tv-mini-ctrls"><button type="button" data-tv="open" aria-label="${esc(tr("Open Raisina TV"))}">${ICONS.expand}</button><button type="button" data-tv="close" aria-label="${esc(tr("Close"))}">${ICONS.close}</button></div>
+      <button type="button" class="tv-start" hidden><span class="tv-start-i"></span><span class="tv-start-p">${ICONS.play}</span><b>${esc(tr("Watch Raisina TV live"))}</b></button>
       <div class="tv-off" hidden><b>${esc(tr("Raisina TV is off air"))}</b><span>${esc(tr("Back soon."))}</span></div>
     </div>
     <div class="tv-ticker" aria-label="${esc(tr("Latest headlines"))}"><span class="tv-tk-break" hidden></span><div class="tv-tk-run"><div class="tv-tk-track"></div></div></div>`;
   video = root.querySelector("video");
-  anchor = createAnchor(root.querySelector(".tv-screen"), { isPaused: () => paused, hearing: () => engaged && !video.muted, label: tr, audioCtx: () => (engaged ? music.audio() : null) });
+  anchor = createAnchor(root.querySelector(".tv-screen"), { isPaused: () => paused, hearing: () => engaged && wantSound, label: tr, audioCtx: () => (engaged ? music.audio() : null), onSpeak: on => music.duck(on) });
   video.addEventListener("ended", onEnded);
   video.addEventListener("error", () => { if (mode === "ad") nextAd(); else if (mode === "story") setTimeout(() => advance(), 600); });
   video.addEventListener("timeupdate", onTime);
@@ -126,7 +155,7 @@ function showCtl() {
   ctlTimer = setTimeout(() => { if (!root.querySelector(".tv-ctrls:hover")) root.classList.remove("ctl-on"); }, 3000);
 }
 function onClick(e) {
-  const b = e.target.closest("[data-tv], .tv-sound, .tv-ad-skip, .tv-tk-item");
+  const b = e.target.closest("[data-tv], .tv-sound, .tv-start, .tv-ad-skip, .tv-tk-item");
   if (!b) {
     if (!e.target.closest(".tv-screen")) return;
     if (root.classList.contains("mini")) return deps.navigate?.("/tv");
@@ -136,10 +165,11 @@ function onClick(e) {
   }
   if (b.classList.contains("tv-tk-item")) { if (b.dataset.href) { e.preventDefault(); deps.navigate?.(b.dataset.href); } return; }
   if (b.classList.contains("tv-sound")) return unmute();
+  if (b.classList.contains("tv-start")) { arm(); return dockTV(); }
   if (b.classList.contains("tv-ad-skip")) return nextAd();
   const k = b.dataset.tv;
   if (k === "pause") togglePause();
-  if (k === "mute") { if (video.muted) unmute(); else { video.muted = true; inputMute(true); syncSound(); } }
+  if (k === "mute") { if (wantSound) { wantSound = false; applyMute(); syncSound(); } else unmute(); }
   if (k === "full") { const s = root.querySelector(".tv-screen"); (s.requestFullscreen ? s.requestFullscreen() : video.webkitEnterFullscreen?.())?.catch?.(() => {}); }
   if (k === "cast") { if (video.remote?.prompt) video.remote.prompt().catch(() => {}); else video.webkitShowPlaybackTargetPicker?.(); }
   if (k === "share") deps.share?.(tr("Raisina TV — live"), `${location.origin}${withLang("/tv")}`);
@@ -147,15 +177,18 @@ function onClick(e) {
   if (k === "close") stopTV();
 }
 function unmute() {
-  engaged = true; video.muted = false; music.audio(); music.resume();
+  engaged = true; wantSound = true; music.audio(); music.resume();
+  applyMute();
   if (mode === "story" && !paused) video.play().catch(() => {});
-  inputMute(false); syncSound();
+  syncSound();
 }
+// The video's own sound: on when the viewer wants sound, except under the anchor's voice-over.
+function applyMute() { if (video) video.muted = !wantSound || voMute; inputMute(!wantSound); anchor?.setHearing(engaged && wantSound); }
 function syncSound() {
-  root.querySelector(".tv-sound").hidden = !video.muted;
-  root.querySelector('[data-tv="mute"]').innerHTML = video.muted ? ICONS.muted : ICONS.sound;
+  root.querySelector(".tv-sound").hidden = wantSound;
+  root.querySelector('[data-tv="mute"]').innerHTML = wantSound ? ICONS.sound : ICONS.muted;
 }
-const soundOn = () => engaged && video && !video.muted && feed?.seq?.music !== false;
+const soundOn = () => engaged && wantSound && feed?.seq?.music !== false;
 
 /* ---------- Pause ---------- */
 function togglePause() { setPaused(!paused); }
@@ -226,7 +259,7 @@ function playStory(i) {
   hideSeq();
   root.querySelector(".tv-ad").hidden = true;
   root.querySelector(".tv-lower").hidden = true;
-  anchor?.hide(); video.volume = 1; root.classList.remove("anchor-vo");
+  anchor?.hide(); voMute = false; applyMute(); root.classList.remove("anchor-vo");
   if (video.getAttribute("src") !== v.src) { video.src = v.src; video.poster = v.thumb || ""; } else video.currentTime = 0;
   video.addEventListener("playing", () => lowerThird(v.category || tr("Explainer"), v.title), { once: true });
   if (!paused) video.play().catch(() => {});
@@ -253,15 +286,15 @@ async function introStory(i) {
   if (!await anchor.say(it.cam, alive)) return;
   // Voice over: the explainer's pictures, silent, a few seconds in.
   anchor.shot("vo", who);
-  root.classList.add("anchor-vo"); video.volume = 0; try { video.currentTime = Math.min(3, (video.duration || 30) / 10); } catch { /* not loaded yet */ }
+  root.classList.add("anchor-vo"); voMute = true; applyMute(); try { video.currentTime = Math.min(3, (video.duration || 30) / 10); } catch { /* not loaded yet */ }
   if (!paused) video.play().catch(() => {});
   lowerThird(v.category || tr("Explainer"), v.title, { stay: true });
   const voOk = await anchor.say(it.vo, alive);
-  root.classList.remove("anchor-vo");
-  if (!voOk) { video.volume = 1; return; }
+  root.classList.remove("anchor-vo"); voMute = false; applyMute();
+  if (!voOk) return;
   video.pause(); root.querySelector(".tv-lower").hidden = true;
   anchor.shot("cam", who);
-  if (!await anchor.say(it.out, alive)) { video.volume = 1; return; }
+  if (!await anchor.say(it.out, alive)) return;
   if (alive()) playStory(n);
 }
 function onEnded() { if (mode === "ad") nextAd(); else if (mode === "story") advance(); }
@@ -538,7 +571,7 @@ async function cutToInput(inp) {
   // "We're bringing you live visuals of …", on camera, then the cut.
   const ll = anchorsOn() && feed.anchors.lines?.live;
   if (ll) { root.querySelector(".tv-lower").hidden = true; anchor.shot("cam", { key: ll.anchor, roster: feed.anchors.roster, pick: tr("LIVE") }); await anchor.say(ll, () => tok === seqToken && inputOn === inp); anchor.hide(); if (inputOn !== inp) return; }
-  const box = root.querySelector(".tv-input"), muted = !soundOn() && video.muted;
+  const box = root.querySelector(".tv-input"), muted = !wantSound;
   if (inp.kind === "youtube") box.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(inp.src)}?autoplay=1&mute=${muted ? 1 : 0}&playsinline=1&controls=0&rel=0&modestbranding=1&enablejsapi=1" title="${esc(inp.title)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
   else {
     box.innerHTML = `<video class="tv-input-video" playsinline autoplay${muted ? " muted" : ""}></video>`;
@@ -588,16 +621,14 @@ function breakingSets() {
   for (let i = 0; i < items.length; i += 5) sets.push({ topic: tr("BREAKING"), live: true, items: items.slice(i, i + 5) });
   return sets.filter(st => st.items.length >= 3);
 }
-// Opening TV: stinger, the short promo, Breaking Headlines, then the newest explainer. Once a
-// visit: someone back within 30 minutes goes straight to the channel.
-const OPENER_GAP = 30 * 60e3;
+// Opening TV (every time it's started): the stinger, Breaking Headlines introduced by the anchor,
+// then the anchor's intro and the newest explainer.
 async function opener() {
   const tok = ++seqToken;
   mode = "seq"; root.querySelector(".tv-lower").hidden = true;
   ls.set("rw-tv-last", Date.now());
   preload(feed.playlist[0]);
   await stinger(tok);
-  if (tok === seqToken) await promo(tok, 8);
   const sets = breakingSets();
   if (tok === seqToken && sets.length) await newsUpdate(tok, false, { sets, label: tr("HEADLINES"), card: tr("BREAKING HEADLINES") });
   if (tok === seqToken) introStory(0);
@@ -608,7 +639,7 @@ export async function dockTV() {
     build();
     root.classList.remove("mini"); document.body.classList.remove("tv-mini-on");
     if (root.parentElement !== slot) slot.append(root);
-    if (mode === "idle") await (starting ||= startTV().finally(() => { starting = null; })); // one start, however many redraws
+    if (mode === "idle") { if (armed) await (starting ||= startTV().finally(() => { starting = null; })); else showStart(); } // one start, however many redraws
     else if (!paused && mode === "story" && video.paused && !document.hidden) video.play().catch(() => {});
     return;
   }
@@ -627,9 +658,10 @@ async function startTV() {
   renderClock(); clearInterval(clockTimer); clockTimer = setInterval(renderClock, 15e3);
   // Every 10 seconds: new explainers, the ticker, break-ins and the live input.
   clearInterval(pollTimer); pollTimer = setInterval(() => { if (!document.hidden && mode !== "idle") { load(); if (!paused) ls.set("rw-tv-last", Date.now()); } }, 10e3);
-  syncSound();
-  // Viewers start with the opener (once a visit), then the newest explainer, going back in time.
-  const fresh = Date.now() - ls.get("rw-tv-last", 0) > OPENER_GAP && feed.playlist.length && feed.seq?.stinger !== false;
+  root.querySelector(".tv-start").hidden = true;
+  applyMute(); syncSound();
+  // Viewers start with the opener, then the newest explainer, going back in time.
+  const fresh = feed.playlist.length && feed.seq?.stinger !== false;
   syncInput();
   if (inputOn) return; // a live input is on air: viewers join it straight away
   if (fresh && !(feed.force && Date.now() - Date.parse(feed.force.at) < 120e3)) opener(); else introStory(0);
@@ -641,31 +673,20 @@ export function stopTV() {
   if (inputOn) { const box = root.querySelector(".tv-input"); box.hls?.destroy?.(); box.innerHTML = ""; box.hidden = true; inputOn = null; }
   video.pause(); video.removeAttribute("src"); video.load();
   if (paused) setPaused(false);
-  mode = "idle"; engaged = false;
+  mode = "idle"; engaged = false; wantSound = false; armed = false;
   clearInterval(pollTimer); clearInterval(clockTimer);
   root.classList.remove("mini"); document.body.classList.remove("tv-mini-on");
   root.remove();
 }
 
-/* ---------- The muted preview on the home page ---------- */
-// Plays silently only while on screen, for at most 90 seconds a visit, then rests on a still.
-// Data-saver and reduced-motion get the still picture with a play button.
-let previewSpent = 0;
+/* ---------- The preview on the home page ---------- */
+// No autoplay: the newest explainer's picture with a play button; a tap starts Raisina TV with sound.
 export async function mountPreview(host) {
   const f = await loadTV(); if (!f?.on || !f.playlist.length || !host.isConnected) { host.hidden = true; return; }
   const v = f.playlist[0];
-  const still = navigator.connection?.saveData || matchMedia("(prefers-reduced-motion: reduce)").matches || previewSpent >= 90;
   host.hidden = false;
   host.innerHTML = `<a class="tv-preview" href="/tv" aria-label="${esc(tr("Watch Raisina TV live"))}">
-    <span class="tvp-media">${v.thumb ? `<img src="${esc(v.thumb)}" alt="" loading="lazy">` : ""}${still ? "" : `<video muted playsinline loop preload="none" src="${esc(v.src)}"></video>`}
-      <span class="tv-live"><span class="pulse"></span>LIVE</span><span class="tvp-logo">${markDome("tv-dome", 4)}<b>Raisina TV</b></span>${still ? `<span class="tvp-play">${ICONS.play}</span>` : ""}</span>
+    <span class="tvp-media">${v.thumb ? `<img src="${esc(v.thumb)}" alt="" loading="lazy">` : ""}
+      <span class="tv-live"><span class="pulse"></span>LIVE</span><span class="tvp-logo">${markDome("tv-dome", 4)}<b>Raisina TV</b></span><span class="tvp-play">${ICONS.play}</span></span>
     <span class="tvp-body"><span class="tvp-k">${esc(tr("On Raisina TV now"))}</span><b>${esc(v.title)}</b><span class="tvp-go">${ICONS.play}<span>${esc(tr("Watch live"))}</span></span></span></a>`;
-  const pv = host.querySelector("video"); if (!pv) return;
-  let started = 0;
-  const io = new IntersectionObserver(([e]) => {
-    if (e.isIntersecting && previewSpent < 90 && !document.hidden) { started = Date.now(); pv.play().then(() => host.classList.add("playing")).catch(() => {}); }
-    else if (!pv.paused) { pv.pause(); previewSpent += (Date.now() - started) / 1000; if (previewSpent >= 90) { pv.remove(); host.classList.remove("playing"); } }
-  }, { threshold: 0.5 });
-  io.observe(pv);
-  setTimeout(() => { if (pv.isConnected && !pv.paused) { previewSpent = 90; pv.pause(); pv.remove(); host.classList.remove("playing"); } }, 90e3);
 }
