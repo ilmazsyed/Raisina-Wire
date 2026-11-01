@@ -1696,8 +1696,9 @@ body.cin-open{overflow:hidden}
 .cd-c em{font:800 clamp(9px,1.4cqw,24px) var(--mono);font-style:normal;letter-spacing:.32em;padding:.4cqw 1cqw;background:#e0262f}
 .cd-sub{position:absolute;z-index:2;left:0;right:0;bottom:4.5cqw;text-align:center;font:600 clamp(9px,1.3cqw,22px) var(--sans);color:rgba(255,255,255,.75)}
 .cd-n{display:inline-block;min-width:1.4em;font:800 1.4em/1 var(--mono);color:#fff}.cd-n.tick{animation:tv-slam .5s cubic-bezier(.2,1.4,.4,1)}
-/* small players (phones): picture becomes the backdrop, one line per headline */
+/* small players (phones): picture becomes the backdrop; the sound prompt shrinks to an icon */
 @container (max-width:560px){
+  .tv:has(.tv-seq:not([hidden])) .tv-sound{padding:7px;top:calc(2.45cqw + 30px)}.tv:has(.tv-seq:not([hidden])) .tv-sound span{display:none}
   .bx-pic{width:100%;clip-path:none;opacity:.35}.bx-pic::before{display:none}
   .bx-panel{left:4cqw;right:4cqw;width:auto;top:13cqw;bottom:2.5cqw}
   .bx-h b{font-size:calc(clamp(11px,3.6cqw,16px) * var(--fs,1));line-height:1.15}.bx-list li{padding-top:.4cqw;padding-bottom:.4cqw}.bx-h small{display:none}

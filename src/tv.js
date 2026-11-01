@@ -428,7 +428,9 @@ async function newsUpdate(tok, bulletin, over = null) {
     // fit (phones) the set splits into screens that share the set's time.
     const pages = paginate(items);
     for (let pg = 0, start = 0; pg < pages.length; start += pages[pg].length, pg++) {
-      const n = pages[pg].length, ms = per * n / items.length;
+      const n = pages[pg].length, chars = pages[pg].reduce((t, h) => t + String(h.text).length, 0);
+      // Its share of the set's time, but never less than it takes to read the screen.
+      const ms = pages.length > 1 ? Math.max(per * n / items.length, 1500 + chars * 22) : per;
       const ol = seqEl().querySelector(".bx-list");
       if (ol) { ol.outerHTML = listHtml(pages[pg], start, Math.max(600, (ms - 900) / n)); fitList(seqEl().querySelector(".bx-list")); }
       if (!await wait(ms, tok)) return stop(0.3);
