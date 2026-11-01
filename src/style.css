@@ -1759,3 +1759,58 @@ body.cin-open{overflow:hidden}
 .w-thumb::before,.w-short::before{content:"RAISINA WIRE";position:absolute;left:12px;bottom:10px;font:800 10px/1 var(--sans);letter-spacing:1.6px;color:rgba(255,255,255,.28)}
 .w-thumb img,.w-short img{z-index:1}
 .w-hero .tv{max-width:1180px;margin:0 auto}
+/* Raisina TV: the AI anchor (src/tvanchor.js). Shots: cam (full screen in the studio), vo (voice
+   over the pictures: only the strap), pip (a window beside a title card). */
+.tv-anchor{position:absolute;inset:0;z-index:4;pointer-events:none;color:#fff;font-family:var(--sans);opacity:0;transition:opacity .35s}
+.tv-anchor.on{opacity:1}
+.ta-cam{position:absolute;inset:0;overflow:hidden;background:#070a12}
+.ta-fill{position:absolute;inset:-8%;background:#0b1020 center/cover no-repeat;filter:blur(2.4cqw) saturate(1.15) brightness(.55);transform:scale(1.08)}
+.ta-cam::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(7,10,18,.78),rgba(7,10,18,.15) 45%,rgba(7,10,18,0) 70%),linear-gradient(0deg,rgba(7,10,18,.65),transparent 32%)}
+.ta-frame{position:absolute;top:0;bottom:0;left:38%;aspect-ratio:var(--ta-aspect,1);max-width:66%;overflow:hidden;box-shadow:0 0 6cqw 2cqw rgba(0,0,0,.35);-webkit-mask-image:linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent);mask-image:linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent)}
+.ta-v{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;transition:opacity .18s}
+.ta-mouth{position:absolute;opacity:0;transition:opacity .22s ease;-webkit-mask-image:radial-gradient(closest-side,#000 48%,rgba(0,0,0,.6) 72%,transparent 98%);mask-image:radial-gradient(closest-side,#000 48%,rgba(0,0,0,.6) 72%,transparent 98%)}
+.tv-anchor.lipsync .ta-mouth{opacity:1}
+.ta-talk{opacity:0}.tv-anchor.talking .ta-talk{opacity:1}.tv-anchor.lipsync .ta-talk{opacity:0}
+.ta-cam,.ta-frame{animation:ta-push 30s linear both}
+@keyframes ta-push{to{transform:scale(1.04)}}
+.ta-strap{position:absolute;left:6cqw;bottom:6.5cqw;display:flex;align-items:center;gap:1.3cqw;padding:1cqw 1.8cqw 1cqw 1cqw;border-radius:1cqw;background:rgba(8,11,20,.86);border-left:.45cqw solid #e0262f;box-shadow:0 1cqw 3cqw rgba(0,0,0,.35);animation:ta-in .5s cubic-bezier(.2,.9,.2,1) both}
+@keyframes ta-in{from{opacity:0;transform:translateX(-2cqw)}}
+.ta-face{width:5.6cqw;height:5.6cqw;flex:none;border-radius:50%;background:#1a2133 50% 12%/190% auto no-repeat;box-shadow:0 0 0 .25cqw rgba(255,255,255,.18)}
+.ta-who{display:flex;flex-direction:column;min-width:0}
+.ta-who b{font:800 clamp(12px,2.3cqw,40px)/1.05 var(--sans);letter-spacing:.01em}
+.ta-who small{margin-top:.35cqw;font:600 clamp(8px,1.15cqw,20px)/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#c9cfdb}
+.ta-ai{align-self:center;padding:.25cqw .6cqw;border-radius:.35cqw;background:#fff;color:#0f1422;font:800 clamp(8px,1.1cqw,18px)/1 var(--mono);letter-spacing:.08em}
+.ta-bars{display:flex;align-items:flex-end;gap:.3cqw;height:2.2cqw;margin-left:.4cqw}
+.ta-bars i{width:.42cqw;height:25%;border-radius:.2cqw;background:#fff;opacity:.85}
+.tv-anchor.talking .ta-bars i{animation:ta-talk .8s ease-in-out infinite}
+.ta-bars i:nth-child(2){animation-delay:.15s!important}.ta-bars i:nth-child(3){animation-delay:.3s!important}.ta-bars i:nth-child(4){animation-delay:.45s!important}
+@keyframes ta-talk{0%,100%{height:25%}50%{height:100%}}
+.ta-pick{position:absolute;left:6cqw;top:9.5cqw;padding:.45cqw 1cqw;border-radius:.35cqw;background:#e0262f;font:800 clamp(8px,1.3cqw,22px)/1 var(--mono);letter-spacing:.16em}
+.ta-line{position:absolute;left:6cqw;width:min(34cqw,46%);bottom:17cqw;padding:.8cqw 1.2cqw;border-radius:.5cqw;background:rgba(0,0,0,.62);font:500 clamp(11px,1.75cqw,30px)/1.35 var(--serif)}
+/* Voice over: the pictures play underneath; only the strap (bottom right) and captions show. */
+.tv-anchor[data-shot="vo"] .ta-cam,.tv-anchor[data-shot="vo"] .ta-pick{display:none}
+.tv-anchor[data-shot="vo"] .ta-strap{left:auto;right:2cqw;bottom:2cqw;animation:none}
+.tv-anchor[data-shot="vo"] .ta-line{left:12cqw;right:12cqw;width:auto;bottom:13cqw;text-align:center}
+.tv-anchor[data-shot="pip"] .ta-line{left:6cqw;width:52cqw;bottom:6cqw}
+/* Under a voice over the explainer's pictures are reframed so its own burned-in captions fall out
+   of shot (scaled about its printed logo, which stays under the bug). */
+.tv.anchor-vo .tv-video{transform:scale(1.28);transform-origin:12% 8%;transition:transform .4s}
+/* Picture in picture beside a title card. */
+.tv-anchor[data-shot="pip"] .ta-cam{inset:auto 4cqw 15cqw auto;width:30cqw;aspect-ratio:var(--ta-aspect,1);height:auto;border-radius:1.2cqw;box-shadow:0 2cqw 5cqw rgba(0,0,0,.5),0 0 0 .25cqw rgba(255,255,255,.14);animation:ta-pop .5s cubic-bezier(.2,1,.3,1) both}
+@keyframes ta-pop{from{opacity:0;transform:translateY(2cqw) scale(.96)}}
+.tv-anchor[data-shot="pip"] .ta-fill,.tv-anchor[data-shot="pip"] .ta-cam::after{display:none}
+.tv-anchor[data-shot="pip"] .ta-frame{inset:0;left:0;max-width:none;width:100%;-webkit-mask-image:none;mask-image:none;box-shadow:none;animation:none}
+.tv-anchor[data-shot="pip"] .ta-strap{left:auto;right:4cqw;bottom:6cqw}
+.tv-anchor[data-shot="pip"] .ta-face{display:none}
+@media (prefers-reduced-motion:reduce){.ta-cam,.ta-frame,.ta-strap,.tv-anchor[data-shot="pip"] .ta-cam{animation:none}.tv-anchor.talking .ta-bars i{animation:none;height:70%}}
+/* With the anchor in a window beside it, the title card keeps to the left and wraps. */
+.tv.anchor-pip .bx-card{right:38cqw}
+.tv.anchor-pip .bx-big{font-size:clamp(22px,6.4cqw,120px)}
+/* Phones: captions run full width along the bottom; the strap moves up under the LIVE bug. */
+@container (max-width:560px){
+  .ta-line,.tv-anchor[data-shot="vo"] .ta-line,.tv-anchor[data-shot="pip"] .ta-line{left:2.5cqw;right:2.5cqw;width:auto;bottom:2cqw;font-size:11px;padding:4px 7px}
+  .tv-anchor[data-shot="cam"] .ta-strap{bottom:auto;top:14cqw;left:3cqw}
+  .ta-pick{top:30cqw;left:3cqw}
+  .tv-anchor[data-shot="vo"]:has(.ta-line:not([hidden])) .ta-strap{display:none}
+  .tv-screen:has(.tv-anchor[data-shot="vo"] .ta-line:not([hidden])) .tv-lower{visibility:hidden}
+}

@@ -258,7 +258,7 @@ async function render(view){
     <div class="split"><div class="panel"><h2>Between videos</h2><p class="muted" style="font-size:13px">A 5–7 second transition between explainers (four styles in rotation), and every few videos the full package: stinger, 15-second Raisina Wire promo and a News Update of full-screen headline sets.</p>
       <form id="seqForm"><div class="form-grid">
         <label class="field check"><input type="checkbox" name="stinger" ${S.seq.stinger?"checked":""}> Stinger</label><label class="field check"><input type="checkbox" name="promo" ${S.seq.promo?"checked":""}> 15-second promo</label>
-        <label class="field check"><input type="checkbox" name="news" ${S.seq.news?"checked":""}> News Update</label><label class="field check"><input type="checkbox" name="hourly" ${S.seq.hourly?"checked":""}> Top-of-the-hour bulletin</label>
+        <label class="field check"><input type="checkbox" name="news" ${S.seq.news?"checked":""}> News Update</label><label class="field check"><input type="checkbox" name="hourly" ${S.seq.hourly?"checked":""}> Top-of-the-hour bulletin</label><label class="field check"><input type="checkbox" name="anchors" ${S.seq.anchors!==false?"checked":""}> AI anchors (intros before explainers, headlines, breaking and live lines; English channel)</label>
         <label class="field">Full package<select name="fullEvery">${[1,2,3,4,6].map(k=>`<option value="${k}" ${k===S.seq.fullEvery?"selected":""}>${k===1?"After every video":`After every ${k} videos`}</option>`).join("")}</select></label>
         <label class="field">Headline sets per News Update<select name="sets">${[3,4,5].map(k=>`<option ${k===S.seq.sets?"selected":""}>${k}</option>`).join("")}</select></label>
         <label class="field">Seconds per set<select name="setSeconds">${[5,6,7,8,10,12].map(k=>`<option ${k===S.seq.setSeconds?"selected":""}>${k}</option>`).join("")}</select></label></div>
@@ -303,7 +303,7 @@ async function render(view){
     $$("[data-ad-on]").forEach(c=>c.addEventListener("change",()=>done(c.checked?"Ad on.":"Ad off.",()=>put(`/api/admin/tv/ads/${encodeURIComponent(c.dataset.adOn)}`,{onAir:c.checked}))));
     $$("[data-ad-del]").forEach(b=>b.addEventListener("click",()=>{if(confirm("Delete this ad?"))done("Ad deleted.",()=>api(`/api/admin/tv/ads/${encodeURIComponent(b.dataset.adDel)}`,{method:"DELETE"}))}));
     const seqOf=()=>({...S.seq});
-    $("#seqForm").addEventListener("submit",e=>{e.preventDefault();const f=e.currentTarget,q=seqOf();["stinger","promo","news","hourly"].forEach(k=>q[k]=f.elements[k].checked);["fullEvery","sets","setSeconds"].forEach(k=>q[k]=+f.elements[k].value);done("Saved. Applies from the next switch.",()=>put("/api/admin/tv/settings",{seq:q}))});
+    $("#seqForm").addEventListener("submit",e=>{e.preventDefault();const f=e.currentTarget,q=seqOf();["stinger","promo","news","hourly","anchors"].forEach(k=>q[k]=f.elements[k].checked);["fullEvery","sets","setSeconds"].forEach(k=>q[k]=+f.elements[k].value);done("Saved. Applies from the next switch.",()=>put("/api/admin/tv/settings",{seq:q}))});
     $("#musicOn").addEventListener("change",e=>done(e.target.checked?"Music on.":"Music off.",()=>put("/api/admin/tv/settings",{seq:{...seqOf(),music:e.target.checked}})));
     $$("[data-theme-on]").forEach(c=>c.addEventListener("change",()=>{const q=seqOf();q.themes={...q.themes,[c.dataset.themeOn]:c.checked};done("Saved.",()=>put("/api/admin/tv/settings",{seq:q}))}));
     let stopPreview=()=>{};

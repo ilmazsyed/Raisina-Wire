@@ -11,6 +11,7 @@
 import { markDome } from "./brand.js";
 import { tr, lang, LOCALE, withLang } from "./i18n.js";
 import * as music from "./tvaudio.js";
+import { createAnchor, prefetchLines } from "./tvanchor.js";
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const IST = { timeZone: "Asia/Kolkata" };
@@ -42,6 +43,7 @@ let deps = {};           // beacon, share, navigate: supplied by main.js
 let feed = null, root = null, video = null;
 let idx = 0, mode = "idle", engaged = false, sinceAd = 0, adQueue = [], adIdx = ls.get("rw-tv-ad", 0);
 let lastTick = 0, unsent = 0, pollTimer = 0, clockTimer = 0, wasPaused = false, startedAt = 0;
+let anchor = null;      // the AI anchor on screen (src/tvanchor.js)
 let seqToken = 0, paused = false, sinceFull = 0, setCursor = 0, shortCursor = 0, stingCursor = 0, lastBulletin = -1, inputOn = null;
 // Tests only (localStorage rw-tv-debug): make the next switch an ad break, poll at once, inspect.
 if (ls.get("rw-tv-debug", false)) window.__tv = { adNow: () => { sinceAd = 1e9; }, fullNext: () => { sinceFull = 99; }, bulletinNext: () => { forceBulletin = true; sinceFull = 99; }, poll: () => load(), openerNext: () => ls.set("rw-tv-last", 0), state: () => ({ mode, idx, paused, src: video?.currentSrc, seq: root?.querySelector(".tv-seq")?.dataset.kind || "", input: inputOn?.id || null }) };
@@ -92,6 +94,7 @@ function build() {
     </div>
     <div class="tv-ticker" aria-label="${esc(tr("Latest headlines"))}"><span class="tv-tk-break" hidden></span><div class="tv-tk-run"><div class="tv-tk-track"></div></div></div>`;
   video = root.querySelector("video");
+  anchor = createAnchor(root.querySelector(".tv-screen"), { isPaused: () => paused, hearing: () => engaged && !video.muted, label: tr, audioCtx: () => (engaged ? music.audio() : null) });
   video.addEventListener("ended", onEnded);
   video.addEventListener("error", () => { if (mode === "ad") nextAd(); else if (mode === "story") setTimeout(() => advance(), 600); });
   video.addEventListener("timeupdate", onTime);
@@ -162,8 +165,9 @@ function setPaused(p) {
   root.classList.toggle("paused", p);
   const btn = root.querySelector('[data-tv="pause"]');
   btn.innerHTML = p ? ICONS.play : ICONS.pause; btn.setAttribute("aria-label", tr(p ? "Play" : "Pause"));
+  anchor?.pause(p);
   if (p) { video.pause(); inputPause(true); music.suspend(); music.pauseTracks(); }
-  else { if (["story", "ad"].includes(mode)) video.play().catch(() => {}); inputPause(false); music.resume(); music.resumeTracks(); }
+  else { if (["story", "ad"].includes(mode) || anchor?.shotNow() === "vo") video.play().catch(() => {}); inputPause(false); music.resume(); music.resumeTracks(); }
 }
 // A timer that stops while paused and ends early if a newer sequence takes over.
 function wait(ms, tok) {
@@ -222,12 +226,43 @@ function playStory(i) {
   hideSeq();
   root.querySelector(".tv-ad").hidden = true;
   root.querySelector(".tv-lower").hidden = true;
-  video.src = v.src; video.poster = v.thumb || "";
+  anchor?.hide(); video.volume = 1; root.classList.remove("anchor-vo");
+  if (video.getAttribute("src") !== v.src) { video.src = v.src; video.poster = v.thumb || ""; } else video.currentTime = 0;
   video.addEventListener("playing", () => lowerThird(v.category || tr("Explainer"), v.title), { once: true });
   if (!paused) video.play().catch(() => {});
   mediaSession(v.title, v.thumb);
   deps.beacon?.({ t: "play", id: v.id, src: "tv" });
   document.dispatchEvent(new CustomEvent("tvchange"));
+}
+// The anchor's intro before an explainer, cut like a bulletin: on camera for the hook, her voice
+// over the explainer's opening pictures (muted), back on camera for the hand-off, then the film
+// from the start. Without an intro (or with anchors off) the explainer just plays.
+const anchorsOn = () => Boolean(anchor && feed?.anchors && feed.seq?.anchors !== false);
+async function introStory(i) {
+  if (!feed?.playlist.length) return playStory(i);
+  const n = ((i % feed.playlist.length) + feed.playlist.length) % feed.playlist.length, v = feed.playlist[n];
+  const it = anchorsOn() && feed.anchors.intros?.[v.id];
+  if (!it) return playStory(n);
+  const tok = ++seqToken, alive = () => tok === seqToken;
+  idx = n; mode = "seq"; hideSeq();
+  root.querySelector(".tv-ad").hidden = true; root.querySelector(".tv-lower").hidden = true;
+  video.pause(); video.src = v.src; video.poster = v.thumb || "";
+  prefetchLines([it.vo, it.out]);
+  const who = { key: it.anchor, roster: feed.anchors.roster, pick: it.pick ? tr("EDITOR’S PICK") : "" };
+  anchor.shot("cam", who);
+  if (!await anchor.say(it.cam, alive)) return;
+  // Voice over: the explainer's pictures, silent, a few seconds in.
+  anchor.shot("vo", who);
+  root.classList.add("anchor-vo"); video.volume = 0; try { video.currentTime = Math.min(3, (video.duration || 30) / 10); } catch { /* not loaded yet */ }
+  if (!paused) video.play().catch(() => {});
+  lowerThird(v.category || tr("Explainer"), v.title, { stay: true });
+  const voOk = await anchor.say(it.vo, alive);
+  root.classList.remove("anchor-vo");
+  if (!voOk) { video.volume = 1; return; }
+  video.pause(); root.querySelector(".tv-lower").hidden = true;
+  anchor.shot("cam", who);
+  if (!await anchor.say(it.out, alive)) { video.volume = 1; return; }
+  if (alive()) playStory(n);
 }
 function onEnded() { if (mode === "ad") nextAd(); else if (mode === "story") advance(); }
 // Between explainers: the short transition, or the full package every few videos (or the
@@ -249,9 +284,9 @@ async function advance() {
   } else await shortTransition(tok, next);
   if (tok !== seqToken) return;
   if (feed.ads.length && sinceAd >= feed.every * 60) return startBreak();
-  playStory(idx + 1);
+  introStory(idx + 1);
 }
-function preload(v) { if (!v) return; const p = document.createElement("link"); p.rel = "preload"; p.as = "video"; p.href = v.src; document.head.append(p); setTimeout(() => p.remove(), 60e3); }
+function preload(v) { if (!v) return; const it = feed?.anchors?.intros?.[v.id]; if (it) prefetchLines([it.cam, it.vo, it.out]); const p = document.createElement("link"); p.rel = "preload"; p.as = "video"; p.href = v.src; document.head.append(p); setTimeout(() => p.remove(), 60e3); }
 function startBreak() {
   sinceAd = 0; hideSeq();
   adQueue = Array.from({ length: Math.min(feed.perBreak, 4) }, (_, k) => feed.ads[(adIdx + k) % feed.ads.length]);
@@ -261,7 +296,7 @@ function startBreak() {
 function nextAd(first = false) {
   const ad = first ? adQueue[0] : (adQueue.shift(), adQueue[0]);
   if (!first && mode === "ad" && root.dataset.adId) deps.beacon?.({ t: "ad", id: root.dataset.adId, done: video.ended });
-  if (!ad) { root.querySelector(".tv-ad").hidden = true; delete root.dataset.adId; mode = "story"; return playStory(idx + 1); }
+  if (!ad) { root.querySelector(".tv-ad").hidden = true; delete root.dataset.adId; mode = "story"; return introStory(idx + 1); }
   root.dataset.adId = ad.id;
   root.querySelector(".tv-lower").hidden = true;
   const box = root.querySelector(".tv-ad"), skip = box.querySelector(".tv-ad-skip");
@@ -314,11 +349,12 @@ function score({ sting = false, bed = 0, breaking = false } = {}) {
 /* ---------- Sequences ---------- */
 const seqEl = () => root.querySelector(".tv-seq");
 function showSeq(kind, html) {
+  anchor?.hide();
   const el = seqEl(); el.dataset.kind = kind; el.className = `tv-seq sq-${kind}`; el.innerHTML = html; el.hidden = false;
   void el.offsetWidth; el.classList.add("on");
   return el;
 }
-function hideSeq() { const el = seqEl(); if (!el) return; el.hidden = true; el.innerHTML = ""; el.dataset.kind = ""; }
+function hideSeq() { anchor?.hide(); root?.classList.remove("anchor-pip"); const el = seqEl(); if (!el) return; el.hidden = true; el.innerHTML = ""; el.dataset.kind = ""; }
 const shuffle = a => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
 // Full-screen pictures: the 960 px WebP copy first (tools/thumbs.py), the original underneath.
 // Background image (the small WebP first where there is one); extra CSS goes in the same style attribute.
@@ -412,7 +448,12 @@ async function newsUpdate(tok, bulletin, over = null) {
   showSeq("nu", `${STUDIO}<span class="bx-card"><span class="bx-k"><span class="pulse"></span>RAISINA WIRE · ${esc(tr("LIVE"))}</span>
     <b class="bx-big">${esc(over?.card || label)}${bulletin ? ` <em>${esc(hourLabel())}</em>` : ""}</b><span class="bx-line"></span>
     <span class="bx-meta">${esc(dateNow())} · ${esc(clockNow())} IST</span></span>`);
-  if (!await wait(3000, tok)) return stop(0.3);
+  // The anchor introduces it from a window beside the title card.
+  const al = feed.anchors?.lines, aLine = !anchorsOn() ? null : over ? al?.headlines : bulletin ? al?.bulletin : al?.news;
+  if (aLine) { root.classList.add("anchor-pip"); anchor.shot("pip", { key: aLine.anchor, roster: feed.anchors.roster }); }
+  const ok = (await Promise.all([wait(3000, tok), aLine ? anchor.say(aLine, () => tok === seqToken) : true])).every(Boolean);
+  if (aLine) { anchor.hide(); root.classList.remove("anchor-pip"); }
+  if (!ok) return stop(0.3);
   for (let i = 0; i < sets.length; i++) {
     const st = sets[i], items = (st.items || []).slice(0, 5), slot = Math.max(700, (per - 1000) / Math.max(items.length, 1));
     const pic = st.markets ? [] : setPic(st, i);
@@ -473,6 +514,8 @@ async function checkForce() {
     showSeq("breaking", `<span class="br-flash"></span><span class="br-band"><span>${esc(tr("BREAKING NEWS"))}</span></span>${f.text || feed.breaking[0] ? `<b class="br-text">${esc(f.text || feed.breaking[0])}</b>` : ""}${DOME("br-dome")}`);
     await wait(4800, tok); stop(0.6);
     if (tok !== seqToken) return;
+    const bl = anchorsOn() && feed.anchors.lines?.breaking;
+    if (bl) { anchor.shot("cam", { key: bl.anchor, roster: feed.anchors.roster, pick: tr("BREAKING NEWS") }); await anchor.say(bl, () => tok === seqToken); anchor.hide(); if (tok !== seqToken) return; }
   }
   if (k >= 0) return playStory(k);
   // Sting only: back to the explainer that was on.
@@ -489,9 +532,12 @@ function syncInput() {
 }
 let hlsLoad = null;
 async function cutToInput(inp) {
-  ++seqToken; hideSeq();
+  const tok = ++seqToken; hideSeq();
   if (mode === "ad") root.querySelector(".tv-ad").hidden = true;
   video.pause(); mode = "input"; inputOn = inp;
+  // "We're bringing you live visuals of …", on camera, then the cut.
+  const ll = anchorsOn() && feed.anchors.lines?.live;
+  if (ll) { root.querySelector(".tv-lower").hidden = true; anchor.shot("cam", { key: ll.anchor, roster: feed.anchors.roster, pick: tr("LIVE") }); await anchor.say(ll, () => tok === seqToken && inputOn === inp); anchor.hide(); if (inputOn !== inp) return; }
   const box = root.querySelector(".tv-input"), muted = !soundOn() && video.muted;
   if (inp.kind === "youtube") box.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(inp.src)}?autoplay=1&mute=${muted ? 1 : 0}&playsinline=1&controls=0&rel=0&modestbranding=1&enablejsapi=1" title="${esc(inp.title)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
   else {
@@ -508,6 +554,7 @@ async function cutToInput(inp) {
   mediaSession(inp.title);
 }
 function endInput() {
+  anchor?.hide();
   const box = root.querySelector(".tv-input");
   box.hls?.destroy?.(); box.innerHTML = ""; box.hidden = true; inputOn = null;
   root.querySelector(".tv-lower").hidden = true;
@@ -553,7 +600,7 @@ async function opener() {
   if (tok === seqToken) await promo(tok, 8);
   const sets = breakingSets();
   if (tok === seqToken && sets.length) await newsUpdate(tok, false, { sets, label: tr("HEADLINES"), card: tr("BREAKING HEADLINES") });
-  if (tok === seqToken) playStory(0);
+  if (tok === seqToken) introStory(0);
 }
 export async function dockTV() {
   const slot = document.getElementById("tvSlot");
@@ -585,12 +632,12 @@ async function startTV() {
   const fresh = Date.now() - ls.get("rw-tv-last", 0) > OPENER_GAP && feed.playlist.length && feed.seq?.stinger !== false;
   syncInput();
   if (inputOn) return; // a live input is on air: viewers join it straight away
-  if (fresh && !(feed.force && Date.now() - Date.parse(feed.force.at) < 120e3)) opener(); else playStory(0);
+  if (fresh && !(feed.force && Date.now() - Date.parse(feed.force.at) < 120e3)) opener(); else introStory(0);
 }
 export function stopTV() {
   if (!root) return;
   flushWatch();
-  ++seqToken; hideSeq();
+  ++seqToken; hideSeq(); anchor?.hide();
   if (inputOn) { const box = root.querySelector(".tv-input"); box.hls?.destroy?.(); box.innerHTML = ""; box.hidden = true; inputOn = null; }
   video.pause(); video.removeAttribute("src"); video.load();
   if (paused) setPaused(false);
