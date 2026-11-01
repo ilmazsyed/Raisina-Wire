@@ -1836,3 +1836,6 @@ body.cin-open{overflow:hidden}
 .ta-wipe.go{animation:ta-wipe .7s cubic-bezier(.7,0,.3,1) both}
 @keyframes ta-wipe{from{transform:translateX(-101%)}to{transform:translateX(101%)}}
 @container (max-width:560px){.ta-aston{left:3cqw;bottom:5cqw}}
+/* Headlines the anchor reads: the highlight follows her voice instead of a timer. */
+.bx-list.voiced li::before{animation:none;transition:opacity .3s,transform .4s cubic-bezier(.2,.9,.2,1)}
+.bx-list.voiced li.reading::before{opacity:1;transform:none}

@@ -1,0 +1,41 @@
+# Raisina TV live reads: every 10 minutes (and on demand), records the anchor reading the headlines,
+# breaking lines and live captions the channel is waiting for, in the explainers' Kokoro voice, and
+# uploads them to the site. Needs the repository secret RW_PUBLISH_TOKEN (the Worker's PUBLISH_TOKEN).
+name: Raisina TV live reads
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+concurrency:
+  group: live-reads
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  reads:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: video
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Kokoro model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/rw-video
+          key: kokoro-v1.0
+      - name: Download the model if it isn't cached
+        run: |
+          mkdir -p ~/.cache/rw-video && cd ~/.cache/rw-video
+          for f in kokoro-v1.0.onnx voices-v1.0.bin; do [ -s $f ] || curl -sSL -o $f https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/$f; done
+      - name: Install
+        run: |
+          sudo apt-get install -y -qq ffmpeg > /dev/null
+          pip install -q kokoro-onnx soundfile numpy
+      - name: Record and upload
+        env:
+          RW_PUBLISH_TOKEN: ${{ secrets.RW_PUBLISH_TOKEN }}
+        run: python video/live_reads.py
