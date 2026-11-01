@@ -14,7 +14,9 @@ from audio import MODEL_DIR, SR, anchor_chain, style_of, trim  # noqa: E402
 SITE = os.environ.get("RW_SITE", "https://raisinawire.calibrex.org").rstrip("/")
 TOKEN = os.environ.get("RW_PUBLISH_TOKEN", "")
 SPEED, LIMIT = 1.06, int(os.environ.get("RW_READS_LIMIT", "80"))
-if not TOKEN: sys.exit("RW_PUBLISH_TOKEN is not set (the Worker's PUBLISH_TOKEN secret).")
+if not TOKEN:   # not set up yet: say so in the run's summary, without failing every ten minutes
+    print("::warning::Add the repository secret RW_PUBLISH_TOKEN (the Worker's PUBLISH_TOKEN) to record Raisina TV live reads.")
+    sys.exit(0)
 
 def call(method, path, body=None, ctype=None):
     req = urllib.request.Request(SITE + path, data=body, method=method, headers={"authorization": f"Bearer {TOKEN}", "user-agent": "raisina-live-reads", **({"content-type": ctype} if ctype else {})})
