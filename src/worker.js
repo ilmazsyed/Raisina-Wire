@@ -408,11 +408,13 @@ async function handleMcp(request, env, ctx) {
   const user = await currentUser(request, env);
   if (!isStaff(user)) return err("Publisher authentication failed.",403);
   const rpc = await request.json().catch(()=>null);
-  if (!rpc || rpc.jsonrpc !== "2.0" || !("id" in rpc) || typeof rpc.method !== "string") return json({jsonrpc:"2.0",id:rpc?.id??null,error:{code:-32600,message:"Invalid JSON-RPC request"}},400);
+  if (!rpc || rpc.jsonrpc !== "2.0" || typeof rpc.method !== "string") return json({jsonrpc:"2.0",id:rpc?.id??null,error:{code:-32600,message:"Invalid JSON-RPC request"}},400);
+  // MCP notifications have no id and must not receive a JSON-RPC response.
+  if (rpc.method === "notifications/initialized" && !("id" in rpc)) return new Response(null,{status:202,headers:{"cache-control":"no-store"}});
+  if (!("id" in rpc)) return new Response(null,{status:202,headers:{"cache-control":"no-store"}});
   const result = (value) => json({jsonrpc:"2.0",id:rpc.id,result:value},200,{"cache-control":"no-store"});
   if (rpc.method === "initialize") return result({protocolVersion:"2025-03-26",capabilities:{tools:{}},serverInfo:{name:"raisina-wire-publisher",version:"1.0.0"}});
   if (rpc.method === "ping") return result({});
-  if (rpc.method === "notifications/initialized") return new Response(null,{status:202});
   if (rpc.method === "tools/list") return result({tools:MCP_TOOLS});
   if (rpc.method !== "tools/call") return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32601,message:"Method not found"}},200);
   const name=rpc.params?.name, a=rpc.params?.arguments||{};
