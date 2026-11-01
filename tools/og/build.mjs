@@ -61,3 +61,47 @@ body{width:1200px;height:630px;overflow:hidden;font-family:Manrope,sans-serif;co
 </body></html>`;
   fs.writeFileSync(`${dir}og-${l}.html`, html);
 }
+
+
+// Raisina TV campaign card. Portraits are read from the same public anchor assets
+// used by the live channel, so the share artwork always uses the approved faces.
+const portrait = key => "data:image/jpeg;base64," + fs.readFileSync(new URL(`../../public/anchors/${key}.jpg`, import.meta.url)).toString("base64");
+const tvHtml = `<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,700&family=Manrope:wght@500;600;700;800&display=block" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0}body{width:1200px;height:630px;overflow:hidden;position:relative;color:#fff;font-family:Manrope,sans-serif;background:radial-gradient(700px 440px at 78% 48%,rgba(191,28,43,.44),transparent 68%),radial-gradient(600px 340px at 20% 100%,rgba(194,145,72,.16),transparent 70%),linear-gradient(130deg,#080d18,#151b2a 58%,#210d17)}
+.top{position:absolute;left:0;top:0;width:100%;height:6px;background:linear-gradient(90deg,#ff922e 0 33.3%,#f4f1e9 33.3% 66.6%,#168b4b 66.6%)}
+.brand{position:absolute;left:64px;top:44px;font-size:20px;font-weight:800;letter-spacing:2px;color:#f3d8ad}.brand b{color:#fff}
+.copy{position:absolute;left:64px;top:132px;width:560px}
+.live{display:inline-flex;align-items:center;gap:9px;border:1px solid rgba(255,91,100,.55);background:rgba(196,25,38,.2);border-radius:30px;padding:9px 16px;font-size:13px;font-weight:800;letter-spacing:2px;color:#ff9ba0}
+.dot{width:8px;height:8px;background:#ff3949;border-radius:50%;box-shadow:0 0 0 5px rgba(255,57,73,.16)}
+h1{font:700 76px/.94 Newsreader,serif;letter-spacing:-2px;margin-top:26px;max-width:550px}
+h1 span{color:#ff626b}
+.sub{font-size:21px;line-height:1.45;color:rgba(255,255,255,.8);margin-top:24px;max-width:500px}
+.foot{position:absolute;left:64px;bottom:54px;font-size:13px;font-weight:800;letter-spacing:2px;color:#e7c58c}
+.url{position:absolute;left:64px;bottom:28px;font-size:13px;color:rgba(255,255,255,.55);letter-spacing:1px}
+.people{position:absolute;right:42px;top:72px;width:520px;height:490px}
+.person{position:absolute;overflow:hidden;border:2px solid rgba(238,207,157,.68);border-radius:18px;background:#151b2a;box-shadow:0 22px 50px rgba(0,0,0,.45)}
+.person img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
+.p-ilmaz{left:0;top:24px;width:240px;height:390px;z-index:3;transform:rotate(-3deg)}
+.p-tara{left:228px;top:0;width:220px;height:350px;z-index:4;transform:rotate(3deg)}
+.p-bharti{left:352px;top:280px;width:125px;height:165px;z-index:5}
+.p-kabir{left:42px;top:330px;width:125px;height:150px;z-index:5}
+.p-vikram{left:190px;top:355px;width:125px;height:125px;z-index:5}
+.label{position:absolute;bottom:0;left:0;right:0;padding:8px 5px;text-align:center;background:linear-gradient(transparent,rgba(0,0,0,.86));font-size:11px;font-weight:800;letter-spacing:1.2px}
+.p-tara .label{font-size:12px}.p-ilmaz .label{font-size:14px}
+</style></head><body><div class="top"></div>
+<div class="brand">RAISINA <b>TV</b></div>
+<div class="copy"><div class="live"><i class="dot"></i> LIVE · 24/7</div>
+<h1>Something will change the way you view news. <span>Live.</span></h1>
+<div class="sub">Thoughtful journalism. Powerful explainers. A fresh perspective on the stories shaping our world.</div></div>
+<div class="people">
+<div class="person p-ilmaz"><img src="${portrait("ilmaz")}"><div class="label">ILMAZ</div></div>
+<div class="person p-tara"><img src="${portrait("tara")}"><div class="label">TARA</div></div>
+<div class="person p-bharti"><img src="${portrait("bharti")}"><div class="label">BHARTI</div></div>
+<div class="person p-kabir"><img src="${portrait("kabir")}"><div class="label">KABIR</div></div>
+<div class="person p-vikram"><img src="${portrait("vikram")}"><div class="label">VIKRAM</div></div>
+</div>
+<div class="foot">RAISINA WIRE · NEWS, WITH PERSPECTIVE</div><div class="url">raisinawire.calibrex.org/tv</div>
+</body></html>`;
+fs.writeFileSync(new URL("./og-tv.html", import.meta.url), tvHtml);
