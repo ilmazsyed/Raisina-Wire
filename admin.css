@@ -229,3 +229,5 @@ td .row-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .switch span::after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .switch input:checked+span{background:#137a55}.switch input:checked+span::after{transform:translateX(18px)}
 .tv-breakin{border-color:rgba(200,20,31,.3)!important}
+.tv-inputs{border-color:rgba(200,20,31,.25)!important}.tv-list li.on-air{border-color:#c8141f;background:rgba(200,20,31,.06)}
+.pill.bad{background:#c8141f;color:#fff}

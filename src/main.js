@@ -1,6 +1,6 @@
 import "./style.css";
 import { editions, NEWSLETTER_URL, AUTHOR } from "./editions.js";
-import { initTV, dockTV, mountPreview, loadTV, tvFeed, tvNow } from "./tv.js";
+import { initTV, dockTV, mountPreview, loadTV, tvFeed } from "./tv.js";
 import { brandMark, skyline, tribar, wordmark } from "./brand.js";
 import { WRITERS, writer, setGuestWriters } from "./writers.js";
 import { ABOUT, LEGAL, LEGAL_ORDER, LEGAL_UPDATED } from "./legal.js";
@@ -44,6 +44,9 @@ const ICON_CHECK = `<svg class="ck" width="18" height="18" viewBox="0 0 24 24" f
 const ICON_LOCK = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold-ink)" stroke-width="2" aria-hidden="true" style="flex-shrink:0;margin-top:2px"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`;
 const ICON_REFRESH = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v4.5h-4.5"/></svg>`;
 const ICON_INFO = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold-ink)" stroke-width="2" aria-hidden="true" style="flex-shrink:0;margin-top:2px"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>`;
+// Explainer and short covers have a small WebP copy (tools/thumbs.py); cards ask for it first.
+const smallThumb = src => /^\/videos\/[\w.-]+\.jpg$/.test(src || "") ? src.replace(/\.jpg$/, "-sm.webp") : src;
+const thumbImg = (src, eager = false) => src ? `<img class="img-cover" src="${esc(smallThumb(src))}"${smallThumb(src) !== src ? ` data-full="${esc(src)}"` : ""} alt="" loading="${eager ? "eager" : "lazy"}" decoding="async" data-hide-on-error>` : "";
 const img = (src, alt = "") => src ? `<img class="img-cover" src="${esc(src)}" alt="${esc(alt)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-hide-on-error>` : "";
 
 /* ---------- Storage (per device conveniences only) ---------- */
@@ -171,13 +174,12 @@ const NAV = [
   ["Today", "/", r => r.page === "home"],
   ["Raisina Wire", "/editions", r => ["editions", "edition", "article"].includes(r.page)],
   ["Live", "/live", r => r.page === "live" && !r.arg],
-  ["TV", "/tv", r => r.page === "tv"],
+  ["TV", "/tv", r => r.page === "tv" || r.page === "watch"],
   ["India", "/live/India", r => r.page === "live" && r.arg === "India"],
   ["Security", "/live/Security", r => r.page === "live" && r.arg === "Security"],
   ["Markets", "/markets", r => r.page === "markets"],
   ["Community", "/community", r => r.page === "community" || r.page === "discussion"],
   ["Events", "/events", r => r.page === "events"],
-  ["Watch", "/watch", r => r.page === "watch"],
   ["Saved", "/saved", r => r.page === "saved"]
 ];
 
@@ -194,6 +196,7 @@ function renderShell() {
     <div class="utility">
       <div class="utility-left"><span id="today"></span><span id="wireStatus"><span class="dot-ok"></span>Connecting to the live wire…</span><button class="fresh-btn" id="freshBtn" type="button" data-action="refresh-all" aria-label="Refresh the news">${ICON_REFRESH}<span id="freshText">Updated just now</span></button></div>
       <div class="utility-right">
+        <a class="icon-btn tv-btn" href="/tv" aria-label="Raisina TV, live" title="Raisina TV · LIVE"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M8 21h8M9 2l3 4 3-4"/></svg><span class="tv-btn-dot"></span><span class="tv-btn-txt">TV</span></a>
         <details class="lang-menu" id="langMenu"><summary class="icon-btn lang-btn" aria-label="Language" title="Language">${ICON_GLOBE}<span lang="${lang}">${LANGUAGES[lang].short}</span></summary>
           <div class="lang-pop glass" id="langPop" data-no-tr role="menu">${languageLinks()}</div></details>
         <button class="icon-btn" type="button" data-action="theme" aria-label="Switch between light and dark" title="Light or dark"><svg class="i-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg><svg class="i-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
@@ -307,6 +310,8 @@ function renderShell() {
   // Hide images from feeds that fail to load rather than showing a broken icon.
   document.addEventListener("error", e => {
     if (!e.target?.matches?.("img[data-hide-on-error]")) return;
+    // A small thumbnail that isn't there yet: fall back to the full picture.
+    if (e.target.dataset.full && !e.target.dataset.fellBack) { e.target.dataset.fellBack = "1"; e.target.src = e.target.dataset.full; return; }
     (e.target.closest(".thumb, .reader-hero") || e.target).classList.add("hidden");
   }, true);
 }
@@ -710,7 +715,7 @@ function shareLinks(text, raw) {
     ["telegram", "Telegram", `https://t.me/share/url?url=${link("telegram")}&text=${t}`], ["mail", "Email", `mailto:?subject=${t}&body=${tu("email")}`]];
 }
 // Where a video or short is shared to: the Watch page opens it (a short in the player).
-const mediaUrl = m => `${location.origin}${withLang("/watch")}?v=${encodeURIComponent(m.id)}`;
+const mediaUrl = m => `${location.origin}${withLang("/tv")}?v=${encodeURIComponent(m.id)}`;
 const shareBtn = (title, url, cls = "update-share") => `<button class="${cls}" type="button" data-action="share-native" data-title="${esc(title)}" data-url="${esc(url)}" aria-label="Share">${SHARE_ICONS.share}<span>Share</span></button>`;
 // No share sheet (most desktop browsers): a small panel with the social buttons instead.
 function openSharePop(title, url) {
@@ -1639,7 +1644,7 @@ function viewEvents() {
 /* ---------- Watch & listen (multimedia from the control room) ---------- */
 async function loadMedia() {
   try { const r = await fetch("/api/media"); state.media = r.ok ? (await r.json()).items || [] : []; } catch { state.media = []; }
-  if (parseRoute().page === "watch") viewWatch();
+  if (["tv", "watch"].includes(parseRoute().page)) viewWatch();
   renderHomeMedia();
 }
 // Vertical (9:16) videos are "shorts": story bubbles on the homepage, a row on Watch, and a
@@ -1651,12 +1656,12 @@ const seenShorts = () => new Set(store.get("rw-seen-shorts", []));
 function shortBubbles(list) {
   const seen = seenShorts();
   return list.map((m, i) => `<button class="short-bubble${seen.has(m.id) ? " seen" : ""}" type="button" data-action="short" data-index="${i}" aria-label="Play: ${esc(m.title)}">
-    <span class="short-ring"><span class="short-face">${img(m.thumbnailUrl, "")}</span></span><span class="short-name">${esc(m.title)}</span></button>`).join("");
+    <span class="short-ring"><span class="short-face">${thumbImg(m.thumbnailUrl, i < 5)}</span></span><span class="short-name">${esc(m.title)}</span></button>`).join("");
 }
 // The first bubble in the shorts row opens Raisina TV.
 const tvBubble = () => `<a class="short-bubble tv-bubble" href="/tv" aria-label="Raisina TV, live"><span class="short-ring tv-ring"><span class="short-face tv-face">${brandMark("tv-face-mark")}<span class="tv-face-live">LIVE</span></span></span><span class="short-name">Raisina TV</span></a>`;
 function videoCard(m) {
-  return `<article class="vcard"><div class="vcard-media" data-video="${esc(m.id)}"><button class="vcard-play" type="button" data-action="play-video" data-id="${esc(m.id)}" aria-label="Play: ${esc(m.title)}">${img(m.thumbnailUrl, "")}<span class="play-badge" aria-hidden="true"></span></button></div>
+  return `<article class="vcard"><div class="vcard-media" data-video="${esc(m.id)}"><button class="vcard-play" type="button" data-action="play-video" data-id="${esc(m.id)}" aria-label="Play: ${esc(m.title)}">${thumbImg(m.thumbnailUrl)}<span class="play-badge" aria-hidden="true"></span></button></div>
     <div class="vcard-body"><span class="kicker">${esc(m.category || "Explainer")}</span><h3>${esc(m.title)}</h3>${m.description ? `<p>${esc(m.description)}</p>` : ""}${shareBtn(m.title, mediaUrl(m))}</div></article>`;
 }
 function renderHomeMedia() {
@@ -1666,12 +1671,12 @@ function renderHomeMedia() {
     rail.hidden = !list.length;
     const tv = tvFeed()?.on && tvFeed().playlist.length;
     rail.hidden = !list.length && !tv;
-    rail.innerHTML = list.length || tv ? `<div class="shorts-head"><span class="kicker">Shorts</span><a class="link-gold" href="/watch#shorts">All shorts →</a></div><div class="shorts-row">${tv ? tvBubble() : ""}${shortBubbles(list)}</div>` : "";
+    rail.innerHTML = list.length || tv ? `<div class="shorts-head"><span class="kicker">Shorts</span><a class="link-gold" href="/tv#shorts">All shorts →</a></div><div class="shorts-row">${tv ? tvBubble() : ""}${shortBubbles(list)}</div>` : "";
   }
   if (band) {
     const films = (state.media || []).filter(isFilm);
     band.hidden = !films.length;
-    band.innerHTML = films.length ? `<div class="section-head"><h2 id="videoBandTitle">Explainers</h2><div class="carousel-nav"><button class="carousel-btn" type="button" data-action="carousel" data-dir="-1" aria-label="Previous videos">‹</button><button class="carousel-btn" type="button" data-action="carousel" data-dir="1" aria-label="Next videos">›</button><a class="link-gold" href="/watch">Watch all →</a></div></div>
+    band.innerHTML = films.length ? `<div class="section-head"><h2 id="videoBandTitle">Explainers</h2><div class="carousel-nav"><button class="carousel-btn" type="button" data-action="carousel" data-dir="-1" aria-label="Previous videos">‹</button><button class="carousel-btn" type="button" data-action="carousel" data-dir="1" aria-label="Next videos">›</button><a class="link-gold" href="/tv">Watch all →</a></div></div>
       <div id="tvPreview" class="tv-preview-host" hidden></div>
       <div class="vcarousel" tabindex="0" aria-label="Explainer videos">${films.map(videoCard).join("")}</div>` : "";
     const host = $("#tvPreview"); if (host) mountPreview(host);
@@ -1704,7 +1709,7 @@ function openShorts(index) {
       const b = e.target.closest("[data-sv]"); if (!b) return;
       const k = b.dataset.sv;
       if (k === "share") { const m = shortsState?.list[shortsState.i]; if (m) { v.pause(); shareOut(m.title, mediaUrl(m)).then(() => { if (!$("#sharePop") || $("#sharePop").hidden) v.play().catch(() => {}); }); } }
-      else if (k === "full") { const full = fullOf(shortsState?.list[shortsState.i]); closeShorts(); if (full) { openedShared = null; navigate(withLang(`/watch?v=${encodeURIComponent(full.id)}&play=1`)); } }
+      else if (k === "full") { const full = fullOf(shortsState?.list[shortsState.i]); closeShorts(); if (full) { openedShared = null; navigate(withLang(`/tv?v=${encodeURIComponent(full.id)}&play=1`)); } }
       else if (k === "replay") { el.querySelector(".sv-end").hidden = true; v.currentTime = 0; v.play().catch(() => {}); }
       else if (k === "close") closeShorts(); else if (k === "prev") stepShort(-1); else if (k === "next") stepShort(1);
       else if (k === "mute") { v.muted = !v.muted; b.textContent = v.muted ? "🔇" : "🔊"; b.setAttribute("aria-label", v.muted ? "Unmute" : "Mute"); }
@@ -1758,7 +1763,7 @@ function closeShorts() {
   const v = el.querySelector("video"); v.pause(); v.removeAttribute("src"); v.load();
   el.hidden = true; document.body.classList.remove("sv-open");
   shortsState?.opener?.focus?.({ preventScroll: true }); shortsState = null;
-  renderHomeMedia(); if (parseRoute().page === "watch") viewWatch();
+  renderHomeMedia(); if (["tv", "watch"].includes(parseRoute().page)) viewWatch();
 }
 function mediaEmbed(m) {
   const u = String(m.mediaUrl || "");
@@ -1769,25 +1774,9 @@ function mediaEmbed(m) {
   if (/\.(mp4|webm)(\?|$)/i.test(u)) return `<div class="media-frame"><video controls preload="none" src="${esc(u)}"${m.thumbnailUrl ? ` poster="${esc(m.thumbnailUrl)}"` : ""}></video></div>`;
   return `${m.thumbnailUrl ? `<div class="media-frame">${img(m.thumbnailUrl, m.title)}</div>` : ""}<a class="btn btn-light btn-sm" href="${esc(u)}" target="_blank" rel="noreferrer">Open ↗</a>`;
 }
-/* ---------- Raisina TV page ---------- */
-function viewTV() {
-  document.title = `Raisina TV — live · Raisina Wire`;
-  $("#view").innerHTML = `<div class="tvpage"><div class="wrap"><div class="tvpage-grid">
-    <div id="tvSlot" class="tv-slot"></div>
-    <aside class="tv-side glass" id="tvSide" aria-live="polite"></aside></div></div></div>`;
-  renderTVSide();
-}
-function renderTVSide() {
-  const host = $("#tvSide") || $("#wOnAir"); if (!host) return;
-  const f = tvFeed(), now = tvNow();
-  if (!f) { host.innerHTML = `<div class="skeleton" style="height:220px"></div>`; return; }
-  const k = now ? f.playlist.findIndex(v => v.id === now.id) : 0, next = [1, 2, 3, 4].map(n => f.playlist[(k + n) % f.playlist.length]).filter((v, i, a) => v && v !== now && a.indexOf(v) === i);
-  host.innerHTML = `<div class="tvs-k"><span class="dot-live"></span>Raisina TV · LIVE</div>
-    ${now ? `<span class="kicker">${esc(now.category || "Explainer")}</span><h1>${esc(now.title)}</h1>${now.description ? `<p>${esc(now.description)}</p>` : ""}` : `<h1>${esc(tr("Raisina TV"))}</h1>`}
-    ${next.length ? `<div class="tvs-next"><span class="meta">Up next</span>${next.map(v => `<a class="tvs-item" href="/watch?v=${encodeURIComponent(v.id)}"><span class="thumb">${img(v.thumb, "")}</span><b>${esc(v.title)}</b></a>`).join("")}</div>` : ""}
-    ${host.id === "wOnAir" ? `<a class="btn btn-red" href="/tv">Open Raisina TV ↗</a>` : `<a class="link-gold" href="/watch">All explainers on Watch →</a>`}`;
-}
-document.addEventListener("tvchange", () => { renderTVSide(); if (parseRoute().page === "home") renderHomeMedia(); });
+/* ---------- TV: Raisina TV live on top, the explainer library below ---------- */
+function viewTV(r) { return viewWatch(r); }
+document.addEventListener("tvchange", () => { if (parseRoute().page === "home") renderHomeMedia(); });
 
 /* ---------- Watch: a Netflix-style library around Raisina TV ---------- */
 let openedShared = null;
@@ -1797,19 +1786,22 @@ const durations = () => store.get("rw-durations", {});
 const fmtDur = s => s ? (s >= 60 ? `${Math.round(s / 60)} min` : `${Math.round(s)} s`) : "";
 const ytId = m => String(m?.mediaUrl || "").match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/)?.[1];
 const thumbOf = m => m.thumbnailUrl || (ytId(m) ? `https://i.ytimg.com/vi/${ytId(m)}/hqdefault.jpg` : "");
-function wCard(m, list) {
+function wCard(m, list, i = 9) {
   const p = progressOf()[m.id], d = durations()[m.id];
   return `<button class="w-card" type="button" data-action="w-open" data-id="${esc(m.id)}" data-list="${esc(list)}">
-    <span class="w-thumb">${img(thumbOf(m), "")}${d ? `<span class="w-dur">${fmtDur(d)}</span>` : ytId(m) ? "" : `<span class="w-dur" data-dur="${esc(m.id)}" hidden></span>`}${p && p.d ? `<span class="w-prog"><i style="width:${Math.min(100, 100 * p.t / p.d).toFixed(1)}%"></i></span>` : ""}<span class="w-play" aria-hidden="true"></span></span>
+    <span class="w-thumb">${thumbImg(thumbOf(m), i < 4)}${d ? `<span class="w-dur">${fmtDur(d)}</span>` : ytId(m) ? "" : `<span class="w-dur" data-dur="${esc(m.id)}" hidden></span>`}${p && p.d ? `<span class="w-prog"><i style="width:${Math.min(100, 100 * p.t / p.d).toFixed(1)}%"></i></span>` : ""}<span class="w-play" aria-hidden="true"></span></span>
     <span class="w-meta"><span class="kicker">${esc(CAT_NAMES[m.category] || m.category || "Explainer")}</span><b>${esc(m.title)}</b></span></button>`;
 }
 function wRow(key, title, items, extra = "") {
   if (!items.length) return "";
   state.wLists[key] = items.map(m => m.id);
   return `<section class="w-row" data-row="${esc(key)}"${extra}><div class="w-row-head"><h2>${esc(title)}</h2><span class="meta">${items.length}</span></div>
-    <div class="w-rail">${items.map(m => wCard(m, key)).join("")}</div></section>`;
+    <div class="w-rail">${items.map((m, i) => wCard(m, key, i)).join("")}</div></section>`;
 }
 function viewWatch() {
+  // /watch is now part of TV: keep old links (and shared ?v= links) working.
+  if (parseRoute().page === "watch") history.replaceState(history.state, "", withLang("/tv") + location.search + location.hash);
+  document.title = "Raisina TV — live · Raisina Wire";
   const all = state.media, sh = all ? shorts() : [], films = all ? all.filter(isFilm) : [], others = all ? all.filter(m => !isShort(m) && !isFilm(m)) : [];
   state.wLists = {};
   const prog = progressOf();
@@ -1822,13 +1814,13 @@ function viewWatch() {
   const more = Object.entries(byCat).filter(([, l]) => l.length < 2).flatMap(([, l]) => l);
   const popular = films.filter(m => m.plays > 0).sort((a, b) => b.plays - a.plays).slice(0, 12);
   $("#view").innerHTML = `<div class="watch">
-    <section class="w-hero"><div class="wrap"><div class="w-hero-grid"><div id="tvSlot" class="tv-slot"></div><aside class="w-onair tv-side glass" id="wOnAir" aria-live="polite"></aside></div></div></section>
+    <section class="w-hero"><div class="wrap"><div id="tvSlot" class="tv-slot"></div></div></section>
     <div class="wrap">
       ${all == null ? `<div class="skeleton" style="height:260px;margin-top:30px"></div>` : `
       <div class="w-tools"><div class="chips" role="tablist">${["All", ...cats.map(([c]) => c)].map(c => `<button class="chip" type="button" data-action="w-cat" data-cat="${esc(c)}" aria-pressed="${c === "All"}">${esc(c === "All" ? "All" : CAT_NAMES[c] || c)}</button>`).join("")}</div>
         <label class="w-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input type="search" id="wSearch" placeholder="Search explainers" aria-label="Search explainers"></label></div>
       <div id="wRows">
-        ${sh.length ? `<section class="w-row w-shorts" id="shorts"><div class="w-row-head"><h2>Shorts</h2><span class="meta">${sh.length}</span></div><div class="w-rail">${sh.map((m, i) => `<button class="w-short" type="button" data-action="short" data-index="${i}" aria-label="Play: ${esc(m.title)}">${img(m.thumbnailUrl, "")}<span class="play-badge" aria-hidden="true"></span><b>${esc(m.title)}</b></button>`).join("")}</div></section>` : ""}
+        ${sh.length ? `<section class="w-row w-shorts" id="shorts"><div class="w-row-head"><h2>Shorts</h2><span class="meta">${sh.length}</span></div><div class="w-rail">${sh.map((m, i) => `<button class="w-short" type="button" data-action="short" data-index="${i}" aria-label="Play: ${esc(m.title)}">${thumbImg(m.thumbnailUrl, i < 5)}<span class="play-badge" aria-hidden="true"></span><b>${esc(m.title)}</b></button>`).join("")}</div></section>` : ""}
         ${wRow("continue", "Continue watching", cont)}
         ${wRow("latest", "Latest explainers", films.slice(0, 14))}
         ${last && because.length ? wRow("because", `Because you watched ${last.title.length > 40 ? last.title.slice(0, 38) + "…" : last.title}`, because) : ""}
@@ -1839,7 +1831,6 @@ function viewWatch() {
       </div><div id="wResults" class="w-results" hidden></div>
       ${!films.length && !sh.length && !others.length ? `<div class="empty">Nothing published yet. Explainers will appear here.</div>` : ""}`}
     </div></div>`;
-  renderTVSide();
   $("#wSearch")?.addEventListener("input", e => filterWatch(e.target.value));
   watchDurations(); watchHover();
   // A shared link (/watch?v=id) opens that short in the player, or plays that explainer.
@@ -1860,7 +1851,7 @@ function filterWatch(q, cat) {
   const hits = films.filter(m => (!cat || cat === "All" || m.category === cat) && (!q || `${m.title} ${m.description || ""}`.toLowerCase().includes(q)));
   state.wLists.results = hits.map(m => m.id);
   rows.hidden = true; res.hidden = false;
-  res.innerHTML = hits.length ? `<div class="w-grid">${hits.map(m => wCard(m, "results")).join("")}</div>` : `<div class="empty">No explainers match.</div>`;
+  res.innerHTML = hits.length ? `<div class="w-grid">${hits.map((m, i) => wCard(m, "results", i)).join("")}</div>` : `<div class="empty">No explainers match.</div>`;
   watchDurations(); watchHover();
 }
 // Lengths are read from each video file once (only its header) and remembered on the device.
@@ -1958,7 +1949,7 @@ function closeCinema() {
   const v = el.querySelector("video"); v.pause(); v.removeAttribute("src"); v.load();
   el.querySelector(".cin-frame")?.remove();
   el.hidden = true; document.body.classList.remove("cin-open"); state.cinema = null;
-  if (parseRoute().page === "watch") viewWatch();
+  if (["tv", "watch"].includes(parseRoute().page)) viewWatch();
 }
 function pauseTVForCinema() { document.querySelectorAll("#tvPlayer video").forEach(v => v.pause()); }
 

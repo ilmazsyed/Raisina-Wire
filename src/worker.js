@@ -17,7 +17,8 @@ import m0015 from "../migrations/0015_guest_writers.sql";
 import m0016 from "../migrations/0016_media_full.sql";
 import m0017 from "../migrations/0017_article_video.sql";
 import m0018 from "../migrations/0018_raisina_tv.sql";
-import { tvSettings, saveTvSettings, setForce, tvPlaylist, tvAds, tvBreaking, saveAd, saveBreaking, saveOrder, tvOrderRows } from "./channel.js";
+import { tvSettings, saveTvSettings, setForce, tvPlaylist, tvAds, tvBreaking, saveAd, saveBreaking, saveOrder, tvOrderRows, tvInputs, saveInput, tvMusic, saveMusic } from "./channel.js";
+import m0019 from "../migrations/0019_tv_sequences.sql";
 import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { liveResults } from "./results.js";
@@ -74,7 +75,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0018_raisina_tv.sql", m0018]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0018_raisina_tv.sql", m0018], ["0019_tv_sequences.sql", m0019]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -305,13 +306,25 @@ const plainText = t => String(t || "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").r
 // Raisina TV's feed: running order, ad settings, breaking lines, the ticker and the break-in switch.
 async function tvFeed(env, ctx, lang) {
   const settings = await tvSettings(env);
-  const [playlist, ads, breaking, stories, live] = await Promise.all([
+  const [playlist, ads, breaking, stories, live, inputs, music, liveUps] = await Promise.all([
     tvPlaylist(env, settings), tvAds(env), tvBreaking(env),
-    listPublished(env, { limit: 8 }).then(l => localiseArticles(env, lang, l)),
-    env.DB.prepare("SELECT c.slug,c.title,(SELECT body FROM live_updates u WHERE u.coverage_id=c.id ORDER BY created_at DESC LIMIT 1) AS latest FROM live_coverage c WHERE c.status='live' ORDER BY c.started_at DESC LIMIT 5").all().then(r => r.results)
+    listPublished(env, { limit: 40 }).then(l => localiseArticles(env, lang, l)),
+    env.DB.prepare("SELECT c.slug,c.title,(SELECT body FROM live_updates u WHERE u.coverage_id=c.id ORDER BY created_at DESC LIMIT 1) AS latest FROM live_coverage c WHERE c.status='live' ORDER BY c.started_at DESC LIMIT 5").all().then(r => r.results),
+    tvInputs(env), tvMusic(env),
+    env.DB.prepare("SELECT c.title,u.body FROM live_updates u JOIN live_coverage c ON c.id=u.coverage_id WHERE c.status='live' ORDER BY u.created_at DESC LIMIT 5").all().then(r => r.results)
   ]);
+  const markets = await cached("markets", 45e3, marketBoard).catch(() => null);
   const wire = await cached(`wire${lang}`, 90e3, () => wireIn(env, ctx, lang)).catch(() => ({ items: [] }));
-  if (lang) { await translateFields(env, lang, playlist, ["title", "description"], { cacheOnly: true }); await translateFields(env, lang, live, ["title", "latest"], { cacheOnly: true }); }
+  if (lang) { await translateFields(env, lang, playlist, ["title", "description"], { cacheOnly: true }); await translateFields(env, lang, [...live, ...liveUps], ["title", "latest", "body"], { cacheOnly: true }); }
+  // News Update: headline sets by topic, five each (the desk's stories first, then the wire).
+  const byTopic = new Map();
+  for (const h of [...stories.map(a => ({ t: a.title, c: a.category, src: "Raisina Wire" })), ...(wire.items || []).map(i => ({ t: i.title, c: i.category, src: i.source }))]) {
+    if (!h.c || !h.t) continue;
+    const l = byTopic.get(h.c) || []; if (l.length < 5 && !l.some(x => x.t === h.t)) l.push(h); byTopic.set(h.c, l);
+  }
+  const sets = [...byTopic.entries()].filter(([, l]) => l.length >= 5).map(([topic, l]) => ({ topic, items: l.map(x => ({ text: x.t, source: x.src })) }));
+  if (liveUps.length >= 3) sets.unshift({ topic: "Live", live: true, items: liveUps.map(u => ({ text: plainText(u.body).slice(0, 150), source: u.title })) });
+  const input = inputs.find(i => i.onAir && i.source);
   const ticker = [
     ...live.map(c => ({ kind: "live", text: c.latest ? `${c.title}: ${plainText(c.latest).slice(0, 160)}` : c.title, href: `/coverage/${encodeURIComponent(c.slug)}` })),
     ...stories.slice(0, 6).map(a => ({ kind: "story", text: a.title, href: a.href })),
@@ -319,7 +332,13 @@ async function tvFeed(env, ctx, lang) {
   ];
   return { on: settings.on, every: settings.every, perBreak: settings.perBreak, skippable: settings.skippable, force: settings.force || null,
     playlist: playlist.map(v => ({ id: v.id, title: v.title, description: v.description, category: v.category, src: v.mediaUrl, thumb: v.thumbnailUrl, publishedAt: v.publishedAt })),
-    ads: ads.filter(a => a.src).map(a => ({ id: a.id, title: a.title, src: a.src })), breaking: breaking.map(b => b.text), ticker, updatedAt: new Date().toISOString() };
+    ads: ads.filter(a => a.src).map(a => ({ id: a.id, title: a.title, src: a.src })), breaking: breaking.map(b => b.text), ticker,
+    seq: settings.seq, pinset: settings.pinset?.on && settings.pinset.items.length ? settings.pinset : null, sets,
+    markets: (markets?.overview || []).filter(q => q.value != null).slice(0, 8).map(q => ({ label: q.label, value: q.value, pct: q.changePct, currency: q.currency })),
+    promo: [...new Set([...stories.map(a => a.heroUrl || a.imageUrl || a.image), ...playlist.map(v => v.thumbnailUrl)].filter(x => x && /^(https:|\/)/.test(x)))].slice(0, 18),
+    input: input ? { id: input.id, title: input.title, ...input.source } : null,
+    music: music.filter(m => m.src).map(m => ({ id: m.id, title: m.title, src: m.src })),
+    updatedAt: new Date().toISOString() };
 }
 // Stories without an editor's translation: machine-translated, and marked so the reader says so.
 async function mtArticles(env, lang, list, opts) {
@@ -867,7 +886,7 @@ async function api(request, env, ctx) {
   // ---- Raisina TV (src/channel.js): the channel, its ticker, ads and the break-in switch
   if (url.pathname === "/api/tv" && request.method === "GET") {
     const lang = reqLang(url);
-    return json(await cached(`tv${lang}`, 15e3, () => tvFeed(env, ctx, lang)), 200, { "cache-control": "no-cache" });
+    return json(await cached(`tv${lang}`, 5e3, () => tvFeed(env, ctx, lang)), 200, { "cache-control": "no-cache" });
   }
   if (url.pathname.startsWith("/api/admin/tv")) {
     const user = await currentUser(request, env);
@@ -880,7 +899,7 @@ async function api(request, env, ctx) {
         const { results: all } = await env.DB.prepare("SELECT id,title,thumbnail_url AS thumbnailUrl,category,published_at AS publishedAt FROM media_items WHERE status='published' AND media_type='video' ORDER BY published_at DESC LIMIT 200").all();
         const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
         const { results: st } = await env.DB.prepare("SELECT metric,dim,SUM(n) AS n FROM metrics_daily WHERE day>=? AND metric IN ('tv','adimp','addone','play') GROUP BY metric,dim").bind(since).all();
-        return json({ settings, playlist: playlist.slice(0, 12), videos: all, order: await tvOrderRows(env), ads: await tvAds(env, true), breaking: await tvBreaking(env, true), stats: st }, 200, { "cache-control": "no-store" });
+        return json({ settings, playlist: playlist.slice(0, 12), videos: all, order: await tvOrderRows(env), ads: await tvAds(env, true), breaking: await tvBreaking(env, true), inputs: await tvInputs(env), music: await tvMusic(env, true), stats: st }, 200, { "cache-control": "no-store" });
       }
       if (url.pathname === "/api/admin/tv/settings" && request.method === "PUT") await saveTvSettings(env, b);
       else if (url.pathname === "/api/admin/tv/order" && request.method === "PUT") await saveOrder(env, Array.isArray(b.rows) ? b.rows : []);
@@ -894,6 +913,15 @@ async function api(request, env, ctx) {
       else if (url.pathname.startsWith("/api/admin/tv/ads")) {
         if (request.method === "DELETE") await env.DB.prepare("DELETE FROM tv_ads WHERE id=?").bind(id).run();
         else await saveAd(env, request.method === "POST" ? null : id, b);
+      }
+      else if (url.pathname.startsWith("/api/admin/tv/inputs")) {
+        if (request.method === "DELETE") await env.DB.prepare("DELETE FROM tv_inputs WHERE id=?").bind(id).run();
+        else await saveInput(env, request.method === "POST" ? null : id, b);
+        if (request.method === "PUT") await audit(env, user, b.onAir ? "tv.input.on" : "tv.input.off", "tv_input", id, {});
+      }
+      else if (url.pathname.startsWith("/api/admin/tv/music")) {
+        if (request.method === "DELETE") await env.DB.prepare("DELETE FROM tv_music WHERE id=?").bind(id).run();
+        else await saveMusic(env, request.method === "POST" ? null : id, b);
       }
       else if (url.pathname.startsWith("/api/admin/tv/breaking")) {
         if (request.method === "DELETE") await env.DB.prepare("DELETE FROM tv_breaking WHERE id=?").bind(id).run();
