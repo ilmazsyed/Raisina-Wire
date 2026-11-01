@@ -117,7 +117,9 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx }) {
   // `alive()` turns false (a newer sequence took over). Pausing the TV pauses the line. The voice
   // is fetched whenever it can be heard or measured (a muted viewer who has tapped once still gets
   // lips that follow it, silently).
-  function say(line, alive) {
+  async function say(line, alive) {
+    // The mouth shapes load with the anchor; give them a moment so the first line is lip-synced too.
+    if (!mouth && who) await Promise.race([loadMouth(who), new Promise(r => setTimeout(r, 1500))]);
     return new Promise(res => {
       if (!line?.text) return res(true);
       const cap = el.querySelector(".ta-line");
