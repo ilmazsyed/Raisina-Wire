@@ -66,6 +66,8 @@ export function initTV(d) {
 function arm() {
   build();
   armed = true; engaged = true; wantSound = true;
+  // iPhones: this is media playback, so the silent switch doesn't mute the channel's sound.
+  try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch { /* older Safari */ }
   music.audio(); music.resume();
   video.muted = false;
   if (!video.getAttribute("src")) { video.src = "/tv-unlock.mp4"; video.play().then(() => video.pause()).catch(() => {}); }
@@ -123,7 +125,7 @@ function build() {
     </div>
     <div class="tv-ticker" aria-label="${esc(tr("Latest headlines"))}"><span class="tv-tk-break" hidden></span><div class="tv-tk-run"><div class="tv-tk-track"></div></div></div>`;
   video = root.querySelector("video");
-  anchor = createAnchor(root.querySelector(".tv-screen"), { isPaused: () => paused, hearing: () => engaged && wantSound, label: tr, audioCtx: () => (engaged ? music.audio() : null), onSpeak: on => music.duck(on) });
+  anchor = createAnchor(root.querySelector(".tv-screen"), { isPaused: () => paused, hearing: () => engaged && wantSound, label: tr, audioCtx: () => (engaged ? music.audio() : null), onSpeak: on => music.duck(on), onBlocked: () => { wantSound = false; applyMute(); syncSound(); } });
   video.addEventListener("ended", onEnded);
   video.addEventListener("error", () => { if (mode === "ad") nextAd(); else if (mode === "story") setTimeout(() => advance(), 600); });
   video.addEventListener("timeupdate", onTime);
@@ -177,7 +179,7 @@ function onClick(e) {
   if (k === "close") stopTV();
 }
 function unmute() {
-  engaged = true; wantSound = true; music.audio(); music.resume();
+  engaged = true; wantSound = true; music.audio(); music.resume(); anchor?.unlock();
   applyMute();
   if (mode === "story" && !paused) video.play().catch(() => {});
   syncSound();
