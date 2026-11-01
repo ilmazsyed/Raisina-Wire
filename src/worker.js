@@ -395,9 +395,71 @@ async function mtWarm(env) {
   }
 }
 
+const MCP_TOOLS = [
+  { name:"publisher_health", description:"Check public Raisina Wire API health.", inputSchema:{type:"object",properties:{}} },
+  { name:"list_articles", description:"List articles and editions in the editorial system.", inputSchema:{type:"object",properties:{}} },
+  { name:"create_article_draft", description:"Create an article or edition as a draft. Never publishes or sends alerts.", inputSchema:{type:"object",required:["title","body"],properties:{kind:{type:"string",enum:["article","edition"]},title:{type:"string"},dek:{type:"string"},topic:{type:"string"},category:{type:"string"},tags:{type:"array",items:{type:"string"}},writer:{type:"string"},body:{type:"string"},sourceUrl:{type:"string"},imageUrl:{type:"string"},heroUrl:{type:"string"},heroCaption:{type:"string"},videoUrl:{type:"string"}}} },
+  { name:"update_article", description:"Update an existing article. Publishing requires explicit editor approval; notify remains false.", inputSchema:{type:"object",required:["id","changes"],properties:{id:{type:"string"},changes:{type:"object"}}} },
+  { name:"list_live_coverage", description:"List live coverage records.", inputSchema:{type:"object",properties:{}} },
+  { name:"create_live_draft", description:"Create live coverage in draft status.", inputSchema:{type:"object",required:["title"],properties:{title:{type:"string"},summary:{type:"string"},slug:{type:"string"},imageUrl:{type:"string"},socialUrl:{type:"string"},heroCaption:{type:"string"}}} },
+  { name:"post_live_update", description:"Post a live coverage update; push notification remains disabled.", inputSchema:{type:"object",required:["id","body"],properties:{id:{type:"string"},body:{type:"string"},sourceUrl:{type:"string"},mediaUrl:{type:"string"}}} },
+  { name:"list_media", description:"List multimedia items.", inputSchema:{type:"object",properties:{}} },
+  { name:"create_media_draft", description:"Create a multimedia item in draft status.", inputSchema:{type:"object",required:["title","mediaUrl"],properties:{title:{type:"string"},mediaUrl:{type:"string"},mediaType:{type:"string",enum:["video","short","image","gallery","audio","embed"]},category:{type:"string"},thumbnailUrl:{type:"string"},description:{type:"string"}}} },
+  { name:"list_events", description:"List editorial events and briefings.", inputSchema:{type:"object",properties:{}} },
+  { name:"create_event", description:"Create an event. This publishes immediately; call only after explicit editor approval.", inputSchema:{type:"object",required:["title","startsAt"],properties:{title:{type:"string"},description:{type:"string"},eventType:{type:"string"},startsAt:{type:"string"},access:{type:"string",enum:["public","member","premium"]},notify:{type:"boolean",default:false}}} },
+  { name:"list_alerts", description:"List recent reader alerts.", inputSchema:{type:"object",properties:{}} },
+  { name:"send_reader_alert", description:"Send a reader alert immediately. Call only after explicit approval of exact headline, body and destination.", inputSchema:{type:"object",required:["title","url"],properties:{title:{type:"string"},body:{type:"string"},url:{type:"string"}}} }
+];
+async function handleMcp(request, env, ctx) {
+  const url = new URL(request.url);
+  if (request.method === "GET") return new Response("Raisina Wire MCP endpoint. Use Streamable HTTP POST.", {status:405,headers:{"content-type":"text/plain","allow":"POST, OPTIONS"}});
+  if (request.method !== "POST") return new Response("Method not allowed",{status:405});
+  const user = await currentUser(request, env);
+  if (!isStaff(user)) return err("Publisher authentication failed.",403);
+  const rpc = await request.json().catch(()=>null);
+  if (!rpc || rpc.jsonrpc !== "2.0" || typeof rpc.method !== "string") return json({jsonrpc:"2.0",id:rpc?.id??null,error:{code:-32600,message:"Invalid JSON-RPC request"}},400);
+  // MCP notifications have no id and must not receive a JSON-RPC response.
+  if (rpc.method === "notifications/initialized" && !("id" in rpc)) return new Response(null,{status:202,headers:{"cache-control":"no-store"}});
+  if (!("id" in rpc)) return new Response(null,{status:202,headers:{"cache-control":"no-store"}});
+  const result = (value) => json({jsonrpc:"2.0",id:rpc.id,result:value},200,{"cache-control":"no-store"});
+  if (rpc.method === "initialize") return result({protocolVersion:"2025-03-26",capabilities:{tools:{}},serverInfo:{name:"raisina-wire-publisher",version:"1.0.0"}});
+  if (rpc.method === "ping") return result({});
+  if (rpc.method === "tools/list") return result({tools:MCP_TOOLS});
+  if (rpc.method !== "tools/call") return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32601,message:"Method not found"}},200);
+  const name=rpc.params?.name, a=rpc.params?.arguments||{};
+  const routes = {
+    publisher_health:["GET","/api/health",null],
+    list_articles:["GET","/api/admin/articles",null],
+    create_article_draft:["POST","/api/admin/articles",{...a,status:"draft",notify:false}],
+    update_article:["PUT","/api/admin/articles/"+encodeURIComponent(a.id||""),{...(a.changes||{}),notify:false}],
+    list_live_coverage:["GET","/api/admin/live",null],
+    create_live_draft:["POST","/api/admin/live",{...a,status:"draft",notify:false}],
+    post_live_update:["POST","/api/admin/live/"+encodeURIComponent(a.id||"")+"/updates",{body:a.body,sourceUrl:a.sourceUrl,mediaUrl:a.mediaUrl,notify:false}],
+    list_media:["GET","/api/admin/media",null],
+    create_media_draft:["POST","/api/admin/media",{...a,status:"draft"}],
+    list_events:["GET","/api/admin/events",null],
+    create_event:["POST","/api/events",{...a,notify:false}],
+    list_alerts:["GET","/api/admin/alerts",null],
+    send_reader_alert:["POST","/api/admin/alerts",a]
+  };
+  const route=routes[name];
+  if(!route) return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32602,message:"Unknown tool"}},200);
+  if(name==="update_article" && !a.id) return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32602,message:"id is required"}},200);
+  if(name==="post_live_update" && !a.id) return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32602,message:"id is required"}},200);
+  const headers=new Headers({"authorization":request.headers.get("authorization")||""});
+  if(route[2]) headers.set("content-type","application/json");
+  const downstream=new Request(new URL(route[1],url.origin),{method:route[0],headers,body:route[2]?JSON.stringify(route[2]):undefined});
+  const response=await api(downstream,env,ctx);
+  const raw=await response.text();
+  let payload; try{payload=JSON.parse(raw)}catch{payload={message:raw}}
+  const textValue=JSON.stringify(payload);
+  return result({content:[{type:"text",text:textValue}],isError:!response.ok});
+}
+
 async function api(request, env, ctx) {
   const url = new URL(request.url);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: JSON_HEADERS });
+  if (url.pathname === "/mcp") return handleMcp(request, env, ctx);
 
   if (url.pathname === "/api/health") return json({ ok: true, service: "Raisina Wire API", time: new Date().toISOString(), database: Boolean(env.DB) }, 200, { "cache-control":"no-store" });
 
@@ -1358,6 +1420,10 @@ export default {
   async scheduled(event, env, ctx) { ctx.waitUntil(scheduled(env)); },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname === "/mcp") {
+      try { return await api(request,env,ctx); }
+      catch (e) { return json({error:"MCP internal error",detail:e.message},500,{"cache-control":"no-store"}); }
+    }
     if (url.pathname.startsWith("/api/")) {
       try { return await api(request,env,ctx); }
       catch (e) { return json({error:"Internal API error",detail:e.message},500,{"cache-control":"no-store"}); }
