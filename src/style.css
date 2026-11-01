@@ -1771,7 +1771,8 @@ body.cin-open{overflow:hidden}
 .ta-mouth{position:absolute;opacity:0;transition:opacity .22s ease;-webkit-mask-image:radial-gradient(closest-side,#000 48%,rgba(0,0,0,.6) 72%,transparent 98%);mask-image:radial-gradient(closest-side,#000 48%,rgba(0,0,0,.6) 72%,transparent 98%)}
 .tv-anchor.lipsync .ta-mouth{opacity:1}
 .ta-talk{opacity:0}.tv-anchor.talking .ta-talk{opacity:1}.tv-anchor.lipsync .ta-talk{opacity:0}
-.ta-cam,.ta-frame{animation:ta-push 30s linear both}
+.ta-frame{animation:ta-push 30s linear both;will-change:transform}
+.ta-fill{will-change:transform}
 @keyframes ta-push{to{transform:scale(1.04)}}
 .ta-strap{position:absolute;left:6cqw;bottom:6.5cqw;display:flex;align-items:center;gap:1.3cqw;padding:1cqw 1.8cqw 1cqw 1cqw;border-radius:1cqw;background:rgba(8,11,20,.86);border-left:.45cqw solid #e0262f;box-shadow:0 1cqw 3cqw rgba(0,0,0,.35);animation:ta-in .5s cubic-bezier(.2,.9,.2,1) both}
 @keyframes ta-in{from{opacity:0;transform:translateX(-2cqw)}}
@@ -1792,9 +1793,12 @@ body.cin-open{overflow:hidden}
 .tv-anchor[data-shot="vo"] .ta-strap{left:auto;right:2cqw;bottom:2cqw;animation:none}
 .tv-anchor[data-shot="vo"] .ta-line{left:12cqw;right:12cqw;width:auto;bottom:13cqw;text-align:center}
 .tv-anchor[data-shot="pip"] .ta-line{left:6cqw;width:52cqw;bottom:6cqw}
-/* Under a voice over the explainer's pictures are reframed so its own burned-in captions fall out
-   of shot (scaled about its printed logo, which stays under the bug). */
-.tv.anchor-vo .tv-video{transform:scale(1.28);transform-origin:12% 8%;transition:transform .4s}
+/* Voice-over: the explainer's cover picture, pushing in slowly (no video plays underneath). */
+.ta-vo{position:absolute;inset:0;display:none;background:#05070d center/cover no-repeat;animation:ta-vo-push 22s linear both}
+.ta-vo::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(5,7,13,.6),transparent 40%)}
+.tv-anchor[data-shot="vo"] .ta-vo{display:block}
+@keyframes ta-vo-push{from{transform:scale(1)}to{transform:scale(1.08)}}
+@media (prefers-reduced-motion:reduce){.ta-vo{animation:none}}
 /* Picture in picture beside a title card. */
 .tv-anchor[data-shot="pip"] .ta-cam{inset:auto 4cqw 15cqw auto;width:30cqw;aspect-ratio:var(--ta-aspect,1);height:auto;border-radius:1.2cqw;box-shadow:0 2cqw 5cqw rgba(0,0,0,.5),0 0 0 .25cqw rgba(255,255,255,.14);animation:ta-pop .5s cubic-bezier(.2,1,.3,1) both}
 @keyframes ta-pop{from{opacity:0;transform:translateY(2cqw) scale(.96)}}
@@ -1802,7 +1806,7 @@ body.cin-open{overflow:hidden}
 .tv-anchor[data-shot="pip"] .ta-frame{inset:0;left:0;max-width:none;width:100%;-webkit-mask-image:none;mask-image:none;box-shadow:none;animation:none}
 .tv-anchor[data-shot="pip"] .ta-strap{left:auto;right:4cqw;bottom:6cqw}
 .tv-anchor[data-shot="pip"] .ta-face{display:none}
-@media (prefers-reduced-motion:reduce){.ta-cam,.ta-frame,.ta-strap,.tv-anchor[data-shot="pip"] .ta-cam{animation:none}.tv-anchor.talking .ta-bars i{animation:none;height:70%}}
+@media (prefers-reduced-motion:reduce){.ta-frame,.ta-strap,.tv-anchor[data-shot="pip"] .ta-cam{animation:none}.tv-anchor.talking .ta-bars i{animation:none;height:70%}}
 /* With the anchor in a window beside it, the title card keeps to the left and wraps. */
 .tv.anchor-pip .bx-card{right:38cqw}
 .tv.anchor-pip .bx-big{font-size:clamp(22px,6.4cqw,120px)}
@@ -1813,6 +1817,7 @@ body.cin-open{overflow:hidden}
   .ta-pick{top:30cqw;left:3cqw}
   .tv-anchor[data-shot="vo"]:has(.ta-line:not([hidden])) .ta-strap{display:none}
   .tv-screen:has(.tv-anchor[data-shot="vo"] .ta-line:not([hidden])) .tv-lower{visibility:hidden}
+  .tv-anchor[data-shot="vo"] .ta-strap{display:none}
 }
 /* A line's own words on screen (the breaking story, the live caption): a headline, not a subtitle. */
 .ta-line.show{font:600 clamp(13px,2.4cqw,42px)/1.25 var(--serif);background:rgba(8,11,20,.88);border-left:.45cqw solid #e0262f}
@@ -1824,3 +1829,5 @@ body.cin-open{overflow:hidden}
 .tv-start b{position:relative;font:800 clamp(14px,2.6cqw,40px)/1.1 var(--sans);letter-spacing:.01em;text-shadow:0 .3cqw 1.5cqw rgba(0,0,0,.6)}
 .tv-start:hover .tv-start-p,.tv-start:focus-visible .tv-start-p{transform:scale(1.06)}
 .tv-start:focus-visible{outline:3px solid #fff;outline-offset:-6px}
+/* The story's lower third shows over the voice-over picture. */
+.tv-screen:has(.tv-anchor[data-shot="vo"]) .tv-lower{z-index:5}

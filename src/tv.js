@@ -259,7 +259,7 @@ function playStory(i) {
   hideSeq();
   root.querySelector(".tv-ad").hidden = true;
   root.querySelector(".tv-lower").hidden = true;
-  anchor?.hide(); voMute = false; applyMute(); root.classList.remove("anchor-vo");
+  anchor?.hide(); voMute = false; applyMute();
   if (video.getAttribute("src") !== v.src) { video.src = v.src; video.poster = v.thumb || ""; } else video.currentTime = 0;
   video.addEventListener("playing", () => lowerThird(v.category || tr("Explainer"), v.title), { once: true });
   if (!paused) video.play().catch(() => {});
@@ -284,15 +284,13 @@ async function introStory(i) {
   const who = { key: it.anchor, roster: feed.anchors.roster, pick: it.pick ? tr("EDITOR’S PICK") : "" };
   anchor.shot("cam", who);
   if (!await anchor.say(it.cam, alive)) return;
-  // Voice over: the explainer's pictures, silent, a few seconds in.
-  anchor.shot("vo", who);
-  root.classList.add("anchor-vo"); voMute = true; applyMute(); try { video.currentTime = Math.min(3, (video.duration || 30) / 10); } catch { /* not loaded yet */ }
-  if (!paused) video.play().catch(() => {});
+  // Voice over: the explainer's cover picture, slowly pushing in (the film itself waits at its
+  // first frame, so it starts cleanly afterwards; phones never have to seek or decode it twice).
+  const md = v.thumb && /^\/videos\/[\w.-]+\.jpg$/.test(v.thumb) ? v.thumb.replace(/\.jpg$/, "-md.webp") : "";
+  anchor.shot("vo", { ...who, pics: [md, v.thumb].filter(Boolean) });
   lowerThird(v.category || tr("Explainer"), v.title, { stay: true });
-  const voOk = await anchor.say(it.vo, alive);
-  root.classList.remove("anchor-vo"); voMute = false; applyMute();
-  if (!voOk) return;
-  video.pause(); root.querySelector(".tv-lower").hidden = true;
+  if (!await anchor.say(it.vo, alive)) return;
+  root.querySelector(".tv-lower").hidden = true;
   anchor.shot("cam", who);
   if (!await anchor.say(it.out, alive)) return;
   if (alive()) playStory(n);

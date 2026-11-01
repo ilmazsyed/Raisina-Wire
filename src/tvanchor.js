@@ -26,6 +26,7 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx, onSpe
   el.className = "tv-anchor"; el.hidden = true; el.setAttribute("aria-live", "polite");
   el.innerHTML = `<div class="ta-cam"><span class="ta-fill"></span>
       <span class="ta-frame"><video class="ta-v ta-idle" muted playsinline loop preload="auto"></video><video class="ta-v ta-talk" muted playsinline loop preload="auto"></video><canvas class="ta-mouth" aria-hidden="true"></canvas></span></div>
+    <span class="ta-vo" aria-hidden="true"></span>
     <span class="ta-pick" hidden></span>
     <div class="ta-strap"><span class="ta-face"></span><span class="ta-who"><b></b><small></small></span><span class="ta-ai">AI</span><span class="ta-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
     <div class="ta-line" hidden></div>`;
@@ -55,8 +56,9 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx, onSpe
     const synced = on && Boolean(lip);
     el.classList.toggle("lipsync", synced);
     const v = on && !synced ? talk : idle, other = v === talk ? idle : talk;
-    if (!isPaused()) v.play().catch(() => {});
     other.pause();
+    // Off screen (voice-over) the face videos rest, to spare the phone.
+    if (el.dataset.shot === "vo" || el.hidden) v.pause(); else if (!isPaused()) v.play().catch(() => {});
   }
   // Draws the mouth for an openness between two neighbouring shapes, blended, so it never snaps.
   function draw(o) {
@@ -113,9 +115,10 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx, onSpe
   }
   function stopLip() { if (!lip) return; cancelAnimationFrame(lip.raf); lip = null; el.classList.remove("lipsync"); }
   // Show the anchor in a shot (cam, vo or pip), with an optional "Editor's Pick" tag.
-  function shot(kind, { key, roster, pick = "" } = {}) {
+  function shot(kind, { key, roster, pick = "", pics = [] } = {}) {
     if (key) setWho(key, roster?.[key]);
     el.dataset.shot = kind;
+    if (kind === "vo") { const v = el.querySelector(".ta-vo"); v.style.backgroundImage = pics.map(u => `url('${String(u).replace(/'/g, "%27")}')`).join(","); v.style.animation = "none"; void v.offsetWidth; v.style.animation = ""; }
     const p = el.querySelector(".ta-pick"); p.hidden = !pick; p.textContent = pick;
     if (el.hidden) { el.hidden = false; void el.offsetWidth; }
     el.classList.add("on");
