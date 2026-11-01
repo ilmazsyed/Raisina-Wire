@@ -22,8 +22,8 @@ import m0019 from "../migrations/0019_tv_sequences.sql";
 import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { liveResults } from "./results.js";
-import { handleTts, ttsEnabled } from "./tts.js";
-import { anchorLines, anchorVoice } from "./anchors.js";
+import { handleTts } from "./tts.js";
+import { anchorLines, liveReads } from "./anchors.js";
 import { editions } from "./editions.js";
 import editionBodies from "./edition-bodies.json";
 import seedHi from "./translations/hi.json";
@@ -357,7 +357,9 @@ async function tvFeed(env, ctx, lang) {
   if (!lang && settings.seq.anchors !== false) {
     const srcs = playlist.map(v => String(v.mediaUrl || "").split("?")[0]).filter(Boolean);
     const picks = srcs.length ? new Set((await env.DB.prepare(`SELECT video_url FROM articles WHERE status='published' AND writer='ilmaz-syed' AND video_url IN (${srcs.map(() => "?").join(",")})`).bind(...srcs).all()).results.map(r => r.video_url)) : new Set();
-    anchors = { voice: ttsEnabled(env), ...await anchorLines({ playlist: playlist.map(v => ({ id: v.id, src: v.mediaUrl, editorPick: picks.has(String(v.mediaUrl || "").split("?")[0]) })), input, breaking: breaking.map(b => b.text), force: settings.force }) };
+    const reads = await liveReads({ breaking: breaking.map(b => b.text), inputs: input ? [input] : [], force: settings.force });
+    const voiced = reads.length ? new Set((await env.DB.prepare(`SELECT key FROM tts_audio WHERE key IN (${reads.map(() => "?").join(",")})`).bind(...reads.map(r => r.id)).all()).results.map(r => r.key)) : new Set();
+    anchors = { ...await anchorLines({ playlist: playlist.map(v => ({ id: v.id, src: v.mediaUrl, editorPick: picks.has(String(v.mediaUrl || "").split("?")[0]) })), input, breaking: breaking.map(b => b.text), force: settings.force, voiced }) };
   }
   return { anchors, on: settings.on, every: settings.every, perBreak: settings.perBreak, skippable: settings.skippable, force: settings.force || null,
     playlist: playlist.map(v => ({ id: v.id, title: v.title, description: v.description, category: v.category, src: v.mediaUrl, thumb: v.thumbnailUrl, publishedAt: v.publishedAt })),
@@ -979,12 +981,28 @@ async function api(request, env, ctx) {
     const lang = reqLang(url);
     return json(await cached(`tv${lang}`, 5e3, () => tvFeed(env, ctx, lang)), 200, { "cache-control": "no-cache" });
   }
-  // An anchor's line, voiced (src/anchors.js); only lines the channel has on air are made.
+  // Raisina TV live reads (src/anchors.js): recorded in the editor's browser, kept in D1, played by the channel.
   if (url.pathname.startsWith("/api/tv/voice/") && request.method === "GET") {
-    const id = url.pathname.slice(14).replace(/\.mp3$/, "");
-    const audio = await anchorVoice(env, id, () => cached("tv", 5e3, () => tvFeed(env, ctx, "")).then(f => f.anchors));
-    if (!audio) return err("No such line.", 404);
-    return new Response(audio, { headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=31536000, immutable" } });
+    const row = await env.DB.prepare("SELECT data FROM tts_audio WHERE key=?").bind(url.pathname.slice(14)).first();
+    if (!row) return err("No such recording.", 404);
+    const data = new Uint8Array(row.data), wav = data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46;
+    return new Response(data, { headers: { "content-type": wav ? "audio/wav" : "audio/mpeg", "cache-control": "public, max-age=31536000, immutable" } });
+  }
+  if ((url.pathname === "/api/admin/tv/voice-todo" && request.method === "GET") || (url.pathname.startsWith("/api/admin/tv/voice/") && request.method === "PUT")) {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const settings = await tvSettings(env);
+    const reads = await liveReads({ breaking: (await tvBreaking(env)).map(b => b.text), inputs: (await tvInputs(env)).filter(i => i.source), force: settings.force });
+    const have = reads.length ? new Set((await env.DB.prepare(`SELECT key FROM tts_audio WHERE key IN (${reads.map(() => "?").join(",")})`).bind(...reads.map(r => r.id)).all()).results.map(r => r.key)) : new Set();
+    const todo = settings.seq.anchors === false ? [] : reads.filter(r => !have.has(r.id));
+    if (request.method === "GET") return json({ todo }, 200, { "cache-control": "no-store" });
+    // Only a read the channel needs, as a WAV file of reasonable size.
+    const id = url.pathname.slice(20), r = todo.find(x => x.id === id) || reads.find(x => x.id === id);
+    if (!r) return err("That line isn't needed on air.", 404);
+    const data = new Uint8Array(await request.arrayBuffer());
+    if (data.length < 1000 || data.length > 1.8e6 || String.fromCharCode(...data.slice(0, 4)) !== "RIFF") return err("Send a WAV recording under 1.8 MB.");
+    await env.DB.prepare("INSERT OR REPLACE INTO tts_audio (key,voice,chars,data) VALUES (?,?,?,?)").bind(id, `kokoro:${r.voice}`, r.text.length, data.buffer).run();
+    return json({ ok: true }, 200, { "cache-control": "no-store" });
   }
   if (url.pathname.startsWith("/api/admin/tv")) {
     const user = await currentUser(request, env);

@@ -241,6 +241,7 @@ async function render(view){
     const stat=(m,dim)=>d.stats.filter(r=>r.metric===m&&(dim===undefined||r.dim===dim)).reduce((a,r)=>a+Number(r.n),0);
     const ord=new Map(d.order.map(o=>[o.id,o])),f=S.force;
     $("#view").innerHTML=`<div class="cards">${[["Raisina TV",S.on?"On air":"Off air"],["Viewers, 30 days",n(stat("tv","viewers"))],["Minutes watched, 30 days",n(Math.round(stat("tv","seconds")/60))],["Ad impressions / finished",`${n(stat("adimp"))} / ${n(stat("addone"))}`]].map(x=>`<div class="metric-card"><small>${x[0]}</small><b>${x[1]}</b></div>`).join("")}</div>
+    <p id="voiceRec" class="notice" style="display:block" hidden></p>
     <div class="split"><div class="panel"><h2>On air</h2>
       <label class="field check"><input type="checkbox" id="tvOn" ${S.on?"checked":""}> Raisina TV is on (off shows "off air" to viewers)</label>
       <p class="muted" style="font-size:13px">Explainers play newest first, around the clock. Shorts never play on TV. Changes take effect at the next switch between stories; use <b>Break in now</b> to cut in immediately.</p>
@@ -316,6 +317,8 @@ async function render(view){
     $("#inForm").addEventListener("submit",e=>{e.preventDefault();done("Saved. Switch it on to cut to it.",()=>put("/api/admin/tv/inputs",Object.fromEntries(new FormData(e.currentTarget)),"POST"))});
     $$("[data-in-on]").forEach(c=>c.addEventListener("change",()=>{if(c.checked&&!confirm("Cut every viewer to this stream now?")){c.checked=false;return}done(c.checked?"On air: viewers cut to it within about 10 seconds.":"Off air: back to the channel.",()=>put(`/api/admin/tv/inputs/${encodeURIComponent(c.dataset.inOn)}`,{onAir:c.checked}))}));
     $$("[data-in-del]").forEach(b=>b.addEventListener("click",()=>{if(confirm("Delete this input?"))done("Deleted.",()=>api(`/api/admin/tv/inputs/${encodeURIComponent(b.dataset.inDel)}`,{method:"DELETE"}))}));
+    // The anchor reads breaking lines and live captions in her explainer voice: recorded here, in this browser.
+    if(S.seq.anchors!==false)import("./src/anchorrecord.js").then(m=>m.recordLiveReads(t=>{const p=$("#voiceRec");if(p){p.hidden=false;p.textContent=t}}));
     $("#ordSave").addEventListener("click",()=>done("Order saved. It takes effect at the next switch.",()=>put("/api/admin/tv/order",{rows:$$("[data-ord]").map(r=>({id:r.dataset.ord,pin:r.querySelector(".ord-pin").value,next:r.querySelector(".ord-next").checked,excluded:r.querySelector(".ord-out").checked}))})));
   }else if(view==="writers"){
     const d=await api("/api/admin/writers"),ed=d.writers.find(w=>w.key===state.writerEdit&&w.guest);

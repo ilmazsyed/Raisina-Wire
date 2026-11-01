@@ -26,12 +26,24 @@ anchor carries an on-screen "AI" label.
 - **Intros:** each explainer's 25–30 second intro (65–80 words: `cam` hook, `vo` voice-over, `out`
   hand-off) lives in `src/tv-intros.js`, keyed by the video file. Add one there whenever a new
   explainer is made; an explainer without one simply plays.
-- **Short lines** (News Update, bulletin, Breaking Headlines, break-ins, "We're bringing you live
-  visuals of …") are written automatically in `src/anchors.js`.
-- **Voices:** Google Cloud Text-to-Speech, Chirp 3 HD, Indian English: Tara `Despina`, Kabir `Charon`,
-  Bharti `Kore`, Vikram `Iapetus`, Ilmaz `Orus` (stand-in until a cloned voice is possible). Each
-  line is generated once and kept in D1. Without `GOOGLE_TTS_API_KEY` the anchors still appear, with
-  captions instead of a voice.
+- **Short lines** (News Update, an hourly bulletin line, Breaking Headlines, break-ins, live cuts)
+  are fixed in `src/anchors.js`.
+- **Voices:** Kokoro, the voice engine the explainers use, recorded offline (no Google voice). Tara
+  has the explainers' Indian-British narrator voice, `hf_beta:0.6+bf_isabella:0.4`. The other
+  anchors have their own blends, set in `src/anchors.js`. Every line an anchor can say is fixed
+  text, recorded to `public/anchors/voice/` by `node video/anchor-voices.mjs` (run it after
+  adding or editing an intro, or adding an anchor; it also updates `src/anchor-voices.js`). A
+  line without a recording shows as a caption. Lines whose words change are said in a fixed form,
+  with the words on screen: "Breaking news. Here is what we know." over the breaking story, and
+  "We're bringing you live visuals now." over the live input's caption.
+- **Live reads:** the breaking story and the live caption are also read in full, in the same voice
+  ("Breaking news. {line}", "We're bringing you live visuals of {caption}"). Kokoro can't run on the
+  live site, so these are recorded in the editor's browser: whenever the control room's Raisina TV
+  page is open, it records any line the channel is waiting for (breaking lines on air, the last
+  break-in headline, every live input) and uploads it to D1 (`src/anchorrecord.js`). The first
+  time, the browser downloads the voice model, about 90 MB, from Hugging Face. Until a read is
+  recorded, Tara says the fixed line above. The blended voice the browser uses is
+  `public/anchors/<key>-voice.bin` (the same blend as the recordings).
 - **Who is ready:** only anchors listed in `READY` in `src/anchors.js` go on air. For now that is
   Tara alone: she presents every hour, and introduces Ilmaz's Editor's Picks as "Today's Editor's
   Pick". To add an anchor, render their faces (below), put the files in `public/anchors/`, and add
