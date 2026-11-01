@@ -11,6 +11,7 @@
 // story, a live input's caption) are said in a fixed form, with the words themselves on screen.
 import { TV_INTROS } from "./tv-intros.js";
 import { VOICED } from "./anchor-voices.js";
+import { LIPPED } from "./anchor-lips.js";
 
 export const ANCHORS = {
   tara:   { name: "Tara",       role: "News Anchor (AI)", voice: "hf_beta:0.6+bf_isabella:0.4" },
@@ -38,7 +39,7 @@ async function line(anchor, text) {
   const t = String(text || "").replace(/\s+/g, " ").trim();
   if (!t) return null;
   const id = await lineId(anchor, t);
-  return { id, anchor, text: t, audio: VOICED.has(id) ? `/anchors/voice/${id}.mp3` : null };
+  return { id, anchor, text: t, audio: VOICED.has(id) ? `/anchors/voice/${id}.mp3` : null, clip: LIPPED.has(id) ? `/anchors/lips/${id}.mp4` : null };
 }
 // The fixed lines, shared by the channel and the recording script.
 export const FIXED = {
