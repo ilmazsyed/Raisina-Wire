@@ -1,0 +1,19 @@
+{
+ "slug": "iran-no-limits-short",
+ "title": "Iran's 'no limits' warning in 40 seconds",
+ "series": "Explained",
+ "style": "vox",
+ "formats": ["9x16"],
+ "captionChars": 30,
+ "scenes": [
+  {"type": "snap", "src": "media/ir-irgc-march.jpg", "frame": "full", "say": "Strike Iran again, and the answer will have no limits."},
+  {"type": "cutout", "src": "media/ir-salute.jpg", "kicker": "In 40 seconds", "title": "No geographical limits", "say": "Iran's new supreme leader, in his first reported meeting with his generals.", "speak": "Iran's new supreme leader, in his first reported meeting with his generals."},
+  {"type": "doc", "say": "Any threat must meet an immediate, geographically unrestricted response.", "kicker": "Mojtaba Khamenei", "text": "Any level or type of threat must be met with an immediate, impactful and geographically unrestricted response.", "hl": "geographically unrestricted"},
+  {"type": "kinetic", "say": "He orders a new target list: all American and Israeli assets.", "text": "A new | target list", "hl": ["target"], "bg": "media/ir-launchers.jpg", "cut": "whip"},
+  {"type": "kinetic", "say": "It comes days before the US midterms, when Washington may strike again.", "text": "US midterms: | Tuesday", "hl": ["Tuesday"]},
+  {"type": "share", "say": "The Strait of Hormuz normally carries a fifth of the world's oil.", "value": 20, "ringLabel": "of world oil use", "title": "Through Hormuz", "bg": "media/ir-azadi-missiles.jpg"},
+  {"type": "kinetic", "say": "For India, a second round means a fuel shock.", "text": "India: | a fuel shock", "hl": ["fuel"], "cut": "zoom"},
+  {"type": "kinetic", "say": "Talks in Doha are still on. Can they win the race?", "text": "Talks vs | target lists", "hl": ["target"]},
+  {"type": "outro", "say": "Watch the full explainer on Raisina Wire.", "title": "Watch the full explainer"}
+ ]
+}
