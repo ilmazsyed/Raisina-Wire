@@ -1790,7 +1790,8 @@ body.cin-open{overflow:hidden}
 .ta-line{position:absolute;left:6cqw;width:min(34cqw,46%);bottom:17cqw;padding:.8cqw 1.2cqw;border-radius:.5cqw;background:rgba(0,0,0,.62);font:500 clamp(11px,1.75cqw,30px)/1.35 var(--serif)}
 /* Voice over: the pictures play underneath; only the strap (bottom right) and captions show. */
 .tv-anchor[data-shot="vo"] .ta-cam,.tv-anchor[data-shot="vo"] .ta-pick{display:none}
-.tv-anchor[data-shot="vo"] .ta-strap{left:auto;right:2cqw;bottom:2cqw;animation:none}
+/* Over the explainer's pictures the anchor's name tag stays off: only the story's title shows. */
+.tv-anchor[data-shot="vo"] .ta-strap{display:none}
 .tv-anchor[data-shot="vo"] .ta-line{left:12cqw;right:12cqw;width:auto;bottom:13cqw;text-align:center}
 .tv-anchor[data-shot="pip"] .ta-line{left:6cqw;width:52cqw;bottom:6cqw}
 /* Voice-over: the explainer's cover picture, pushing in slowly (no video plays underneath). */
@@ -1815,9 +1816,7 @@ body.cin-open{overflow:hidden}
   .ta-line,.tv-anchor[data-shot="vo"] .ta-line,.tv-anchor[data-shot="pip"] .ta-line{left:2.5cqw;right:2.5cqw;width:auto;bottom:2cqw;font-size:11px;padding:4px 7px}
   .tv-anchor[data-shot="cam"] .ta-strap{bottom:auto;top:14cqw;left:3cqw}
   .ta-pick{top:30cqw;left:3cqw}
-  .tv-anchor[data-shot="vo"]:has(.ta-line:not([hidden])) .ta-strap{display:none}
   .tv-screen:has(.tv-anchor[data-shot="vo"] .ta-line:not([hidden])) .tv-lower{visibility:hidden}
-  .tv-anchor[data-shot="vo"] .ta-strap{display:none}
 }
 /* A line's own words on screen (the breaking story, the live caption): a headline, not a subtitle. */
 .ta-line.show{font:600 clamp(13px,2.4cqw,42px)/1.25 var(--serif);background:rgba(8,11,20,.88);border-left:.45cqw solid #e0262f}
