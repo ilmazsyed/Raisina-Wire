@@ -1670,15 +1670,15 @@ body.cin-open{overflow:hidden}
 .bx-prog i.on::after{content:"";position:absolute;inset:0;background:#fff;transform:scaleX(0);transform-origin:left;animation:sq-grow var(--t) linear forwards}
 .bx-list{list-style:none;margin:0;padding:0;flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-evenly;gap:.3cqw;overflow:hidden}
 .bx-list li{position:relative;display:flex;align-items:center;gap:1.2cqw;padding:.6cqw 1.2cqw .6cqw 0;border-bottom:1px solid rgba(255,255,255,.1);opacity:0;animation:bx-row .5s calc(.25s + var(--i) * .1s) cubic-bezier(.2,.9,.2,1) forwards}
-.bx-list li::before{content:"";position:absolute;inset:0;z-index:-1;background:#fff;transform:scaleX(0);transform-origin:left;animation:bx-hi var(--slot) calc(.9s + var(--i) * var(--slot)) cubic-bezier(.7,0,.2,1)}
-.bx-list li{isolation:isolate;animation:bx-row .5s calc(.25s + var(--i) * .1s) cubic-bezier(.2,.9,.2,1) forwards,bx-ink var(--slot) calc(.9s + var(--i) * var(--slot)) steps(1)}
+.bx-list li::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(255,255,255,.16),rgba(255,255,255,.05) 85%,transparent);box-shadow:inset .45cqw 0 0 #e0262f;opacity:0;transform:scaleX(.4);transform-origin:left;animation:bx-hi var(--slot) calc(.9s + var(--i) * var(--slot)) ease-in-out}
+.bx-list li{isolation:isolate}
+.bx-list.measure{visibility:hidden}.bx-list.measure li,.bx-list.measure li::before{animation:none;opacity:1}
 .bx-no{flex-shrink:0;display:grid;place-items:center;width:3cqw;height:3cqw;min-width:18px;min-height:18px;background:#e0262f;color:#fff;font:800 clamp(10px,1.45cqw,26px)/1 var(--display)}
 .bx-h{flex:1;min-width:0;display:flex;flex-direction:column;gap:.25cqw}
 .bx-h b{font:500 calc(clamp(11px,1.85cqw,33px) * var(--fs,1))/1.18 var(--serif)}
 .bx-h small{font:700 clamp(7px,.82cqw,14px)/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @keyframes bx-row{from{opacity:0;transform:translateX(-3cqw)}to{opacity:1;transform:none}}
-@keyframes bx-hi{0%{transform:scaleX(0);opacity:1}10%,92%{transform:scaleX(1);opacity:1}100%{transform:scaleX(1);opacity:0}}
-@keyframes bx-ink{0%{color:#0b0f1e}100%{color:#0b0f1e}}
+@keyframes bx-hi{0%{opacity:0;transform:scaleX(.4)}14%,86%{opacity:1;transform:none}100%{opacity:0;transform:none}}
 /* markets board */
 .bx-mkts{flex:1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1.2cqw;align-content:center}
 .bx-mkt{display:flex;flex-direction:column;gap:.5cqw;padding:1.4cqw;background:rgba(255,255,255,.06);border-top:.3cqw solid #e0262f;opacity:0;animation:bx-row .5s calc(.2s + var(--i) * .08s) forwards}
