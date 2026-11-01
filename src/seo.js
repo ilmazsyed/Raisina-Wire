@@ -44,7 +44,7 @@ function videoLd(o, m, ctx = true) {
   const yt = String(m.mediaUrl || "").match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
   return { ...(ctx ? { "@context": "https://schema.org" } : {}), "@type": "VideoObject", name: clip(m.title, 100), description: clip(m.description || `${m.mediaType === "short" ? "A short" : "An explainer"} from the Raisina Wire desk.`, 300),
     thumbnailUrl: [m.thumb ? (/^https?:/.test(m.thumb) ? m.thumb : o + m.thumb) : `${o}/og-image.jpg`], uploadDate: lastmodIso(m.publishedAt),
-    url: `${o}/watch?v=${encodeURIComponent(m.id)}`, ...(yt ? { embedUrl: `https://www.youtube.com/embed/${yt[1]}` } : { contentUrl: media }),
+    url: `${o}/tv?v=${encodeURIComponent(m.id)}`, ...(yt ? { embedUrl: `https://www.youtube.com/embed/${yt[1]}` } : { contentUrl: media }),
     publisher: { "@id": `${o}/#organization` }, inLanguage: "en-IN", isFamilyFriendly: true };
 }
 const lastmodIso = d => { const t = Date.parse(String(d || "").replace(" ", "T") + (/[zZ+]/.test(String(d)) ? "" : "Z")); return Number.isNaN(t) ? new Date().toISOString() : new Date(t).toISOString(); };
@@ -197,19 +197,20 @@ async function pageFor(path, url, env, o, lang = "en") {
       ld: [{ "@context": "https://schema.org", "@type": "WebPage", url: `${o}/${section}`, name: d.title, dateModified: new Date(LEGAL_UPDATED).toISOString(), isPartOf: { "@id": `${o}/#website` } }],
       body: `<article><h1>${d.title}</h1><p>Last updated ${LEGAL_UPDATED}</p>${d.html}</article>` };
   }
-  // A shared video or short (/watch?v=id): its own title and picture in link previews.
-  if (section === "watch" && url.searchParams.get("v")) {
+  // A shared video or short (/tv?v=id): its own title and picture in link previews.
+  if (section === "tv" && url.searchParams.get("v")) {
     const m = await env.DB.prepare("SELECT id,title,description,media_type AS mediaType,media_url AS mediaUrl,thumbnail_url AS thumb,published_at AS publishedAt FROM media_items WHERE id=? AND status='published'").bind(url.searchParams.get("v")).first();
-    if (m) return { canonicalPath: "/watch", ld: [videoLd(o, m)], ogUrl: `${o}${lang === "en" ? "" : `/${lang}`}/watch?v=${encodeURIComponent(m.id)}`, type: "video.other",
+    if (m) return { canonicalPath: "/tv", ld: [videoLd(o, m)], ogUrl: `${o}${lang === "en" ? "" : `/${lang}`}/tv?v=${encodeURIComponent(m.id)}`, type: "video.other",
       title: `${m.title} · ${SITE}`, ogTitle: m.title, description: clip(m.description || `${m.mediaType === "short" ? "A short" : "An explainer"} from the Raisina Wire desk.`, 200),
       image: m.thumb ? (/^https?:/.test(m.thumb) ? m.thumb : o + m.thumb) : undefined, body: `<h1>${esc(m.title)}</h1>${m.description ? `<p>${esc(m.description)}</p>` : ""}` };
   }
-  if (section === "tv") return { title: `Raisina TV — live: India and world news explainers, 24×7 · ${SITE}`, description: "Raisina TV plays the desk's latest explainers on geopolitics, security, diplomacy and markets around the clock, with a live news ticker.", body: `<h1>Raisina TV</h1><p>The desk's latest explainers, around the clock, with a live news ticker.</p><p><a href="/watch">All explainers</a></p>` };
-  if (section === "watch") {
+  // Watch is now part of TV (shared ?v= links keep their query on the redirect).
+  if (section === "watch") return { redirect: prefixed(lang, "/tv") };
+  if (section === "tv") {
     const { results: vids } = await env.DB.prepare("SELECT id,title,description,media_type AS mediaType,media_url AS mediaUrl,thumbnail_url AS thumb,published_at AS publishedAt FROM media_items WHERE status='published' AND media_type IN ('video','short') ORDER BY published_at DESC LIMIT 50").all();
-    return { title: `Video explainers and shorts on India and the world · ${SITE}`, description: "Video explainers and vertical shorts from the Raisina Wire desk on geopolitics, security, diplomacy and markets.",
+    return { title: `Raisina TV — live: India and world news explainers, 24×7 · ${SITE}`, description: "Raisina TV plays the desk's latest explainers on geopolitics, security, diplomacy and markets around the clock, with a live news ticker, News Updates and every explainer and short to watch on demand.",
       ld: [{ "@context": "https://schema.org", "@type": "ItemList", itemListElement: vids.filter(v => v.thumb).map((v, i) => ({ "@type": "ListItem", position: i + 1, item: videoLd(o, v, false) })) }],
-      body: `<h1>Video explainers and shorts</h1><ul>${vids.map(v => `<li><a href="/watch?v=${encodeURIComponent(v.id)}">${esc(v.title)}</a>${v.description ? ` — ${esc(clip(v.description, 160))}` : ""}</li>`).join("")}</ul>` };
+      body: `<h1>Raisina TV</h1><p>The desk's latest explainers, around the clock, with a live news ticker.</p><h2>Explainers and shorts</h2><ul>${vids.map(v => `<li><a href="/tv?v=${encodeURIComponent(v.id)}">${esc(v.title)}</a>${v.description ? ` — ${esc(clip(v.description, 160))}` : ""}</li>`).join("")}</ul>` };
   }
 
   if (section === "community") {
@@ -330,7 +331,7 @@ export async function sitemap(request, env, ensureSchema) {
   const bare = p => p.replace(/^\/(hi|bn)(?=\/|$)/, "") || "/";
   const urls = [
     ["/", newest, "hourly", "1.0"], ["/editions", newest, "daily", "0.9"], ["/live", "", "always", "0.8"], ["/markets", "", "always", "0.7"],
-    ...LIVE_CATS.map(c => [`/live/${c}`, "", "always", "0.5"]), ["/community", "", "daily", "0.7"], ["/events", "", "daily", "0.6"], ["/watch", "", "daily", "0.7"], ["/tv", "", "hourly", "0.7"], ["/about", "", "monthly", "0.5"], ...LEGAL_ORDER.map(([k]) => [`/${k}`, "", "yearly", "0.2"]),
+    ...LIVE_CATS.map(c => [`/live/${c}`, "", "always", "0.5"]), ["/community", "", "daily", "0.7"], ["/events", "", "daily", "0.6"], ["/tv", "", "hourly", "0.8"], ["/about", "", "monthly", "0.5"], ...LEGAL_ORDER.map(([k]) => [`/${k}`, "", "yearly", "0.2"]),
     ...WRITERS.map(w => [`/author/${w.key}`, newest, "weekly", "0.6"]),
     ...(await allTags(env)).map(t => [`/tag/${t.slug}`, newest, "weekly", "0.5"]),
     ...LANGS.flatMap(l => [[`/${l}`, newest, "hourly", "0.9"], [`/${l}/editions`, newest, "daily", "0.7"]]),
@@ -340,7 +341,7 @@ export async function sitemap(request, env, ensureSchema) {
     ...posts.map(p => [`/discussion/${encodeURIComponent(p.id)}`, p.created_at, "weekly", "0.4"])
   ];
   return xmlResponse(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1" xmlns:xhtml="http://www.w3.org/1999/xhtml">
-${urls.map(([p, m, f, pr, s, langs]) => `<url><loc>${xml(o + p)}</loc>${lastmod(m) ? `<lastmod>${lastmod(m)}</lastmod>` : ""}<changefreq>${f}</changefreq><priority>${pr}</priority>${alt(bare(p), langs)}${s ? `<image:image><image:loc>${xml(abs(o, s.heroUrl || s.image))}</image:loc></image:image>` : ""}${p === "/watch" ? videoXml : ""}</url>`).join("\n")}
+${urls.map(([p, m, f, pr, s, langs]) => `<url><loc>${xml(o + p)}</loc>${lastmod(m) ? `<lastmod>${lastmod(m)}</lastmod>` : ""}<changefreq>${f}</changefreq><priority>${pr}</priority>${alt(bare(p), langs)}${s ? `<image:image><image:loc>${xml(abs(o, s.heroUrl || s.image))}</image:loc></image:image>` : ""}${p === "/tv" ? videoXml : ""}</url>`).join("\n")}
 </urlset>`);
 }
 
