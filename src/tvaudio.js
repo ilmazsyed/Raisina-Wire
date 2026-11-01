@@ -28,6 +28,13 @@ export function audio() {
   return ctx;
 }
 export const suspend = () => ctx?.state === "running" && ctx.suspend();
+// The music dips under the anchor's voice and comes back after (the desk's tracks too).
+let duckK = 1;
+export function duck(on) {
+  duckK = on ? 0.22 : 1;
+  if (master) { const t = ctx.currentTime; master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t); master.gain.linearRampToValueAtTime(0.55 * duckK, t + (on ? 0.25 : 0.6)); }
+  playing.forEach(a => { a.volume = on ? Math.min(a.volume, 0.7 * duckK) : a.volume > 0.05 ? 0.7 : a.volume; });
+}
 export const resume = () => ctx?.state === "suspended" && ctx.resume();
 
 let noiseBuf = null;
@@ -122,8 +129,8 @@ export const pauseTracks = () => playing.forEach(a => a.pause());
 export const resumeTracks = () => playing.forEach(a => a.play().catch(() => {}));
 export function track(src, secs) {
   const a = new Audio(src); a.volume = 0; a.play().catch(() => {}); playing.add(a);
-  let v = 0; const up = setInterval(() => { v = Math.min(0.7, v + 0.07); a.volume = v; if (v >= 0.7) clearInterval(up); }, 80);
-  const stop = () => { clearInterval(up); const down = setInterval(() => { v = Math.max(0, v - 0.08); a.volume = v; if (v <= 0) { clearInterval(down); a.pause(); a.removeAttribute("src"); playing.delete(a); } }, 70); };
+  let v = 0; const up = setInterval(() => { v = Math.min(0.7, v + 0.07); a.volume = v * duckK; if (v >= 0.7) clearInterval(up); }, 80);
+  const stop = () => { clearInterval(up); const down = setInterval(() => { v = Math.max(0, v - 0.08); a.volume = v * duckK; if (v <= 0) { clearInterval(down); a.pause(); a.removeAttribute("src"); playing.delete(a); } }, 70); };
   const end = setTimeout(stop, secs * 1000);
   return () => { clearTimeout(end); stop(); };
 }

@@ -21,7 +21,7 @@ function loadMouth(key) {
   })).catch(() => null));
 }
 
-export function createAnchor(screen, { isPaused, hearing, label, audioCtx }) {
+export function createAnchor(screen, { isPaused, hearing, label, audioCtx, onSpeak }) {
   const el = document.createElement("div");
   el.className = "tv-anchor"; el.hidden = true; el.setAttribute("aria-live", "polite");
   el.innerHTML = `<div class="ta-cam"><span class="ta-fill"></span>
@@ -72,8 +72,8 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx }) {
   // and natural rather than flickering; scaled to the line's own loudest moments.
   function lipLoop() {
     if (!lip || !mouth) return;
-    const { an, buf, gain } = lip;
-    gain.gain.value = hearing() ? 1 : 0;
+    const { an, buf } = lip;
+    lip.gain.gain.value = hearing() ? 1 : 0;
     an.getFloatTimeDomainData(buf);
     let s = 0; for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
     const rms = Math.sqrt(s / buf.length);
@@ -85,19 +85,33 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx }) {
     if (Math.abs(lip.o - lip.shown) > 0.01) { lip.shown = lip.o; draw(lip.o); }
     lip.raf = requestAnimationFrame(lipLoop);
   }
-  function startLip(a) {
+  // One voice player for every line, unlocked by the viewer's click (phones only let a player
+  // that was started by a tap make sound), so two lines can never play over each other. Once the
+  // channel's audio is running it goes through an analyser (for the lips) and a gain (for mute).
+  const voice = new Audio(); voice.preload = "auto";
+  let graph = null;
+  function wire() {
+    if (graph) return graph;
     const ctx = audioCtx?.();
-    if (!ctx || ctx.state !== "running" || !mouth) return false;
+    if (!ctx || ctx.state !== "running") return null;
     try {
-      const src = ctx.createMediaElementSource(a), an = ctx.createAnalyser(), gain = ctx.createGain();
+      const src = ctx.createMediaElementSource(voice), an = ctx.createAnalyser(), gain = ctx.createGain();
       an.fftSize = 1024; an.smoothingTimeConstant = 0;
       src.connect(an); an.connect(gain); gain.connect(ctx.destination);
-      lip = { src, an, gain, buf: new Float32Array(an.fftSize), peak: 0.05, o: 0, shown: -1, raf: 0, t: 0 };
-      draw(0);
-      return true;
-    } catch { lip = null; return false; }
+      graph = { an, gain, buf: new Float32Array(an.fftSize) };
+    } catch { graph = null; }
+    return graph;
   }
-  function stopLip() { if (!lip) return; cancelAnimationFrame(lip.raf); try { lip.src.disconnect(); lip.gain.disconnect(); } catch { /* gone */ } lip = null; el.classList.remove("lipsync"); }
+  const SILENCE = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+  function unlock() { wire(); voice.src = SILENCE; voice.play().then(() => voice.pause()).catch(() => {}); }
+  function startLip() {
+    const g = wire();
+    if (!g || !mouth) return false;
+    lip = { ...g, peak: 0.05, o: 0, shown: -1, raf: 0, t: 0 };
+    draw(0);
+    return true;
+  }
+  function stopLip() { if (!lip) return; cancelAnimationFrame(lip.raf); lip = null; el.classList.remove("lipsync"); }
   // Show the anchor in a shot (cam, vo or pip), with an optional "Editor's Pick" tag.
   function shot(kind, { key, roster, pick = "" } = {}) {
     if (key) setWho(key, roster?.[key]);
@@ -111,7 +125,7 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx }) {
     stopAudio(); face(false); idle.pause(); talk.pause();
     el.classList.remove("on", "talking"); el.hidden = true; el.dataset.shot = "";
   }
-  function stopAudio() { stopLip(); if (audio) { audio.onended = audio.onerror = audio.onplaying = null; audio.pause(); audio.removeAttribute("src"); audio = null; } }
+  function stopAudio() { stopLip(); if (audio) { voice.onended = voice.onerror = voice.onplaying = null; voice.pause(); audio = null; onSpeak?.(false); } }
 
   // Say a line: resolves when the audio ends (or, without it, after reading time), or early if
   // `alive()` turns false (a newer sequence took over). Pausing the TV pauses the line. The voice
@@ -130,17 +144,19 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx }) {
       let done = false, left = est, last = performance.now(), started = false, waited = 0;
       const finish = ok => { if (done) return; done = true; face(false); stopAudio(); cap.hidden = true; cap.classList.remove("show"); res(ok); };
       const fallback = () => { stopAudio(); started = true; face(true); }; // no voice: reading time, talking loop
-      const ctx = audioCtx?.(), measurable = Boolean(ctx && ctx.state === "running" && mouth);
+      const measurable = Boolean(wire() && mouth);
       if (line.audio && (hearing() || measurable)) {
         stopAudio();
-        audio = new Audio(line.audio);
-        const a = audio, synced = startLip(a);
+        const synced = startLip();
         if (!synced && !hearing()) { fallback(); }
         else {
-          a.onplaying = () => { if (a !== audio) return; started = true; face(true); if (lip && !lip.raf) lipLoop(); };
-          a.onended = () => { if (a === audio) finish(true); };
-          a.onerror = () => { if (a === audio) fallback(); };
-          if (!isPaused()) a.play().catch(() => { if (a === audio) fallback(); });
+          const a = audio = {};   // this line's turn on the voice player
+          if (graph) graph.gain.gain.value = hearing() ? 1 : 0; else voice.muted = !hearing();
+          voice.src = line.audio;
+          voice.onplaying = () => { if (a !== audio) return; started = true; face(true); onSpeak?.(true); if (lip && !lip.raf) lipLoop(); };
+          voice.onended = () => { if (a === audio) finish(true); };
+          voice.onerror = () => { if (a === audio) fallback(); };
+          if (!isPaused()) voice.play().catch(() => { if (a === audio) fallback(); });
         }
       } else fallback();
       // Watchdog: reading time runs while there's no audio; a voice that never starts is cut off.
@@ -158,11 +174,13 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx }) {
   }
   function pause(p) {
     if (el.hidden) return;
-    if (p) { audio?.pause(); idle.pause(); talk.pause(); }
-    else { audio?.play().catch(() => {}); (speaking && !lip ? talk : idle).play().catch(() => {}); }
+    if (p) { if (audio) voice.pause(); idle.pause(); talk.pause(); }
+    else { if (audio) voice.play().catch(() => {}); (speaking && !lip ? talk : idle).play().catch(() => {}); }
   }
   const shotNow = () => (el.hidden ? "" : el.dataset.shot || "");
-  return { shot, say, hide, pause, shotNow };
+  // Sound switched on or off mid-line.
+  const setHearing = h => { if (graph) graph.gain.gain.value = h ? 1 : 0; else voice.muted = !h; };
+  return { shot, say, hide, pause, shotNow, unlock, setHearing };
 }
 
 // Warm the browser's cache for lines coming up.

@@ -1816,3 +1816,11 @@ body.cin-open{overflow:hidden}
 }
 /* A line's own words on screen (the breaking story, the live caption): a headline, not a subtitle. */
 .ta-line.show{font:600 clamp(13px,2.4cqw,42px)/1.25 var(--serif);background:rgba(8,11,20,.88);border-left:.45cqw solid #e0262f}
+/* Raisina TV's start button: TV never plays by itself (opened from a shared link or a reload). */
+.tv-start{position:absolute;inset:0;z-index:7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.6cqw;border:0;padding:0;background:#05070d;color:#fff;cursor:pointer;font:inherit}
+.tv-start-i{position:absolute;inset:0;background:#0b1020 center/cover no-repeat;filter:brightness(.45) saturate(1.1)}
+.tv-start-p{position:relative;display:grid;place-items:center;width:clamp(56px,11cqw,130px);aspect-ratio:1;border-radius:50%;background:#e0262f;box-shadow:0 0 0 .8cqw rgba(224,38,47,.25),0 1cqw 4cqw rgba(0,0,0,.5);transition:transform .2s}
+.tv-start-p svg{width:42%;height:42%;margin-left:8%}
+.tv-start b{position:relative;font:800 clamp(14px,2.6cqw,40px)/1.1 var(--sans);letter-spacing:.01em;text-shadow:0 .3cqw 1.5cqw rgba(0,0,0,.6)}
+.tv-start:hover .tv-start-p,.tv-start:focus-visible .tv-start-p{transform:scale(1.06)}
+.tv-start:focus-visible{outline:3px solid #fff;outline-offset:-6px}
