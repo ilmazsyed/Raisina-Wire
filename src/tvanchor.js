@@ -58,25 +58,31 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx }) {
     if (!isPaused()) v.play().catch(() => {});
     other.pause();
   }
-  function draw(i) {
-    const { meta, img } = mouth, h = cv.height;
-    const c = cv.getContext("2d"); c.clearRect(0, 0, cv.width, h);
+  // Draws the mouth for an openness between two neighbouring shapes, blended, so it never snaps.
+  function draw(o) {
+    const { meta, img } = mouth, h = cv.height, lv = meta.open;
+    let i = 0; while (i < lv.length - 2 && lv[i + 1] <= o) i++;
+    const f = Math.min(1, Math.max(0, (o - lv[i]) / Math.max(lv[i + 1] - lv[i], 1e-3)));
+    const c = cv.getContext("2d"); c.globalAlpha = 1; c.clearRect(0, 0, cv.width, h);
     c.drawImage(img, 0, i * h, cv.width, h, 0, 0, cv.width, h);
+    if (f > 0.02) { c.globalAlpha = f; c.drawImage(img, 0, (i + 1) * h, cv.width, h, 0, 0, cv.width, h); }
   }
-  // Lip sync: loudness -> how open -> the nearest mouth shape. Opens fast, closes a little slower,
-  // scaled to the line's own loudest moments so quiet and loud voices both move fully.
+  // Lip sync: loudness -> how open -> the mouth, blended between shapes. Eased both ways (opening a
+  // touch quicker than closing) and capped short of the widest shape, so the movement stays soft
+  // and natural rather than flickering; scaled to the line's own loudest moments.
   function lipLoop() {
     if (!lip || !mouth) return;
-    const { an, buf, gain } = lip, levels = mouth.meta.open;
+    const { an, buf, gain } = lip;
     gain.gain.value = hearing() ? 1 : 0;
     an.getFloatTimeDomainData(buf);
     let s = 0; for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
     const rms = Math.sqrt(s / buf.length);
     lip.peak = Math.max(lip.peak * 0.998, rms, 0.015);
     const floor = lip.peak * 0.14, t = Math.min(1, Math.max(0, (rms - floor) / (lip.peak * 0.8 - floor))) ** 0.85;
-    lip.o += (t - lip.o) * (t > lip.o ? 0.6 : 0.32);
-    let best = 0; for (let i = 1; i < levels.length; i++) if (Math.abs(levels[i] - lip.o) < Math.abs(levels[best] - lip.o)) best = i;
-    if (best !== lip.shown) { lip.shown = best; draw(best); }
+    const now = performance.now(), dt = Math.min(0.1, (now - (lip.t || now)) / 1000); lip.t = now;
+    const target = t * 0.85;
+    lip.o += (target - lip.o) * (1 - Math.exp(-dt * (target > lip.o ? 22 : 13)));
+    if (Math.abs(lip.o - lip.shown) > 0.01) { lip.shown = lip.o; draw(lip.o); }
     lip.raf = requestAnimationFrame(lipLoop);
   }
   function startLip(a) {
@@ -86,7 +92,7 @@ export function createAnchor(screen, { isPaused, hearing, label, audioCtx }) {
       const src = ctx.createMediaElementSource(a), an = ctx.createAnalyser(), gain = ctx.createGain();
       an.fftSize = 1024; an.smoothingTimeConstant = 0;
       src.connect(an); an.connect(gain); gain.connect(ctx.destination);
-      lip = { src, an, gain, buf: new Float32Array(an.fftSize), peak: 0.05, o: 0, shown: -1, raf: 0 };
+      lip = { src, an, gain, buf: new Float32Array(an.fftSize), peak: 0.05, o: 0, shown: -1, raf: 0, t: 0 };
       draw(0);
       return true;
     } catch { lip = null; return false; }
