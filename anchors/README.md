@@ -57,3 +57,11 @@ for `tara`, `kabir`, `bharti`, `vikram`, `ilmaz`. Made offline with SadTalker (C
 --preprocess full --enhancer gfpgan`) from the portraits in `sources/`: the talking loop is driven by a
 few seconds of speech, the idle loop by near-silence. Each render becomes a silent loop that plays
 forwards then backwards, 720 px tall. Lips are approximate, not synced to the words.
+
+## On screen
+- **Aston:** when the anchor is on camera, a broadcast lower third wipes in, holds and wipes out:
+  "Tara, Raisina Wire" over "News Anchor (AI)" (roles in `src/anchors.js`).
+- **Voice-over pictures:** four per explainer, one after another with a Raisina Wire wipe (crimson
+  then navy). They are the explainer script's own photos, made up to four with stills from the film
+  (above its captions), in `public/anchors/vo/`. Run `python3 video/anchor_vo_pics.py` after adding
+  an intro for a new explainer; it also writes `src/tv-intro-pics.js`.
