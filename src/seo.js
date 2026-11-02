@@ -93,6 +93,15 @@ async function pageFor(path, url, env, o, lang = "en") {
   const parts = path.split("/").filter(Boolean).map(decodeURIComponent);
   const [section, arg] = parts;
 
+  if (section === "install") {
+    const title = "Get the Raisina Wire App — The Lightweight App Revolution";
+    const description = "Install Raisina Wire on iPhone, Android or desktop. A lightweight, secure app-like experience for geopolitics, security, markets and live news — without a bulky app-store download.";
+    const image = `${o}/og-install.jpg`;
+    return { title, ogTitle: "Get the Raisina Wire App", description, image, noindex: true,
+      ld: [{ "@context": "https://schema.org", "@type": "WebPage", name: title, description, url: `${o}/install`, primaryImageOfPage: image, isPartOf: { "@id": `${o}/#website` } }],
+      body: `<h1>Get the Raisina Wire app</h1><p>${esc(description)}</p><p>Lightweight by design. Secure over HTTPS. Add it to your home screen in seconds.</p>` };
+  }
+
   if (!section && lang !== "en") {
     const stories = await localiseArticles(env, lang, await listPublished(env, { limit: 30 })), t = HOME_TEXT[lang];
     return { title: t.title, description: t.description, inLanguage: LOCALES[lang],
@@ -387,4 +396,4 @@ ${stories.map(s => `<item><title>${xml(s.title)}</title><link>${o}${s.href}</lin
 
 // Paths the Worker renders as HTML pages (the rest are app-only views or static files), tested
 // without the /hi or /bn prefix.
-export const PAGE_PATTERN = /^\/(?:$|editions\/?$|(?:edition|article|author|tag|discussion|coverage)\/[^/]+\/?$|live(?:\/[^/]+)?\/?$|markets\/?$|community\/?$|events\/?$|watch\/?$|tv\/?$|(?:about|terms|privacy|disclaimer|copyright|community-guidelines|grievance)\/?$)/;
+export const PAGE_PATTERN = /^\/(?:$|install\/?$|editions\/?$|(?:edition|article|author|tag|discussion|coverage)\/[^/]+\/?$|live(?:\/[^/]+)?\/?$|markets\/?$|community\/?$|events\/?$|watch\/?$|tv\/?$|(?:about|terms|privacy|disclaimer|copyright|community-guidelines|grievance)\/?$)/;
