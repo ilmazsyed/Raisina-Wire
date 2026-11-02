@@ -1457,7 +1457,12 @@ body.is-reading .new-pill{top:calc(18px + env(safe-area-inset-top))}
 /* ticker */
 .tv-ticker{display:flex;align-items:stretch;height:clamp(30px,3.2vw,38px);background:#0b0f19;border-top:2px solid #e0262f;overflow:hidden}
 .tv-tk-break{flex-shrink:0;display:flex;align-items:center;padding:0 12px;background:#e0262f;font:900 clamp(10px,1vw,12px)/1 var(--mono);letter-spacing:1.6px;color:#fff;animation:tk-pulse 1.6s ease-in-out infinite}
-@keyframes tk-pulse{50%{background:#ff3b45;box-shadow:inset 0 0 0 2px rgba(255,255,255,.35)}}
+/* The BREAKING pulse is a glow layer that fades in and out (opacity only), so the graphics chip
+   does it without repainting the picture. Animating the label's own colour and border made the
+   whole player repaint every frame, which made video and sound stutter on smart TVs. */
+.tv-tk-break{position:relative;isolation:isolate;animation:none!important}
+.tv-tk-break::after{content:"";position:absolute;inset:0;z-index:-1;background:#ff3b45;box-shadow:inset 0 0 0 2px rgba(255,255,255,.35);opacity:0;will-change:opacity;animation:tk-glow 1.6s ease-in-out infinite}
+@keyframes tk-glow{50%{opacity:1}}
 .tv-tk-run{flex:1;overflow:hidden;display:flex;align-items:center;mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent)}
 .tv-tk-track{display:flex;white-space:nowrap;animation:tv-run var(--tk-dur,60s) linear infinite}
 .tv-ticker:hover .tv-tk-track{animation-play-state:paused}
