@@ -518,7 +518,7 @@ function paginate(items) {
 async function newsUpdate(tok, bulletin, over = null) {
   const sets = over?.sets || pickSets(), per = (feed.seq?.setSeconds || 7) * 1000;
   if (!sets.length) return;
-  const stop = score({ sting: true, bed: 3 + sets.length * per / 1000 });
+  const stop = score({ sting: true, bed: Infinity }); // the bed runs until the segment ends, however long she reads
   const label = over?.label || (bulletin ? tr("BULLETIN") : tr("NEWS UPDATE"));
   // Title card.
   if (!await swapSeq(tok, "nu", `${STUDIO}<span class="bx-card"><span class="bx-k"><span class="pulse"></span>RAISINA WIRE · ${esc(tr("LIVE"))}</span>

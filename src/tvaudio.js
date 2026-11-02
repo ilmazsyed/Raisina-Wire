@@ -79,8 +79,12 @@ export function sting(name) {
 export function bed(name, secs) {
   if (!audio()) return () => {};
   const th = THEMES[name] || THEMES.pulse, b = bus(), t0 = ctx.currentTime + 0.05, beat = 60 / th.bpm, bar = beat * 4;
-  const bars = Math.ceil(secs / bar);
-  for (let k = 0; k < bars; k++) {
+  // Bars are scheduled a few seconds ahead as the bed plays, so it can run as long as the segment
+  // does (secs = Infinity: until it's stopped), e.g. while the anchor reads every headline.
+  const bars = Number.isFinite(secs) ? Math.ceil(secs / bar) : Infinity;
+  let k = 0, stopped = false;
+  const ahead = () => { if (stopped) return; while (k < bars && t0 + k * bar < ctx.currentTime + 6) playBar(k++); };
+  function playBar(k) {
     const t = t0 + k * bar, ch = th.chords[k % th.chords.length], r = th.root;
     if (name === "cinema") {
       pad(b.g, t, ch.map(i => r + i), bar, 0.06);
@@ -105,9 +109,12 @@ export function bed(name, secs) {
       if (k % 2 === 0) stab(b.g, t, ch.map(i => r + 12 + i), 0.13);
     }
   }
+  ahead();
+  const feed = setInterval(ahead, 1000);
+  const halt = fade => { if (stopped) return; stopped = true; clearInterval(feed); clearTimeout(end); b.stop(fade); };
   // End on a gentle fade at the requested length.
-  const end = setTimeout(() => b.stop(0.8), Math.max(0, secs - 0.8) * 1000);
-  return (fade) => { clearTimeout(end); b.stop(fade); };
+  const end = Number.isFinite(secs) ? setTimeout(() => halt(0.8), Math.max(0, secs - 0.8) * 1000) : 0;
+  return halt;
 }
 // Breaking news: staccato strings, timpani roll and brass hits, rising (about `secs` seconds).
 export function breaking(secs = 4.5) {
@@ -128,10 +135,11 @@ const playing = new Set();
 export const pauseTracks = () => playing.forEach(a => a.pause());
 export const resumeTracks = () => playing.forEach(a => a.play().catch(() => {}));
 export function track(src, secs) {
-  const a = new Audio(src); a.volume = 0; a.play().catch(() => {}); playing.add(a);
+  // secs = Infinity: loops until stopped (a segment whose length isn't known ahead).
+  const a = new Audio(src); a.volume = 0; a.loop = !Number.isFinite(secs); a.play().catch(() => {}); playing.add(a);
   let v = 0; const up = setInterval(() => { v = Math.min(0.7, v + 0.07); a.volume = v * duckK; if (v >= 0.7) clearInterval(up); }, 80);
   const stop = () => { clearInterval(up); const down = setInterval(() => { v = Math.max(0, v - 0.08); a.volume = v * duckK; if (v <= 0) { clearInterval(down); a.pause(); a.removeAttribute("src"); playing.delete(a); } }, 70); };
-  const end = setTimeout(stop, secs * 1000);
+  const end = Number.isFinite(secs) ? setTimeout(stop, secs * 1000) : 0;
   return () => { clearTimeout(end); stop(); };
 }
 
