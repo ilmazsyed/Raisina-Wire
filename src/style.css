@@ -1868,3 +1868,16 @@ body.cin-open{overflow:hidden}
 @keyframes ps-push{from{transform:scale(1.07)}to{transform:scale(1)}}
 @keyframes ps-shine{to{transform:translateX(120%)}}
 @media (prefers-reduced-motion:reduce){.sq-poster .ps-img,.sq-poster .ps-shine{animation:none}.sq-poster .ps-shine{display:none}}
+
+
+/* PWA install sheet: lightweight-app positioning and honest storage/security claims */
+.install-promise{margin:10px 0 0;color:var(--ink-2);font-size:14px;line-height:1.55}
+.install-sheet .sheet-list{margin-top:14px}
+.install-sheet .sheet-list li{align-items:flex-start;line-height:1.45}
+.install-sheet .sheet-list li b{color:var(--ink)}
+.install-footnote{margin:12px 0 0;padding:10px 12px;border:1px solid rgba(15,20,34,.09);border-radius:12px;background:rgba(15,20,34,.035);color:var(--muted);font-size:11px;line-height:1.5}
+.install-installed{margin-top:14px;padding:13px 14px;border-radius:14px;background:rgba(224,38,47,.07);border:1px solid rgba(224,38,47,.14);font-size:13px;line-height:1.5}
+.install-installed p{margin:5px 0 0;color:var(--ink-2)}
+.install-actions [data-action="install-open"]{flex:1}
+.install-actions .sheet-secondary{white-space:nowrap}
+@media(max-width:420px){.install-sheet{padding:20px}.install-actions{gap:8px}.install-actions .sheet-secondary{font-size:12px;padding-inline:8px}}
