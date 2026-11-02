@@ -66,6 +66,12 @@ export const TV_INTRO_PICS = {
   "/anchors/vo/trump-sindoor-claim-explained-3.webp",
   "/anchors/vo/trump-sindoor-claim-explained-4.webp"
  ],
+ "/videos/us-midterms-explained-16x9.mp4": [
+  "/anchors/vo/us-midterms-explained-1.webp",
+  "/anchors/vo/us-midterms-explained-2.webp",
+  "/anchors/vo/us-midterms-explained-3.webp",
+  "/anchors/vo/us-midterms-explained-4.webp"
+ ],
  "/videos/machado-returns-explained-16x9.mp4": [
   "/anchors/vo/machado-returns-explained-1.webp",
   "/anchors/vo/machado-returns-explained-2.webp",
