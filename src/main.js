@@ -326,7 +326,7 @@ function renderShell() {
       <p class="install-storage">Uses a small amount of device storage for the app and cached content. Offline saves may use more.</p>
       <button class="sheet-secondary install-later" type="button" data-action="install-dismiss">Not now</button>
     </div>
-  </section>`;`;
+  </section>`;
 
   $("#today").textContent = new Date().toLocaleDateString(LOCALE, { ...IST, weekday: "long", day: "numeric", month: "long", year: "numeric" });
   $("#signInBtn").addEventListener("click", () => openAuth("login"));
