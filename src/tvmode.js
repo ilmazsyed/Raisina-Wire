@@ -97,7 +97,7 @@ export function mountTVMode({ navigate }) {
     const vid = v => ({ kind: "video", id: v.id, title: v.title, sub: v.category || tr("Explainer"), desc: v.description || "", img: v.thumbnailUrl, src: v.mediaUrl });
     rows = [
       heads.length && { key: "heads", title: tr("Breaking headlines"), type: "head", items: heads },
-      live.length && { key: "live", title: tr("Live coverage"), type: "head", items: live.map(c => ({ kind: "live", slug: c.slug, title: c.title, sub: tr("LIVE"), desc: c.summary || "", img: "", live: true })) },
+      live.length && { key: "live", title: tr("Live coverage"), type: "head", items: live.map(c => ({ kind: "live", slug: c.slug, title: c.title, sub: tr("Live coverage"), desc: c.summary || "", img: "", live: true })) },
       films.length && { key: "latest", title: tr("Latest explainers"), type: "video", items: films.slice(0, 14).map(vid) },
       shorts.length && { key: "shorts", title: tr("Shorts"), type: "short", items: shorts.slice(0, 16).map(s => ({ ...vid(s), kind: "short" })) },
       ...Object.entries(byCat).filter(([, l]) => l.length >= 2).sort((a, b) => b[1].length - a[1].length).map(([cat, l]) => ({ key: `cat:${cat}`, title: tr(cat), type: "video", items: l.map(vid) })),
