@@ -1820,7 +1820,7 @@ body.tvmode .ticker,body.tvmode header,body.tvmode .nav-dock,body.tvmode .site-f
 .tvon-x{position:absolute;right:14px;top:14px;width:34px;height:34px;border:0;border-radius:50%;background:rgba(127,127,127,.15);color:inherit;font-size:15px;cursor:pointer}
 .tvon h2{margin:6px 0 16px;font:500 clamp(22px,4vw,30px)/1.15 var(--serif)}
 .tvon-k{margin:0;opacity:.75}
-.tvon-addr{margin:6px 0 4px;font:800 clamp(19px,4.2vw,30px)/1.2 var(--mono);color:#c8141f;word-break:break-all}
+.tvon-addr{margin:6px 0 4px;font:800 clamp(14px,4.4vw,30px)/1.2 var(--mono);color:#c8141f;white-space:nowrap;overflow-x:auto}
 .tvon-note{margin:0 0 20px;font-size:13px;opacity:.7}
 .tvon-grid{display:grid;grid-template-columns:minmax(0,1fr) 168px;gap:22px;align-items:start}
 .tvon-ways{display:grid;gap:12px;margin:0;padding-left:20px}
