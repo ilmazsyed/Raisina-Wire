@@ -321,11 +321,20 @@ async function introStory(i) {
   video.pause(); video.src = v.src; video.poster = v.thumb || "";
   prefetchLines([it.vo, it.out]);
   const who = { key: it.anchor, roster: feed.anchors.roster, pick: it.pick ? tr("EDITOR’S PICK") : "" };
-  anchor.shot("cam", who); reveal();
-  if (!await hello(it.anchor, tok) || !await anchor.say(it.cam, alive)) return;
   // Voice over: the explainer's pictures one after another with a Raisina Wire wipe (the film
   // itself waits at its first frame, so it starts cleanly afterwards).
   const pics = TV_INTRO_PICS[String(v.src || "").split("?")[0]] || [v.thumb].filter(Boolean);
+  // A voice-only intro (chosen for this explainer, or until the anchor's lip-synced clips for it are
+  // ready): all three parts over the pictures, no anchor on screen, no self-introduction.
+  if (it.mode === "voice") {
+    anchor.shot("vo", { pics, pick: who.pick });
+    lowerThird(v.category || tr("Explainer"), v.title, { stay: true }); reveal();
+    for (const l of [it.cam, it.vo, it.out]) if (!await anchor.say(l, alive)) return;
+    if (await cover(tok)) { playStory(n); reveal(); }
+    return;
+  }
+  anchor.shot("cam", who); reveal();
+  if (!await hello(it.anchor, tok) || !await anchor.say(it.cam, alive)) return;
   if (!await cover(tok)) return;
   anchor.shot("vo", { ...who, pics });
   lowerThird(v.category || tr("Explainer"), v.title, { stay: true }); reveal();

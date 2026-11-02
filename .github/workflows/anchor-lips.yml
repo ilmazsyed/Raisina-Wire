@@ -1,0 +1,69 @@
+# Raisina TV lip sync: every 15 minutes (and on demand), renders the lip-synced clips the channel is
+# waiting for (a new explainer's on-camera intro, a new on-air anchor's lines) and uploads them to
+# the site; the intro goes on camera as soon as both its clips are in (until then it plays as a
+# voice-over). CPU only: about 10-20 minutes per explainer. Needs the repository secret
+# RW_PUBLISH_TOKEN (the Worker's PUBLISH_TOKEN). See video/lips/action.py.
+name: Raisina TV lip sync
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+concurrency:
+  group: anchor-lips
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  lips:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Anything to render?
+        id: todo
+        env:
+          RW_PUBLISH_TOKEN: ${{ secrets.RW_PUBLISH_TOKEN }}
+        run: |
+          if [ -z "$RW_PUBLISH_TOKEN" ]; then echo "::warning::Add the repository secret RW_PUBLISH_TOKEN to render lip sync."; echo "n=0" >> "$GITHUB_OUTPUT"; exit 0; fi
+          n=$(curl -sf -H "authorization: Bearer $RW_PUBLISH_TOKEN" https://raisinawire.calibrex.org/api/admin/tv/lips-todo | python3 -c "import json,sys; print(len(json.load(sys.stdin)['todo']))" || echo 0)
+          echo "$n clips to render"; echo "n=$n" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.todo.outputs.n != '0'
+        with:
+          sparse-checkout: |
+            video
+            public/anchors
+      - uses: actions/setup-python@v5
+        if: steps.todo.outputs.n != '0'
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: video/lips/requirements.txt
+      - name: Wav2Lip and the model weights
+        if: steps.todo.outputs.n != '0'
+        uses: actions/cache@v4
+        with:
+          path: ~/rw-lips
+          key: rw-lips-v1
+      - name: Download them if they aren't cached
+        if: steps.todo.outputs.n != '0'
+        run: |
+          set -e
+          L=~/rw-lips; mkdir -p "$L/gfpgan/weights"
+          if [ ! -d "$L/Wav2Lip" ]; then git clone -q https://github.com/Rudrabha/Wav2Lip.git "$L/Wav2Lip" && git -C "$L/Wav2Lip" checkout -q bac9a81; fi
+          get() { [ -s "$2" ] || curl -sSfL -o "$2" "$1"; }
+          get https://github.com/Winfredy/SadTalker/releases/download/v0.0.2/wav2lip.pth "$L/Wav2Lip/checkpoints/wav2lip.pth"
+          get https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth "$L/gfpgan/weights/GFPGANv1.4.pth"
+          get https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth "$L/gfpgan/weights/detection_Resnet50_Final.pth"
+          get https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth "$L/gfpgan/weights/parsing_parsenet.pth"
+          mkdir -p "$L/Wav2Lip/temp"
+      - name: Install
+        if: steps.todo.outputs.n != '0'
+        run: |
+          sudo apt-get install -y -qq ffmpeg > /dev/null
+          pip install -q torch==2.1.2+cpu torchvision==0.16.2+cpu --index-url https://download.pytorch.org/whl/cpu
+          pip install -q --no-build-isolation -r video/lips/requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+      - name: Render and upload
+        if: steps.todo.outputs.n != '0'
+        env:
+          RW_PUBLISH_TOKEN: ${{ secrets.RW_PUBLISH_TOKEN }}
+        run: WAV2LIP=~/rw-lips/Wav2Lip GFPGAN_HOME=~/rw-lips python video/lips/action.py 60

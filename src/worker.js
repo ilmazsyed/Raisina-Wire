@@ -24,7 +24,9 @@ import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { liveResults } from "./results.js";
 import { handleTts } from "./tts.js";
-import { anchorLines, liveReads, READ, spoken } from "./anchors.js";
+import { anchorLines, liveReads, lipLines, READ, spoken } from "./anchors.js";
+import { LIPPED } from "./anchor-lips.js";
+import { VOICED } from "./anchor-voices.js";
 // Every headline Raisina TV can show (the anchor reads them): breaking lines, Breaking Headlines,
 // the News Update sets and the desk's own set.
 const tvHeads = ({ breaking = [], recent = [], sets = [], pinset = null }) => [...new Set([...breaking, ...recent.map(r => r.text), ...sets.flatMap(st => (st.items || []).map(i => i.text)), ...(pinset?.on ? pinset.items : [])].filter(Boolean))];
@@ -374,6 +376,11 @@ async function mtLive(env, lang, item, updates) {
 // Ticker text without the editor's formatting marks (**bold**, [links](…), # headings).
 const plainText = t => String(t || "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/\*\*|__|`|^#+\s*/gm, "").replace(/\s+/g, " ").trim();
 // Raisina TV's feed: running order, ad settings, breaking lines, the ticker and the break-in switch.
+// Lip-synced clips the GitHub Action "Raisina TV lip sync" has rendered (kept in D1 as "lip:<id>").
+async function tvLips(env) {
+  const rows = (await env.DB.prepare("SELECT key FROM tts_audio WHERE voice LIKE 'lips:%'").all().catch(() => ({ results: [] }))).results;
+  return new Set(rows.map(r => String(r.key).slice(4)));
+}
 async function tvFeed(env, ctx, lang) {
   const settings = await tvSettings(env);
   const [playlist, ads, breaking, stories, live, inputs, music, liveUps] = await Promise.all([
@@ -432,7 +439,8 @@ async function tvFeed(env, ctx, lang) {
     const voiced = reads.length ? new Set((await env.DB.prepare(`SELECT key FROM tts_audio WHERE key IN (${reads.map(() => "?").join(",")})`).bind(...reads.map(r => r.id)).all()).results.map(r => r.key)) : new Set();
     // Headlines the anchor has recorded: shown text -> its read.
     const headReads = Object.fromEntries(heads.map(t => [t, reads.find(r => r.text === READ.head(t) && voiced.has(r.id))]).filter(([, r]) => r).map(([t, r]) => [t, `/api/tv/voice/${r.id}`]));
-    anchors = { ...await anchorLines({ playlist: playlist.map(v => ({ id: v.id, src: v.mediaUrl, editorPick: picks.has(String(v.mediaUrl || "").split("?")[0]) })), input, breaking: breaking.map(b => b.text), force: settings.force, voiced }), reads: headReads };
+    const lips = await tvLips(env);
+    anchors = { ...await anchorLines({ playlist: playlist.map(v => ({ id: v.id, src: v.mediaUrl, editorPick: picks.has(String(v.mediaUrl || "").split("?")[0]) })), input, breaking: breaking.map(b => b.text), force: settings.force, voiced, lips }), reads: headReads };
   }
   return { anchors, on: settings.on, every: settings.every, perBreak: settings.perBreak, skippable: settings.skippable, force: settings.force || null,
     playlist: playlist.map(v => ({ id: v.id, title: v.title, description: v.description, category: v.category, src: v.mediaUrl, thumb: v.thumbnailUrl, publishedAt: v.publishedAt })),
@@ -1053,6 +1061,34 @@ async function api(request, env, ctx) {
   if (url.pathname === "/api/tv" && request.method === "GET") {
     const lang = reqLang(url);
     return json(await cached(`tv${lang}`, 5e3, () => tvFeed(env, ctx, lang)), 200, { "cache-control": "no-cache" });
+  }
+  // Raisina TV lip-synced clips rendered by the GitHub Action (video/lips/action.py), kept in D1.
+  // Served with byte ranges: iPhones only play a video whose server answers them.
+  if (url.pathname.startsWith("/api/tv/lip/") && request.method === "GET") {
+    const row = await env.DB.prepare("SELECT data FROM tts_audio WHERE key=?").bind(`lip:${url.pathname.slice(12)}`).first();
+    if (!row) return err("No such clip.", 404);
+    const data = new Uint8Array(row.data), size = data.length, m = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get("range") || "");
+    const head = { "content-type": "video/mp4", "accept-ranges": "bytes", "cache-control": "public, max-age=31536000, immutable" };
+    if (!m || (m[1] === "" && m[2] === "")) return new Response(data, { headers: { ...head, "content-length": String(size) } });
+    let a = m[1] === "" ? size - Number(m[2]) : Number(m[1]), b = m[1] === "" || m[2] === "" ? size - 1 : Math.min(Number(m[2]), size - 1);
+    a = Math.max(0, a);
+    if (a > b || a >= size) return new Response(null, { status: 416, headers: { ...head, "content-range": `bytes */${size}` } });
+    return new Response(data.slice(a, b + 1), { status: 206, headers: { ...head, "content-range": `bytes ${a}-${b}/${size}`, "content-length": String(b - a + 1) } });
+  }
+  // What the lip-sync Action should render: lines needing a clip that has none yet and whose voice
+  // is recorded. It uploads each clip (a silent MP4 under 1.9 MB) with a PUT.
+  if ((url.pathname === "/api/admin/tv/lips-todo" && request.method === "GET") || (url.pathname.startsWith("/api/admin/tv/lip/") && request.method === "PUT")) {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const all = await lipLines(), have = await tvLips(env);
+    const todo = all.filter(l => !LIPPED.has(l.id) && !have.has(l.id) && VOICED.has(l.id));
+    if (request.method === "GET") return json({ todo: todo.map(l => ({ ...l, audio: `/anchors/voice/${l.id}.mp3` })) }, 200, { "cache-control": "no-store" });
+    const id = url.pathname.slice(18), l = all.find(x => x.id === id);
+    if (!l) return err("That line doesn't need a clip.", 404);
+    const data = new Uint8Array(await request.arrayBuffer());
+    if (data.length < 2000 || data.length > 1.9e6 || String.fromCharCode(...data.slice(4, 8)) !== "ftyp") return err("Send an MP4 clip under 1.9 MB.");
+    await env.DB.prepare("INSERT OR REPLACE INTO tts_audio (key,voice,chars,data) VALUES (?,?,?,?)").bind(`lip:${id}`, `lips:${l.anchor}`, l.text.length, data.buffer).run();
+    return json({ ok: true }, 200, { "cache-control": "no-store" });
   }
   // Raisina TV live reads (src/anchors.js): recorded in the editor's browser, kept in D1, played by the channel.
   if (url.pathname.startsWith("/api/tv/voice/") && request.method === "GET") {
