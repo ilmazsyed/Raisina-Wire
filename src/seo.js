@@ -222,7 +222,7 @@ async function pageFor(path, url, env, o, lang = "en") {
     const { results: vids } = await env.DB.prepare("SELECT id,title,description,media_type AS mediaType,media_url AS mediaUrl,thumbnail_url AS thumb,published_at AS publishedAt FROM media_items WHERE status='published' AND media_type IN ('video','short') ORDER BY published_at DESC LIMIT 50").all();
     return { title: `Raisina TV — live news, viewed differently · ${SITE}`, ogTitle: "Raisina TV — Something will change the way you view news. Live.", image: `${o}/og-tv.jpg`, description: "Meet Raisina TV: a fresh live news experience bringing you thoughtful journalism, powerful explainers and the stories shaping India and the world. Watch live, around the clock.",
       ld: [{ "@context": "https://schema.org", "@type": "ItemList", itemListElement: vids.filter(v => v.thumb).map((v, i) => ({ "@type": "ListItem", position: i + 1, item: videoLd(o, v, false) })) }],
-      body: `<h1>Raisina TV</h1><p>The desk's latest explainers, around the clock, with a live news ticker.</p><h2>Explainers and shorts</h2><ul>${vids.map(v => `<li><a href="/tv?v=${encodeURIComponent(v.id)}">${esc(v.title)}</a>${v.description ? ` — ${esc(clip(v.description, 160))}` : ""}</li>`).join("")}</ul>` };
+      body: `<h1>Raisina TV</h1><p>The desk's latest explainers, around the clock, with a live news ticker.</p><p><a href="/">Back to Raisina Wire headlines</a> · <a href="/editions">Read our latest reporting and analysis</a></p><h2>Explainers and shorts</h2><ul>${vids.map(v => `<li><a href="/tv?v=${encodeURIComponent(v.id)}">${esc(v.title)}</a>${v.description ? ` — ${esc(clip(v.description, 160))}` : ""}</li>`).join("")}</ul>` };
   }
 
   if (section === "community") {
