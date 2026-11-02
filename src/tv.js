@@ -81,6 +81,8 @@ async function showStart() {
   if (v?.thumb) b.querySelector(".tv-start-i").style.backgroundImage = `url('${String(v.thumb).replace(/'/g, "%27")}')`;
 }
 export const tvFeed = () => feed;
+// Raisina TV is on air for this viewer (playing, not paused): pop-ups should wait.
+export const tvBusy = () => mode !== "idle" && !paused;
 export const tvNow = () => (feed && mode !== "ad" ? feed.playlist[idx] : null);
 
 async function load() {

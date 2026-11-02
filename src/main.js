@@ -1,6 +1,6 @@
 import "./style.css";
 import { editions, NEWSLETTER_URL, AUTHOR } from "./editions.js";
-import { initTV, dockTV, mountPreview, loadTV, tvFeed } from "./tv.js";
+import { initTV, dockTV, mountPreview, loadTV, tvFeed, tvBusy } from "./tv.js";
 import { brandMark, skyline, tribar, wordmark } from "./brand.js";
 import { WRITERS, writer, setGuestWriters } from "./writers.js";
 import { ABOUT, LEGAL, LEGAL_ORDER, LEGAL_UPDATED } from "./legal.js";
@@ -2239,10 +2239,12 @@ async function installPWA() {
   const { outcome } = await promptEvent.userChoice;
   if (outcome !== "accepted") store.set("rw-install-dismissed", Date.now());
 }
+// The automatic offer waits while Raisina TV is playing, and comes once it stops or is paused.
+function offerInstall(opts) { if (tvBusy()) setTimeout(() => offerInstall(opts), 15e3); else showInstallSheet(opts); }
 window.addEventListener("beforeinstallprompt", e => {
   e.preventDefault();
   state.installPrompt = e;
-  showInstallSheet();
+  offerInstall();
 });
 window.addEventListener("appinstalled", () => {
   if (!store.get("rw-installed", false)) { store.set("rw-installed", true); beacon({ t: "install", platform: platformOf() }); }
@@ -2254,7 +2256,7 @@ window.addEventListener("appinstalled", () => {
 // the browser's Add to Home Screen / Install menu.
 if (!isStandalone()) {
   const installLanding = location.pathname.replace(/\/+$/, "") === "/install";
-  setTimeout(() => showInstallSheet({ force: installLanding }), installLanding ? 900 : 6500);
+  setTimeout(() => offerInstall({ force: installLanding }), installLanding ? 900 : 6500);
 }
 document.documentElement.classList.toggle("standalone", isStandalone());
 
