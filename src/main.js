@@ -279,7 +279,7 @@ function renderShell() {
     <span class="kicker">The Raisina Wire app</span><h2 id="installTitle">Add Raisina Wire to your home screen</h2>
     <ul class="sheet-list"><li>${ICON_CHECK}<span>Every edition readable offline</span></li><li>${ICON_CHECK}<span>Live wire, markets and live coverage in one tap</span></li><li>${ICON_CHECK}<span>Alerts and full-screen reading, like any app</span></li></ul>
     <ol class="install-ios" hidden>
-      <li><span class="step">1</span><span>Tap <b>Share</b> <svg class="ios-share" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg> in Safari’s toolbar</span></li>
+      <li><span class="step">1</span><span>Tap <b>Share</b> in your browser <svg class="ios-share" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg> in the toolbar or browser menu</span></li>
       <li><span class="step">2</span><span>Choose <b>Add to Home Screen</b> <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span></li>
       <li><span class="step">3</span><span>Open Raisina Wire from your home screen</span></li>
     </ol>
