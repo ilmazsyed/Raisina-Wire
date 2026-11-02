@@ -150,6 +150,7 @@ async function pageFor(path, url, env, o, lang = "en") {
         <p class="ssr-byline">${lang === "en" ? "By " : ""}<a href="${prefixed(lang, `/author/${w.key}`)}">${esc(w.name)}</a> · <time datetime="${esc(a.publishedAt)}">${fmtDate(a.publishedAt, lang)}</time>${lang === "en" ? ` · ${a.readMinutes} min read` : ""}</p>
         ${a.videoUrl ? `<video controls preload="none" src="${esc(a.videoUrl)}" poster="${esc(a.heroUrl || a.image)}"></video>` : `<img src="${esc(a.heroUrl || a.image)}" alt="" width="1600" height="1000">`}${blocksHTML(blocks)}
         <p class="ssr-tv-cta"><a href="/tv">Watch Raisina TV live</a> · <a href="/editions">Read more Raisina Wire analysis</a></p>
+        <p class="ssr-google-preferred"><a href="https://www.google.com/preferences/source?q=https%3A%2F%2Fraisinawire.calibrex.org%2F" target="_blank" rel="noopener noreferrer">Add Raisina Wire as a preferred source on Google Search ↗</a></p>
       </article>`
     };
   }
