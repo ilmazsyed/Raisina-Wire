@@ -467,7 +467,7 @@ async function tvFeed(env, ctx, lang) {
     const lips = await tvLips(env);
     anchors = { ...await anchorLines({ playlist: playlist.map(v => ({ id: v.id, src: v.mediaUrl, editorPick: picks.has(String(v.mediaUrl || "").split("?")[0]) })), input, breaking: breaking.map(b => b.text), force: settings.force, voiced, lips }), reads: headReads };
   }
-  return { anchors, on: settings.on, every: settings.every, perBreak: settings.perBreak, skippable: settings.skippable, force: settings.force || null,
+  return { anchors, on: settings.on, qr: settings.qr, every: settings.every, perBreak: settings.perBreak, skippable: settings.skippable, force: settings.force || null,
     playlist: playlist.map(v => ({ id: v.id, title: v.title, description: v.description, category: v.category, src: v.mediaUrl, thumb: v.thumbnailUrl, publishedAt: v.publishedAt })),
     ads: ads.filter(a => a.src).map(a => ({ id: a.id, title: a.title, src: a.src })), breaking: breaking.map(b => b.text), ticker, recent,
     seq: settings.seq, pinset: settings.pinset?.on && settings.pinset.items.length ? settings.pinset : null, sets,

@@ -84,6 +84,17 @@ export const tvFeed = () => feed;
 // Raisina TV is on air for this viewer (playing, not paused): pop-ups should wait.
 export const tvBusy = () => mode !== "idle" && !paused;
 export const tvNow = () => (feed && mode !== "ad" ? feed.playlist[idx] : null);
+// For TV mode (/t): what is on screen, and the remote's buttons.
+export const tvStatus = () => ({ mode, paused, muted: !wantSound, seq: root?.querySelector(".tv-seq")?.dataset.kind || "", now: mode === "story" ? feed?.playlist[idx] || null : null, qr: feed?.qr !== false });
+// Starts TV with sound, as a click on a TV link does (TV mode calls it from the remote's OK).
+export function tvStart() { arm(); return dockTV(); }
+export function tvControl(cmd) {
+  if (!root || !video) return;
+  if (cmd === "pause") togglePause();
+  if (cmd === "unmute") unmute();
+  if (cmd === "mute") { wantSound = false; applyMute(); syncSound(); }
+  if (cmd === "sound") tvControl(wantSound ? "mute" : "unmute");
+}
 
 async function load() {
   try {
