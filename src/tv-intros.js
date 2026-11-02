@@ -78,6 +78,12 @@ export const TV_INTROS = {
     vo: "At a Florida rally he spoke of two hundred and fifty per cent tariffs and eleven planes shot down. India's account is very different: the pause came at Pakistan's request, agreed directly between the two. And Washington's politics keep spilling into India's security.",
     out: "The claim, and India's answer. Here's the explainer."
   },
+  "/videos/us-midterms-explained-16x9.mp4": {
+    anchor: "tara", intro: "cam",
+    cam: "America votes on the third of November, and Donald Trump's grip on Congress is on the line.",
+    vo: "All four hundred and thirty-five House seats and a third of the Senate are up, with Republicans holding razor-thin margins. For India, the result could shape everything from the hundred-thousand-dollar H-1B fee to the tariffs on our exports.",
+    out: "How the midterms work, and why they matter. Here's the explainer."
+  },
   "/videos/machado-returns-explained-16x9.mp4": {
     anchor: "tara", intro: "cam",
     cam: "After ten months in exile, Venezuela's opposition leader, Nobel laureate María Corina Machado, is back home, and she has a message.",
