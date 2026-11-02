@@ -283,6 +283,11 @@ function renderShell() {
       <li><span class="step">2</span><span>Choose <b>Add to Home Screen</b> <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span></li>
       <li><span class="step">3</span><span>Open Raisina Wire from your home screen</span></li>
     </ol>
+    <ol class="install-other" hidden>
+      <li><span class="step">1</span><span>Tap the browser menu <b>⋮</b> or <b>Share</b>.</span></li>
+      <li><span class="step">2</span><span>Choose <b>Install app</b> or <b>Add to Home screen</b>.</span></li>
+      <li><span class="step">3</span><span>Confirm <b>Install</b> or <b>Add</b>. Raisina Wire will appear with your apps.</span></li>
+    </ol>
     <div class="sheet-actions install-actions"><button class="btn btn-red sheet-primary" type="button" data-action="install">Install the app</button><button class="sheet-secondary" type="button" data-action="install-dismiss">Not now</button></div>
   </section>`;
 
@@ -2154,6 +2159,7 @@ function showInstallSheet({ force = false } = {}) {
   const ios = isIOS() && !state.installPrompt;
   const button = $(".install-actions [data-action=install]");
   $(".install-ios").hidden = !ios;
+  $(".install-other").hidden = ios || !!state.installPrompt;
   button.hidden = false;
   button.textContent = ios ? "How to add Raisina Wire" : state.installPrompt ? "Install Raisina Wire" : "Install / Add to Home Screen";
   $("#installSheet").hidden = false;
