@@ -1808,6 +1808,7 @@ body.tvmode .ticker,body.tvmode header,body.tvmode .nav-dock,body.tvmode .site-f
 .tvm-qr .qr{flex-shrink:0;width:11vh;height:11vh}
 .tvm-qr span{font:700 1.7vh/1.25 var(--sans)}
 .tvm.bar-on .tvm-qr{opacity:.25}
+.tvm:has(.tv-anchor.on) .tvm-qr{opacity:0;pointer-events:none} /* never over the anchor or her name strap */
 
 /* "Watch on your TV" (TV page and footer) */
 .w-tvon{display:flex;justify-content:flex-end;margin-top:12px}
