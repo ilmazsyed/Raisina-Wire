@@ -344,7 +344,7 @@ async function advance() {
   const tok = ++seqToken, s = feed.seq || {}, next = feed.playlist[(idx + 1) % feed.playlist.length];
   mode = "seq"; video.pause(); root.querySelector(".tv-lower").hidden = true;
   preload(next);
-  sinceFull++;
+  sinceFull++; sincePoster++;
   const bulletin = s.hourly && bulletinDue();
   const full = bulletin || (sinceFull >= (s.fullEvery || 2) && (s.stinger || s.promo || s.news));
   if (full) {
@@ -353,8 +353,8 @@ async function advance() {
     if (bulletin) await countdown(tok);
     else if (s.promo !== false) await promo(tok);
     if (s.news !== false) await newsUpdate(tok, bulletin);
-  } else if (posterDue()) await posterIdent(tok);
-  else await shortTransition(tok, next);
+  } else await shortTransition(tok, next);
+  if (tok === seqToken && sincePoster >= 2) await posterIdent(tok);
   if (tok !== seqToken) return;
   if (feed.ads.length && sinceAd >= feed.every * 60) return startBreak();
   introStory(idx + 1);
@@ -594,13 +594,13 @@ async function shortTransition(tok, next) {
   await wait(ms, tok); stop(0.5);
 }
 // The Raisina TV ident: the channel poster (its anchors, "The world. Decoded."), pushing in
-// slowly with a sheen across it, about 2.6 s between the wipes. Between explainers, at most once
-// every 20 minutes, so it is never seen twice in a row.
+// slowly with a sheen across it, about 2.6 s between the wipes. When TV starts it comes after the
+// headlines, before the first explainer; then after every two explainers, just before the next
+// one (after any News Update), so it is never seen twice in a row.
 const IDENT = "/tv/raisina-tv-ident.webp";
-let posterAt = 0;
-const posterDue = () => Date.now() - posterAt > 20 * 60e3;
+let sincePoster = 0;
 async function posterIdent(tok) {
-  posterAt = Date.now();
+  sincePoster = 0;
   const stop = score({ sting: true });
   if (!await swapSeq(tok, "poster", `<span class="ps-img" style="background-image:url('${IDENT}')"></span><span class="ps-shine"></span>`)) return stop(0.3);
   await wait(2600, tok); stop(0.5);
@@ -719,6 +719,7 @@ async function opener() {
   await stinger(tok);
   const sets = breakingSets();
   if (tok === seqToken && sets.length) await newsUpdate(tok, false, { sets, label: tr("HEADLINES"), card: tr("BREAKING HEADLINES") });
+  if (tok === seqToken) await posterIdent(tok);
   if (tok === seqToken) introStory(0);
 }
 export async function dockTV() {
