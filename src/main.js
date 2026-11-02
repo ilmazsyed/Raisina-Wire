@@ -276,8 +276,11 @@ function renderShell() {
     <span class="sheet-grip" aria-hidden="true"></span>
     <button class="sheet-x" type="button" data-action="install-dismiss" aria-label="Close">${ICON_X}</button>
     <div class="sheet-hero install"><img class="sheet-app" src="/icon-192.png" alt="" width="72" height="72"></div>
-    <span class="kicker">The Raisina Wire app</span><h2 id="installTitle">Add Raisina Wire to your home screen</h2>
-    <ul class="sheet-list"><li>${ICON_CHECK}<span>Every edition readable offline</span></li><li>${ICON_CHECK}<span>Live wire, markets and live coverage in one tap</span></li><li>${ICON_CHECK}<span>Alerts and full-screen reading, like any app</span></li></ul>
+    <span class="kicker">THE LIGHTWEIGHT APP REVOLUTION</span><h2 id="installTitle">A new way to use the app</h2>
+    <p class="install-promise">The full Raisina Wire experience. No bulky app-store download. Add it to your home screen in seconds.</p>
+    <ul class="sheet-list"><li>${ICON_CHECK}<span><b>Lightweight by design</b> — no large app package to download</span></li><li>${ICON_CHECK}<span><b>Secure connection</b> — served over HTTPS</span></li><li>${ICON_CHECK}<span><b>Read offline</b> — editions and saved stories stay available</span></li><li>${ICON_CHECK}<span><b>One tap access</b> — full-screen, app-like experience</span></li></ul>
+    <p class="install-footnote">Uses a small amount of device storage for the app and cached content. Offline saves may use more; you can clear browser data any time.</p>
+    <div class="install-installed" hidden><b>Already added to this device?</b><p>On iPhone, launch Raisina Wire from your Home Screen. On Android, tap the Raisina Wire icon in your app list. Some browsers can open the installed app directly from this prompt.</p></div>
     <ol class="install-ios" hidden>
       <li><span class="step">1</span><span>Tap <b>Share</b> in your browser <svg class="ios-share" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg> in the toolbar or browser menu</span></li>
       <li><span class="step">2</span><span>Choose <b>Add to Home Screen</b> <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span></li>
@@ -288,7 +291,7 @@ function renderShell() {
       <li><span class="step">2</span><span>Choose <b>Install app</b> or <b>Add to Home screen</b>.</span></li>
       <li><span class="step">3</span><span>Confirm <b>Install</b> or <b>Add</b>. Raisina Wire will appear with your apps.</span></li>
     </ol>
-    <div class="sheet-actions install-actions"><button class="btn btn-red sheet-primary" type="button" data-action="install">Install the app</button><button class="sheet-secondary" type="button" data-action="install-dismiss">Not now</button></div>
+    <div class="sheet-actions install-actions"><button class="btn btn-red sheet-primary" type="button" data-action="install">Add Raisina Wire</button><button class="btn btn-red sheet-primary" type="button" data-action="install-open" hidden>Open Raisina Wire</button><button class="sheet-secondary" type="button" data-action="install-dismiss">Not now</button></div>
   </section>`;
 
   $("#today").textContent = new Date().toLocaleDateString(LOCALE, { ...IST, weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -1223,6 +1226,7 @@ async function onAction(e) {
   if (a === "search") openSearch();
   if (a === "ics") downloadIcs(el.dataset.event);
   if (a === "install") { e.preventDefault(); installPWA(); }
+  if (a === "install-open") { e.preventDefault(); openInstalledPWA(); }
   if (a === "install-dismiss") { store.set("rw-install-dismissed", Date.now()); $("#installSheet").hidden = true; }
   if (a === "update-later") $("#updateBar").hidden = true;
   if (a === "lang-later") { $("#langSuggest").hidden = true; setLanguagePreference("en"); }
@@ -2157,22 +2161,37 @@ const recentlyDismissed = () => Date.now() - (store.get("rw-install-dismissed", 
 function showInstallSheet({ force = false } = {}) {
   if (isStandalone() || (!force && recentlyDismissed())) return;
   const ios = isIOS() && !state.installPrompt;
+  const installed = store.get("rw-installed", false);
   const button = $(".install-actions [data-action=install]");
-  $(".install-ios").hidden = !ios;
-  $(".install-other").hidden = ios || !!state.installPrompt;
-  button.hidden = false;
+  const openButton = $(".install-actions [data-action=install-open]");
+  $(".install-ios").hidden = !ios || installed;
+  $(".install-other").hidden = ios || installed || !!state.installPrompt;
+  $(".install-installed").hidden = !installed;
+  button.hidden = installed;
+  openButton.hidden = !installed;
   button.textContent = ios ? "How to add Raisina Wire" : state.installPrompt ? "Install Raisina Wire" : "Install / Add to Home Screen";
+  $("#installTitle").textContent = installed ? "Your Raisina Wire app is ready" : "A new way to use the app";
   $("#installSheet").hidden = false;
+}
+function openInstalledPWA() {
+  if (isIOS()) return toast("Open Raisina Wire from its home-screen icon to launch the app.");
+  // Re-open the same origin in a fresh top-level tab. Android browsers that support
+  // installed-web-app link capture can hand this URL to the installed app.
+  const target = new URL(location.href);
+  const opened = window.open(target.href, "_blank", "noopener");
+  if (!opened) toast("If the app doesn't open automatically, launch Raisina Wire from your app list.");
+  else toast("Opening Raisina Wire. If it stays in the browser, use the app icon.");
 }
 async function installPWA() {
   if (isStandalone()) return toast("Raisina Wire is already installed on this device.");
+  if (store.get("rw-installed", false)) return openInstalledPWA();
   if (isIOS()) {
     showInstallSheet({ force: true });
     return toast("Follow the steps above: Share, then Add to Home Screen.");
   }
   if (!state.installPrompt) {
     showInstallSheet({ force: true });
-    return toast("If no install prompt appears, open your browser menu and choose Install app or Add to Home screen.");
+    return toast("Use your browser menu to choose Install app or Add to Home screen.");
   }
   $("#installSheet").hidden = true;
   const promptEvent = state.installPrompt;
