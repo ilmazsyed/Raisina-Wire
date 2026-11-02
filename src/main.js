@@ -2204,7 +2204,7 @@ function showInstallSheet({ force = false } = {}) {
   button.hidden = installed;
   openButton.hidden = !installed;
   button.textContent = ios ? "How to add Raisina Wire" : state.installPrompt ? "Install Raisina Wire" : "Install / Add to Home Screen";
-  $("#installTitle").textContent = installed ? "Your Raisina Wire app is ready" : "A new way to use the app";
+  $("#installTitle").innerHTML = installed ? "Your Raisina Wire app is ready" : "Install the<br>Raisina Wire <span>App</span>";
   $("#installSheet").hidden = false;
 }
 function openInstalledPWA() {
