@@ -405,4 +405,4 @@ ${stories.map(s => `<item><title>${xml(s.title)}</title><link>${o}${s.href}</lin
 
 // Paths the Worker renders as HTML pages (the rest are app-only views or static files), tested
 // without the /hi or /bn prefix.
-export const PAGE_PATTERN = /^\/(?:$|install\/?$|editions\/?$|(?:edition|article|author|tag|discussion|coverage)\/[^/]+\/?$|live(?:\/[^/]+)?\/?$|markets\/?$|community\/?$|events\/?$|watch\/?$|tv\/?$|(?:about|terms|privacy|disclaimer|copyright|community-guidelines|grievance)\/?$)/;
+export const PAGE_PATTERN = /^\/(?:$|install\/?$|editions\/?$|(?:edition|article|author|tag|discussion|coverage)\/[^/]+\/?$|live(?:\/[^/]+)?\/?$|markets\/?$|community\/?$|events\/?$|watch\/?$|tv\/?$|t\/?$|(?:about|terms|privacy|disclaimer|copyright|community-guidelines|grievance)\/?$)/;
