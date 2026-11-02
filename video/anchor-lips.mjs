@@ -12,7 +12,7 @@ for (const k of Object.keys(ANCHORS)) for (const t of allLines(k)) want.add(awai
 mkdirSync(OUT, { recursive: true });
 if (from) for (const f of readdirSync(from)) { const id = f.replace(/\.mp4$/, ""); if (f.endsWith(".mp4") && want.has(id)) copyFileSync(join(from, f), join(OUT, f)); }
 const have = [];
-for (const f of readdirSync(OUT)) { const id = f.replace(/\.mp4$/, ""); if (want.has(id)) have.push(id); else unlinkSync(join(OUT, f)); }
+for (const f of readdirSync(OUT)) if (f.endsWith(".mp4")) have.push(f.replace(/\.mp4$/, "")); // none removed: legacy intros keep theirs
 have.sort();
 writeFileSync(join(root, "src/anchor-lips.js"), `// Written by \`node video/anchor-lips.mjs\`: anchor lines with a lip-synced clip in public/anchors/lips/.\nexport const LIPPED = new Set(${JSON.stringify(have).replace(/","/g, '",\n  "').replace("[", "[\n  ").replace(/\]$/, "\n]")});\n`);
 console.log(`${have.length} lip-synced clips on the channel`);

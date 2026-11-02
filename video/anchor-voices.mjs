@@ -14,8 +14,10 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(root, "public/anchors/voice");
 if (!existsSync(join(root, "src/anchor-voices.js"))) writeFileSync(join(root, "src/anchor-voices.js"), "export const VOICED = new Set([]);\n");
-const { ANCHORS, allLines, lineId, spoken } = await import("../src/anchors.js");
-const who = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(ANCHORS).filter(k => allLines(k).length);
+const { ANCHORS, allLines, lineId, spoken, engineOf } = await import("../src/anchors.js");
+// Kokoro anchors only: Chatterbox anchors ("cb:" voices) are recorded by the GitHub Action
+// "Raisina TV anchor voices" into the site's database.
+const who = (process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(ANCHORS).filter(k => allLines(k).length)).filter(k => engineOf(k) === "kokoro");
 mkdirSync(OUT, { recursive: true });
 
 const want = new Map();
@@ -30,13 +32,9 @@ if (todo.length) {
   unlinkSync(jobs);
   if (r.status) process.exit(r.status);
 }
-// Keep only recordings some line still uses, and list them for the channel.
-const have = [];
-for (const f of readdirSync(OUT)) {
-  const id = f.replace(/\.mp3$/, "");
-  if (!f.endsWith(".mp3")) continue;
-  if (want.has(id)) have.push(id); else unlinkSync(join(OUT, f));
-}
+// List every recording for the channel. None is removed: intros made before the move to
+// Chatterbox (`legacy`) keep playing their recordings in the anchors' earlier voices.
+const have = readdirSync(OUT).filter(f => f.endsWith(".mp3")).map(f => f.replace(/\.mp3$/, ""));
 have.sort();
 writeFileSync(join(root, "src/anchor-voices.js"), `// Written by \`node video/anchor-voices.mjs\`: the anchor lines recorded in public/anchors/voice/.\nexport const VOICED = new Set(${JSON.stringify(have, null, 0).replace(/","/g, '",\n  "').replace("[", "[\n  ").replace(/\]$/, "\n]")});\n`);
 console.log(`${have.length} lines recorded`);
