@@ -72,6 +72,25 @@ new clips with `node video/anchor-lips.mjs <dir-of-clips>`.
   (above its captions), in `public/anchors/vo/`. Run `python3 video/anchor_vo_pics.py` after adding
   an intro for a new explainer; it also writes `src/tv-intro-pics.js`.
 
+## Intros: chosen anchor, on camera or voice only
+Each explainer's intro in `src/tv-intros.js` names its `anchor` and its `intro` type, chosen by the
+editor for that explainer (nothing is made for the other anchors):
+- `"voice"`: all three parts are read over the explainer's pictures; no anchor on screen, no
+  self-introduction, no narrator card.
+- `"cam"`: on camera (hook, voice-over, hand-off) once the anchor's face is ready (READY) and both
+  on-camera lines have lip-synced clips. Until then it plays as `"voice"`, so a new explainer can go
+  on air straight away.
+
+**Lip sync, automatic.** The GitHub Action "Raisina TV lip sync" (`.github/workflows/anchor-lips.yml`,
+every 15 minutes and on demand) asks the site which lines need a clip
+(`GET /api/admin/tv/lips-todo`: `lipLines()` in `src/anchors.js`, less those already made), renders
+them on CPU (`video/lips/action.py`: Wav2Lip on the anchor's resting loop, the face position from
+`video/lips/faces.json`, the lower face sharpened by `video/lips/sharpen.py`) and uploads each one
+(`PUT /api/admin/tv/lip/<id>`, kept in D1). The channel uses a clip as soon as it's there:
+`/api/tv/lip/<id>`, served with byte ranges for iPhones. Clips made offline into
+`public/anchors/lips/` (`src/anchor-lips.js`) work the same way. Needs the repository secret
+`RW_PUBLISH_TOKEN`. A new anchor's face goes in `faces.json` when their face is made.
+
 ## Live reads (headlines, breaking lines, live captions)
 Tara reads every headline the channel shows (News Update sets, Breaking Headlines), the editor's
 breaking lines and live-input captions, in her Kokoro voice. These change all the time, so the

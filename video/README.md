@@ -102,6 +102,15 @@ the Caribbean, Central America and northern South America); no borders are drawn
 story says, as for articles.
 
 ## Raisina TV anchor intros
-Each explainer that plays on Raisina TV gets a 25–30 second anchor intro (written in
-`src/tv-intros.js`, keyed by the 16:9 video file). After adding one, record it:
-`PYTHON=<python with kokoro-onnx> node video/anchor-voices.mjs`. See `anchors/README.md`.
+Each explainer that plays on Raisina TV gets a 25–30 second intro (written in `src/tv-intros.js`,
+keyed by the 16:9 video file). Before starting an explainer, ask the editor (every time, see
+`CLAUDE.md`): which anchor reads the intro, whether it is on camera (`intro: "cam"`) or voice only
+(`intro: "voice"`), and which anchor narrates the explainer (its script's `voice`, that anchor's
+blend in `src/anchors.js`). Then:
+1. Add the intro with `anchor` and `intro` set as chosen.
+2. Record it: `PYTHON=<python with kokoro-onnx> node video/anchor-voices.mjs` (only the chosen
+   anchor's lines are made).
+3. The voice-over pictures: `python video/anchor_vo_pics.py` (see its header).
+4. Publish. The intro plays at once as a voice-over on the pictures; for an on-camera intro the
+   GitHub Action "Raisina TV lip sync" renders the anchor's two on-camera clips (10–20 minutes)
+   and the intro switches to camera by itself. See `anchors/README.md`.

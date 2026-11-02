@@ -1,5 +1,6 @@
 // Records the Raisina TV anchors' lines with Kokoro (the explainers' voice engine), offline.
-//   node video/anchor-voices.mjs            # every anchor in READY (src/anchors.js)
+//   node video/anchor-voices.mjs            # every anchor with lines: those on air (READY in
+//                                           # src/anchors.js) and those given an intro
 //   node video/anchor-voices.mjs tara kabir # these anchors
 // Writes public/anchors/voice/<id>.mp3 for each line not yet recorded, removes recordings no line
 // uses any more, and lists the recorded lines in src/anchor-voices.js. Run it after editing an
@@ -13,8 +14,8 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(root, "public/anchors/voice");
 if (!existsSync(join(root, "src/anchor-voices.js"))) writeFileSync(join(root, "src/anchor-voices.js"), "export const VOICED = new Set([]);\n");
-const { ANCHORS, READY, allLines, lineId, spoken } = await import("../src/anchors.js");
-const who = process.argv.slice(2).length ? process.argv.slice(2) : READY;
+const { ANCHORS, allLines, lineId, spoken } = await import("../src/anchors.js");
+const who = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(ANCHORS).filter(k => allLines(k).length);
 mkdirSync(OUT, { recursive: true });
 
 const want = new Map();

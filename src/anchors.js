@@ -35,11 +35,14 @@ const end = t => /[.!?…]["”’]?$/.test(t) ? t : `${t}.`;
 
 const sha = async t => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)))].map(b => b.toString(16).padStart(2, "0")).join("");
 export const lineId = async (anchor, text) => (await sha(`${ANCHORS[anchor].voice}|${text}`)).slice(0, 20);
-async function line(anchor, text) {
+// A line's lip-synced clip: rendered offline into the site (LIPPED), or by the GitHub Action
+// "Raisina TV lip sync" into D1 (`lips`, ids the Worker found there).
+async function line(anchor, text, lips = new Set()) {
   const t = String(text || "").replace(/\s+/g, " ").trim();
   if (!t) return null;
   const id = await lineId(anchor, t);
-  return { id, anchor, text: t, audio: VOICED.has(id) ? `/anchors/voice/${id}.mp3` : null, clip: LIPPED.has(id) ? `/anchors/lips/${id}.mp4` : null };
+  const clip = LIPPED.has(id) ? `/anchors/lips/${id}.mp4` : lips.has(id) ? `/api/tv/lip/${id}` : null;
+  return { id, anchor, text: t, audio: VOICED.has(id) ? `/anchors/voice/${id}.mp3` : null, clip };
 }
 // The fixed lines, shared by the channel and the recording script.
 export const FIXED = {
@@ -77,34 +80,55 @@ export async function liveReads({ breaking = [], inputs = [], force = null, head
 }
 // Every line an anchor can say (for recording): the intros, both ways for the Editor's Picks, and
 // the fixed lines, including a bulletin line for each hour.
+// Who reads an intro: the anchor the editor chose for that explainer.
+export const introAnchor = it => (ANCHORS[it?.anchor] ? it.anchor : ROTA[0]);
+const fixedLines = anchor => [FIXED.hello(ANCHORS[anchor].name), FIXED.news, FIXED.headlines, FIXED.breaking, FIXED.live, ...Array.from({ length: 24 }, (_, h) => FIXED.bulletin(h))];
+// Every line an anchor can say (for recording): the channel's fixed lines if the anchor goes on air,
+// and the intros of the explainers the editor gave this anchor. Nothing is made for other anchors.
 export function allLines(anchor) {
-  const out = [FIXED.hello(ANCHORS[anchor].name), FIXED.news, FIXED.headlines, FIXED.breaking, FIXED.live, ...Array.from({ length: 24 }, (_, h) => FIXED.bulletin(h))];
-  for (const it of Object.values(TV_INTROS)) out.push(camFor(anchor, it), it.vo, it.out);
+  const out = READY.includes(anchor) ? fixedLines(anchor) : [];
+  for (const it of Object.values(TV_INTROS)) if (introAnchor(it) === anchor) out.push(camFor(anchor, it), it.vo, it.out);
   return [...new Set(out)];
+}
+// The lines that need a lip-synced clip (for the GitHub Action): every line an on-air anchor says
+// on screen, and the on-camera parts of the intros set to "cam" whose anchor's face is ready.
+// `pip`: shown in the small window beside a title card (no face sharpening needed).
+export async function lipLines() {
+  const out = [];
+  for (const k of READY) {
+    const pip = new Set([FIXED.news, FIXED.headlines, ...Array.from({ length: 24 }, (_, h) => FIXED.bulletin(h))]);
+    for (const t of fixedLines(k)) out.push({ id: await lineId(k, t), anchor: k, text: t, pip: pip.has(t) });
+    for (const it of Object.values(TV_INTROS)) if (it.intro !== "voice" && introAnchor(it) === k) for (const t of [camFor(k, it), it.out]) out.push({ id: await lineId(k, t), anchor: k, text: t, pip: false });
+  }
+  return [...new Map(out.map(l => [l.id, l])).values()];
 }
 
 // Everything the anchors say on the channel right now (English channel only).
 // playlist: [{ id, src, editorPick }]; input: the live input on air; breaking: the editor's lines.
-export async function anchorLines({ playlist, input, breaking, force, voiced = new Set(), now = Date.now() }) {
+export async function anchorLines({ playlist, input, breaking, force, voiced = new Set(), lips = new Set(), now = Date.now() }) {
   const duty = onDuty(now), h = istHour(now);
   const intros = {};
   for (const v of playlist) {
     const it = TV_INTROS[String(v.src || "").split("?")[0]];
     if (!it) continue;
-    const who = v.editorPick && READY.includes("ilmaz") ? "ilmaz" : duty;
+    const who = introAnchor(it);
     // His own picks are written in the first person; another anchor introduces them as his pick.
-    const [cam, vo, out] = await Promise.all([line(who, camFor(who, it)), line(who, it.vo), line(who, it.out)]);
-    if (cam && vo && out) intros[v.id] = { anchor: who, pick: Boolean(v.editorPick), cam, vo, out };
+    const [cam, vo, out] = await Promise.all([line(who, camFor(who, it), lips), line(who, it.vo), line(who, it.out, lips)]);
+    if (!cam || !vo || !out) continue;
+    // On camera once the anchor's face and both lip-synced clips are ready; until then (and for
+    // intros set to "voice") all three parts are read over the explainer's pictures.
+    const mode = it.intro !== "voice" && READY.includes(who) && cam.clip && out.clip ? "cam" : "voice";
+    intros[v.id] = { anchor: who, mode, pick: Boolean(v.editorPick), cam, vo, out };
   }
   const brk = force?.breaking ? (force.text || breaking[0] || "") : (breaking[0] || "");
   // The breaking story and the live caption: read in full once recorded (live reads), otherwise
   // the fixed line. Either way the words are on screen.
   const read = async (text, fixed, show) => {
     const l = await line(duty, text);
-    return voiced.has(l.id) ? { ...l, audio: `/api/tv/voice/${l.id}`, show } : { ...await line(duty, fixed), show };
+    return voiced.has(l.id) ? { ...l, audio: `/api/tv/voice/${l.id}`, show } : { ...await line(duty, fixed, lips), show };
   };
   const [hello, news, bulletin, headlines, breakingLine, live] = await Promise.all([
-    line(duty, FIXED.hello(ANCHORS[duty].name)), line(duty, FIXED.news), line(duty, FIXED.bulletin(h)), line(duty, FIXED.headlines),
+    line(duty, FIXED.hello(ANCHORS[duty].name), lips), line(duty, FIXED.news, lips), line(duty, FIXED.bulletin(h), lips), line(duty, FIXED.headlines, lips),
     brk ? read(READ.breaking(brk), FIXED.breaking, end(clip(brk, 220))) : null,
     input ? read(READ.live(input.title), FIXED.live, clip(input.title, 120)) : null
   ]);
