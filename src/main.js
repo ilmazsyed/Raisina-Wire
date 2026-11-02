@@ -272,27 +272,61 @@ function renderShell() {
     <button class="btn btn-red btn-sm" type="button" data-action="apply-update">Update</button>
     <button class="ub-close" type="button" data-action="update-later" aria-label="Later">${ICON_X}</button>
   </div>
-  <section class="sheet install-sheet" id="installSheet" role="dialog" aria-labelledby="installTitle" hidden>
-    <span class="sheet-grip" aria-hidden="true"></span>
-    <button class="sheet-x" type="button" data-action="install-dismiss" aria-label="Close">${ICON_X}</button>
-    <div class="sheet-hero install"><img class="sheet-app" src="/icon-192.png" alt="" width="72" height="72"></div>
-    <span class="kicker">THE LIGHTWEIGHT APP REVOLUTION</span><h2 id="installTitle">A new way to use the app</h2>
-    <p class="install-promise">The full Raisina Wire experience. No bulky app-store download. Add it to your home screen in seconds.</p>
-    <ul class="sheet-list"><li>${ICON_CHECK}<span><b>Lightweight by design</b> — no large app package to download</span></li><li>${ICON_CHECK}<span><b>Secure connection</b> — served over HTTPS</span></li><li>${ICON_CHECK}<span><b>Read offline</b> — editions and saved stories stay available</span></li><li>${ICON_CHECK}<span><b>One tap access</b> — full-screen, app-like experience</span></li></ul>
-    <p class="install-footnote">Uses a small amount of device storage for the app and cached content. Offline saves may use more; you can clear browser data any time.</p>
-    <div class="install-installed" hidden><b>Already added to this device?</b><p>On iPhone, launch Raisina Wire from your Home Screen. On Android, tap the Raisina Wire icon in your app list. Some browsers can open the installed app directly from this prompt.</p></div>
-    <ol class="install-ios" hidden>
-      <li><span class="step">1</span><span>Tap <b>Share</b> in your browser <svg class="ios-share" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg> in the toolbar or browser menu</span></li>
-      <li><span class="step">2</span><span>Choose <b>Add to Home Screen</b> <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span></li>
-      <li><span class="step">3</span><span>Open Raisina Wire from your home screen</span></li>
-    </ol>
-    <ol class="install-other" hidden>
-      <li><span class="step">1</span><span>Tap the browser menu <b>⋮</b> or <b>Share</b>.</span></li>
-      <li><span class="step">2</span><span>Choose <b>Install app</b> or <b>Add to Home screen</b>.</span></li>
-      <li><span class="step">3</span><span>Confirm <b>Install</b> or <b>Add</b>. Raisina Wire will appear with your apps.</span></li>
-    </ol>
-    <div class="sheet-actions install-actions"><button class="btn btn-red sheet-primary" type="button" data-action="install">Add Raisina Wire</button><button class="btn btn-red sheet-primary" type="button" data-action="install-open" hidden>Open Raisina Wire</button><button class="sheet-secondary" type="button" data-action="install-dismiss">Not now</button></div>
-  </section>`;
+  <section class="install-sheet" id="installSheet" role="dialog" aria-modal="true" aria-labelledby="installTitle" hidden>
+    <div class="install-panel">
+      <button class="install-close" type="button" data-action="install-dismiss" aria-label="Close">${ICON_X}</button>
+      <header class="install-brand">
+        <img class="install-brand-icon" src="/icon-192.png" alt="Raisina Wire app icon" width="76" height="76">
+        <span class="install-brand-divider" aria-hidden="true"></span>
+        <span class="install-brand-copy"><b>RAISINA WIRE <i>TV</i></b><small>GEOPOLITICS <em>·</em> SECURITY <em>·</em> MARKETS <em>·</em> ANALYSIS</small></span>
+      </header>
+      <div class="install-intro">
+        <div class="install-copy">
+          <span class="install-eyebrow">THE RAISINA WIRE APP</span>
+          <h2 id="installTitle">Install the<br>Raisina Wire <span>App</span></h2>
+          <p>A fast, secure and lightweight news experience — without the app-store download.</p>
+          <div class="install-benefits">
+            <span><b aria-hidden="true">ϟ</b>Lightweight<br>&amp; fast</span>
+            <span><b aria-hidden="true">◇</b>Safe<br>&amp; secure</span>
+            <span><b aria-hidden="true">⌁</b>Read<br>offline</span>
+            <span><b aria-hidden="true">▣</b>Phone, tablet<br>&amp; desktop</span>
+          </div>
+        </div>
+        <div class="install-device" aria-hidden="true">
+          <div class="install-device-frame"><div class="install-device-notch"></div><div class="install-device-screen">
+            <img src="/icon-192.png" alt="" width="100" height="100"><b>Raisina Wire</b><span class="install-globe"></span>
+          </div></div>
+        </div>
+      </div>
+      <div class="install-platforms">
+        <div class="install-platform install-ios">
+          <h3><span class="platform-symbol">●</span> iPhone / iPad <small>(Safari)</small></h3>
+          <ol>
+            <li><span class="step">1</span><span>Tap <b>Share</b> <span class="install-inline-icon">↥</span></span></li>
+            <li><span class="step">2</span><span>Choose <b>Add to Home Screen</b> <span class="install-inline-icon">⊞</span></span></li>
+            <li><span class="step">3</span><span>Open Raisina Wire from your home screen</span></li>
+          </ol>
+        </div>
+        <div class="install-platform install-android">
+          <h3><span class="platform-symbol android-symbol">●</span> Android <small>(Chrome &amp; other browsers)</small></h3>
+          <div class="install-actions">
+            <button class="btn btn-red sheet-primary" type="button" data-action="install"><span aria-hidden="true">↓</span> Install App</button>
+            <button class="btn btn-red sheet-primary" type="button" data-action="install-open" hidden>Open Raisina Wire</button>
+          </div>
+          <p class="install-other" hidden>Or tap <b>⋮</b> in your browser and choose <b>Install app / Add to Home Screen</b>.</p>
+          <p class="install-installed" hidden>Already installed? Open Raisina Wire from your app list or home screen.</p>
+        </div>
+      </div>
+      <div class="install-bottom">
+        <span><b>ϟ</b> Instant access<br><small>Live news &amp; analysis</small></span>
+        <span><b>♧</b> Real-time<br><small>alerts</small></span>
+        <span><b>▱</b> No app store<br><small>required</small></span>
+        <span><b>▣</b> One experience<br><small>across devices</small></span>
+      </div>
+      <p class="install-storage">Uses a small amount of device storage for the app and cached content. Offline saves may use more.</p>
+      <button class="sheet-secondary install-later" type="button" data-action="install-dismiss">Not now</button>
+    </div>
+  </section>`;`;
 
   $("#today").textContent = new Date().toLocaleDateString(LOCALE, { ...IST, weekday: "long", day: "numeric", month: "long", year: "numeric" });
   $("#signInBtn").addEventListener("click", () => openAuth("login"));
