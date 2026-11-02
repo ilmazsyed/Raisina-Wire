@@ -204,6 +204,8 @@ async function pageFor(path, url, env, o, lang = "en") {
       title: `${m.title} · ${SITE}`, ogTitle: m.title, description: clip(m.description || `${m.mediaType === "short" ? "A short" : "An explainer"} from the Raisina Wire desk.`, 200),
       image: m.thumb ? (/^https?:/.test(m.thumb) ? m.thumb : o + m.thumb) : undefined, body: `<h1>${esc(m.title)}</h1>${m.description ? `<p>${esc(m.description)}</p>` : ""}` };
   }
+  // TV mode for smart TVs (/t): the same channel, full screen; search engines index /tv instead.
+  if (section === "t" && !arg) return { title: `Raisina TV — TV mode · ${SITE}`, description: "Raisina TV full screen for smart TVs: the desk's explainers, News Updates and the breaking ticker, 24×7.", canonicalPath: "/tv", noindex: true, body: "<h1>Raisina TV</h1>" };
   // Watch is now part of TV (shared ?v= links keep their query on the redirect).
   if (section === "watch") return { redirect: prefixed(lang, "/tv") };
   if (section === "tv") {

@@ -350,7 +350,7 @@ async function tvFeed(env, ctx, lang) {
   ].filter(x => x.text && x.at).sort(newest).slice(0, 10);
   // If the wire can't be reached, the desk's own latest stories keep the ticker running.
   if (ticker.length < 8) ticker.push(...stories.slice(0, 8).map(a => ({ kind: "story", text: a.title, href: a.href })));
-  return { on: settings.on, every: settings.every, perBreak: settings.perBreak, skippable: settings.skippable, force: settings.force || null,
+  return { on: settings.on, qr: settings.qr, every: settings.every, perBreak: settings.perBreak, skippable: settings.skippable, force: settings.force || null,
     playlist: playlist.map(v => ({ id: v.id, title: v.title, description: v.description, category: v.category, src: v.mediaUrl, thumb: v.thumbnailUrl, publishedAt: v.publishedAt })),
     ads: ads.filter(a => a.src).map(a => ({ id: a.id, title: a.title, src: a.src })), breaking: breaking.map(b => b.text), ticker, recent,
     seq: settings.seq, pinset: settings.pinset?.on && settings.pinset.items.length ? settings.pinset : null, sets,

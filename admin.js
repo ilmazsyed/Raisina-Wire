@@ -1,4 +1,6 @@
 import * as tvSound from "./src/tvaudio.js";
+import { qrMatrix } from "./src/qr.js";
+import { markDome } from "./src/brand.js";
 import { textBlocks, splitTags } from "./src/store.js";
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const state={user:null,view:"overview",editId:null,articleFilter:"all",articleQuery:""};
@@ -245,7 +247,11 @@ async function render(view){
       <label class="field check"><input type="checkbox" id="tvOn" ${S.on?"checked":""}> Raisina TV is on (off shows "off air" to viewers)</label>
       <p class="muted" style="font-size:13px">Explainers play newest first, around the clock. Shorts never play on TV. Changes take effect at the next switch between stories; use <b>Break in now</b> to cut in immediately.</p>
       <h3 style="margin:16px 0 8px;font-size:15px">Now and next (as a new viewer sees it)</h3><ol class="top-list">${d.playlist.slice(0,8).map(v=>`<li><span>${esc(v.title)}</span><b>${esc(v.category||"")}</b></li>`).join("")||"<li>No explainers yet.</li>"}</ol>
-      <div class="form-actions"><a class="action" href="/tv" target="_blank" rel="noreferrer">Open Raisina TV ↗</a></div></div>
+      <div class="form-actions"><a class="action" href="/tv" target="_blank" rel="noreferrer">Open Raisina TV ↗</a><a class="action" href="/t" target="_blank" rel="noreferrer">Open TV mode ↗</a></div>
+      <h3 style="margin:18px 0 6px;font-size:15px">On smart TVs</h3>
+      <p class="muted" style="font-size:13px">Viewers open the TV's web browser and go to <b>${esc(location.host)}/t</b>: full screen, worked with the remote. Smart TVs that open /tv are switched to it automatically.</p>
+      <label class="field check"><input type="checkbox" id="tvQr" ${S.qr!==false?"checked":""}> Show a QR code in the corner of TV mode ("scan to watch on your phone", following what is on screen)</label>
+      <div class="form-actions"><button class="action" type="button" id="qrPoster">Download QR poster (PNG)</button></div></div>
     <div class="panel tv-breakin"><h2>Break in now</h2><p class="muted" style="font-size:13px">For a major story: every viewer's TV cuts away within about 15 seconds, shows a full-screen BREAKING NEWS sting, then plays the video you pick. Normal order resumes after it.</p>
       <form id="forceForm"><div class="form-grid"><label class="field full">Video<select name="id"><option value="">No video: sting and ticker only</option>${d.videos.map(v=>`<option value="${esc(v.id)}">${esc(v.title)}</option>`).join("")}</select></label>
       <label class="field full">Sting headline<input name="text" maxlength="160" placeholder="e.g. Earthquake hits Delhi-NCR"></label>
@@ -290,6 +296,8 @@ async function render(view){
       <div class="form-actions"><button class="button" id="ordSave">Save order</button></div></div>`;
     const put=(u,b,m="PUT")=>api(u,{method:m,body:JSON.stringify(b)});
     const done=async(msg,fn)=>{try{await fn();notice(msg);render("tv")}catch(e){notice(e.message)}};
+    $("#tvQr").addEventListener("change",e=>done(e.target.checked?"QR code on in TV mode.":"QR code off in TV mode.",()=>put("/api/admin/tv/settings",{qr:e.target.checked})));
+    $("#qrPoster").addEventListener("click",()=>qrPoster().catch(e=>notice(e.message)));
     $("#tvOn").addEventListener("change",e=>done(e.target.checked?"Raisina TV is on air.":"Raisina TV is off air.",()=>put("/api/admin/tv/settings",{on:e.target.checked})));
     $("#tvManual").addEventListener("change",e=>done(e.target.checked?"Your order is in use from the next switch.":"Back to newest first.",()=>put("/api/admin/tv/settings",{manual:e.target.checked})));
     $("#forceForm").addEventListener("submit",e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.currentTarget));if(!confirm("Break in on every viewer's TV now?"))return;done("Breaking in: viewers switch within about 15 seconds.",()=>put("/api/admin/tv/force",{id:f.id,text:f.text,breaking:!!e.currentTarget.elements.breaking.checked},"POST"))});
@@ -387,3 +395,24 @@ async function render(view){
 }
 new MutationObserver(labelTables).observe($("#view"),{childList:true});
 boot();
+
+// A print-ready poster: scan to watch on a phone, and the short address for smart TVs.
+async function qrPoster(){
+  const W=1080,H=1350,c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d");
+  const bg=g.createRadialGradient(W*.75,H*.25,40,W*.5,H*.5,H*.9);bg.addColorStop(0,"#8a0c17");bg.addColorStop(.45,"#3a0610");bg.addColorStop(1,"#070a14");g.fillStyle=bg;g.fillRect(0,0,W,H);
+  g.fillStyle="#e0262f";g.beginPath();g.roundRect(80,90,92,92,20);g.fill();
+  // the app icon: the dome in white, and the tricolour bar
+  const svg=markDome("d",4).replace("<svg",`<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" style="color:#fff"`).replace(/currentColor/g,"#fff");
+  const img=new Image();img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);await img.decode().catch(()=>{});if(img.naturalWidth)g.drawImage(img,96,98,60,60);
+  [["#ff9a3c",0],["#fff",1],["#1fa34a",2]].forEach(([col,k])=>{g.fillStyle=col;g.fillRect(96+k*21,162,18,6)});
+  g.fillStyle="#fff";g.font="900 84px 'Playfair Display', Georgia, serif";g.textBaseline="middle";g.fillText("RAISINA",196,136);const w1=g.measureText("RAISINA ").width;g.fillStyle="#ff4b55";g.fillText("TV",196+w1,136);
+  g.fillStyle="#fff";g.font="700 34px 'IBM Plex Mono', monospace";g.fillText("● LIVE 24×7",84,250);
+  g.font="500 58px Georgia, serif";g.fillStyle="#fff";g.fillText("India's strategic briefing,",80,350);g.fillText("live on your screen.",80,420);
+  const url=`${location.origin}/tv`,{n,dark}=qrMatrix(url),box=540,x0=(W-box)/2,y0=490;
+  g.fillStyle="#fff";g.beginPath();g.roundRect(x0-30,y0-30,box+60,box+60,28);g.fill();
+  const m=box/n;g.fillStyle="#0b0f1e";for(let r=0;r<n;r++)for(let k=0;k<n;k++)if(dark(r,k))g.fillRect(Math.floor(x0+k*m),Math.floor(y0+r*m),Math.ceil(m),Math.ceil(m));
+  g.textAlign="center";g.fillStyle="#fff";g.font="700 40px system-ui, sans-serif";g.fillText("Scan to watch on your phone",W/2,y0+box+100);
+  g.font="500 32px system-ui, sans-serif";g.globalAlpha=.8;g.fillText("On a smart TV, open the web browser and go to",W/2,y0+box+168);g.globalAlpha=1;
+  g.font="800 46px 'IBM Plex Mono', monospace";g.fillStyle="#ff6b73";g.fillText(`${location.host}/t`,W/2,y0+box+232);
+  const a=document.createElement("a");a.download="raisina-tv-qr-poster.png";a.href=c.toDataURL("image/png");document.body.append(a);a.click();a.remove();
+}

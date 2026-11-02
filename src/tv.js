@@ -49,6 +49,15 @@ if (ls.get("rw-tv-debug", false)) window.__tv = { adNow: () => { sinceAd = 1e9; 
 export function initTV(d) { deps = d; }
 export const tvFeed = () => feed;
 export const tvNow = () => (feed && mode !== "ad" ? feed.playlist[idx] : null);
+// For TV mode (/t): what is on screen, and the remote's buttons.
+export const tvStatus = () => ({ mode, paused, muted: !video || video.muted, seq: root?.querySelector(".tv-seq")?.dataset.kind || "", now: mode === "story" ? feed?.playlist[idx] || null : null, qr: feed?.qr !== false });
+export function tvControl(cmd) {
+  if (!root || !video) return;
+  if (cmd === "pause") togglePause();
+  if (cmd === "unmute") unmute();
+  if (cmd === "mute") { video.muted = true; inputMute(true); syncSound(); }
+  if (cmd === "sound") tvControl(video.muted ? "unmute" : "mute");
+}
 
 async function load() {
   try {

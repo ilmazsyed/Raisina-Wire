@@ -1,6 +1,7 @@
 import "./style.css";
 import { editions, NEWSLETTER_URL, AUTHOR } from "./editions.js";
 import { initTV, dockTV, mountPreview, loadTV, tvFeed } from "./tv.js";
+import { tvModeHTML, mountTVMode, unmountTVMode, isSmartTV, openWatchOnTV } from "./tvmode.js";
 import { brandMark, skyline, tribar, wordmark } from "./brand.js";
 import { WRITERS, writer, setGuestWriters } from "./writers.js";
 import { ABOUT, LEGAL, LEGAL_ORDER, LEGAL_UPDATED } from "./legal.js";
@@ -218,7 +219,7 @@ function renderShell() {
   <main id="view" tabindex="-1"></main>
   <footer class="site-footer"><div class="wrap">
     <div class="footer-top"><a class="footer-brand" href="/" aria-label="Raisina Wire home">${brandMark()}<span class="wordmark">${wordmark()}</span></a>
-      <div class="footer-links"><a href="/editions">All editions</a><a href="/live">Live wire</a><a href="/markets">Markets</a><a href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer" id="linkedinLink">Newsletter on LinkedIn ↗</a><a href="/about">About</a><a href="#" data-action="install" class="install-link">Install the app</a></div></div>
+      <div class="footer-links"><a href="/editions">All editions</a><a href="#watch-on-tv" data-action="watch-on-tv">Watch on TV</a><a href="/live">Live wire</a><a href="/markets">Markets</a><a href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer" id="linkedinLink">Newsletter on LinkedIn ↗</a><a href="/about">About</a><a href="#" data-action="install" class="install-link">Install the app</a></div></div>
     <form class="lead-form glass" id="leadForm"><span class="kicker">Briefings &amp; partnerships</span>
       <label class="sr-only" for="leadName">Your name</label><input id="leadName" name="name" placeholder="Your name" required minlength="2" autocomplete="name">
       <label class="sr-only" for="leadEmail">Work email</label><input id="leadEmail" name="email" type="email" placeholder="Work email" required autocomplete="email">
@@ -349,11 +350,15 @@ function interceptLinks(e) {
   a.closest("dialog")?.close();
   navigate(href);
 }
-const views = { tv: viewTV, about: viewAbout, ...Object.fromEntries(LEGAL_ORDER.map(([k]) => [k, viewLegal])), coverage: viewCoverage, home: viewHome, editions: viewEditions, edition: viewStory, article: viewStory, author: viewAuthor, tag: viewTag, my: viewMy, read: viewExternal, live: viewLive, markets: viewMarkets, community: viewCommunity, discussion: viewDiscussion, events: viewEvents, watch: viewWatch, account: viewAccount, saved: viewSaved, search: viewSearch };
+const views = { t: viewTVMode, tv: viewTV, about: viewAbout, ...Object.fromEntries(LEGAL_ORDER.map(([k]) => [k, viewLegal])), coverage: viewCoverage, home: viewHome, editions: viewEditions, edition: viewStory, article: viewStory, author: viewAuthor, tag: viewTag, my: viewMy, read: viewExternal, live: viewLive, markets: viewMarkets, community: viewCommunity, discussion: viewDiscussion, events: viewEvents, watch: viewWatch, account: viewAccount, saved: viewSaved, search: viewSearch };
 const DEFAULT_TITLE = "Raisina Wire — India’s strategic briefing on geopolitics, security and markets";
 let routeSeq = 0;
 async function route({ restoreY = null } = {}) {
   const r = parseRoute(), seq = ++routeSeq;
+  // Smart-TV browsers get TV mode (unless the viewer chose the website with Exit).
+  let web = false; try { web = sessionStorage.getItem("rw-web") === "1"; } catch { /* private mode */ }
+  if (r.page === "tv" && !r.params.get("v") && !web && isSmartTV()) return navigate("/t", { replace: true });
+  if (r.page !== "t") unmountTVMode();
   endRead();
   if (state.pendingArticles) { state.articles = state.pendingArticles; state.pendingArticles = null; }
   hideNewPill();
@@ -1240,6 +1245,7 @@ async function onAction(e) {
   if (a === "alerts-off") disableAlerts();
   if (a === "banner-close") $("#alertBanner").hidden = true;
   if (a === "theme") toggleTheme();
+  if (a === "watch-on-tv") { e.preventDefault(); openWatchOnTV(); }
   if (a === "discuss") { if (!state.user) { openAuth("register"); toast("Create a free account to start a discussion."); } else openDiscussionDialog(el.dataset.title ? `On “${el.dataset.title}”` : ""); }
 }
 
@@ -1776,6 +1782,12 @@ function mediaEmbed(m) {
 }
 /* ---------- TV: Raisina TV live on top, the explainer library below ---------- */
 function viewTV(r) { return viewWatch(r); }
+// TV mode (/t): the channel full screen for smart TVs (src/tvmode.js).
+function viewTVMode() {
+  document.title = "Raisina TV — live";
+  $("#view").innerHTML = tvModeHTML();
+  mountTVMode({ navigate });
+}
 document.addEventListener("tvchange", () => { if (parseRoute().page === "home") renderHomeMedia(); });
 
 /* ---------- Watch: a Netflix-style library around Raisina TV ---------- */
@@ -1814,7 +1826,8 @@ function viewWatch() {
   const more = Object.entries(byCat).filter(([, l]) => l.length < 2).flatMap(([, l]) => l);
   const popular = films.filter(m => m.plays > 0).sort((a, b) => b.plays - a.plays).slice(0, 12);
   $("#view").innerHTML = `<div class="watch">
-    <section class="w-hero"><div class="wrap"><div id="tvSlot" class="tv-slot"></div></div></section>
+    <section class="w-hero"><div class="wrap"><div id="tvSlot" class="tv-slot"></div>
+      <div class="w-tvon"><button type="button" class="tvon-btn" data-action="watch-on-tv"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="2" y="5" width="20" height="13" rx="2"/><path d="M8 21h8M12 18v3"/></svg>Watch on your TV</button></div></div></section>
     <div class="wrap">
       ${all == null ? `<div class="skeleton" style="height:260px;margin-top:30px"></div>` : `
       <div class="w-tools"><div class="chips" role="tablist">${["All", ...cats.map(([c]) => c)].map(c => `<button class="chip" type="button" data-action="w-cat" data-cat="${esc(c)}" aria-pressed="${c === "All"}">${esc(c === "All" ? "All" : CAT_NAMES[c] || c)}</button>`).join("")}</div>

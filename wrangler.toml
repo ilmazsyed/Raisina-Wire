@@ -11,7 +11,7 @@ not_found_handling = "single-page-application"
 # is served straight from the built files.
 run_worker_first = [
   "/api/*", "/media/*", "/", "/editions", "/edition/*", "/article/*", "/author/*", "/tag/*",
-  "/live", "/live/*", "/markets", "/community", "/discussion/*", "/events", "/coverage/*", "/watch", "/tv",
+  "/live", "/live/*", "/markets", "/community", "/discussion/*", "/events", "/coverage/*", "/watch", "/tv", "/t",
   "/about", "/terms", "/privacy", "/disclaimer", "/copyright", "/community-guidelines", "/grievance", "/privacy.html", "/terms.html",
   "/hi", "/hi/*", "/bn", "/bn/*",
   "/sitemap.xml", "/news-sitemap.xml", "/robots.txt", "/feed.xml", "/rss.xml"

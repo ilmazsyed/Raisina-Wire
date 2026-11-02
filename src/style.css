@@ -1759,3 +1759,69 @@ body.cin-open{overflow:hidden}
 .w-thumb::before,.w-short::before{content:"RAISINA WIRE";position:absolute;left:12px;bottom:10px;font:800 10px/1 var(--sans);letter-spacing:1.6px;color:rgba(255,255,255,.28)}
 .w-thumb img,.w-short img{z-index:1}
 .w-hero .tv{max-width:1180px;margin:0 auto}
+
+/* ---------- TV mode (/t): the channel full screen for smart-TV browsers ---------- */
+body.tvmode{overflow:hidden;background:#000}
+body.tvmode .ticker,body.tvmode header,body.tvmode .nav-dock,body.tvmode .site-footer,body.tvmode .read-progress,body.tvmode .skip-link,body.tvmode .alert-banner,body.tvmode #alertsSheet,body.tvmode .update-bar,body.tvmode .install-sheet,body.tvmode .new-pill{display:none!important}
+.tvm{position:fixed;inset:0;z-index:50;background:#000;color:#fff;--tkh:5.4vh;--pw:min(100vw,168vh)}
+.tvm-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.tvm .tv-slot{width:var(--pw);max-width:none;margin:0}
+.tvm .tv{border-radius:0;box-shadow:none}
+.tvm .tv-ticker{height:var(--tkh);border-top-width:.35vh}
+.tvm .tv-tk-item{font-size:2.5vh}.tvm .tv-tk-item em{font-size:1.8vh}
+.tvm .tv-tk-break{font-size:2vh;padding:0 1.8vh}.tvm .tv-tk-sep{font-size:1.2vh;margin:0 2vh}
+.tvm .tv-clock{font-size:max(12px,1.3cqw);padding:.45cqw .9cqw}
+.tvm .tv-ctrls,.tvm .tv-sound,.tvm .tv-mini-ctrls{display:none!important}
+.tvm .tv-screen{cursor:none}
+/* lighter effects for TV browsers */
+.tvm .bx-r1,.tvm .bx-r2,.tvm .bx-r3{filter:none;opacity:.5}
+.tvm *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+/* start card */
+.tvm-start{position:absolute;inset:0;z-index:9;display:grid;place-items:center;background:radial-gradient(ellipse at center,rgba(7,10,20,.5),rgba(7,10,20,.9))}
+.tvm-start[hidden]{display:none}
+.tvm-card{display:flex;flex-direction:column;align-items:center;gap:3.2vh;max-width:80vw;padding:5vh 7vh;border-radius:3vh;background:rgba(10,14,28,.85);box-shadow:0 3vh 8vh -2vh rgba(0,0,0,.7),inset 0 0 0 1px rgba(255,255,255,.08);text-align:center}
+.tvm-brand{display:flex;align-items:center;gap:1.8vh}
+.tvm-app{position:relative;display:grid;place-items:center;width:9vh;height:9vh;border-radius:22%;background:linear-gradient(160deg,#e3232f,#a10f1b);overflow:hidden}
+.tvm-dome{width:62%;height:auto;color:#fff;margin-bottom:12%}
+.tvm-tri{position:absolute;left:14%;right:14%;bottom:13%;display:flex;height:7%;gap:4%}.tvm-tri i{flex:1;border-radius:1px}
+.tvm-tri i:nth-child(1){background:#ff9a3c}.tvm-tri i:nth-child(2){background:#fff}.tvm-tri i:nth-child(3){background:#1fa34a}
+.tvm-brand b{font:900 6.4vh/1 var(--display);letter-spacing:.02em}.tvm-brand b em{font-style:normal;color:#ff4b55}
+.tvm-live{display:inline-flex;align-items:center;gap:1vh;padding:.9vh 1.6vh;border-radius:1vh;background:#e0262f;font:800 2.2vh/1 var(--mono);letter-spacing:.22em}
+.tvm-live i{width:1.2vh;height:1.2vh;border-radius:50%;background:#fff;animation:tv-live-blink 1.2s ease-in-out infinite}
+.tvm-go{padding:2.2vh 6vh;border:0;border-radius:999px;background:#fff;color:#0b0f1e;font:800 4vh/1 var(--sans);cursor:pointer;outline:none;box-shadow:0 0 0 .8vh rgba(224,38,47,.55);animation:tvm-pulse 1.8s ease-in-out infinite}
+.tvm-go:focus{box-shadow:0 0 0 1vh #e0262f}
+@keyframes tvm-pulse{50%{box-shadow:0 0 0 1.6vh rgba(224,38,47,.25)}}
+.tvm-card small{max-width:64vh;font:500 2.2vh/1.4 var(--sans);opacity:.75}
+/* the remote's control bar */
+.tvm-bar{position:absolute;left:50%;bottom:calc(var(--tkh) + 3vh);z-index:8;display:flex;align-items:center;gap:1.2vh;padding:1.2vh;border-radius:2vh;background:rgba(7,10,20,.9);box-shadow:0 2vh 6vh -1vh rgba(0,0,0,.7),inset 0 0 0 1px rgba(255,255,255,.1);transform:translateX(-50%)}
+.tvm-bar[hidden]{display:none}
+.tvm-bar button,.tvm-bar a{display:inline-flex;align-items:center;gap:1.2vh;min-height:7vh;padding:0 2.6vh;border:0;border-radius:1.4vh;background:rgba(255,255,255,.08);color:#fff;font:700 2.6vh/1 var(--sans);text-decoration:none;cursor:pointer;outline:none;transition:background .15s,color .15s,transform .15s}
+.tvm-bar button:focus,.tvm-bar a:focus,.tvm-bar button:hover,.tvm-bar a:hover{background:#fff;color:#0b0f1e;box-shadow:0 0 0 .5vh #e0262f;transform:scale(1.06)}
+.tvm-ic{font-size:2.4vh;min-width:2.6vh;text-align:center}
+.tvm-langs{display:flex;gap:1vh;padding:0 1vh;border-left:1px solid rgba(255,255,255,.15);border-right:1px solid rgba(255,255,255,.15)}
+.tvm-langs a.on{box-shadow:inset 0 -.6vh 0 #e0262f}
+/* "scan on your phone" */
+.tvm-qr{position:absolute;z-index:7;right:calc((100vw - var(--pw)) / 2 + 2vh);bottom:calc(var(--tkh) + 2.4vh);display:flex;align-items:center;gap:1.2vh;max-width:32vh;padding:1vh 1.6vh 1vh 1vh;border-radius:1.4vh;background:rgba(255,255,255,.95);color:#0b0f1e;box-shadow:0 1vh 3vh -1vh rgba(0,0,0,.6);transition:opacity .3s}
+.tvm-qr[hidden]{display:none}
+.tvm-qr .qr{flex-shrink:0;width:11vh;height:11vh}
+.tvm-qr span{font:700 1.7vh/1.25 var(--sans)}
+.tvm.bar-on .tvm-qr{opacity:.25}
+
+/* "Watch on your TV" (TV page and footer) */
+.w-tvon{display:flex;justify-content:flex-end;margin-top:12px}
+.tvon-btn{display:inline-flex;align-items:center;gap:8px;padding:8px 15px;border:1px solid rgba(127,127,127,.3);border-radius:999px;background:rgba(127,127,127,.08);color:inherit;font:600 13px/1 var(--sans);cursor:pointer}
+.tvon-btn:hover{border-color:#c8141f;color:#c8141f}
+.tvon{width:min(720px,calc(100vw - 32px));max-height:calc(100vh - 32px);padding:0;border:0;border-radius:20px;color:inherit;overflow:auto}
+.tvon::backdrop{background:rgba(5,7,13,.55)}
+.tvon-in{position:relative;padding:28px}
+.tvon-x{position:absolute;right:14px;top:14px;width:34px;height:34px;border:0;border-radius:50%;background:rgba(127,127,127,.15);color:inherit;font-size:15px;cursor:pointer}
+.tvon h2{margin:6px 0 16px;font:500 clamp(22px,4vw,30px)/1.15 var(--serif)}
+.tvon-k{margin:0;opacity:.75}
+.tvon-addr{margin:6px 0 4px;font:800 clamp(19px,4.2vw,30px)/1.2 var(--mono);color:#c8141f;word-break:break-all}
+.tvon-note{margin:0 0 20px;font-size:13px;opacity:.7}
+.tvon-grid{display:grid;grid-template-columns:minmax(0,1fr) 168px;gap:22px;align-items:start}
+.tvon-ways{display:grid;gap:12px;margin:0;padding-left:20px}
+.tvon-ways b{display:block}.tvon-ways span{font-size:14px;opacity:.78}
+.tvon-qr{margin:0;text-align:center}.tvon-qr .qr{width:100%;height:auto;border-radius:10px;box-shadow:0 0 0 1px rgba(127,127,127,.25)}
+.tvon-qr figcaption{margin-top:6px;font-size:12px;opacity:.75}
+@media(max-width:560px){.tvon-grid{grid-template-columns:1fr}.tvon-qr{width:180px;margin:0 auto}}

@@ -28,12 +28,12 @@ export async function tvSettings(env) {
   }
   s.every = Math.min(Math.max(Number(s.every) || 12, 3), 60);
   s.perBreak = Math.min(Math.max(Number(s.perBreak) || 1, 1), 4);
-  s.on = s.on !== false; s.skippable = !!s.skippable; s.manual = !!s.manual;
+  s.on = s.on !== false; s.skippable = !!s.skippable; s.manual = !!s.manual; s.qr = s.qr !== false;
   s.seq = cleanSeq(s.seq); s.pinset = cleanPinset(s.pinset);
   return s;
 }
 export async function saveTvSettings(env, patch) {
-  const allowed = { on: v => !!v, every: v => Math.min(Math.max(Math.round(Number(v)) || 12, 3), 60), perBreak: v => Math.min(Math.max(Math.round(Number(v)) || 1, 1), 4), skippable: v => !!v, manual: v => !!v, seq: cleanSeq, pinset: cleanPinset };
+  const allowed = { on: v => !!v, qr: v => !!v, every: v => Math.min(Math.max(Math.round(Number(v)) || 12, 3), 60), perBreak: v => Math.min(Math.max(Math.round(Number(v)) || 1, 1), 4), skippable: v => !!v, manual: v => !!v, seq: cleanSeq, pinset: cleanPinset };
   const writes = Object.entries(patch).filter(([k]) => allowed[k]).map(([k, v]) =>
     env.DB.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(`tv_${k}`, JSON.stringify(allowed[k](v))));
   if (writes.length) await env.DB.batch(writes);
