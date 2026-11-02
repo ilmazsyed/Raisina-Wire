@@ -2213,7 +2213,10 @@ window.addEventListener("appinstalled", () => {
 // Offer installation on every supported device/browser, not just iOS or browsers that fire
 // beforeinstallprompt. Native installation is used where available; otherwise the sheet explains
 // the browser's Add to Home Screen / Install menu.
-if (!isStandalone()) setTimeout(() => showInstallSheet(), 6500);
+if (!isStandalone()) {
+  const installLanding = location.pathname.replace(/\\/+$/, "") === "/install";
+  setTimeout(() => showInstallSheet({ force: installLanding }), installLanding ? 900 : 6500);
+}
 document.documentElement.classList.toggle("standalone", isStandalone());
 
 function syncOnline(event) {
