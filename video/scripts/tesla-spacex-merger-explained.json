@@ -1,0 +1,324 @@
+{
+  "slug": "tesla-spacex-merger-explained",
+  "title": "Tesla and SpaceX: one company?",
+  "series": "Explained",
+  "style": "vox",
+  "voice": "hm_psi:0.55+bm_fable:0.45",
+  "alternate": false,
+  "formats": [
+    "16x9"
+  ],
+  "captionChars": 40,
+  "scenes": [
+    {
+      "type": "snap",
+      "src": "media/ts-tesla-spacex.jpg",
+      "frame": "full",
+      "say": "Elon Musk's car company and his rocket company could become one.",
+      "marks": [
+        {
+          "kind": "circle",
+          "x": 0.14,
+          "y": 0.2,
+          "r": 0.1,
+          "at": "car"
+        },
+        {
+          "kind": "circle",
+          "x": 0.84,
+          "y": 0.22,
+          "r": 0.12,
+          "at": "rocket"
+        }
+      ]
+    },
+    {
+      "type": "kinetic",
+      "say": "A giant worth about 3.5 trillion dollars.",
+      "speak": "A giant worth about three and a half trillion dollars.",
+      "text": "$3.5 trillion",
+      "hl": [
+        "$3.5"
+      ]
+    },
+    {
+      "type": "cutout",
+      "src": "media/ts-musk-tesla-logo.jpg",
+      "say": "Tesla and SpaceX: why Musk wants to merge them.",
+      "kicker": "Explained · Tesla + SpaceX",
+      "title": "One company?",
+      "side": "right",
+      "cut": "zoom"
+    },
+    {
+      "type": "kinetic",
+      "para": true,
+      "say": "Asked if a merger made sense, Musk said one word.",
+      "text": "Does a merger | make sense?",
+      "hl": [
+        "sense?"
+      ]
+    },
+    {
+      "type": "kinetic",
+      "say": "Yes.",
+      "text": "\"Yes.\"",
+      "hl": [
+        "\"Yes.\""
+      ],
+      "size": 0.2,
+      "hold": 0.4
+    },
+    {
+      "type": "snap",
+      "src": "media/ts-dragon.jpg",
+      "say": "Special committees have now been set up to study a deal.",
+      "marks": [
+        {
+          "kind": "label",
+          "x": 0.06,
+          "y": 0.12,
+          "text": "Committees formed",
+          "color": "red",
+          "at": "committees"
+        }
+      ]
+    },
+    {
+      "type": "kinetic",
+      "say": "Musk himself will sit out those talks.",
+      "text": "Musk | sits out",
+      "hl": [
+        "out"
+      ]
+    },
+    {
+      "type": "kinetic",
+      "say": "But Musk says there's no certainty, and no agreement yet.",
+      "text": "No deal | yet",
+      "hl": [
+        "yet"
+      ]
+    },
+    {
+      "type": "versus",
+      "para": true,
+      "say": "Tesla is valued at about 1.5 trillion dollars. SpaceX, around 2 trillion.",
+      "speak": "Tesla is valued at about one and a half trillion dollars. SpaceX, around two trillion.",
+      "kicker": "Valuation",
+      "a": {
+        "value": 1.5,
+        "decimals": 1,
+        "prefix": "$",
+        "suffix": " tn",
+        "label": "Tesla"
+      },
+      "b": {
+        "value": 2,
+        "prefix": "$",
+        "suffix": " tn",
+        "label": "SpaceX"
+      },
+      "at": "SpaceX,"
+    },
+    {
+      "type": "number",
+      "say": "Together, nearly 3.5 trillion: one of the biggest mergers ever.",
+      "speak": "Together, nearly three and a half trillion: one of the biggest mergers ever.",
+      "kicker": "Combined",
+      "prefix": "$",
+      "value": 3.5,
+      "decimals": 1,
+      "suffix": " tn",
+      "label": "Combined value, approx.",
+      "bg": "media/ts-musk-chart.jpg"
+    },
+    {
+      "type": "kinetic",
+      "para": true,
+      "say": "So why do it?",
+      "hl": [
+        "why"
+      ]
+    },
+    {
+      "type": "doc",
+      "say": "Musk says there's a lot to be gained from working together.",
+      "kicker": "Elon Musk",
+      "text": "There's a lot to be gained from cooperating on developing superintelligence software, chip design, the Terafab obviously, robotics, mass-to-orbit… connectivity.",
+      "hl": "a lot to be gained",
+      "source": "Elon Musk"
+    },
+    {
+      "type": "flow",
+      "say": "Take Terafab, his chip project: chips for Tesla's cars and robots, and SpaceX's data centres.",
+      "kicker": "Terafab",
+      "title": "One chip plant, two companies",
+      "nodes": [
+        "Terafab chips",
+        "Tesla cars & Optimus",
+        "SpaceX data centres"
+      ]
+    },
+    {
+      "type": "kinetic",
+      "say": "He hopes it starts volume production by late 2028.",
+      "speak": "He hopes it starts volume production by late twenty twenty-eight.",
+      "text": "Late | 2028",
+      "hl": [
+        "2028"
+      ]
+    },
+    {
+      "type": "snap",
+      "src": "media/ts-white-models.jpg",
+      "say": "Tesla's batteries could power SpaceX's hungry computers.",
+      "marks": [
+        {
+          "kind": "underline",
+          "x": 0.05,
+          "y": 0.8,
+          "w": 0.6,
+          "at": "batteries"
+        }
+      ]
+    },
+    {
+      "type": "kinetic",
+      "say": "And Starlink could connect Tesla's robotaxis and robots.",
+      "text": "Starlink → | robotaxis",
+      "hl": [
+        "robotaxis"
+      ],
+      "bg": "media/ts-falcon-heavy.jpg"
+    },
+    {
+      "type": "photo",
+      "src": "media/ts-musk-starship.jpg",
+      "style": "parallax",
+      "focus": 0.4,
+      "say": "Tesla's factory know-how could help SpaceX build Starship at scale.",
+      "title": "Building Starship"
+    },
+    {
+      "type": "kinetic",
+      "say": "There's control, too: Musk has worried about his say at Tesla.",
+      "text": "Who controls | Tesla?",
+      "hl": [
+        "controls"
+      ],
+      "bg": "media/ts-musk-tesla-logo.jpg"
+    },
+    {
+      "type": "kinetic",
+      "para": true,
+      "say": "For investors, one share would buy into everything.",
+      "text": "One share, | everything",
+      "hl": [
+        "everything"
+      ]
+    },
+    {
+      "type": "collage",
+      "say": "Cars, batteries, robots, rockets and satellite internet.",
+      "kicker": "Under one roof",
+      "title": "What you'd own",
+      "photos": [
+        {
+          "src": "media/ts-models-launch.jpg",
+          "caption": "Tesla"
+        },
+        {
+          "src": "media/ts-dragon.jpg",
+          "caption": "SpaceX Dragon"
+        },
+        {
+          "src": "media/ts-falcon-heavy.jpg",
+          "caption": "Falcon Heavy"
+        }
+      ]
+    },
+    {
+      "type": "kinetic",
+      "say": "But also, every risk at once.",
+      "hl": [
+        "risk"
+      ]
+    },
+    {
+      "type": "kinetic",
+      "say": "Cars and rockets sell into very different markets.",
+      "text": "Cars ≠ | rockets",
+      "hl": [
+        "rockets"
+      ]
+    },
+    {
+      "type": "snap",
+      "src": "media/ts-trump-whitehouse.jpg",
+      "para": true,
+      "say": "SpaceX works for the US military, intelligence agencies and NASA.",
+      "marks": [
+        {
+          "kind": "label",
+          "x": 0.05,
+          "y": 0.1,
+          "text": "US security contractor",
+          "color": "red",
+          "at": "military,"
+        }
+      ]
+    },
+    {
+      "type": "kinetic",
+      "say": "Tesla has a big business in China, including its Shanghai factory.",
+      "text": "Tesla's | Shanghai factory",
+      "hl": [
+        "Shanghai"
+      ],
+      "bg": "media/ts-models-launch.jpg"
+    },
+    {
+      "type": "kinetic",
+      "say": "Together, they could draw scrutiny in Washington, and strain ties with Beijing.",
+      "text": "Washington | Beijing",
+      "hl": [
+        "Beijing"
+      ]
+    },
+    {
+      "type": "list",
+      "say": "Then shareholders must agree, and the big projects are costly and unproven.",
+      "kicker": "Still to clear",
+      "title": "The hurdles",
+      "items": [
+        "Shareholder approval",
+        "Fair value for both sides",
+        "Costly, unproven projects"
+      ]
+    },
+    {
+      "type": "photo",
+      "src": "media/ts-spacex-tube.jpg",
+      "style": "duotone",
+      "say": "A merger wouldn't make those risks go away.",
+      "title": "The risks stay"
+    },
+    {
+      "type": "kinetic",
+      "para": true,
+      "say": "For now, it's an idea Musk likes, not a deal.",
+      "text": "An idea, | not a deal",
+      "hl": [
+        "not"
+      ],
+      "cut": "zoom"
+    },
+    {
+      "type": "outro",
+      "say": "More on Raisina Wire.",
+      "title": "Raisina Wire",
+      "url": "raisinawire.calibrex.org"
+    }
+  ]
+}

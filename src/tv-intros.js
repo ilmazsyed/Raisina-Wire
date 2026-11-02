@@ -12,6 +12,12 @@
 // Explainers from a story Ilmaz Syed wrote are his Editor's Pick. A new explainer gets its intro
 // here when it is made (see video/README.md).
 export const TV_INTROS = {
+  "/videos/tesla-spacex-merger-explained-16x9.mp4": {
+    anchor: "tara", intro: "cam",
+    cam: "Elon Musk's car company and his rocket company could soon be one. Asked whether Tesla and SpaceX should merge, Musk said simply: yes.",
+    vo: "Special committees are now studying a deal that could create a company worth about three and a half trillion dollars, spanning cars, batteries, robots, rockets and satellite internet. It would also put SpaceX's work for the US military under the same roof as Tesla's big business in China.",
+    out: "What a merger could mean. Here's the explainer."
+  },
   "/videos/iran-no-limits-explained-16x9.mp4": {
     anchor: "tara", intro: "cam",
     cam: "Strike Iran again, and the answer will have no limits. That is the order Iran's new supreme leader has given his generals.",

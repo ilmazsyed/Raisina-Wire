@@ -1,5 +1,11 @@
 // Written by `python3 video/anchor_vo_pics.py`: the pictures under the anchor's voice-over, per explainer.
 export const TV_INTRO_PICS = {
+ "/videos/tesla-spacex-merger-explained-16x9.mp4": [
+  "/anchors/vo/tesla-spacex-merger-explained-1.webp",
+  "/anchors/vo/tesla-spacex-merger-explained-2.webp",
+  "/anchors/vo/tesla-spacex-merger-explained-3.webp",
+  "/anchors/vo/tesla-spacex-merger-explained-4.webp"
+ ],
  "/videos/iran-no-limits-explained-16x9.mp4": [
   "/anchors/vo/iran-no-limits-explained-1.webp",
   "/anchors/vo/iran-no-limits-explained-2.webp",
