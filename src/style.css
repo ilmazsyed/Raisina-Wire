@@ -554,7 +554,7 @@ body.nav-stuck .site-nav{max-width:var(--max);background:rgba(255,255,255,.86);b
 .wrap{padding-left:max(var(--gutter),env(safe-area-inset-left));padding-right:max(var(--gutter),env(safe-area-inset-right))}
 .toast{bottom:calc(22px + env(safe-area-inset-bottom))}
 .offline-bar{position:sticky;top:0;z-index:40;padding:9px 16px;background:#3b2a12;color:#fbe9c7;font-size:13px;font-weight:600;text-align:center}
-.offline-bar[hidden],.update-bar[hidden],.install-sheet[hidden],.install-ios[hidden],.install-actions [hidden]{display:none}
+.offline-bar[hidden],.update-bar[hidden],.install-sheet[hidden],.install-ios[hidden],.install-other[hidden],.install-actions [hidden]{display:none}
 .update-bar{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:55;display:flex;align-items:center;gap:14px;padding:10px 10px 10px 18px;border-radius:16px;background:rgba(255,255,255,.92);font-size:14px;font-weight:600;max-width:calc(100vw - 24px)}
 .install-sheet{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:55;width:min(400px,calc(100vw - 24px));border-radius:24px;padding:24px;background:rgba(255,255,255,.94)}
 .install-head{display:flex;align-items:center;gap:14px;padding-right:30px}
@@ -915,11 +915,11 @@ img.desk{border-radius:22%!important}
 .sheet-list{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:8px}
 .sheet-list li{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:rgba(15,20,34,.035);font-size:14px;font-weight:600;color:var(--ink-2)}
 .sheet-list .ck{flex-shrink:0;padding:3px;width:22px;height:22px;border-radius:50%;background:rgba(19,122,85,.12);color:var(--up)}
-.install-ios{list-style:none;margin:14px 0 0;padding:14px;border-radius:16px;background:rgba(245,169,68,.12);display:grid;gap:10px}
-.install-ios[hidden]{display:none}
-.install-ios li{display:flex;align-items:center;gap:10px;font-size:14px;line-height:1.4}
+.install-ios,.install-other{list-style:none;margin:14px 0 0;padding:14px;border-radius:16px;background:rgba(245,169,68,.12);display:grid;gap:10px}
+.install-ios[hidden],.install-other[hidden]{display:none}
+.install-ios li,.install-other li{display:flex;align-items:center;gap:10px;font-size:14px;line-height:1.4}
 .install-ios svg{vertical-align:-4px;color:#0a84ff}
-.install-ios .step{display:grid;place-items:center;flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;font:700 12px var(--sans)}
+.install-ios .step,.install-other .step{display:grid;place-items:center;flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;font:700 12px var(--sans)}
 .sheet-actions{display:flex;flex-direction:column;gap:6px;margin-top:18px}
 .sheet-actions [hidden]{display:none}
 .sheet-primary{width:100%;min-height:50px;font-size:15px;border-radius:14px}
