@@ -2199,6 +2199,7 @@ function showInstallSheet({ force = false } = {}) {
   const button = $(".install-actions [data-action=install]");
   const openButton = $(".install-actions [data-action=install-open]");
   $(".install-ios").hidden = !ios || installed;
+  $(".install-android").hidden = ios;
   $(".install-other").hidden = ios || installed || !!state.installPrompt;
   $(".install-installed").hidden = !installed;
   button.hidden = installed;
