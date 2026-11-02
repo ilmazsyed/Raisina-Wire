@@ -2214,7 +2214,7 @@ window.addEventListener("appinstalled", () => {
 // beforeinstallprompt. Native installation is used where available; otherwise the sheet explains
 // the browser's Add to Home Screen / Install menu.
 if (!isStandalone()) {
-  const installLanding = location.pathname.replace(/\\/+$/, "") === "/install";
+  const installLanding = location.pathname.replace(/\/+$/, "") === "/install";
   setTimeout(() => showInstallSheet({ force: installLanding }), installLanding ? 900 : 6500);
 }
 document.documentElement.classList.toggle("standalone", isStandalone());

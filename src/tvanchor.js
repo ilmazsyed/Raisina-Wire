@@ -45,11 +45,17 @@ export function createAnchor(screen, { isPaused, hearing, label, onBlocked, onSp
       if (want) v.play().catch(() => {}); else v.pause();
     }
   }
-  // Keeps the clip in step with the voice.
+  // Keeps the clip in step with the voice: a big gap is closed by a jump, a small one by playing the
+  // clip a touch faster or slower (no visible skip), so the lips stay within a few hundredths of a
+  // second of the words.
   function follow() {
     if (!clipOn || !audio) return;
-    if (Math.abs(clip.currentTime - voice.currentTime) > 0.1) clip.currentTime = voice.currentTime;
-    if (voice.paused) clip.pause(); else if (clip.paused && !offScreen()) clip.play().catch(() => {});
+    const d = clip.currentTime - voice.currentTime;
+    if (clip.ended) return;
+    if (Math.abs(d) > 0.08) { clip.currentTime = voice.currentTime; clip.playbackRate = 1; }
+    else clip.playbackRate = Math.abs(d) < 0.02 ? 1 : Math.min(1.1, Math.max(0.9, 1 - d * 2));
+    const over = clip.ended || (clip.duration && voice.currentTime >= clip.duration - 0.05); // the clip has said it all
+    if (voice.paused || over) clip.pause(); else if (clip.paused && !offScreen()) clip.play().catch(() => {});
   }
 
   // One voice player for every line, unlocked by the viewer's click (phones only let a player
@@ -58,7 +64,16 @@ export function createAnchor(screen, { isPaused, hearing, label, onBlocked, onSp
   const voice = new Audio(); voice.preload = "auto";
   // A tenth of a second of real silence: playing it during the viewer's tap unlocks the player.
   const SILENCE = "data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==";
-  function unlock() { if (audio) return; voice.src = SILENCE; voice.play().then(() => { if (!audio) voice.pause(); }).catch(() => {}); }
+  function unlock() {
+    // Her face too: iPhones (always in Low Power Mode) won't start a video that a tap never
+    // started, so her mouth would stay shut. Each face player is started and stopped during the tap.
+    for (const v of [idle, talk, clip]) {
+      if (!v.getAttribute("src")) v.src = "/tv-unlock.mp4";
+      if (v.paused) v.play().then(() => { if (v === clip) { if (!(clipOn && speaking)) v.pause(); } else face(speaking); }).catch(() => {});
+    }
+    if (audio) return;
+    voice.src = SILENCE; voice.play().then(() => { if (!audio) voice.pause(); }).catch(() => {});
+  }
 
   // Voice-over pictures: one after another, each pushing in slowly, changing with a Raisina Wire
   // wipe (a crimson band and a navy band sweeping across); at least three, looping if the read runs on.
@@ -117,7 +132,7 @@ export function createAnchor(screen, { isPaused, hearing, label, onBlocked, onSp
       const finish = ok => { if (done) return; done = true; stopAudio(); clipOn = false; face(false); cap.hidden = true; cap.classList.remove("show"); res(ok); };
       // The lip-synced clip, if this line has one, starts with the voice (or alone, without sound).
       clipOn = Boolean(line.clip);
-      if (clipOn) { clip.src = line.clip; clip.currentTime = 0; }
+      if (clipOn) { clip.src = line.clip; clip.currentTime = 0; clip.playbackRate = 1; }
       const fallback = () => {   // no voice: the clip (or the talking loop) and reading time
         if (audio) { voice.onended = voice.onerror = voice.onplaying = voice.onpause = null; voice.pause(); audio = null; onSpeak?.(false); }
         started = true; face(true);
