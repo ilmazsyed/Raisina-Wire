@@ -65,3 +65,18 @@ forwards then backwards, 720 px tall. Lips are approximate, not synced to the wo
   then navy). They are the explainer script's own photos, made up to four with stills from the film
   (above its captions), in `public/anchors/vo/`. Run `python3 video/anchor_vo_pics.py` after adding
   an intro for a new explainer; it also writes `src/tv-intro-pics.js`.
+
+## Live reads (headlines, breaking lines, live captions)
+Tara reads every headline the channel shows (News Update sets, Breaking Headlines), the editor's
+breaking lines and live-input captions, in her Kokoro voice. These change all the time, so the
+GitHub Action **Raisina TV live reads** (`.github/workflows/live-reads.yml`, every 10 minutes and on
+demand) asks the site what's waiting (`/api/admin/tv/voice-todo`), records it with
+`video/live_reads.py` and uploads it (kept in D1 for four days). It needs the repository secret
+`RW_PUBLISH_TOKEN`, the same value as the Worker's `PUBLISH_TOKEN`. The control room records too
+while its Raisina TV page is open. A headline not yet recorded is shown on its usual timer.
+
+## Self-introduction
+"Hello and welcome to today's news updates. My name is Tara, and you're watching Raisina Wire Live."
+The anchor says it before her first line when TV starts, when a new anchor takes over, and when
+she's back on screen after half an hour (`hello` in `src/tv.js`, `FIXED.hello` in `src/anchors.js`).
+Names are recorded as they're said ("Raisina" as "Rayseena"): `SAY` in `src/anchors.js`.

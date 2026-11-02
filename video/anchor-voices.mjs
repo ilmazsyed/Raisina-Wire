@@ -13,13 +13,13 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(root, "public/anchors/voice");
 if (!existsSync(join(root, "src/anchor-voices.js"))) writeFileSync(join(root, "src/anchor-voices.js"), "export const VOICED = new Set([]);\n");
-const { ANCHORS, READY, allLines, lineId } = await import("../src/anchors.js");
+const { ANCHORS, READY, allLines, lineId, spoken } = await import("../src/anchors.js");
 const who = process.argv.slice(2).length ? process.argv.slice(2) : READY;
 mkdirSync(OUT, { recursive: true });
 
 const want = new Map();
 for (const k of Object.keys(ANCHORS)) {
-  for (const text of allLines(k)) want.set(await lineId(k, text), { anchor: k, voice: ANCHORS[k].voice, text });
+  for (const text of allLines(k)) want.set(await lineId(k, text), { anchor: k, voice: ANCHORS[k].voice, text, say: spoken(text) });
 }
 const todo = [...want].filter(([id, l]) => who.includes(l.anchor) && !existsSync(join(OUT, `${id}.mp3`))).map(([id, l]) => ({ id, ...l }));
 console.log(`${todo.length} lines to record for ${who.join(", ")}`);

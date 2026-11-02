@@ -47,20 +47,30 @@ export const FIXED = {
   headlines: "Here are the breaking headlines at this hour.",
   bulletin: h => `It's ${hourWords(h)}. Here are the headlines on Raisina TV.`,
   breaking: "Breaking news. Here is what we know.",
-  live: "We're bringing you live visuals now."
+  live: "We're bringing you live visuals now.",
+  // The anchor's self-introduction: when TV starts, when an anchor takes over, and when the anchor
+  // is back on screen after half an hour.
+  hello: name => `Hello and welcome to today's news updates. My name is ${name}, and you're watching Raisina Wire Live.`
 };
+// How names are said aloud (Kokoro reads the spelling): used when recording, never shown.
+export const SAY = [[/Raisina/g, "Rayseena"]];
+export const spoken = t => SAY.reduce((s, [a, b]) => s.replace(a, b), String(t));
 const camFor = (who, it) => who === "ilmaz" ? it.cam : it.cam.replace(/^My pick today\.\s*/, "Today's Editor's Pick. ");
 // Live reads: the breaking story and the live caption in the anchor's own words. Recorded in the
 // editor's browser from the control room (src/anchorrecord.js) and kept in D1; until a read is
 // recorded the anchor says the fixed line with the words on screen.
 export const READ = {
   breaking: t => `Breaking news. ${end(clip(t, 220))}`,
-  live: t => `We're bringing you live visuals of ${end(clip(t, 120))}`
+  live: t => `We're bringing you live visuals of ${end(clip(t, 120))}`,
+  head: t => end(String(t || "").replace(/\s+/g, " ").trim())   // a headline, read as it's shown
 };
 // The live reads to record now, for each anchor on air: every breaking line on air, the last
-// break-in's headline, and every live input (so a cut is voiced the moment it happens).
-export async function liveReads({ breaking = [], inputs = [], force = null }) {
-  const texts = [...new Set([...breaking.map(READ.breaking), ...(force?.text ? [READ.breaking(force.text)] : []), ...inputs.map(i => READ.live(i.title))])];
+// break-in's headline, every live input (so a cut is voiced the moment it happens), and every
+// headline the channel can show (News Update sets, Breaking Headlines), which the anchor reads.
+// Recorded by the GitHub Action "Raisina TV live reads" (video/live_reads.py) every few minutes,
+// or by the control room when it is open.
+export async function liveReads({ breaking = [], inputs = [], force = null, heads = [] }) {
+  const texts = [...new Set([...breaking.map(READ.breaking), ...(force?.text ? [READ.breaking(force.text)] : []), ...inputs.map(i => READ.live(i.title)), ...heads.filter(Boolean).map(READ.head)])];
   const out = [];
   for (const k of READY.filter(k => ROTA.includes(k))) for (const t of texts) out.push({ id: await lineId(k, t), anchor: k, voice: ANCHORS[k].voice, voiceFile: `/anchors/${k}-voice.bin`, text: t });
   return out;
@@ -68,7 +78,7 @@ export async function liveReads({ breaking = [], inputs = [], force = null }) {
 // Every line an anchor can say (for recording): the intros, both ways for the Editor's Picks, and
 // the fixed lines, including a bulletin line for each hour.
 export function allLines(anchor) {
-  const out = [FIXED.news, FIXED.headlines, FIXED.breaking, FIXED.live, ...Array.from({ length: 24 }, (_, h) => FIXED.bulletin(h))];
+  const out = [FIXED.hello(ANCHORS[anchor].name), FIXED.news, FIXED.headlines, FIXED.breaking, FIXED.live, ...Array.from({ length: 24 }, (_, h) => FIXED.bulletin(h))];
   for (const it of Object.values(TV_INTROS)) out.push(camFor(anchor, it), it.vo, it.out);
   return [...new Set(out)];
 }
@@ -93,13 +103,13 @@ export async function anchorLines({ playlist, input, breaking, force, voiced = n
     const l = await line(duty, text);
     return voiced.has(l.id) ? { ...l, audio: `/api/tv/voice/${l.id}`, show } : { ...await line(duty, fixed), show };
   };
-  const [news, bulletin, headlines, breakingLine, live] = await Promise.all([
-    line(duty, FIXED.news), line(duty, FIXED.bulletin(h)), line(duty, FIXED.headlines),
+  const [hello, news, bulletin, headlines, breakingLine, live] = await Promise.all([
+    line(duty, FIXED.hello(ANCHORS[duty].name)), line(duty, FIXED.news), line(duty, FIXED.bulletin(h)), line(duty, FIXED.headlines),
     brk ? read(READ.breaking(brk), FIXED.breaking, end(clip(brk, 220))) : null,
     input ? read(READ.live(input.title), FIXED.live, clip(input.title, 120)) : null
   ]);
   return {
     duty, roster: Object.fromEntries(Object.entries(ANCHORS).map(([k, a]) => [k, { name: a.name, role: a.role }])),
-    intros, lines: { news, bulletin, headlines, breaking: breakingLine, live }
+    intros, lines: { hello, news, bulletin, headlines, breaking: breakingLine, live }
   };
 }
