@@ -91,6 +91,11 @@ them on CPU (`video/lips/action.py`: Wav2Lip on the anchor's resting loop, the f
 `public/anchors/lips/` (`src/anchor-lips.js`) work the same way. Needs the repository secret
 `RW_PUBLISH_TOKEN`. A new anchor's face goes in `faces.json` when their face is made.
 
+**Starting the Actions.** GitHub runs scheduled Actions only now and then on a quiet repository, so the
+Worker's cron starts them when there is work: "Raisina TV live reads" when reads are waiting (checked
+every 10 minutes) and "Raisina TV lip sync" when clips are (every 15). Needs the Worker secret
+`GITHUB_DISPATCH_TOKEN`: a fine-grained GitHub token for this repository with "Actions: read and write".
+
 ## Live reads (headlines, breaking lines, live captions)
 Tara reads every headline the channel shows (News Update sets, Breaking Headlines), the editor's
 breaking lines and live-input captions, in her Kokoro voice. These change all the time, so the
