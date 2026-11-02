@@ -156,6 +156,32 @@ The Vite preview runs the static front-end. For live `/api/*` routes locally, us
 npm run dev:worker
 ```
 
+## Google Search and Google News launch checklist
+
+The Worker generates these public discovery endpoints on the canonical domain:
+
+- `/sitemap.xml` — all indexable editorial pages, article images and published video entries.
+- `/news-sitemap.xml` — only articles published in the previous 48 hours; keep this current as stories publish.
+- `/robots.txt` — permits public crawling and references both sitemaps.
+- `/feed.xml` — RSS feed for readers, aggregators and publication discovery.
+
+After deployment:
+
+1. Verify the canonical domain in Google Search Console using the DNS TXT record supplied by Google. Do not verify a workers.dev host.
+2. Submit both sitemap URLs in Search Console and inspect the homepage, a recent article, a Hindi article and a Bengali article with URL Inspection. Confirm the selected canonical is the intended URL and that Google can fetch the full HTML.
+3. In Search Console, monitor Page indexing, Crawl stats, Enhancements and the Google News / News performance reports as data becomes available.
+4. Keep the Publisher name, site name and About page consistent: Raisina Wire. Keep visible author bylines, publication and update dates, author biographies, editorial standards, ownership/funding disclosures and a working editorial contact.
+5. Google News eligibility is algorithmic. Publisher Center is optional brand/section management, not an approval or guaranteed placement mechanism. A publisher-specific Follow link should only be published after the verified Raisina Wire source page URL is known. Until then use the Google News search link, not a guessed publication identifier.
+6. Build legitimate authority: publish original reporting and clearly labelled analysis; cite primary sources; add contextual internal links; correct stories transparently; earn relevant citations and links from real organisations and experts. Do not buy links, fabricate author credentials, mass-produce near-duplicate pages or keyword-stuff headlines.
+7. Use Google News-specific sitemaps for discovery, not as a substitute for Search Console or strong editorial quality. News sitemap entries must be recent (last 48 hours) and accurate.
+
+Google documentation:
+- Article structured data: https://developers.google.com/search/docs/appearance/structured-data/article
+- News sitemap requirements: https://developers.google.com/search/docs/crawling-indexing/sitemaps/news-sitemap
+- Google News transparency policies: https://support.google.com/news/publisher-center/answer/6204050
+- Google News technical guidelines: https://support.google.com/news/publisher-center/answer/9606708
+- Preferred sources guidance: https://developers.google.com/search/docs/appearance/preferred-sources
+
 ## Cloudflare deployment
 
 1. Create a Cloudflare D1 database.
