@@ -1,0 +1,20 @@
+{
+  "slug": "tesla-spacex-merger-short",
+  "title": "Tesla + SpaceX in 30 seconds",
+  "series": "Explained",
+  "style": "vox",
+  "voice": "hm_psi:0.55+bm_fable:0.45",
+  "alternate": false,
+  "formats": ["9x16"],
+  "captionChars": 30,
+  "scenes": [
+    {"type": "snap", "src": "media/ts-tesla-spacex.jpg", "frame": "full", "say": "Tesla and SpaceX could become one company."},
+    {"type": "kinetic", "say": "Asked about a merger, Musk said: yes.", "text": "\"Yes.\"", "hl": ["\"Yes.\""], "size": 0.2},
+    {"type": "versus", "say": "Tesla, about 1.5 trillion dollars. SpaceX, around 2 trillion.", "speak": "Tesla, about one and a half trillion dollars. SpaceX, around two trillion.", "a": {"value": 1.5, "decimals": 1, "prefix": "$", "suffix": " tn", "label": "Tesla"}, "b": {"value": 2, "prefix": "$", "suffix": " tn", "label": "SpaceX"}, "at": "SpaceX,"},
+    {"type": "number", "say": "Together, nearly 3.5 trillion.", "speak": "Together, nearly three and a half trillion.", "prefix": "$", "value": 3.5, "decimals": 1, "suffix": " tn", "label": "Combined value, approx.", "bg": "media/ts-musk-chart.jpg"},
+    {"type": "kinetic", "say": "The pitch: AI, chips, robots and Starlink, under one roof.", "text": "AI. Chips. | Robots. Starlink.", "hl": ["Starlink."], "bg": "media/ts-falcon-heavy.jpg"},
+    {"type": "kinetic", "say": "The risk: SpaceX's US military work meets Tesla's China business.", "text": "US military work | meets China", "hl": ["China"]},
+    {"type": "kinetic", "say": "Committees are studying it. There's no deal yet.", "text": "No deal | yet", "hl": ["yet"]},
+    {"type": "outro", "say": "Watch the full explainer on Raisina Wire.", "title": "Watch the full explainer"}
+  ]
+}
