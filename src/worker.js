@@ -516,7 +516,10 @@ const MCP_TOOLS = [
   { name:"list_events", description:"List editorial events and briefings.", inputSchema:{type:"object",properties:{}} },
   { name:"create_event", description:"Create an event. This publishes immediately; call only after explicit editor approval.", inputSchema:{type:"object",required:["title","startsAt"],properties:{title:{type:"string"},description:{type:"string"},eventType:{type:"string"},startsAt:{type:"string"},access:{type:"string",enum:["public","member","premium"]},notify:{type:"boolean",default:false}}} },
   { name:"list_alerts", description:"List recent reader alerts.", inputSchema:{type:"object",properties:{}} },
-  { name:"send_reader_alert", description:"Send a reader alert immediately. Call only after explicit approval of exact headline, body and destination.", inputSchema:{type:"object",required:["title","url"],properties:{title:{type:"string"},body:{type:"string"},url:{type:"string"}}} }
+  { name:"send_reader_alert", description:"Send a reader alert immediately. Call only after explicit approval of exact headline, body and destination.", inputSchema:{type:"object",required:["title","url"],properties:{title:{type:"string"},body:{type:"string"},url:{type:"string"}}} },
+  { name:"list_translations", description:"List articles and pages with Hindi and Bengali translation status.", inputSchema:{type:"object",properties:{}} },
+  { name:"get_translation", description:"Get the English source and existing Hindi or Bengali translation for an article or page.", inputSchema:{type:"object",required:["ref","lang"],properties:{kind:{type:"string",enum:["article","page"],default:"article"},ref:{type:"string"},lang:{type:"string",enum:["hi","bn"]}}} },
+  { name:"save_translation", description:"Save a complete Hindi or Bengali translation for an article or page. Save only after editorial review; this does not publish a new English article.", inputSchema:{type:"object",required:["ref","lang","translation"],properties:{kind:{type:"string",enum:["article","page"],default:"article"},ref:{type:"string"},lang:{type:"string",enum:["hi","bn"]},translation:{type:"object",required:["title","body"],properties:{title:{type:"string"},dek:{type:"string"},topic:{type:"string"},heroCaption:{type:"string"},tags:{type:"array",items:{type:"string"}},body:{type:"string"}}}}} }
 ];
 async function handleMcp(request, env, ctx) {
   const url = new URL(request.url);
@@ -548,8 +551,16 @@ async function handleMcp(request, env, ctx) {
     list_events:["GET","/api/admin/events",null],
     create_event:["POST","/api/events",{...a,notify:false}],
     list_alerts:["GET","/api/admin/alerts",null],
-    send_reader_alert:["POST","/api/admin/alerts",a]
+    send_reader_alert:["POST","/api/admin/alerts",a],
+    list_translations:["GET","/api/admin/translations",null]
   };
+  if(name==="get_translation" || name==="save_translation") {
+    const kind=a.kind==="page"?"page":"article", ref=String(a.ref||""), lang=String(a.lang||"");
+    if(!ref || !["hi","bn"].includes(lang)) return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32602,message:"ref and lang (hi or bn) are required"}},200);
+    const path="/api/admin/translations/"+kind+"/"+encodeURIComponent(ref)+"/"+lang;
+    routes[name]=[name==="get_translation"?"GET":"PUT",path,name==="save_translation"?a.translation:null];
+    if(name==="save_translation" && (!a.translation || typeof a.translation!=="object")) return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32602,message:"translation object is required"}},200);
+  }
   const route=routes[name];
   if(!route) return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32602,message:"Unknown tool"}},200);
   if(name==="update_article" && !a.id) return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32602,message:"id is required"}},200);
