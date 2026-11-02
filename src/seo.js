@@ -365,6 +365,7 @@ export async function newsSitemap(request, env, ensureSchema) {
   // Keep only genuinely published articles from the rolling 48-hour window; translated
   // variants are included only where a saved translation exists.
   const all = [...stories.map(s => ({ ...s, lang: "en" }))];
+  // Google News expects ISO 639-1 language codes: Hindi=hi, Bengali=bn.
   for (const l of LANGS) all.push(...(await localiseArticles(env, l, stories)).filter(s => s.lang === l && s.publishedAt));
   return xmlResponse(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
 ${all.map(s => `<url><loc>${xml(o + prefixed(s.lang, s.href))}</loc><news:news><news:publication><news:name>${SITE}</news:name><news:language>${s.lang}</news:language></news:publication><news:publication_date>${xml(s.publishedAt)}</news:publication_date><news:title>${xml(s.title)}</news:title></news:news></url>`).join("\n")}
