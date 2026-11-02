@@ -2152,25 +2152,43 @@ const recentlyDismissed = () => Date.now() - (store.get("rw-install-dismissed", 
 function showInstallSheet({ force = false } = {}) {
   if (isStandalone() || (!force && recentlyDismissed())) return;
   const ios = isIOS() && !state.installPrompt;
+  const button = $(".install-actions [data-action=install]");
   $(".install-ios").hidden = !ios;
-  $(".install-actions [data-action=install]").hidden = ios;
+  button.hidden = false;
+  button.textContent = ios ? "How to add Raisina Wire" : state.installPrompt ? "Install Raisina Wire" : "Install / Add to Home Screen";
   $("#installSheet").hidden = false;
 }
 async function installPWA() {
   if (isStandalone()) return toast("Raisina Wire is already installed on this device.");
+  if (isIOS()) {
+    showInstallSheet({ force: true });
+    return toast("Follow the steps above: Share, then Add to Home Screen.");
+  }
   if (!state.installPrompt) {
-    if (!$("#installSheet").hidden && !isIOS()) return toast("Use your browser menu and choose “Install app” or “Add to Home screen”.");
-    return showInstallSheet({ force: true });
+    showInstallSheet({ force: true });
+    return toast("If no install prompt appears, open your browser menu and choose Install app or Add to Home screen.");
   }
   $("#installSheet").hidden = true;
-  state.installPrompt.prompt();
-  const { outcome } = await state.installPrompt.userChoice;
+  const promptEvent = state.installPrompt;
   state.installPrompt = null;
+  promptEvent.prompt();
+  const { outcome } = await promptEvent.userChoice;
   if (outcome !== "accepted") store.set("rw-install-dismissed", Date.now());
 }
-window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); state.installPrompt = e; setTimeout(() => showInstallSheet(), 8000); });
-window.addEventListener("appinstalled", () => { if (!store.get("rw-installed", false)) { store.set("rw-installed", true); beacon({ t: "install", platform: platformOf() }); } $("#installSheet").hidden = true; toast("Raisina Wire is installed. Find it on your home screen."); });
-if (isIOS() && !isStandalone()) setTimeout(() => showInstallSheet(), 15000);
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  state.installPrompt = e;
+  showInstallSheet();
+});
+window.addEventListener("appinstalled", () => {
+  if (!store.get("rw-installed", false)) { store.set("rw-installed", true); beacon({ t: "install", platform: platformOf() }); }
+  $("#installSheet").hidden = true;
+  toast("Raisina Wire is installed. Find it on your home screen.");
+});
+// Offer installation on every supported device/browser, not just iOS or browsers that fire
+// beforeinstallprompt. Native installation is used where available; otherwise the sheet explains
+// the browser's Add to Home Screen / Install menu.
+if (!isStandalone()) setTimeout(() => showInstallSheet(), 6500);
 document.documentElement.classList.toggle("standalone", isStandalone());
 
 function syncOnline(event) {
