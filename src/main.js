@@ -1,6 +1,6 @@
 import "./style.css";
 import { editions, NEWSLETTER_URL, AUTHOR } from "./editions.js";
-import { initTV, dockTV, mountPreview, loadTV, tvFeed } from "./tv.js";
+import { initTV, dockTV, mountPreview, loadTV, tvFeed, tvBusy } from "./tv.js";
 import { tvModeHTML, mountTVMode, unmountTVMode, isSmartTV, openWatchOnTV } from "./tvmode.js";
 import { brandMark, skyline, tribar, wordmark } from "./brand.js";
 import { WRITERS, writer, setGuestWriters } from "./writers.js";
@@ -273,18 +273,60 @@ function renderShell() {
     <button class="btn btn-red btn-sm" type="button" data-action="apply-update">Update</button>
     <button class="ub-close" type="button" data-action="update-later" aria-label="Later">${ICON_X}</button>
   </div>
-  <section class="sheet install-sheet" id="installSheet" role="dialog" aria-labelledby="installTitle" hidden>
-    <span class="sheet-grip" aria-hidden="true"></span>
-    <button class="sheet-x" type="button" data-action="install-dismiss" aria-label="Close">${ICON_X}</button>
-    <div class="sheet-hero install"><img class="sheet-app" src="/icon-192.png" alt="" width="72" height="72"></div>
-    <span class="kicker">The Raisina Wire app</span><h2 id="installTitle">Add Raisina Wire to your home screen</h2>
-    <ul class="sheet-list"><li>${ICON_CHECK}<span>Every edition readable offline</span></li><li>${ICON_CHECK}<span>Live wire, markets and live coverage in one tap</span></li><li>${ICON_CHECK}<span>Alerts and full-screen reading, like any app</span></li></ul>
-    <ol class="install-ios" hidden>
-      <li><span class="step">1</span><span>Tap <b>Share</b> <svg class="ios-share" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg> in Safari’s toolbar</span></li>
-      <li><span class="step">2</span><span>Choose <b>Add to Home Screen</b> <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span></li>
-      <li><span class="step">3</span><span>Open Raisina Wire from your home screen</span></li>
-    </ol>
-    <div class="sheet-actions install-actions"><button class="btn btn-red sheet-primary" type="button" data-action="install">Install the app</button><button class="sheet-secondary" type="button" data-action="install-dismiss">Not now</button></div>
+  <section class="install-sheet" id="installSheet" role="dialog" aria-modal="true" aria-labelledby="installTitle" hidden>
+    <div class="install-panel">
+      <button class="install-close" type="button" data-action="install-dismiss" aria-label="Close">${ICON_X}</button>
+      <header class="install-brand">
+        <img class="install-brand-icon" src="/icon-192.png" alt="Raisina Wire app icon" width="76" height="76">
+        <span class="install-brand-divider" aria-hidden="true"></span>
+        <span class="install-brand-copy"><b>RAISINA WIRE <i>TV</i></b><small>GEOPOLITICS <em>·</em> SECURITY <em>·</em> MARKETS <em>·</em> ANALYSIS</small></span>
+      </header>
+      <div class="install-intro">
+        <div class="install-copy">
+          <span class="install-eyebrow">THE RAISINA WIRE APP</span>
+          <h2 id="installTitle">Install the<br>Raisina Wire <span>App</span></h2>
+          <p>A fast, secure and lightweight news experience — without the app-store download.</p>
+          <div class="install-benefits">
+            <span><b aria-hidden="true">ϟ</b>Lightweight<br>&amp; fast</span>
+            <span><b aria-hidden="true">◇</b>Safe<br>&amp; secure</span>
+            <span><b aria-hidden="true">⌁</b>Read<br>offline</span>
+            <span><b aria-hidden="true">▣</b>Phone, tablet<br>&amp; desktop</span>
+          </div>
+        </div>
+        <div class="install-device" aria-hidden="true">
+          <div class="install-device-frame"><div class="install-device-notch"></div><div class="install-device-screen">
+            <img src="/icon-192.png" alt="" width="100" height="100"><b>Raisina Wire</b><span class="install-globe"></span>
+          </div></div>
+        </div>
+      </div>
+      <div class="install-platforms">
+        <div class="install-platform install-ios">
+          <h3><span class="platform-symbol">●</span> iPhone / iPad <small>(Safari)</small></h3>
+          <ol>
+            <li><span class="step">1</span><span>Tap <b>Share</b> <span class="install-inline-icon">↥</span></span></li>
+            <li><span class="step">2</span><span>Choose <b>Add to Home Screen</b> <span class="install-inline-icon">⊞</span></span></li>
+            <li><span class="step">3</span><span>Open Raisina Wire from your home screen</span></li>
+          </ol>
+        </div>
+        <div class="install-platform install-android">
+          <h3><span class="platform-symbol android-symbol">●</span> Android <small>(Chrome &amp; other browsers)</small></h3>
+          <div class="install-actions">
+            <button class="btn btn-red sheet-primary" type="button" data-action="install"><span aria-hidden="true">↓</span> Install App</button>
+            <button class="btn btn-red sheet-primary" type="button" data-action="install-open" hidden>Open Raisina Wire</button>
+          </div>
+          <p class="install-other" hidden>Or tap <b>⋮</b> in your browser and choose <b>Install app / Add to Home Screen</b>.</p>
+          <p class="install-installed" hidden>Already installed? Open Raisina Wire from your app list or home screen.</p>
+        </div>
+      </div>
+      <div class="install-bottom">
+        <span><b>ϟ</b> Instant access<br><small>Live news &amp; analysis</small></span>
+        <span><b>♧</b> Real-time<br><small>alerts</small></span>
+        <span><b>▱</b> No app store<br><small>required</small></span>
+        <span><b>▣</b> One experience<br><small>across devices</small></span>
+      </div>
+      <p class="install-storage">Uses a small amount of device storage for the app and cached content. Offline saves may use more.</p>
+      <button class="sheet-secondary install-later" type="button" data-action="install-dismiss">Not now</button>
+    </div>
   </section>`;
 
   $("#today").textContent = new Date().toLocaleDateString(LOCALE, { ...IST, weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -663,6 +705,10 @@ async function viewStory(r) {
     <div class="prose dropcap">${blocks.length ? proseHTML(blocks, { pull: pullQuote(blocks) }) : `<p>This story could not be loaded.</p>`}</div>
     ${(a.tags || []).length ? `<div class="story-tags"><span class="meta">Topics</span>${a.tags.map((t, i) => `<a class="tag-chip" href="/tag/${tagSlug(t)}">${esc(a.tagLabels?.[i] || t)}</a>`).join("")}</div>` : ""}
     ${shareBlock(a.title, a.href)}
+    <div class="reader-end glass"><div><b style="font-size:16px">Find Raisina Wire on Google News</b><div class="muted" style="font-size:14px;margin-top:4px">Search for “Raisina Wire” in Google News and follow the publication when its source page appears.</div></div><a class="btn btn-light" href="https://news.google.com/search?q=Raisina%20Wire" target="_blank" rel="noopener noreferrer">Find on Google News ↗</a></div>
+    <div class="reader-end glass"><div><b style="font-size:16px">Watch Raisina TV</b><div class="muted" style="font-size:14px;margin-top:4px">Live coverage, explainers and the stories shaping India and the world.</div></div><a class="btn btn-red" href="/tv">Watch live ↗</a></div>
+    <div class="reader-end glass"><div><b style="font-size:16px">Get Raisina Wire in your feed</b><div class="muted" style="font-size:14px;margin-top:4px">Follow our RSS feed in your preferred news reader.</div></div><a class="btn btn-light" href="/feed.xml" target="_blank" rel="noopener noreferrer">RSS feed ↗</a></div>
+    <div class="reader-end glass"><div><b style="font-size:16px">Make Raisina Wire a preferred Google source</b><div class="muted" style="font-size:14px;margin-top:4px">Choose Raisina Wire to see more of our coverage in Google Top Stories.</div></div><a class="btn btn-light" href="https://www.google.com/preferences/source?q=https%3A%2F%2Fraisinawire.calibrex.org%2F" target="_blank" rel="noopener noreferrer">Add preferred source ↗</a></div>
     <div class="author-box"><img src="${w.photo}" alt="" class="${w.isDesk ? "desk" : ""}"><div><span class="kicker">${w.isDesk ? "From the desk" : "About the author"}</span><b><a href="/author/${w.key}">${esc(w.name)}</a></b><p>${esc(w.bio)}</p><a class="link-gold" href="/author/${w.key}" style="font-size:13px">More from ${esc(w.name)} →</a></div></div>
     <div class="reader-end glass discuss-end"><div><span class="kicker">Community</span><b style="display:block;font-size:17px;margin-top:4px">What do you make of this?</b><div class="muted" style="font-size:14px;margin-top:4px">Members discuss every story in moderated threads. Free to join.</div></div><button class="btn btn-dark" type="button" data-action="discuss" data-title="${esc(a.title)}">Discuss this story</button></div>
     ${linkedin ? `<div class="reader-end glass"><div><b style="font-size:16px">Follow Raisina Wire on LinkedIn</b><div class="muted" style="font-size:14px;margin-top:4px">${edition ? "First published in the Raisina Wire newsletter." : "New editions every week."}</div></div><a class="btn btn-light" href="${NEWSLETTER_URL}" target="_blank" rel="noreferrer">Subscribe ↗</a></div>` : ""}
@@ -1223,6 +1269,7 @@ async function onAction(e) {
   if (a === "search") openSearch();
   if (a === "ics") downloadIcs(el.dataset.event);
   if (a === "install") { e.preventDefault(); installPWA(); }
+  if (a === "install-open") { e.preventDefault(); openInstalledPWA(); }
   if (a === "install-dismiss") { store.set("rw-install-dismissed", Date.now()); $("#installSheet").hidden = true; }
   if (a === "update-later") $("#updateBar").hidden = true;
   if (a === "lang-later") { $("#langSuggest").hidden = true; setLanguagePreference("en"); }
@@ -2165,25 +2212,65 @@ const recentlyDismissed = () => Date.now() - (store.get("rw-install-dismissed", 
 function showInstallSheet({ force = false } = {}) {
   if (isStandalone() || (!force && recentlyDismissed())) return;
   const ios = isIOS() && !state.installPrompt;
-  $(".install-ios").hidden = !ios;
-  $(".install-actions [data-action=install]").hidden = ios;
+  const installed = store.get("rw-installed", false);
+  const button = $(".install-actions [data-action=install]");
+  const openButton = $(".install-actions [data-action=install-open]");
+  $(".install-ios").hidden = !ios || installed;
+  $(".install-android").hidden = ios;
+  $(".install-other").hidden = ios || installed || !!state.installPrompt;
+  $(".install-installed").hidden = !installed;
+  button.hidden = installed;
+  openButton.hidden = !installed;
+  button.textContent = ios ? "How to add Raisina Wire" : state.installPrompt ? "Install Raisina Wire" : "Install / Add to Home Screen";
+  $("#installTitle").innerHTML = installed ? "Your Raisina Wire app is ready" : "Install the<br>Raisina Wire <span>App</span>";
   $("#installSheet").hidden = false;
+}
+function openInstalledPWA() {
+  if (isIOS()) return toast("Open Raisina Wire from its home-screen icon to launch the app.");
+  // Re-open the same origin in a fresh top-level tab. Android browsers that support
+  // installed-web-app link capture can hand this URL to the installed app.
+  const target = new URL(location.href);
+  const opened = window.open(target.href, "_blank", "noopener");
+  if (!opened) toast("If the app doesn't open automatically, launch Raisina Wire from your app list.");
+  else toast("Opening Raisina Wire. If it stays in the browser, use the app icon.");
 }
 async function installPWA() {
   if (isStandalone()) return toast("Raisina Wire is already installed on this device.");
+  if (store.get("rw-installed", false)) return openInstalledPWA();
+  if (isIOS()) {
+    showInstallSheet({ force: true });
+    return toast("Follow the steps above: Share, then Add to Home Screen.");
+  }
   if (!state.installPrompt) {
-    if (!$("#installSheet").hidden && !isIOS()) return toast("Use your browser menu and choose “Install app” or “Add to Home screen”.");
-    return showInstallSheet({ force: true });
+    showInstallSheet({ force: true });
+    return toast("Use your browser menu to choose Install app or Add to Home screen.");
   }
   $("#installSheet").hidden = true;
-  state.installPrompt.prompt();
-  const { outcome } = await state.installPrompt.userChoice;
+  const promptEvent = state.installPrompt;
   state.installPrompt = null;
+  promptEvent.prompt();
+  const { outcome } = await promptEvent.userChoice;
   if (outcome !== "accepted") store.set("rw-install-dismissed", Date.now());
 }
-window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); state.installPrompt = e; setTimeout(() => showInstallSheet(), 8000); });
-window.addEventListener("appinstalled", () => { if (!store.get("rw-installed", false)) { store.set("rw-installed", true); beacon({ t: "install", platform: platformOf() }); } $("#installSheet").hidden = true; toast("Raisina Wire is installed. Find it on your home screen."); });
-if (isIOS() && !isStandalone()) setTimeout(() => showInstallSheet(), 15000);
+// The automatic offer waits while Raisina TV is playing, and comes once it stops or is paused.
+function offerInstall(opts) { if (tvBusy()) setTimeout(() => offerInstall(opts), 15e3); else showInstallSheet(opts); }
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  state.installPrompt = e;
+  offerInstall();
+});
+window.addEventListener("appinstalled", () => {
+  if (!store.get("rw-installed", false)) { store.set("rw-installed", true); beacon({ t: "install", platform: platformOf() }); }
+  $("#installSheet").hidden = true;
+  toast("Raisina Wire is installed. Find it on your home screen.");
+});
+// Offer installation on every supported device/browser, not just iOS or browsers that fire
+// beforeinstallprompt. Native installation is used where available; otherwise the sheet explains
+// the browser's Add to Home Screen / Install menu.
+if (!isStandalone()) {
+  const installLanding = location.pathname.replace(/\/+$/, "") === "/install";
+  setTimeout(() => offerInstall({ force: installLanding }), installLanding ? 900 : 6500);
+}
 document.documentElement.classList.toggle("standalone", isStandalone());
 
 function syncOnline(event) {

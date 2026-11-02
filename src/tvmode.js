@@ -1,10 +1,10 @@
 // TV mode (/t): Raisina TV for smart-TV browsers, without an app. The channel fills the screen;
-// one press of OK turns the sound on and goes full screen (TV browsers need one press before they
+// one press of OK starts the channel with sound and goes full screen (TV browsers need one press before they
 // allow sound); the remote's arrows, OK, Play/Pause and Back work the controls. A small QR code
 // in the corner opens what is on screen on a phone. The screen is kept awake, and the page
 // refreshes itself every few hours so a TV left on all day stays smooth.
 import { tr, lang, withLang } from "./i18n.js";
-import { tvStatus, tvControl } from "./tv.js";
+import { tvStatus, tvControl, tvStart } from "./tv.js";
 import { qrSvg } from "./qr.js";
 import { markDome } from "./brand.js";
 import * as music from "./tvaudio.js";
@@ -76,7 +76,7 @@ export function mountTVMode({ navigate }) {
     if (started) return;
     started = true; card.hidden = true;
     if (!auto) { try { await document.documentElement.requestFullscreen?.({ navigationUI: "hide" }); } catch { /* not allowed here */ } }
-    tvControl("unmute");
+    tvStart(); // the press of OK lets TV play with sound
     ls.set("rw-tvm-started", Date.now());
     wake(); renderQr();
     if (!auto) showBar();
@@ -84,7 +84,6 @@ export function mountTVMode({ navigate }) {
   // After the page refreshes itself, start again without the card when the TV still allows sound.
   async function resume() {
     if (Date.now() - ls.get("rw-tvm-started", 0) > RESTART_AFTER) return;
-    for (let i = 0; i < 40 && tvStatus().mode === "idle"; i++) await new Promise(r => setTimeout(r, 250));
     const ctx = music.audio();
     try { await ctx?.resume(); } catch { /* blocked */ }
     if (ctx?.state === "running") start(true);

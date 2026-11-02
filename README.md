@@ -95,7 +95,7 @@ A 24×7 channel of the desk's explainers (`media_type` video, uploaded `.mp4`/`.
 
 Control room → **Live TV** also has: on/off; **Break in now** (every viewer cuts to a chosen explainer within ~15 s; people opening TV more than two minutes later just start normally); between-video settings (stinger, promo, News Update, hourly bulletin on/off; full package after every 1–6 videos; 3–5 sets; seconds per set); a **pinned headline set** of your own five lines that leads every News Update while on; music (built-in themes on/off with preview, your tracks); breaking ticker lines; ads (Google Drive "Anyone with the link" share links, converted automatically; keep files under ~100 MB; an ad that won't load is skipped), a break every N minutes of watching (default 12), 1–4 ads per break, skippable after 5 s or not; and the running order ("Use my order"). Code: `src/tv.js` (player and sequences), `src/tvaudio.js` (music), `src/channel.js` (feed and settings), migrations 0018–0019. Plays, TV viewers and minutes, and ad impressions show in Audience.
 
-**On smart TVs (no app needed).** TV mode at `/t` (`/hi/t`, `/bn/t`): the channel full screen for a TV's web browser, with nothing else on the page, sized for viewing from across the room and with lighter effects for TV browsers. It opens on a "Press OK to start" card while the channel plays muted behind it; one press turns the sound on and goes full screen (TV browsers need one press before they allow sound). The remote works it: OK shows the controls or picks one, ◀ ▶ move between Pause, Sound, EN / हिं / বাং and Exit, Play/Pause pauses, Back hides the controls; they fade after 5 seconds. A small QR in the corner ("scan to watch on your phone") follows what is on screen: the current explainer, or the Raisina Wire home page during sequences (Control room → Live TV → On smart TVs to switch it off). The screen is kept awake where the TV allows it, and the page refreshes itself every four hours between explainers; within 12 hours it starts again without the card if the TV still allows sound. Smart-TV browsers that open `/tv` are switched to TV mode; Exit returns to the website for that visit. The TV page has a **Watch on your TV** button (also in the footer): the short address, how to use a smart TV's browser, Cast tab (Chromecast / Google TV) or AirPlay screen mirroring, and a QR to open Raisina TV on a phone. The control room downloads a print-ready **QR poster**. QR codes are made in the browser (`src/qr.js`, the qrcode-generator library); nothing is sent to an outside service. Code: `src/tvmode.js`.
+**On smart TVs (no app needed).** TV mode at `/t` (`/hi/t`, `/bn/t`): the channel full screen for a TV's web browser, with nothing else on the page, sized for viewing from across the room and with lighter effects for TV browsers. It opens on a "Press OK to start" card over the newest explainer's picture; one press starts the channel with sound and goes full screen (TV browsers need one press before they allow sound). The remote works it: OK shows the controls or picks one, ◀ ▶ move between Pause, Sound, EN / हिं / বাং and Exit, Play/Pause pauses, Back hides the controls; they fade after 5 seconds. A small QR in the corner ("scan to watch on your phone") follows what is on screen: the current explainer, or the Raisina Wire home page during sequences (Control room → Live TV → On smart TVs to switch it off). The screen is kept awake where the TV allows it, and the page refreshes itself every four hours between explainers; within 12 hours it starts again without the card if the TV still allows sound. Smart-TV browsers that open `/tv` are switched to TV mode; Exit returns to the website for that visit. The TV page has a **Watch on your TV** button (also in the footer): the short address, how to use a smart TV's browser, Cast tab (Chromecast / Google TV) or AirPlay screen mirroring, and a QR to open Raisina TV on a phone. The control room downloads a print-ready **QR poster**. QR codes are made in the browser (`src/qr.js`, the qrcode-generator library); nothing is sent to an outside service. Code: `src/tvmode.js`.
 
 The TV page is also the video library (the old `/watch` address redirects here): Raisina TV on top, then a shorts carousel, Continue watching, Latest, "Because you watched…", a row per category, Most watched, chips and search, hover previews on computers, a detail panel on phones, and a cinema player with "Up next in 5…". Thumbnails load as small WebP copies (`*-sm.webp`, 480 px, and `*-md.webp`, 960 px, next to each `.jpg` in `public/videos/`); after adding videos there, run `python3 tools/thumbs.py`.
 
@@ -157,6 +157,32 @@ The Vite preview runs the static front-end. For live `/api/*` routes locally, us
 ```bash
 npm run dev:worker
 ```
+
+## Google Search and Google News launch checklist
+
+The Worker generates these public discovery endpoints on the canonical domain:
+
+- `/sitemap.xml` — all indexable editorial pages, article images and published video entries.
+- `/news-sitemap.xml` — only articles published in the previous 48 hours; keep this current as stories publish.
+- `/robots.txt` — permits public crawling and references both sitemaps.
+- `/feed.xml` — RSS feed for readers, aggregators and publication discovery.
+
+After deployment:
+
+1. Verify the canonical domain in Google Search Console using the DNS TXT record supplied by Google. Do not verify a workers.dev host.
+2. Submit both sitemap URLs in Search Console and inspect the homepage, a recent article, a Hindi article and a Bengali article with URL Inspection. Confirm the selected canonical is the intended URL and that Google can fetch the full HTML.
+3. In Search Console, monitor Page indexing, Crawl stats, Enhancements and the Google News / News performance reports as data becomes available.
+4. Keep the Publisher name, site name and About page consistent: Raisina Wire. Keep visible author bylines, publication and update dates, author biographies, editorial standards, ownership/funding disclosures and a working editorial contact.
+5. Google News eligibility is algorithmic. Publisher Center is optional brand/section management, not an approval or guaranteed placement mechanism. A publisher-specific Follow link should only be published after the verified Raisina Wire source page URL is known. Until then use the Google News search link, not a guessed publication identifier.
+6. Build legitimate authority: publish original reporting and clearly labelled analysis; cite primary sources; add contextual internal links; correct stories transparently; earn relevant citations and links from real organisations and experts. Do not buy links, fabricate author credentials, mass-produce near-duplicate pages or keyword-stuff headlines.
+7. Use Google News-specific sitemaps for discovery, not as a substitute for Search Console or strong editorial quality. News sitemap entries must be recent (last 48 hours) and accurate.
+
+Google documentation:
+- Article structured data: https://developers.google.com/search/docs/appearance/structured-data/article
+- News sitemap requirements: https://developers.google.com/search/docs/crawling-indexing/sitemaps/news-sitemap
+- Google News transparency policies: https://support.google.com/news/publisher-center/answer/6204050
+- Google News technical guidelines: https://support.google.com/news/publisher-center/answer/9606708
+- Preferred sources guidance: https://developers.google.com/search/docs/appearance/preferred-sources
 
 ## Cloudflare deployment
 

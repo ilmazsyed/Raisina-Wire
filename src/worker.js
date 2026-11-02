@@ -19,10 +19,17 @@ import m0017 from "../migrations/0017_article_video.sql";
 import m0018 from "../migrations/0018_raisina_tv.sql";
 import { tvSettings, saveTvSettings, setForce, tvPlaylist, tvAds, tvBreaking, saveAd, saveBreaking, saveOrder, tvOrderRows, tvInputs, saveInput, tvMusic, saveMusic } from "./channel.js";
 import m0019 from "../migrations/0019_tv_sequences.sql";
+import m0020 from "../migrations/0020_oauth.sql";
 import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { liveResults } from "./results.js";
 import { handleTts } from "./tts.js";
+import { anchorLines, liveReads, lipLines, READ, spoken } from "./anchors.js";
+import { LIPPED } from "./anchor-lips.js";
+import { VOICED } from "./anchor-voices.js";
+// Every headline Raisina TV can show (the anchor reads them): breaking lines, Breaking Headlines,
+// the News Update sets and the desk's own set.
+const tvHeads = ({ breaking = [], recent = [], sets = [], pinset = null }) => [...new Set([...breaking, ...recent.map(r => r.text), ...sets.flatMap(st => (st.items || []).map(i => i.text)), ...(pinset?.on ? pinset.items : [])].filter(Boolean))];
 import { editions } from "./editions.js";
 import editionBodies from "./edition-bodies.json";
 import seedHi from "./translations/hi.json";
@@ -75,7 +82,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0018_raisina_tv.sql", m0018], ["0019_tv_sequences.sql", m0019]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0018_raisina_tv.sql", m0018], ["0019_tv_sequences.sql", m0019], ["0020_oauth.sql", m0020]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -155,16 +162,81 @@ async function refreshWriters(env, force = false) {
 }
 // The autopublisher signs in with "Authorization: Bearer <PUBLISH_TOKEN>" (a Worker secret) and
 // acts as the built-in admin. Tokens shorter than 24 characters are ignored.
+
+// OAuth 2.1 for external MCP clients. The legacy PUBLISH_TOKEN remains independent.
+const oauthB64url = bytes => b64(bytes).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
+const oauthRandom = (n=32) => oauthB64url(crypto.getRandomValues(new Uint8Array(n)));
+const oauthHtml = body => new Response("<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Raisina Wire authorisation</title><style>body{margin:0;background:#0b1220;color:#eef2f7;font:16px system-ui;display:grid;min-height:100vh;place-items:center}.panel{width:min(440px,calc(100% - 40px));padding:30px;border:1px solid #344154;border-radius:18px;background:#111c2d;box-sizing:border-box}h1{font-size:24px}p{color:#bac7d8;line-height:1.5}input{box-sizing:border-box;width:100%;padding:13px;margin:7px 0 14px;border-radius:8px;border:1px solid #526176;background:#0b1220;color:white}button{width:100%;padding:14px;border:0;border-radius:8px;background:#c49a48;color:#111;font-weight:700;font-size:16px;cursor:pointer}</style></head><body><main class=panel>"+body+"</main></body></html>",{headers:{"content-type":"text/html;charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"no-referrer","content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
+const oauthMeta = origin => ({issuer:origin,authorization_endpoint:origin+"/oauth/authorize",token_endpoint:origin+"/oauth/token",registration_endpoint:origin+"/oauth/register",response_types_supported:["code"],grant_types_supported:["authorization_code","refresh_token"],code_challenge_methods_supported:["S256"],token_endpoint_auth_methods_supported:["none"],scopes_supported:["mcp:tools"]});
+async function oauthUser(env,email,password) {
+ const row=await env.DB.prepare("SELECT id,email,display_name,role,password_hash FROM users WHERE email=?").bind(email).first();
+ if(await isAdminLogin(env,email,password)){const hash=await passwordHash(password,oauthRandom(16));if(row)await env.DB.prepare("UPDATE users SET role='admin',password_hash=? WHERE id=?").bind(hash,row.id).run();else await env.DB.prepare("INSERT INTO users (id,email,display_name,password_hash,role) VALUES (?,?,?,?,'admin')").bind(randomId(),email,"Raisina Wire Administrator",hash).run();return await env.DB.prepare("SELECT id,email,display_name,role FROM users WHERE email=?").bind(email).first();}
+ if(!row || !(await verifyPassword(password,row.password_hash)) || !["admin","editor"].includes(row.role))return null;return row;
+}
+async function oauthHandle(request,env) {
+ const u=new URL(request.url),origin=u.origin,path=u.pathname;
+ if(path==="/.well-known/oauth-authorization-server"&&request.method==="GET")return json(oauthMeta(origin),200,{"cache-control":"public, max-age=300"});
+ if((path==="/.well-known/oauth-protected-resource"||path==="/.well-known/oauth-protected-resource/mcp")&&request.method==="GET")return json({resource:origin+"/mcp",authorization_servers:[origin],bearer_methods_supported:["header"],scopes_supported:["mcp:tools"]},200,{"cache-control":"public, max-age=300"});
+ if(path==="/oauth/register"&&request.method==="POST"){
+  const b=await request.json().catch(()=>null),name=String(b?.client_name||"MCP client").slice(0,120),redirects=Array.isArray(b?.redirect_uris)?b.redirect_uris:[];
+  if(!redirects.length||redirects.length>10||redirects.some(x=>typeof x!=="string"||x.length>1000||(!/^https:\/\//.test(x)&&!/^http:\/\/(127\.0\.0\.1|localhost)(:|\/)/.test(x))))return err("Valid redirect_uris are required.",400);
+  const id=oauthRandom(24);await env.DB.prepare("INSERT INTO oauth_clients (client_id,client_name,redirect_uris) VALUES (?,?,?)").bind(id,name,JSON.stringify([...new Set(redirects)])).run();
+  return json({client_id:id,client_name:name,redirect_uris:redirects,token_endpoint_auth_method:"none",grant_types:["authorization_code","refresh_token"],response_types:["code"]},201,{"cache-control":"no-store"});
+ }
+ if(path==="/oauth/authorize"&&request.method==="GET"){
+  const p=u.searchParams,client=await env.DB.prepare("SELECT * FROM oauth_clients WHERE client_id=?").bind(p.get("client_id")||"").first(),redirect=p.get("redirect_uri")||"",resource=p.get("resource")||origin+"/mcp";let allowed=[];try{allowed=JSON.parse(client?.redirect_uris||"[]")}catch{}
+  if(!client||!allowed.includes(redirect)||p.get("response_type")!=="code"||p.get("code_challenge_method")!=="S256"||!/^[A-Za-z0-9_-]{43,128}$/.test(p.get("code_challenge")||"")||resource!==origin+"/mcp"||!p.get("state"))return err("Invalid OAuth authorization request.",400);
+  const fields=["client_id","redirect_uri","response_type","code_challenge","code_challenge_method","state","scope","resource"].map(k=>"<input type=hidden name='"+k+"' value='"+String(p.get(k)||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;")+"'>").join("");
+  return oauthHtml("<h1>Connect Raisina Wire</h1><p>"+client.client_name.replace(/[&<>"]/g,"") +" is requesting access to Raisina Wire editorial tools. Sign in with your staff account and approve to continue.</p><form method=post action=/oauth/authorize>"+fields+"<label>Email</label><input name=email type=email autocomplete=username required><label>Password</label><input name=password type=password autocomplete=current-password required><label><input style='width:auto' type=checkbox name=approve value=yes required> I approve access to Raisina Wire publishing tools.</label><button>Approve and connect</button></form><p>Access is revocable. Your existing Claude publishing token is not changed.</p>");
+ }
+ if(path==="/oauth/authorize"&&request.method==="POST"){
+  const p=await request.formData(),get=k=>String(p.get(k)||""),client=await env.DB.prepare("SELECT * FROM oauth_clients WHERE client_id=?").bind(get("client_id")).first();let redirects=[];try{redirects=JSON.parse(client?.redirect_uris||"[]")}catch{}
+  const redirect=get("redirect_uri"),resource=get("resource");
+  if(!client||!redirects.includes(redirect)||get("response_type")!=="code"||get("code_challenge_method")!=="S256"||!/^[A-Za-z0-9_-]{43,128}$/.test(get("code_challenge"))||resource!==origin+"/mcp"||get("approve")!=="yes"||!get("state"))return err("Invalid OAuth approval request.",400);
+  const email=get("email").trim().toLowerCase(),password=get("password"),ip=request.headers.get("cf-connecting-ip")||"unknown",keys=[["oauth:"+email,8],["ip:"+ip,30]];
+  if(await loginBlocked(env,keys))return err("Too many sign-in attempts. Wait 15 minutes and try again.",429);
+  const user=await oauthUser(env,email,password);
+  if(!user){await recordLoginFailure(env,keys);return oauthHtml("<h1>Sign-in failed</h1><p>Use an administrator or editor account. Please restart the connection from ChatGPT.</p>");}
+  await clearLoginFailures(env,keys);const code=oauthRandom(32),scope=get("scope")||"mcp:tools",now=Math.floor(Date.now()/1000);
+  await env.DB.prepare("INSERT INTO oauth_codes (code_hash,client_id,user_id,redirect_uri,code_challenge,scope,resource,expires_at) VALUES (?,?,?,?,?,?,?,?)").bind(await sha256(code),client.client_id,user.id,redirect,get("code_challenge"),scope,resource,now+300).run();
+  const target=new URL(redirect);target.searchParams.set("code",code);target.searchParams.set("state",get("state"));return Response.redirect(target.toString(),302);
+ }
+ if(path==="/oauth/token"&&request.method==="POST"){
+  const p=await request.formData(),get=k=>String(p.get(k)||""),grant=get("grant_type"),clientId=get("client_id"),client=await env.DB.prepare("SELECT client_id FROM oauth_clients WHERE client_id=?").bind(clientId).first();if(!client)return err("Invalid client.",401);
+  const now=Math.floor(Date.now()/1000),access=oauthRandom(32),refresh=oauthRandom(48),expires=now+3600;
+  if(grant==="authorization_code"){
+   const codeHash=await sha256(get("code")),verifier=get("code_verifier"),row=await env.DB.prepare("SELECT * FROM oauth_codes WHERE code_hash=? AND client_id=?").bind(codeHash,clientId).first();
+   if(!row||row.used_at||row.expires_at<=now||row.redirect_uri!==get("redirect_uri")||! /^[A-Za-z0-9._~-]{43,128}$/.test(verifier))return err("Invalid or expired authorization code.",400);
+   const challenge=oauthB64url(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(verifier)));if(challenge!==row.code_challenge)return err("PKCE verification failed.",400);
+   const used=await env.DB.prepare("UPDATE oauth_codes SET used_at=? WHERE code_hash=? AND used_at IS NULL AND expires_at>?").bind(now,codeHash,now).run();if(!used.meta.changes)return err("Authorization code already used.",400);
+   await env.DB.batch([env.DB.prepare("INSERT INTO oauth_access_tokens (token_hash,client_id,user_id,resource,scope,expires_at) VALUES (?,?,?,?,?,?)").bind(await sha256(access),clientId,row.user_id,row.resource,row.scope,expires),env.DB.prepare("INSERT INTO oauth_refresh_tokens (token_hash,client_id,user_id,resource,scope,expires_at) VALUES (?,?,?,?,?,?,?)").bind(await sha256(refresh),clientId,row.user_id,row.resource,row.scope,now+2592000)]);
+   return json({access_token:access,token_type:"Bearer",expires_in:3600,refresh_token:refresh,scope:row.scope},200,{"cache-control":"no-store","pragma":"no-cache"});
+  }
+  if(grant==="refresh_token"){
+   const oldHash=await sha256(get("refresh_token")),old=await env.DB.prepare("SELECT * FROM oauth_refresh_tokens WHERE token_hash=? AND client_id=? AND revoked_at IS NULL AND expires_at>?").bind(oldHash,clientId,now).first();if(!old)return err("Invalid or expired refresh token.",400);
+   const revoked=await env.DB.prepare("UPDATE oauth_refresh_tokens SET revoked_at=CURRENT_TIMESTAMP WHERE token_hash=? AND revoked_at IS NULL").bind(oldHash).run();if(!revoked.meta.changes)return err("Refresh token already used.",400);
+   await env.DB.batch([env.DB.prepare("INSERT INTO oauth_access_tokens (token_hash,client_id,user_id,resource,scope,expires_at) VALUES (?,?,?,?,?,?)").bind(await sha256(access),clientId,old.user_id,old.resource,old.scope,expires),env.DB.prepare("INSERT INTO oauth_refresh_tokens (token_hash,client_id,user_id,resource,scope,expires_at) VALUES (?,?,?,?,?,?,?)").bind(await sha256(refresh),clientId,old.user_id,old.resource,old.scope,now+2592000)]);
+   return json({access_token:access,token_type:"Bearer",expires_in:3600,refresh_token:refresh,scope:old.scope},200,{"cache-control":"no-store","pragma":"no-cache"});
+  }
+  return err("Unsupported grant_type.",400);
+ }
+ return null;
+}
+
 async function publisherUser(request, env) {
   const header = request.headers.get("Authorization") || "";
+  if (!header.startsWith("Bearer ")) return null;
+  const bearer = header.slice(7).trim();
   const secret = String(env.PUBLISH_TOKEN || "");
-  if (!header.startsWith("Bearer ") || secret.length < 24 || !adminEmail(env)) return null;
-  if ((await sha256(header.slice(7).trim())) !== (await sha256(secret))) return null;
-  const find = () => env.DB.prepare("SELECT id,email,display_name,role FROM users WHERE email=?").bind(adminEmail(env)).first();
-  let row = await find();
-  // An empty password hash never verifies; the admin's first password sign-in sets a real one.
-  if (!row) { await env.DB.prepare("INSERT INTO users (id,email,display_name,password_hash,role) VALUES (?,?,?,'','admin')").bind(randomId(), adminEmail(env), "Ilmaz Syed").run(); row = await find(); }
-  return { ...row, role: "admin" };
+  // Preserve the legacy Claude/autopublisher token exactly: same env secret, comparison and admin identity.
+  if (secret.length >= 24 && adminEmail(env) && (await sha256(bearer)) === (await sha256(secret))) {
+    const find = () => env.DB.prepare("SELECT id,email,display_name,role FROM users WHERE email=?").bind(adminEmail(env)).first();
+    let row = await find();
+    if (!row) { await env.DB.prepare("INSERT INTO users (id,email,display_name,password_hash,role) VALUES (?,?,?,?,'admin')").bind(randomId(), adminEmail(env), "Ilmaz Syed", "").run(); row = await find(); }
+    return { ...row, role: "admin" };
+  }
+  const token = await env.DB.prepare("SELECT users.id,users.email,users.display_name,users.role FROM oauth_access_tokens JOIN users ON users.id=oauth_access_tokens.user_id WHERE oauth_access_tokens.token_hash=? AND oauth_access_tokens.expires_at>? AND oauth_access_tokens.resource=?").bind(await sha256(bearer), Math.floor(Date.now()/1000), new URL(request.url).origin + "/mcp").first();
+  return token && ["admin","editor"].includes(token.role) ? token : null;
 }
 async function currentUser(request, env) {
   if (!env.DB) return null;
@@ -304,6 +376,36 @@ async function mtLive(env, lang, item, updates) {
 // Ticker text without the editor's formatting marks (**bold**, [links](…), # headings).
 const plainText = t => String(t || "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/\*\*|__|`|^#+\s*/gm, "").replace(/\s+/g, " ").trim();
 // Raisina TV's feed: running order, ad settings, breaking lines, the ticker and the break-in switch.
+// Lip-synced clips the GitHub Action "Raisina TV lip sync" has rendered (kept in D1 as "lip:<id>").
+async function tvLips(env) {
+  const rows = (await env.DB.prepare("SELECT key FROM tts_audio WHERE voice LIKE 'lips:%'").all().catch(() => ({ results: [] }))).results;
+  return new Set(rows.map(r => String(r.key).slice(4)));
+}
+// The live reads the channel is waiting for (recorded by the GitHub Action "Raisina TV live reads").
+async function tvVoiceTodo(env, ctx) {
+  const settings = await tvSettings(env), f = await cached("tv", 5e3, () => tvFeed(env, ctx, ""));
+  const reads = await liveReads({ breaking: (await tvBreaking(env)).map(b => b.text), inputs: (await tvInputs(env)).filter(i => i.source), force: settings.force, heads: tvHeads({ breaking: f.breaking, recent: f.recent, sets: f.sets, pinset: settings.pinset }) });
+  const have = reads.length ? new Set((await env.DB.prepare(`SELECT key FROM tts_audio WHERE key IN (${reads.map(() => "?").join(",")})`).bind(...reads.map(r => r.id)).all()).results.map(r => r.key)) : new Set();
+  return { reads, todo: settings.seq.anchors === false ? [] : reads.filter(r => !have.has(r.id)) };
+}
+// The lip-synced clips the channel is waiting for (rendered by the GitHub Action "Raisina TV lip sync").
+async function tvLipsTodo(env) {
+  const all = await lipLines(), have = await tvLips(env);
+  return { all, todo: all.filter(l => !LIPPED.has(l.id) && !have.has(l.id) && VOICED.has(l.id)) };
+}
+// GitHub's own schedule runs these Actions only now and then, so the Worker's cron starts them
+// whenever there is work waiting (needs the Worker secret GITHUB_DISPATCH_TOKEN: a fine-grained
+// GitHub token for this repository with "Actions: read and write").
+async function dispatchTv(env) {
+  if (!env.GITHUB_DISPATCH_TOKEN) return;
+  const m = new Date().getUTCMinutes(), repo = env.GITHUB_REPO || "ilmazsyed/Raisina-Wire";
+  const run = async file => {
+    const r = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/${file}/dispatches`, { method: "POST", headers: { authorization: `Bearer ${env.GITHUB_DISPATCH_TOKEN}`, accept: "application/vnd.github+json", "user-agent": "raisina-wire-cron", "content-type": "application/json" }, body: JSON.stringify({ ref: "main" }) });
+    if (!r.ok) console.error(`dispatch ${file}: ${r.status} ${(await r.text()).slice(0, 200)}`);
+  };
+  if (m % 10 === 3 && (await tvVoiceTodo(env, null)).todo.length) await run("live-reads.yml");
+  if (m % 15 === 4 && (await tvLipsTodo(env)).todo.length) await run("anchor-lips.yml");
+}
 async function tvFeed(env, ctx, lang) {
   const settings = await tvSettings(env);
   const [playlist, ads, breaking, stories, live, inputs, music, liveUps] = await Promise.all([
@@ -319,8 +421,9 @@ async function tvFeed(env, ctx, lang) {
   // Short enough for one TV line: end at a full sentence if one fits, else at a word, with "…".
   const clipText = (t, n) => { if (t.length <= n) return t; const c = t.slice(0, n), end = Math.max(c.lastIndexOf(". "), c.lastIndexOf("? "), c.lastIndexOf("! ")); return end > n * 0.5 ? c.slice(0, end + 1) : `${c.slice(0, c.lastIndexOf(" ")).replace(/[,;:\s]+$/, "")}…`; };
   // A live update for the screen: whole sentences only. The first sentence, plus the next while
-  // they fit in about 200 characters; a very long first sentence is still shown whole.
-  const sentences = t => { const raw = String(t || "").split(/(?<=[.!?]["”’)\]]*)\s+(?=["“‘(]?[A-Z0-9])/), parts = []; for (const p of raw) { if (parts.length && /(?:\b[A-Z]|\b(?:Mr|Mrs|Ms|Dr|St|No|vs|Gen|Lt|Col|Sr|Jr|Rs|approx))\.$/.test(parts[parts.length - 1])) parts[parts.length - 1] += ` ${p}`; else parts.push(p); } let out = ""; for (const p of parts) { if (out && (`${out} ${p}`).length > 200) break; out = out ? `${out} ${p}` : p; } return out.trim(); };
+  // they fit in about 200 characters (the ticker); a very long first sentence is still shown whole.
+  // Headline sets on TV take the first sentence alone (limit 0), so they read at a glance.
+  const sentences = (t, limit = 200) => { const raw = String(t || "").split(/(?<=[.!?]["”’)\]]*)\s+(?=["“‘(]?[A-Z0-9])/), parts = []; for (const p of raw) { if (parts.length && /(?:\b[A-Z]|\b(?:Mr|Mrs|Ms|Dr|St|No|vs|Gen|Lt|Col|Sr|Jr|Rs|approx))\.$/.test(parts[parts.length - 1])) parts[parts.length - 1] += ` ${p}`; else parts.push(p); } let out = ""; for (const p of parts) { if (out && (`${out} ${p}`).length > limit) break; out = out ? `${out} ${p}` : p; } return out.trim(); };
   // Wire headlines without the publisher's own tail (" | The Hindu", " - BBC News"): the source is shown anyway.
   const cleanTitle = (t, src) => { let x = String(t || "").trim().replace(/\s+\|\s*[^|]{0,60}$/, ""); if (src) x = x.replace(new RegExp(`\\s+[-–—]\\s+${String(src).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"), ""); return x.trim() || String(t || "").trim(); };
   // News Update: headline sets by topic, five each (the desk's stories first, then the wire).
@@ -331,7 +434,7 @@ async function tvFeed(env, ctx, lang) {
     const l = byTopic.get(h.c) || []; if (l.length < 5 && !l.some(x => x.t === h.t)) l.push(h); byTopic.set(h.c, l);
   }
   const sets = [...byTopic.entries()].filter(([, l]) => l.length >= 5).map(([topic, l]) => ({ topic, items: l.map(x => ({ text: x.t, source: x.src, ...(x.img ? { img: x.img } : {}) })) }));
-  if (liveUps.length >= 3) sets.unshift({ topic: "Live", live: true, items: liveUps.slice(0, 5).map(u => ({ text: sentences(plainText(u.body)), source: String(u.title || "").split(/[:;—|]/)[0].trim().slice(0, 28) })) });
+  if (liveUps.length >= 3) sets.unshift({ topic: "Live", live: true, items: liveUps.slice(0, 5).map(u => ({ text: sentences(plainText(u.body), 0), source: String(u.title || "").split(/[:;—|]/)[0].trim().slice(0, 28) })) });
   const input = inputs.find(i => i.onAir && i.source);
   // The breaking ticker runs from the live wires, newest first across live coverage and the wire
   // (the editor's breaking lines lead it, added in the player).
@@ -345,12 +448,26 @@ async function tvFeed(env, ctx, lang) {
   ].sort(newest);
   // Breaking Headlines (the opener): the newest ten across live updates and the wire, with times.
   const recent = [
-    ...liveUps.map(u => ({ text: sentences(plainText(u.body)), source: shortTitle(u.title), at: isoAt(u.at), live: true })),
+    ...liveUps.map(u => ({ text: sentences(plainText(u.body), 0), source: shortTitle(u.title), at: isoAt(u.at), live: true })),
     ...wireNew.slice(0, 20).map(i => ({ text: cleanTitle(i.title, i.source), source: i.source, at: i.at, ...(okImg(i.image) ? { img: okImg(i.image) } : {}) }))
   ].filter(x => x.text && x.at).sort(newest).slice(0, 10);
   // If the wire can't be reached, the desk's own latest stories keep the ticker running.
   if (ticker.length < 8) ticker.push(...stories.slice(0, 8).map(a => ({ kind: "story", text: a.title, href: a.href })));
-  return { on: settings.on, qr: settings.qr, every: settings.every, perBreak: settings.perBreak, skippable: settings.skippable, force: settings.force || null,
+  // The AI anchors (English channel): their intros before explainers, and their short lines.
+  // An explainer made from a story Ilmaz Syed wrote is his Editor's Pick.
+  let anchors = null;
+  if (!lang && settings.seq.anchors !== false) {
+    const srcs = playlist.map(v => String(v.mediaUrl || "").split("?")[0]).filter(Boolean);
+    const picks = srcs.length ? new Set((await env.DB.prepare(`SELECT video_url FROM articles WHERE status='published' AND writer='ilmaz-syed' AND video_url IN (${srcs.map(() => "?").join(",")})`).bind(...srcs).all()).results.map(r => r.video_url)) : new Set();
+    const heads = tvHeads({ breaking: breaking.map(b => b.text), recent, sets, pinset: settings.pinset });
+    const reads = await liveReads({ breaking: breaking.map(b => b.text), inputs: input ? [input] : [], force: settings.force, heads });
+    const voiced = reads.length ? new Set((await env.DB.prepare(`SELECT key FROM tts_audio WHERE key IN (${reads.map(() => "?").join(",")})`).bind(...reads.map(r => r.id)).all()).results.map(r => r.key)) : new Set();
+    // Headlines the anchor has recorded: shown text -> its read.
+    const headReads = Object.fromEntries(heads.map(t => [t, reads.find(r => r.text === READ.head(t) && voiced.has(r.id))]).filter(([, r]) => r).map(([t, r]) => [t, `/api/tv/voice/${r.id}`]));
+    const lips = await tvLips(env);
+    anchors = { ...await anchorLines({ playlist: playlist.map(v => ({ id: v.id, src: v.mediaUrl, editorPick: picks.has(String(v.mediaUrl || "").split("?")[0]) })), input, breaking: breaking.map(b => b.text), force: settings.force, voiced, lips }), reads: headReads };
+  }
+  return { anchors, on: settings.on, qr: settings.qr, every: settings.every, perBreak: settings.perBreak, skippable: settings.skippable, force: settings.force || null,
     playlist: playlist.map(v => ({ id: v.id, title: v.title, description: v.description, category: v.category, src: v.mediaUrl, thumb: v.thumbnailUrl, publishedAt: v.publishedAt })),
     ads: ads.filter(a => a.src).map(a => ({ id: a.id, title: a.title, src: a.src })), breaking: breaking.map(b => b.text), ticker, recent,
     seq: settings.seq, pinset: settings.pinset?.on && settings.pinset.items.length ? settings.pinset : null, sets,
@@ -386,9 +503,71 @@ async function mtWarm(env) {
   }
 }
 
+const MCP_TOOLS = [
+  { name:"publisher_health", description:"Check public Raisina Wire API health.", inputSchema:{type:"object",properties:{}} },
+  { name:"list_articles", description:"List articles and editions in the editorial system.", inputSchema:{type:"object",properties:{}} },
+  { name:"create_article_draft", description:"Create an article or edition as a draft. Never publishes or sends alerts.", inputSchema:{type:"object",required:["title","body"],properties:{kind:{type:"string",enum:["article","edition"]},title:{type:"string"},dek:{type:"string"},topic:{type:"string"},category:{type:"string"},tags:{type:"array",items:{type:"string"}},writer:{type:"string"},body:{type:"string"},sourceUrl:{type:"string"},imageUrl:{type:"string"},heroUrl:{type:"string"},heroCaption:{type:"string"},videoUrl:{type:"string"}}} },
+  { name:"update_article", description:"Update an existing article. Publishing requires explicit editor approval; notify remains false.", inputSchema:{type:"object",required:["id","changes"],properties:{id:{type:"string"},changes:{type:"object"}}} },
+  { name:"list_live_coverage", description:"List live coverage records.", inputSchema:{type:"object",properties:{}} },
+  { name:"create_live_draft", description:"Create live coverage in draft status.", inputSchema:{type:"object",required:["title"],properties:{title:{type:"string"},summary:{type:"string"},slug:{type:"string"},imageUrl:{type:"string"},socialUrl:{type:"string"},heroCaption:{type:"string"}}} },
+  { name:"post_live_update", description:"Post a live coverage update; push notification remains disabled.", inputSchema:{type:"object",required:["id","body"],properties:{id:{type:"string"},body:{type:"string"},sourceUrl:{type:"string"},mediaUrl:{type:"string"}}} },
+  { name:"list_media", description:"List multimedia items.", inputSchema:{type:"object",properties:{}} },
+  { name:"create_media_draft", description:"Create a multimedia item in draft status.", inputSchema:{type:"object",required:["title","mediaUrl"],properties:{title:{type:"string"},mediaUrl:{type:"string"},mediaType:{type:"string",enum:["video","short","image","gallery","audio","embed"]},category:{type:"string"},thumbnailUrl:{type:"string"},description:{type:"string"}}} },
+  { name:"list_events", description:"List editorial events and briefings.", inputSchema:{type:"object",properties:{}} },
+  { name:"create_event", description:"Create an event. This publishes immediately; call only after explicit editor approval.", inputSchema:{type:"object",required:["title","startsAt"],properties:{title:{type:"string"},description:{type:"string"},eventType:{type:"string"},startsAt:{type:"string"},access:{type:"string",enum:["public","member","premium"]},notify:{type:"boolean",default:false}}} },
+  { name:"list_alerts", description:"List recent reader alerts.", inputSchema:{type:"object",properties:{}} },
+  { name:"send_reader_alert", description:"Send a reader alert immediately. Call only after explicit approval of exact headline, body and destination.", inputSchema:{type:"object",required:["title","url"],properties:{title:{type:"string"},body:{type:"string"},url:{type:"string"}}} }
+];
+async function handleMcp(request, env, ctx) {
+  const url = new URL(request.url);
+  if (request.method === "GET") return new Response("Raisina Wire MCP endpoint. Use Streamable HTTP POST.", {status:405,headers:{"content-type":"text/plain","allow":"POST, OPTIONS"}});
+  if (request.method !== "POST") return new Response("Method not allowed",{status:405});
+  const user = await currentUser(request, env);
+  if (!isStaff(user)) return json({error:"Publisher authentication required."},401,{"cache-control":"no-store","www-authenticate":'Bearer resource_metadata="' + url.origin + '/.well-known/oauth-protected-resource/mcp", scope="mcp:tools"'});
+  const rpc = await request.json().catch(()=>null);
+  if (!rpc || rpc.jsonrpc !== "2.0" || typeof rpc.method !== "string") return json({jsonrpc:"2.0",id:rpc?.id??null,error:{code:-32600,message:"Invalid JSON-RPC request"}},400);
+  // MCP notifications have no id and must not receive a JSON-RPC response.
+  if (rpc.method === "notifications/initialized" && !("id" in rpc)) return new Response(null,{status:202,headers:{"cache-control":"no-store"}});
+  if (!("id" in rpc)) return new Response(null,{status:202,headers:{"cache-control":"no-store"}});
+  const result = (value) => json({jsonrpc:"2.0",id:rpc.id,result:value},200,{"cache-control":"no-store"});
+  if (rpc.method === "initialize") return result({protocolVersion:"2025-03-26",capabilities:{tools:{}},serverInfo:{name:"raisina-wire-publisher",version:"1.0.0"}});
+  if (rpc.method === "ping") return result({});
+  if (rpc.method === "tools/list") return result({tools:MCP_TOOLS});
+  if (rpc.method !== "tools/call") return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32601,message:"Method not found"}},200);
+  const name=rpc.params?.name, a=rpc.params?.arguments||{};
+  const routes = {
+    publisher_health:["GET","/api/health",null],
+    list_articles:["GET","/api/admin/articles",null],
+    create_article_draft:["POST","/api/admin/articles",{...a,status:"draft",notify:false}],
+    update_article:["PUT","/api/admin/articles/"+encodeURIComponent(a.id||""),{...(a.changes||{}),notify:false}],
+    list_live_coverage:["GET","/api/admin/live",null],
+    create_live_draft:["POST","/api/admin/live",{...a,status:"draft",notify:false}],
+    post_live_update:["POST","/api/admin/live/"+encodeURIComponent(a.id||"")+"/updates",{body:a.body,sourceUrl:a.sourceUrl,mediaUrl:a.mediaUrl,notify:false}],
+    list_media:["GET","/api/admin/media",null],
+    create_media_draft:["POST","/api/admin/media",{...a,status:"draft"}],
+    list_events:["GET","/api/admin/events",null],
+    create_event:["POST","/api/events",{...a,notify:false}],
+    list_alerts:["GET","/api/admin/alerts",null],
+    send_reader_alert:["POST","/api/admin/alerts",a]
+  };
+  const route=routes[name];
+  if(!route) return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32602,message:"Unknown tool"}},200);
+  if(name==="update_article" && !a.id) return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32602,message:"id is required"}},200);
+  if(name==="post_live_update" && !a.id) return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32602,message:"id is required"}},200);
+  const headers=new Headers({"authorization":request.headers.get("authorization")||""});
+  if(route[2]) headers.set("content-type","application/json");
+  const downstream=new Request(new URL(route[1],url.origin),{method:route[0],headers,body:route[2]?JSON.stringify(route[2]):undefined});
+  const response=await api(downstream,env,ctx);
+  const raw=await response.text();
+  let payload; try{payload=JSON.parse(raw)}catch{payload={message:raw}}
+  const textValue=JSON.stringify(payload);
+  return result({content:[{type:"text",text:textValue}],isError:!response.ok});
+}
+
 async function api(request, env, ctx) {
   const url = new URL(request.url);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: JSON_HEADERS });
+  if (url.pathname === "/mcp") return handleMcp(request, env, ctx);
 
   if (url.pathname === "/api/health") return json({ ok: true, service: "Raisina Wire API", time: new Date().toISOString(), database: Boolean(env.DB) }, 200, { "cache-control":"no-store" });
 
@@ -908,6 +1087,54 @@ async function api(request, env, ctx) {
     const lang = reqLang(url);
     return json(await cached(`tv${lang}`, 5e3, () => tvFeed(env, ctx, lang)), 200, { "cache-control": "no-cache" });
   }
+  // Raisina TV lip-synced clips rendered by the GitHub Action (video/lips/action.py), kept in D1.
+  // Served with byte ranges: iPhones only play a video whose server answers them.
+  if (url.pathname.startsWith("/api/tv/lip/") && request.method === "GET") {
+    const row = await env.DB.prepare("SELECT data FROM tts_audio WHERE key=?").bind(`lip:${url.pathname.slice(12)}`).first();
+    if (!row) return err("No such clip.", 404);
+    const data = new Uint8Array(row.data), size = data.length, m = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get("range") || "");
+    const head = { "content-type": "video/mp4", "accept-ranges": "bytes", "cache-control": "public, max-age=31536000, immutable" };
+    if (!m || (m[1] === "" && m[2] === "")) return new Response(data, { headers: { ...head, "content-length": String(size) } });
+    let a = m[1] === "" ? size - Number(m[2]) : Number(m[1]), b = m[1] === "" || m[2] === "" ? size - 1 : Math.min(Number(m[2]), size - 1);
+    a = Math.max(0, a);
+    if (a > b || a >= size) return new Response(null, { status: 416, headers: { ...head, "content-range": `bytes */${size}` } });
+    return new Response(data.slice(a, b + 1), { status: 206, headers: { ...head, "content-range": `bytes ${a}-${b}/${size}`, "content-length": String(b - a + 1) } });
+  }
+  // What the lip-sync Action should render: lines needing a clip that has none yet and whose voice
+  // is recorded. It uploads each clip (a silent MP4 under 1.9 MB) with a PUT.
+  if ((url.pathname === "/api/admin/tv/lips-todo" && request.method === "GET") || (url.pathname.startsWith("/api/admin/tv/lip/") && request.method === "PUT")) {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const { all, todo } = await tvLipsTodo(env);
+    if (request.method === "GET") return json({ todo: todo.map(l => ({ ...l, audio: `/anchors/voice/${l.id}.mp3` })) }, 200, { "cache-control": "no-store" });
+    const id = url.pathname.slice(18), l = all.find(x => x.id === id);
+    if (!l) return err("That line doesn't need a clip.", 404);
+    const data = new Uint8Array(await request.arrayBuffer());
+    if (data.length < 2000 || data.length > 1.9e6 || String.fromCharCode(...data.slice(4, 8)) !== "ftyp") return err("Send an MP4 clip under 1.9 MB.");
+    await env.DB.prepare("INSERT OR REPLACE INTO tts_audio (key,voice,chars,data) VALUES (?,?,?,?)").bind(`lip:${id}`, `lips:${l.anchor}`, l.text.length, data.buffer).run();
+    return json({ ok: true }, 200, { "cache-control": "no-store" });
+  }
+  // Raisina TV live reads (src/anchors.js): recorded in the editor's browser, kept in D1, played by the channel.
+  if (url.pathname.startsWith("/api/tv/voice/") && request.method === "GET") {
+    const row = await env.DB.prepare("SELECT data FROM tts_audio WHERE key=?").bind(url.pathname.slice(14)).first();
+    if (!row) return err("No such recording.", 404);
+    const data = new Uint8Array(row.data), wav = data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46;
+    return new Response(data, { headers: { "content-type": wav ? "audio/wav" : "audio/mpeg", "cache-control": "public, max-age=31536000, immutable" } });
+  }
+  if ((url.pathname === "/api/admin/tv/voice-todo" && request.method === "GET") || (url.pathname.startsWith("/api/admin/tv/voice/") && request.method === "PUT")) {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const { reads, todo } = await tvVoiceTodo(env, ctx);
+    if (request.method === "GET") return json({ todo: todo.map(r => ({ ...r, say: spoken(r.text) })) }, 200, { "cache-control": "no-store" });
+    // Only a read the channel needs, as a WAV or MP3 file of reasonable size.
+    const id = url.pathname.slice(20), r = todo.find(x => x.id === id) || reads.find(x => x.id === id);
+    if (!r) return err("That line isn't needed on air.", 404);
+    const data = new Uint8Array(await request.arrayBuffer());
+    const head = String.fromCharCode(...data.slice(0, 4)), mp3 = head.startsWith("ID3") || (data[0] === 0xff && (data[1] & 0xe0) === 0xe0);
+    if (data.length < 1000 || data.length > 1.8e6 || !(head === "RIFF" || mp3)) return err("Send a WAV or MP3 recording under 1.8 MB.");
+    await env.DB.prepare("INSERT OR REPLACE INTO tts_audio (key,voice,chars,data) VALUES (?,?,?,?)").bind(id, `kokoro:${r.voice}`, r.text.length, data.buffer).run();
+    return json({ ok: true }, 200, { "cache-control": "no-store" });
+  }
   if (url.pathname.startsWith("/api/admin/tv")) {
     const user = await currentUser(request, env);
     if (!isStaff(user)) return err("Editor access required.", 403);
@@ -1306,6 +1533,8 @@ async function serveMedia(request, env, ctx) {
 async function scheduled(env) {
   if (!env.DB) return;
   await ensureSchema(env);
+  // Once an hour: Raisina TV live reads older than four days go (headlines move on; fixed lines are files).
+  if (new Date().getUTCMinutes() === 7) await env.DB.prepare("DELETE FROM tts_audio WHERE voice LIKE 'kokoro:%' AND created_at < datetime('now','-4 days')").run().catch(e => console.log("reads", e.message));
   const { results } = await env.DB.prepare(`SELECT id,slug,title,kind,status,published_at FROM articles WHERE alert_state='pending' AND status='published' AND published_at<=? LIMIT 5`).bind(new Date().toISOString()).all();
   // Each step runs on its own, so one failure can't hold up the others; errors go to the Worker logs.
   const step = async (name, fn) => { try { await fn(); } catch (e) { console.error(`cron ${name} failed:`, e?.stack || e); } };
@@ -1314,6 +1543,7 @@ async function scheduled(env) {
   await step("push delivery", () => drainAlerts(env));
   await step("translations", () => mtWarm(env));
   await step("translation cache", () => env.DB.prepare("DELETE FROM mt_cache WHERE created_at < datetime('now','-45 days')").run());
+  await step("Raisina TV actions", () => dispatchTv(env));
 }
 // 9 am and 9 pm India time, every day (unless switched off in the control room).
 // The settings row makes each one send exactly once, even if two cron runs overlap.
@@ -1342,6 +1572,11 @@ export default {
   async scheduled(event, env, ctx) { ctx.waitUntil(scheduled(env)); },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/oauth/") || url.pathname.startsWith("/.well-known/oauth-")) { try { await ensureSchema(env); const response=await oauthHandle(request,env); if(response)return response; } catch(e) { return err("OAuth service temporarily unavailable.",503); } }
+    if (url.pathname === "/mcp") {
+      try { return await api(request,env,ctx); }
+      catch (e) { return json({error:"MCP internal error",detail:e.message},500,{"cache-control":"no-store"}); }
+    }
     if (url.pathname.startsWith("/api/")) {
       try { return await api(request,env,ctx); }
       catch (e) { return json({error:"Internal API error",detail:e.message},500,{"cache-control":"no-store"}); }

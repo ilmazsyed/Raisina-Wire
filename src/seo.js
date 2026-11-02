@@ -93,6 +93,15 @@ async function pageFor(path, url, env, o, lang = "en") {
   const parts = path.split("/").filter(Boolean).map(decodeURIComponent);
   const [section, arg] = parts;
 
+  if (section === "install") {
+    const title = "Get the Raisina Wire App — The Lightweight App Revolution";
+    const description = "Install Raisina Wire on iPhone, Android or desktop. A lightweight, secure app-like experience for geopolitics, security, markets and live news — without a bulky app-store download.";
+    const image = `${o}/og-image.jpg`;
+    return { title, ogTitle: "Get the Raisina Wire App", description, image, noindex: true,
+      ld: [{ "@context": "https://schema.org", "@type": "WebPage", name: title, description, url: `${o}/install`, primaryImageOfPage: image, isPartOf: { "@id": `${o}/#website` } }],
+      body: `<h1>Get the Raisina Wire app</h1><p>${esc(description)}</p><p>Lightweight by design. Secure over HTTPS. Add it to your home screen in seconds.</p>` };
+  }
+
   if (!section && lang !== "en") {
     const stories = await localiseArticles(env, lang, await listPublished(env, { limit: 30 })), t = HOME_TEXT[lang];
     return { title: t.title, description: t.description, inLanguage: LOCALES[lang],
@@ -139,7 +148,10 @@ async function pageFor(path, url, env, o, lang = "en") {
         organization(o), breadcrumbs(o, [["Home", prefixed(lang, "/")], crumb, [a.title, here]])] }],
       body: `<article><p class="ssr-kicker">${esc(a.topic)}</p><h1>${esc(a.title)}</h1>${a.dek ? `<p class="ssr-dek">${esc(a.dek)}</p>` : ""}
         <p class="ssr-byline">${lang === "en" ? "By " : ""}<a href="${prefixed(lang, `/author/${w.key}`)}">${esc(w.name)}</a> · <time datetime="${esc(a.publishedAt)}">${fmtDate(a.publishedAt, lang)}</time>${lang === "en" ? ` · ${a.readMinutes} min read` : ""}</p>
-        ${a.videoUrl ? `<video controls preload="none" src="${esc(a.videoUrl)}" poster="${esc(a.heroUrl || a.image)}"></video>` : `<img src="${esc(a.heroUrl || a.image)}" alt="" width="1600" height="1000">`}${blocksHTML(blocks)}</article>`
+        ${a.videoUrl ? `<video controls preload="none" src="${esc(a.videoUrl)}" poster="${esc(a.heroUrl || a.image)}"></video>` : `<img src="${esc(a.heroUrl || a.image)}" alt="" width="1600" height="1000">`}${blocksHTML(blocks)}
+        <p class="ssr-tv-cta"><a href="/tv">Watch Raisina TV live</a> · <a href="/editions">Read more Raisina Wire analysis</a></p>
+        <p class="ssr-google-preferred"><a href="https://www.google.com/preferences/source?q=https%3A%2F%2Fraisinawire.calibrex.org%2F" target="_blank" rel="noopener noreferrer">Add Raisina Wire as a preferred source on Google Search ↗</a></p>
+      </article>`
     };
   }
 
@@ -210,9 +222,9 @@ async function pageFor(path, url, env, o, lang = "en") {
   if (section === "watch") return { redirect: prefixed(lang, "/tv") };
   if (section === "tv") {
     const { results: vids } = await env.DB.prepare("SELECT id,title,description,media_type AS mediaType,media_url AS mediaUrl,thumbnail_url AS thumb,published_at AS publishedAt FROM media_items WHERE status='published' AND media_type IN ('video','short') ORDER BY published_at DESC LIMIT 50").all();
-    return { title: `Raisina TV — live: India and world news explainers, 24×7 · ${SITE}`, description: "Raisina TV plays the desk's latest explainers on geopolitics, security, diplomacy and markets around the clock, with a live news ticker, News Updates and every explainer and short to watch on demand.",
+    return { title: `Raisina TV — live news, viewed differently · ${SITE}`, ogTitle: "Raisina TV — Something will change the way you view news. Live.", image: `${o}/og-tv.jpg`, description: "Meet Raisina TV: a fresh live news experience bringing you thoughtful journalism, powerful explainers and the stories shaping India and the world. Watch live, around the clock.",
       ld: [{ "@context": "https://schema.org", "@type": "ItemList", itemListElement: vids.filter(v => v.thumb).map((v, i) => ({ "@type": "ListItem", position: i + 1, item: videoLd(o, v, false) })) }],
-      body: `<h1>Raisina TV</h1><p>The desk's latest explainers, around the clock, with a live news ticker.</p><h2>Explainers and shorts</h2><ul>${vids.map(v => `<li><a href="/tv?v=${encodeURIComponent(v.id)}">${esc(v.title)}</a>${v.description ? ` — ${esc(clip(v.description, 160))}` : ""}</li>`).join("")}</ul>` };
+      body: `<h1>Raisina TV</h1><p>The desk's latest explainers, around the clock, with a live news ticker.</p><p><a href="/">Back to Raisina Wire headlines</a> · <a href="/editions">Read our latest reporting and analysis</a></p><p><a href="/feed.xml">Subscribe to the Raisina Wire RSS feed</a></p><h2>Explainers and shorts</h2><ul>${vids.map(v => `<li><a href="/tv?v=${encodeURIComponent(v.id)}">${esc(v.title)}</a>${v.description ? ` — ${esc(clip(v.description, 160))}` : ""}</li>`).join("")}</ul>` };
   }
 
   if (section === "community") {
@@ -275,7 +287,7 @@ export async function renderPage(request, env, ensureSchema) {
   const hreflang = alternates.length > 1 ? [...alternates.map(l => `<link rel="alternate" hreflang="${LOCALES[l]}" href="${esc(o + prefixed(l, path))}">`), `<link rel="alternate" hreflang="x-default" href="${esc(o + path)}">`] : [];
   const image = page.image || `${o}${OG_IMAGE[lang]}`, card = !page.image;
   const head = [
-    `<link rel="canonical" href="${esc(canonical)}">`, ...hreflang,
+    `<link rel="canonical" href="${esc(canonical)}">`,     `<link rel="alternate" type="application/rss+xml" title="Raisina Wire latest reporting" href="${o}/feed.xml">`, ...hreflang,
     ...(lang !== "en" ? [`<meta property="og:locale" content="${LOCALES[lang].replace("-", "_")}">`] : []),
     `<meta property="og:url" content="${esc(page.ogUrl || canonical)}">`,
     ...["en", ...LANGS].filter(l => l !== lang).map(l => `<meta property="og:locale:alternate" content="${LOCALES[l].replace("-", "_")}">`),
@@ -352,8 +364,12 @@ export async function newsSitemap(request, env, ensureSchema) {
   const o = origin(request, env);
   await ensureSchema(env);
   const stories = await listPublished(env, { since: new Date(Date.now() - 2 * 864e5).toISOString(), limit: 1000 });
+  // News sitemap language values must use Google's supported ISO 639-1 language codes.
+  // Keep only genuinely published articles from the rolling 48-hour window; translated
+  // variants are included only where a saved translation exists.
   const all = [...stories.map(s => ({ ...s, lang: "en" }))];
-  for (const l of LANGS) all.push(...(await localiseArticles(env, l, stories)).filter(s => s.lang === l));
+  // Google News expects ISO 639-1 language codes: Hindi=hi, Bengali=bn.
+  for (const l of LANGS) all.push(...(await localiseArticles(env, l, stories)).filter(s => s.lang === l && s.publishedAt));
   return xmlResponse(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
 ${all.map(s => `<url><loc>${xml(o + prefixed(s.lang, s.href))}</loc><news:news><news:publication><news:name>${SITE}</news:name><news:language>${s.lang}</news:language></news:publication><news:publication_date>${xml(s.publishedAt)}</news:publication_date><news:title>${xml(s.title)}</news:title></news:news></url>`).join("\n")}
 </urlset>`);
@@ -389,4 +405,4 @@ ${stories.map(s => `<item><title>${xml(s.title)}</title><link>${o}${s.href}</lin
 
 // Paths the Worker renders as HTML pages (the rest are app-only views or static files), tested
 // without the /hi or /bn prefix.
-export const PAGE_PATTERN = /^\/(?:$|editions\/?$|(?:edition|article|author|tag|discussion|coverage)\/[^/]+\/?$|live(?:\/[^/]+)?\/?$|markets\/?$|community\/?$|events\/?$|watch\/?$|tv\/?$|(?:about|terms|privacy|disclaimer|copyright|community-guidelines|grievance)\/?$)/;
+export const PAGE_PATTERN = /^\/(?:$|install\/?$|editions\/?$|(?:edition|article|author|tag|discussion|coverage)\/[^/]+\/?$|live(?:\/[^/]+)?\/?$|markets\/?$|community\/?$|events\/?$|watch\/?$|tv\/?$|(?:about|terms|privacy|disclaimer|copyright|community-guidelines|grievance)\/?$)/;

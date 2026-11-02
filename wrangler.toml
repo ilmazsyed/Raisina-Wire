@@ -10,7 +10,7 @@ not_found_handling = "single-page-application"
 # search engines), uploaded images, sitemaps, robots.txt and the RSS feed. Everything else
 # is served straight from the built files.
 run_worker_first = [
-  "/api/*", "/media/*", "/", "/editions", "/edition/*", "/article/*", "/author/*", "/tag/*",
+  "/api/*", "/mcp", "/oauth/*", "/.well-known/*", "/media/*", "/", "/editions", "/edition/*", "/article/*", "/author/*", "/tag/*",
   "/live", "/live/*", "/markets", "/community", "/discussion/*", "/events", "/coverage/*", "/watch", "/tv", "/t",
   "/about", "/terms", "/privacy", "/disclaimer", "/copyright", "/community-guidelines", "/grievance", "/privacy.html", "/terms.html",
   "/hi", "/hi/*", "/bn", "/bn/*",

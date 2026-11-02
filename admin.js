@@ -243,6 +243,7 @@ async function render(view){
     const stat=(m,dim)=>d.stats.filter(r=>r.metric===m&&(dim===undefined||r.dim===dim)).reduce((a,r)=>a+Number(r.n),0);
     const ord=new Map(d.order.map(o=>[o.id,o])),f=S.force;
     $("#view").innerHTML=`<div class="cards">${[["Raisina TV",S.on?"On air":"Off air"],["Viewers, 30 days",n(stat("tv","viewers"))],["Minutes watched, 30 days",n(Math.round(stat("tv","seconds")/60))],["Ad impressions / finished",`${n(stat("adimp"))} / ${n(stat("addone"))}`]].map(x=>`<div class="metric-card"><small>${x[0]}</small><b>${x[1]}</b></div>`).join("")}</div>
+    <p id="voiceRec" class="notice" style="display:block" hidden></p>
     <div class="split"><div class="panel"><h2>On air</h2>
       <label class="field check"><input type="checkbox" id="tvOn" ${S.on?"checked":""}> Raisina TV is on (off shows "off air" to viewers)</label>
       <p class="muted" style="font-size:13px">Explainers play newest first, around the clock. Shorts never play on TV. Changes take effect at the next switch between stories; use <b>Break in now</b> to cut in immediately.</p>
@@ -264,7 +265,7 @@ async function render(view){
     <div class="split"><div class="panel"><h2>Between videos</h2><p class="muted" style="font-size:13px">A 5–7 second transition between explainers (four styles in rotation), and every few videos the full package: stinger, 15-second Raisina Wire promo and a News Update of full-screen headline sets.</p>
       <form id="seqForm"><div class="form-grid">
         <label class="field check"><input type="checkbox" name="stinger" ${S.seq.stinger?"checked":""}> Stinger</label><label class="field check"><input type="checkbox" name="promo" ${S.seq.promo?"checked":""}> 15-second promo</label>
-        <label class="field check"><input type="checkbox" name="news" ${S.seq.news?"checked":""}> News Update</label><label class="field check"><input type="checkbox" name="hourly" ${S.seq.hourly?"checked":""}> Top-of-the-hour bulletin</label>
+        <label class="field check"><input type="checkbox" name="news" ${S.seq.news?"checked":""}> News Update</label><label class="field check"><input type="checkbox" name="hourly" ${S.seq.hourly?"checked":""}> Top-of-the-hour bulletin</label><label class="field check"><input type="checkbox" name="anchors" ${S.seq.anchors!==false?"checked":""}> AI anchors (intros before explainers, headlines, breaking and live lines; English channel)</label>
         <label class="field">Full package<select name="fullEvery">${[1,2,3,4,6].map(k=>`<option value="${k}" ${k===S.seq.fullEvery?"selected":""}>${k===1?"After every video":`After every ${k} videos`}</option>`).join("")}</select></label>
         <label class="field">Headline sets per News Update<select name="sets">${[3,4,5].map(k=>`<option ${k===S.seq.sets?"selected":""}>${k}</option>`).join("")}</select></label>
         <label class="field">Seconds per set<select name="setSeconds">${[5,6,7,8,10,12].map(k=>`<option ${k===S.seq.setSeconds?"selected":""}>${k}</option>`).join("")}</select></label></div>
@@ -311,7 +312,7 @@ async function render(view){
     $$("[data-ad-on]").forEach(c=>c.addEventListener("change",()=>done(c.checked?"Ad on.":"Ad off.",()=>put(`/api/admin/tv/ads/${encodeURIComponent(c.dataset.adOn)}`,{onAir:c.checked}))));
     $$("[data-ad-del]").forEach(b=>b.addEventListener("click",()=>{if(confirm("Delete this ad?"))done("Ad deleted.",()=>api(`/api/admin/tv/ads/${encodeURIComponent(b.dataset.adDel)}`,{method:"DELETE"}))}));
     const seqOf=()=>({...S.seq});
-    $("#seqForm").addEventListener("submit",e=>{e.preventDefault();const f=e.currentTarget,q=seqOf();["stinger","promo","news","hourly"].forEach(k=>q[k]=f.elements[k].checked);["fullEvery","sets","setSeconds"].forEach(k=>q[k]=+f.elements[k].value);done("Saved. Applies from the next switch.",()=>put("/api/admin/tv/settings",{seq:q}))});
+    $("#seqForm").addEventListener("submit",e=>{e.preventDefault();const f=e.currentTarget,q=seqOf();["stinger","promo","news","hourly","anchors"].forEach(k=>q[k]=f.elements[k].checked);["fullEvery","sets","setSeconds"].forEach(k=>q[k]=+f.elements[k].value);done("Saved. Applies from the next switch.",()=>put("/api/admin/tv/settings",{seq:q}))});
     $("#musicOn").addEventListener("change",e=>done(e.target.checked?"Music on.":"Music off.",()=>put("/api/admin/tv/settings",{seq:{...seqOf(),music:e.target.checked}})));
     $$("[data-theme-on]").forEach(c=>c.addEventListener("change",()=>{const q=seqOf();q.themes={...q.themes,[c.dataset.themeOn]:c.checked};done("Saved.",()=>put("/api/admin/tv/settings",{seq:q}))}));
     let stopPreview=()=>{};
@@ -324,6 +325,8 @@ async function render(view){
     $("#inForm").addEventListener("submit",e=>{e.preventDefault();done("Saved. Switch it on to cut to it.",()=>put("/api/admin/tv/inputs",Object.fromEntries(new FormData(e.currentTarget)),"POST"))});
     $$("[data-in-on]").forEach(c=>c.addEventListener("change",()=>{if(c.checked&&!confirm("Cut every viewer to this stream now?")){c.checked=false;return}done(c.checked?"On air: viewers cut to it within about 10 seconds.":"Off air: back to the channel.",()=>put(`/api/admin/tv/inputs/${encodeURIComponent(c.dataset.inOn)}`,{onAir:c.checked}))}));
     $$("[data-in-del]").forEach(b=>b.addEventListener("click",()=>{if(confirm("Delete this input?"))done("Deleted.",()=>api(`/api/admin/tv/inputs/${encodeURIComponent(b.dataset.inDel)}`,{method:"DELETE"}))}));
+    // The anchor reads breaking lines and live captions in her explainer voice: recorded here, in this browser.
+    if(S.seq.anchors!==false)import("./src/anchorrecord.js").then(m=>m.recordLiveReads(t=>{const p=$("#voiceRec");if(p){p.hidden=false;p.textContent=t}}));
     $("#ordSave").addEventListener("click",()=>done("Order saved. It takes effect at the next switch.",()=>put("/api/admin/tv/order",{rows:$$("[data-ord]").map(r=>({id:r.dataset.ord,pin:r.querySelector(".ord-pin").value,next:r.querySelector(".ord-next").checked,excluded:r.querySelector(".ord-out").checked}))})));
   }else if(view==="writers"){
     const d=await api("/api/admin/writers"),ed=d.writers.find(w=>w.key===state.writerEdit&&w.guest);
