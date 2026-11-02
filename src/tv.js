@@ -127,7 +127,7 @@ function build() {
     </div>
     <div class="tv-ticker" aria-label="${esc(tr("Latest headlines"))}"><span class="tv-tk-break" hidden></span><div class="tv-tk-run"><div class="tv-tk-track"></div></div></div>`;
   video = root.querySelector("video");
-  anchor = createAnchor(root.querySelector(".tv-screen"), { isPaused: () => paused, hearing: () => engaged && wantSound, label: tr, audioCtx: () => (engaged ? music.audio() : null), onSpeak: on => music.duck(on), onBlocked: () => { wantSound = false; applyMute(); syncSound(); } });
+  anchor = createAnchor(root.querySelector(".tv-screen"), { isPaused: () => paused, hearing: () => engaged && wantSound, label: tr, onSpeak: on => music.duck(on), onBlocked: () => { wantSound = false; applyMute(); syncSound(); } });
   new Image().src = IDENT; // the ident, ready when it's due
   video.addEventListener("ended", onEnded);
   video.addEventListener("error", () => { if (mode === "ad") nextAd(); else if (mode === "story") setTimeout(() => advance(), 600); });
