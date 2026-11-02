@@ -1,0 +1,22 @@
+# Checks that the site still builds on every push to main and every pull request, so a typo in
+# src/ (a stray backtick, a broken regex) shows up as a red cross on GitHub at once, with the
+# file and line, instead of silently stopping the Cloudflare deploy.
+name: Site builds
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Syntax check (every script in src/)
+        run: for f in src/*.js; do cp "$f" /tmp/check.mjs && node --check /tmp/check.mjs || { echo "::error file=$f::syntax error in $f"; exit 1; }; done
+      - run: npm run build
