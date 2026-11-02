@@ -381,6 +381,31 @@ async function tvLips(env) {
   const rows = (await env.DB.prepare("SELECT key FROM tts_audio WHERE voice LIKE 'lips:%'").all().catch(() => ({ results: [] }))).results;
   return new Set(rows.map(r => String(r.key).slice(4)));
 }
+// The live reads the channel is waiting for (recorded by the GitHub Action "Raisina TV live reads").
+async function tvVoiceTodo(env, ctx) {
+  const settings = await tvSettings(env), f = await cached("tv", 5e3, () => tvFeed(env, ctx, ""));
+  const reads = await liveReads({ breaking: (await tvBreaking(env)).map(b => b.text), inputs: (await tvInputs(env)).filter(i => i.source), force: settings.force, heads: tvHeads({ breaking: f.breaking, recent: f.recent, sets: f.sets, pinset: settings.pinset }) });
+  const have = reads.length ? new Set((await env.DB.prepare(`SELECT key FROM tts_audio WHERE key IN (${reads.map(() => "?").join(",")})`).bind(...reads.map(r => r.id)).all()).results.map(r => r.key)) : new Set();
+  return { reads, todo: settings.seq.anchors === false ? [] : reads.filter(r => !have.has(r.id)) };
+}
+// The lip-synced clips the channel is waiting for (rendered by the GitHub Action "Raisina TV lip sync").
+async function tvLipsTodo(env) {
+  const all = await lipLines(), have = await tvLips(env);
+  return { all, todo: all.filter(l => !LIPPED.has(l.id) && !have.has(l.id) && VOICED.has(l.id)) };
+}
+// GitHub's own schedule runs these Actions only now and then, so the Worker's cron starts them
+// whenever there is work waiting (needs the Worker secret GITHUB_DISPATCH_TOKEN: a fine-grained
+// GitHub token for this repository with "Actions: read and write").
+async function dispatchTv(env) {
+  if (!env.GITHUB_DISPATCH_TOKEN) return;
+  const m = new Date().getUTCMinutes(), repo = env.GITHUB_REPO || "ilmazsyed/Raisina-Wire";
+  const run = async file => {
+    const r = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/${file}/dispatches`, { method: "POST", headers: { authorization: `Bearer ${env.GITHUB_DISPATCH_TOKEN}`, accept: "application/vnd.github+json", "user-agent": "raisina-wire-cron", "content-type": "application/json" }, body: JSON.stringify({ ref: "main" }) });
+    if (!r.ok) console.error(`dispatch ${file}: ${r.status} ${(await r.text()).slice(0, 200)}`);
+  };
+  if (m % 10 === 3 && (await tvVoiceTodo(env, null)).todo.length) await run("live-reads.yml");
+  if (m % 15 === 4 && (await tvLipsTodo(env)).todo.length) await run("anchor-lips.yml");
+}
 async function tvFeed(env, ctx, lang) {
   const settings = await tvSettings(env);
   const [playlist, ads, breaking, stories, live, inputs, music, liveUps] = await Promise.all([
@@ -1080,8 +1105,7 @@ async function api(request, env, ctx) {
   if ((url.pathname === "/api/admin/tv/lips-todo" && request.method === "GET") || (url.pathname.startsWith("/api/admin/tv/lip/") && request.method === "PUT")) {
     const user = await currentUser(request, env);
     if (!isStaff(user)) return err("Editor access required.", 403);
-    const all = await lipLines(), have = await tvLips(env);
-    const todo = all.filter(l => !LIPPED.has(l.id) && !have.has(l.id) && VOICED.has(l.id));
+    const { all, todo } = await tvLipsTodo(env);
     if (request.method === "GET") return json({ todo: todo.map(l => ({ ...l, audio: `/anchors/voice/${l.id}.mp3` })) }, 200, { "cache-control": "no-store" });
     const id = url.pathname.slice(18), l = all.find(x => x.id === id);
     if (!l) return err("That line doesn't need a clip.", 404);
@@ -1100,10 +1124,7 @@ async function api(request, env, ctx) {
   if ((url.pathname === "/api/admin/tv/voice-todo" && request.method === "GET") || (url.pathname.startsWith("/api/admin/tv/voice/") && request.method === "PUT")) {
     const user = await currentUser(request, env);
     if (!isStaff(user)) return err("Editor access required.", 403);
-    const settings = await tvSettings(env), f = await cached("tv", 5e3, () => tvFeed(env, ctx, ""));
-    const reads = await liveReads({ breaking: (await tvBreaking(env)).map(b => b.text), inputs: (await tvInputs(env)).filter(i => i.source), force: settings.force, heads: tvHeads({ breaking: f.breaking, recent: f.recent, sets: f.sets, pinset: settings.pinset }) });
-    const have = reads.length ? new Set((await env.DB.prepare(`SELECT key FROM tts_audio WHERE key IN (${reads.map(() => "?").join(",")})`).bind(...reads.map(r => r.id)).all()).results.map(r => r.key)) : new Set();
-    const todo = settings.seq.anchors === false ? [] : reads.filter(r => !have.has(r.id));
+    const { reads, todo } = await tvVoiceTodo(env, ctx);
     if (request.method === "GET") return json({ todo: todo.map(r => ({ ...r, say: spoken(r.text) })) }, 200, { "cache-control": "no-store" });
     // Only a read the channel needs, as a WAV or MP3 file of reasonable size.
     const id = url.pathname.slice(20), r = todo.find(x => x.id === id) || reads.find(x => x.id === id);
@@ -1522,6 +1543,7 @@ async function scheduled(env) {
   await step("push delivery", () => drainAlerts(env));
   await step("translations", () => mtWarm(env));
   await step("translation cache", () => env.DB.prepare("DELETE FROM mt_cache WHERE created_at < datetime('now','-45 days')").run());
+  await step("Raisina TV actions", () => dispatchTv(env));
 }
 // 9 am and 9 pm India time, every day (unless switched off in the control room).
 // The settings row makes each one send exactly once, even if two cron runs overlap.
