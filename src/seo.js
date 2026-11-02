@@ -284,7 +284,7 @@ export async function renderPage(request, env, ensureSchema) {
   const hreflang = alternates.length > 1 ? [...alternates.map(l => `<link rel="alternate" hreflang="${LOCALES[l]}" href="${esc(o + prefixed(l, path))}">`), `<link rel="alternate" hreflang="x-default" href="${esc(o + path)}">`] : [];
   const image = page.image || `${o}${OG_IMAGE[lang]}`, card = !page.image;
   const head = [
-    `<link rel="canonical" href="${esc(canonical)}">`, ...hreflang,
+    `<link rel="canonical" href="${esc(canonical)}">`,     `<link rel="alternate" type="application/rss+xml" title="Raisina Wire latest reporting" href="${o}/feed.xml">`, ...hreflang,
     ...(lang !== "en" ? [`<meta property="og:locale" content="${LOCALES[lang].replace("-", "_")}">`] : []),
     `<meta property="og:url" content="${esc(page.ogUrl || canonical)}">`,
     ...["en", ...LANGS].filter(l => l !== lang).map(l => `<meta property="og:locale:alternate" content="${LOCALES[l].replace("-", "_")}">`),
