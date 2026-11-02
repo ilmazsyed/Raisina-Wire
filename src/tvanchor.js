@@ -27,7 +27,7 @@ export function createAnchor(screen, { isPaused, hearing, label, onBlocked, onSp
   let who = "", audio = null, speaking = false, clipOn = false, clipLive = false;
   // The clip takes over from the talking loop only once it is actually playing (a phone may still be
   // loading it), so her mouth never freezes while the clip catches up.
-  clip.addEventListener("playing", () => { if (clipOn && !clipLive) { clipLive = true; face(speaking); } });
+  clip.addEventListener("playing", () => { if (clipOn && !clipLive) { clipLive = true; movedAt = frameAt = performance.now(); if (audio) clip.currentTime = voice.currentTime; if (frames) clip.requestVideoFrameCallback(onFrame); face(speaking); } });
 
   function setWho(key, a) {
     if (who === key) return;
@@ -45,30 +45,32 @@ export function createAnchor(screen, { isPaused, hearing, label, onBlocked, onSp
     const lips = on && clipOn && clipLive;
     el.classList.toggle("clipping", lips);
     for (const v of [idle, talk]) {
-      const want = !offScreen() && !isPaused() && (on ? (lips ? v === idle : v === talk) : v === idle);
+      const want = !offScreen() && !isPaused() && !lips && (on ? v === talk : v === idle); // one face video at a time
       if (want) v.play().catch(() => {}); else v.pause();
     }
   }
-  // Keeps the clip in step with the voice. Phones stall a video whose speed keeps changing, so the
-  // speed moves in three fixed steps, only when the gap calls for it; a big gap is closed by a jump
-  // (at most once a second). If the clip stops moving while she is still speaking (a phone stalling
-  // it), she goes back to the talking loop for the rest of the line: her mouth never freezes.
-  let seekAt = 0, lastT = -1, movedAt = 0;
-  const setRate = r => { if (clip.playbackRate !== r) clip.playbackRate = r; };
+  // Keeps the clip in step with the voice: no speed changes (phones stall a video whose speed is
+  // changed); it is lined up with the voice as it starts, and a gap over 0.08 s is closed by a jump, at most once every 1.5 s. If the picture stops
+  // changing while she is still speaking (a phone can freeze the frame while the video's clock
+  // runs on), she goes back to the talking loop for the rest of the line: her mouth never freezes.
+  let seekAt = 0, lastT = -1, movedAt = 0, frameAt = 0;
+  const frames = typeof clip.requestVideoFrameCallback === "function";
+  const onFrame = () => { frameAt = performance.now(); if (clipOn) clip.requestVideoFrameCallback(onFrame); };
   function follow() {
     if (!clipOn || !audio || clip.ended) return;
     const over = clip.duration && voice.currentTime >= clip.duration - 0.05; // the clip has said it all
-    if (voice.paused || over) { clip.pause(); movedAt = performance.now(); return; }
+    const now = performance.now();
+    if (voice.paused || over) { clip.pause(); movedAt = frameAt = now; return; }
     if (clip.paused && !offScreen()) clip.play().catch(() => {});
     if (clip.readyState < 2) return; // still loading: no seeking yet
-    const now = performance.now(), d = clip.currentTime - voice.currentTime;
     if (clipLive && !offScreen()) {
       if (clip.currentTime !== lastT) { lastT = clip.currentTime; movedAt = now; }
-      else if (now - movedAt > 400) { clipOn = clipLive = false; clip.pause(); face(speaking); return; }
+      const shown = frames ? frameAt : movedAt;
+      if (now - Math.max(shown, seekAt) > 450 || now - movedAt > 450) { clipOn = clipLive = false; clip.pause(); face(speaking); return; }
     }
-    if (Math.abs(d) > 0.12 && now - seekAt > 1000) { seekAt = now; clip.currentTime = voice.currentTime; setRate(1); return; }
-    setRate(d > 0.04 ? 0.95 : d < -0.04 ? 1.05 : 1);
+    if (Math.abs(clip.currentTime - voice.currentTime) > 0.08 && now - seekAt > 1500) { seekAt = now; clip.currentTime = voice.currentTime; }
   }
+
 
 
   // One voice player for every line, unlocked by the viewer's click (phones only let a player
@@ -145,8 +147,8 @@ export function createAnchor(screen, { isPaused, hearing, label, onBlocked, onSp
       const finish = ok => { if (done) return; done = true; stopAudio(); clipOn = false; face(false); cap.hidden = true; cap.classList.remove("show"); res(ok); };
       // The lip-synced clip, if this line has one, starts with the voice (or alone, without sound).
       clipOn = Boolean(line.clip);
-      clipLive = false; lastT = -1; movedAt = seekAt = 0;
-      if (clipOn) { clip.src = line.clip; clip.currentTime = 0; clip.playbackRate = 1; clip.load(); }
+      clipLive = false; lastT = -1; movedAt = seekAt = frameAt = 0;
+      if (clipOn) { clip.src = line.clip; clip.currentTime = 0; clip.load(); }
       const fallback = () => {   // no voice: the clip (or the talking loop) and reading time
         if (audio) { voice.onended = voice.onerror = voice.onplaying = voice.onpause = null; voice.pause(); audio = null; onSpeak?.(false); }
         started = true; face(true);
