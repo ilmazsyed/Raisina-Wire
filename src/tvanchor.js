@@ -24,7 +24,10 @@ export function createAnchor(screen, { isPaused, hearing, label, onBlocked, onSp
   screen.querySelector(".tv-seq").after(el);
   const idle = el.querySelector(".ta-idle"), talk = el.querySelector(".ta-talk"), clip = el.querySelector(".ta-clip");
   idle.addEventListener("loadedmetadata", () => { if (idle.videoWidth) el.style.setProperty("--ta-aspect", idle.videoWidth / idle.videoHeight); });
-  let who = "", audio = null, speaking = false, clipOn = false;
+  let who = "", audio = null, speaking = false, clipOn = false, clipLive = false;
+  // The clip takes over from the talking loop only once it is actually playing (a phone may still be
+  // loading it), so her mouth never freezes while the clip catches up.
+  clip.addEventListener("playing", () => { if (clipOn && !clipLive) { clipLive = true; face(speaking); } });
 
   function setWho(key, a) {
     if (who === key) return;
@@ -39,9 +42,10 @@ export function createAnchor(screen, { isPaused, hearing, label, onBlocked, onSp
   // The face: the line's lip-synced clip, else the talking loop, while speaking; resting otherwise.
   function face(on) {
     speaking = on; el.classList.toggle("talking", on);
-    el.classList.toggle("clipping", on && clipOn);
+    const lips = on && clipOn && clipLive;
+    el.classList.toggle("clipping", lips);
     for (const v of [idle, talk]) {
-      const want = !offScreen() && !isPaused() && (on ? (clipOn ? v === idle : v === talk) : v === idle);
+      const want = !offScreen() && !isPaused() && (on ? (lips ? v === idle : v === talk) : v === idle);
       if (want) v.play().catch(() => {}); else v.pause();
     }
   }
@@ -52,6 +56,7 @@ export function createAnchor(screen, { isPaused, hearing, label, onBlocked, onSp
     if (!clipOn || !audio) return;
     const d = clip.currentTime - voice.currentTime;
     if (clip.ended) return;
+    if (clip.readyState < 3) { if (clip.paused && !voice.paused && !offScreen()) clip.play().catch(() => {}); return; } // still loading: no seeking yet
     if (Math.abs(d) > 0.08) { clip.currentTime = voice.currentTime; clip.playbackRate = 1; }
     else clip.playbackRate = Math.abs(d) < 0.02 ? 1 : Math.min(1.1, Math.max(0.9, 1 - d * 2));
     const over = clip.ended || (clip.duration && voice.currentTime >= clip.duration - 0.05); // the clip has said it all
@@ -115,7 +120,7 @@ export function createAnchor(screen, { isPaused, hearing, label, onBlocked, onSp
   function stopAudio() {
     if (!audio) return;
     voice.onended = voice.onerror = voice.onplaying = voice.onpause = null; voice.pause(); audio = null;
-    clip.pause(); clipOn = false; onSpeak?.(false);
+    clip.pause(); clipOn = clipLive = false; onSpeak?.(false);
   }
 
   // Say a line: resolves when the voice ends (or, without it, when the clip ends or after reading
@@ -132,7 +137,8 @@ export function createAnchor(screen, { isPaused, hearing, label, onBlocked, onSp
       const finish = ok => { if (done) return; done = true; stopAudio(); clipOn = false; face(false); cap.hidden = true; cap.classList.remove("show"); res(ok); };
       // The lip-synced clip, if this line has one, starts with the voice (or alone, without sound).
       clipOn = Boolean(line.clip);
-      if (clipOn) { clip.src = line.clip; clip.currentTime = 0; clip.playbackRate = 1; }
+      clipLive = false;
+      if (clipOn) { clip.src = line.clip; clip.currentTime = 0; clip.playbackRate = 1; clip.load(); }
       const fallback = () => {   // no voice: the clip (or the talking loop) and reading time
         if (audio) { voice.onended = voice.onerror = voice.onplaying = voice.onpause = null; voice.pause(); audio = null; onSpeak?.(false); }
         started = true; face(true);
