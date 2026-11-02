@@ -96,7 +96,7 @@ async function pageFor(path, url, env, o, lang = "en") {
   if (section === "install") {
     const title = "Get the Raisina Wire App — The Lightweight App Revolution";
     const description = "Install Raisina Wire on iPhone, Android or desktop. A lightweight, secure app-like experience for geopolitics, security, markets and live news — without a bulky app-store download.";
-    const image = `${o}/og-install.jpg`;
+    const image = `${o}/og-image.jpg`;
     return { title, ogTitle: "Get the Raisina Wire App", description, image, noindex: true,
       ld: [{ "@context": "https://schema.org", "@type": "WebPage", name: title, description, url: `${o}/install`, primaryImageOfPage: image, isPartOf: { "@id": `${o}/#website` } }],
       body: `<h1>Get the Raisina Wire app</h1><p>${esc(description)}</p><p>Lightweight by design. Secure over HTTPS. Add it to your home screen in seconds.</p>` };
