@@ -1,0 +1,40 @@
+# Raisina TV anchor voices: records the anchors' own lines the site is waiting for (hello, bulletins,
+# News Update lines, the intros of new explainers) in their Chatterbox voices and uploads them; lip
+# sync follows by itself. Started by the site when lines are waiting (and on demand).
+# Needs the repository secret RW_PUBLISH_TOKEN. See video/voices/lines_action.py.
+name: Raisina TV anchor voices
+on:
+  workflow_dispatch:
+concurrency:
+  group: anchor-voices
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  voices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            video
+            public/anchors
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: video/voices/requirements.txt
+      - name: Voice models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: voices-chatterbox017
+      - name: Install
+        run: |
+          sudo apt-get install -y -qq ffmpeg > /dev/null
+          pip install -q -r video/voices/requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+      - name: Record and upload
+        env:
+          RW_PUBLISH_TOKEN: ${{ secrets.RW_PUBLISH_TOKEN }}
+        run: python video/voices/lines_action.py 55

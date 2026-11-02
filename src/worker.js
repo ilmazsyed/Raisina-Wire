@@ -24,7 +24,7 @@ import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { liveResults } from "./results.js";
 import { handleTts } from "./tts.js";
-import { anchorLines, liveReads, lipLines, READ, spoken } from "./anchors.js";
+import { anchorLines, liveReads, lipLines, allLines, ANCHORS, engineOf, lineId, READ, spoken } from "./anchors.js";
 import { LIPPED } from "./anchor-lips.js";
 import { VOICED } from "./anchor-voices.js";
 // Every headline Raisina TV can show (the anchor reads them): breaking lines, Breaking Headlines,
@@ -390,8 +390,24 @@ async function tvVoiceTodo(env, ctx) {
 }
 // The lip-synced clips the channel is waiting for (rendered by the GitHub Action "Raisina TV lip sync").
 async function tvLipsTodo(env) {
-  const all = await lipLines(), have = await tvLips(env);
-  return { all, todo: all.filter(l => !LIPPED.has(l.id) && !have.has(l.id) && VOICED.has(l.id)) };
+  const [all, have, lines] = await Promise.all([lipLines(), tvLips(env), tvLines(env)]);
+  const todo = all.filter(l => !LIPPED.has(l.id) && !have.has(l.id) && (VOICED.has(l.id) || lines.has(l.id)))
+    .map(l => ({ ...l, audio: VOICED.has(l.id) ? `/anchors/voice/${l.id}.mp3` : `/api/tv/voice/${l.id}` }));
+  return { all, todo };
+}
+// The anchors' own lines (hello, bulletins, intros…) recorded by the GitHub Action "Raisina TV anchor
+// voices" (Chatterbox) into D1 (voice "line:<anchor>"; kept, unlike live reads).
+async function tvLines(env) {
+  const rows = (await env.DB.prepare("SELECT key FROM tts_audio WHERE voice LIKE 'line:%'").all().catch(() => ({ results: [] }))).results;
+  return new Set(rows.map(r => r.key));
+}
+async function tvLinesTodo(env) {
+  const have = await tvLines(env), todo = [];
+  for (const k of Object.keys(ANCHORS)) {
+    if (engineOf(k) !== "chatterbox") continue;
+    for (const t of allLines(k)) { const id = await lineId(k, t); if (!VOICED.has(id) && !have.has(id)) todo.push({ id, anchor: k, text: t, say: spoken(t), engine: "chatterbox", kokoro: ANCHORS[k].kokoro, ref: `/anchors/${k}-ref.wav` }); }
+  }
+  return todo;
 }
 // GitHub's own schedule runs these Actions only now and then, so the Worker's cron starts them
 // whenever there is work waiting (needs the Worker secret GITHUB_DISPATCH_TOKEN: a fine-grained
@@ -405,6 +421,7 @@ async function dispatchTv(env) {
   };
   if (m % 10 === 3 && (await tvVoiceTodo(env, null)).todo.length) await run("live-reads.yml");
   if (m % 15 === 4 && (await tvLipsTodo(env)).todo.length) await run("anchor-lips.yml");
+  if (m % 15 === 9 && (await tvLinesTodo(env)).length) await run("anchor-voices.yml");
 }
 async function tvFeed(env, ctx, lang) {
   const settings = await tvSettings(env);
@@ -464,8 +481,8 @@ async function tvFeed(env, ctx, lang) {
     const voiced = reads.length ? new Set((await env.DB.prepare(`SELECT key FROM tts_audio WHERE key IN (${reads.map(() => "?").join(",")})`).bind(...reads.map(r => r.id)).all()).results.map(r => r.key)) : new Set();
     // Headlines the anchor has recorded: shown text -> its read.
     const headReads = Object.fromEntries(heads.map(t => [t, reads.find(r => r.text === READ.head(t) && voiced.has(r.id))]).filter(([, r]) => r).map(([t, r]) => [t, `/api/tv/voice/${r.id}`]));
-    const lips = await tvLips(env);
-    anchors = { ...await anchorLines({ playlist: playlist.map(v => ({ id: v.id, src: v.mediaUrl, editorPick: picks.has(String(v.mediaUrl || "").split("?")[0]) })), input, breaking: breaking.map(b => b.text), force: settings.force, voiced, lips }), reads: headReads };
+    const [lips, lines] = await Promise.all([tvLips(env), tvLines(env)]);
+    anchors = { ...await anchorLines({ playlist: playlist.map(v => ({ id: v.id, src: v.mediaUrl, editorPick: picks.has(String(v.mediaUrl || "").split("?")[0]) })), input, breaking: breaking.map(b => b.text), force: settings.force, voiced, lips, lines }), reads: headReads };
   }
   return { anchors, on: settings.on, qr: settings.qr, every: settings.every, perBreak: settings.perBreak, skippable: settings.skippable, force: settings.force || null,
     playlist: playlist.map(v => ({ id: v.id, title: v.title, description: v.description, category: v.category, src: v.mediaUrl, thumb: v.thumbnailUrl, publishedAt: v.publishedAt })),
@@ -1111,13 +1128,27 @@ async function api(request, env, ctx) {
     if (a > b || a >= size) return new Response(null, { status: 416, headers: { ...head, "content-range": `bytes */${size}` } });
     return new Response(data.slice(a, b + 1), { status: 206, headers: { ...head, "content-range": `bytes ${a}-${b}/${size}`, "content-length": String(b - a + 1) } });
   }
+  // The anchors' own lines to record (Chatterbox), and their upload (MP3 or WAV under 1.8 MB).
+  if ((url.pathname === "/api/admin/tv/lines-todo" && request.method === "GET") || (url.pathname.startsWith("/api/admin/tv/line/") && request.method === "PUT")) {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const todo = await tvLinesTodo(env);
+    if (request.method === "GET") return json({ todo }, 200, { "cache-control": "no-store" });
+    const id = url.pathname.slice(19), l = todo.find(x => x.id === id);
+    if (!l) return err("That line isn't waiting for a recording.", 404);
+    const data = new Uint8Array(await request.arrayBuffer());
+    const head = String.fromCharCode(...data.slice(0, 4)), mp3 = head.startsWith("ID3") || (data[0] === 0xff && (data[1] & 0xe0) === 0xe0);
+    if (data.length < 1000 || data.length > 1.8e6 || !(head === "RIFF" || mp3)) return err("Send a WAV or MP3 recording under 1.8 MB.");
+    await env.DB.prepare("INSERT OR REPLACE INTO tts_audio (key,voice,chars,data) VALUES (?,?,?,?)").bind(id, `line:${l.anchor}`, l.text.length, data.buffer).run();
+    return json({ ok: true }, 200, { "cache-control": "no-store" });
+  }
   // What the lip-sync Action should render: lines needing a clip that has none yet and whose voice
   // is recorded. It uploads each clip (a silent MP4 under 1.9 MB) with a PUT.
   if ((url.pathname === "/api/admin/tv/lips-todo" && request.method === "GET") || (url.pathname.startsWith("/api/admin/tv/lip/") && request.method === "PUT")) {
     const user = await currentUser(request, env);
     if (!isStaff(user)) return err("Editor access required.", 403);
     const { all, todo } = await tvLipsTodo(env);
-    if (request.method === "GET") return json({ todo: todo.map(l => ({ ...l, audio: `/anchors/voice/${l.id}.mp3` })) }, 200, { "cache-control": "no-store" });
+    if (request.method === "GET") return json({ todo }, 200, { "cache-control": "no-store" });
     const id = url.pathname.slice(18), l = all.find(x => x.id === id);
     if (!l) return err("That line doesn't need a clip.", 404);
     const data = new Uint8Array(await request.arrayBuffer());
