@@ -56,7 +56,13 @@ anchor carries an on-screen "AI" label.
 for `tara`, `kabir`, `bharti`, `vikram`, `ilmaz`. Made offline with SadTalker (CPU, `--still
 --preprocess full --enhancer gfpgan`) from the portraits in `sources/`: the talking loop is driven by a
 few seconds of speech, the idle loop by near-silence. Each render becomes a silent loop that plays
-forwards then backwards, 720 px tall. Lips are approximate, not synced to the words.
+forwards then backwards, 720 px tall. The talking loop's lips are approximate.
+
+**Lip-synced clips** (`public/anchors/lips/<line id>.mp4`, listed in `src/anchor-lips.js`): for the
+lines she says on camera or in the side window, Wav2Lip on her resting loop (`video/lips/render.sh`),
+the lower face sharpened with GFPGAN for on-camera lines (`video/lips/sharpen.py`). The channel
+plays the clip in step with the line's recording; a line without a clip uses the talking loop. Add
+new clips with `node video/anchor-lips.mjs <dir-of-clips>`.
 
 ## On screen
 - **Aston:** when the anchor is on camera, a broadcast lower third wipes in, holds and wipes out:
