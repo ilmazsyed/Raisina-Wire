@@ -34,7 +34,8 @@ def render(job, tmp):
     if not face: raise RuntimeError(f"no face settings for {job['anchor']} in video/lips/faces.json")
     voice = ROOT / "public/anchors/voice" / f"{job['id']}.mp3"
     if not voice.exists():   # recorded after this checkout: take it from the site
-        voice = tmp / "voice.mp3"; urllib.request.urlretrieve(SITE + job["audio"], voice)
+        voice = tmp / "voice.mp3"   # (with a user-agent: the site turns away anonymous downloads)
+        with urllib.request.urlopen(urllib.request.Request(SITE + job["audio"], headers={"user-agent": "raisina-lips"}), timeout=60) as r: voice.write_bytes(r.read())
     wav, raw, lip, out = tmp / "a.wav", tmp / "raw.mp4", tmp / "lip.mp4", tmp / "out.mp4"
     run(["ffmpeg", "-v", "error", "-y", "-i", str(voice), "-ar", "16000", "-ac", "1", str(wav)])
     run([sys.executable, "inference.py", "--checkpoint_path", "checkpoints/wav2lip.pth", "--face", str(ROOT / f"public/anchors/{job['anchor']}-idle.mp4"),
