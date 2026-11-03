@@ -1,4 +1,27 @@
 {
   "_": "Where each anchor's face sits on their 720 px resting loop (public/anchors/<key>-idle.mp4), for Wav2Lip's --box: top bottom left right. Add an anchor here when their face is made.",
-  "tara": { "box": [112, 318, 245, 419] }
+  "tara": {
+    "box": [
+      112,
+      318,
+      245,
+      419
+    ]
+  },
+  "kabir": {
+    "box": [
+      115,
+      321,
+      249,
+      423
+    ]
+  },
+  "bharti": {
+    "box": [
+      81,
+      281,
+      306,
+      475
+    ]
+  }
 }
