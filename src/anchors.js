@@ -41,8 +41,8 @@ export const shiftAnchor = (now = Date.now()) => {
 // Anchors on air. Only these take shifts; a shift whose anchor isn't on air is covered by the next
 // anchor on air in ROTA order (Tara first). STAGING: anchors being prepared (voice recordings and
 // lip sync made in the background) who are not on air yet; they move to READY when complete.
-export const READY = ["tara", "kabir"];
-export const STAGING = ["bharti", "vikram"];
+export const READY = ["tara", "kabir", "bharti"];
+export const STAGING = ["vikram"];
 const istHour = (now = Date.now()) => new Date(now + 5.5 * 3600e3).getUTCHours();
 export const onDuty = (now = Date.now()) => {
   const k = shiftAnchor(now);
