@@ -21,8 +21,8 @@ import { LIPPED } from "./anchor-lips.js";
 // `face`: the anchor's face loops and lip-sync settings are made (video/lips/faces.json).
 export const ANCHORS = {
   tara:   { name: "Tara",       role: "News Anchor (AI)", voice: "cb:tara",   kokoro: "hf_beta:0.6+bf_isabella:0.4", was: "hf_beta:0.6+bf_isabella:0.4", face: true },
-  kabir:  { name: "Kabir",      role: "News Anchor (AI)", voice: "cb:kabir",  kokoro: "hm_psi:0.55+bm_fable:0.45" },
-  bharti: { name: "Bharti",     role: "News Anchor (AI)", voice: "cb:bharti", kokoro: "hf_alpha:0.6+bf_emma:0.4" },
+  kabir:  { name: "Kabir",      role: "News Anchor (AI)", voice: "cb:kabir",  kokoro: "hm_psi:0.55+bm_fable:0.45", face: true },
+  bharti: { name: "Bharti",     role: "News Anchor (AI)", voice: "cb:bharti", kokoro: "hf_alpha:0.6+bf_emma:0.4", face: true },
   vikram: { name: "Vikram",     role: "News Anchor (AI)", voice: "cb:vikram", kokoro: "hm_omega:0.55+bm_george:0.45" },
   ilmaz:  { name: "Ilmaz Syed", role: "Editor (AI)",      voice: "hm_omega:0.5+bm_daniel:0.5" }
 };
