@@ -25,18 +25,21 @@ Rule: everything must run on free tiers. No paid AI API.
 - Listen: Google Chirp 3 HD bn-IN male + female voices, reader picks; each paragraph generated once and cached.
 - Corrections workflow: pull/correct any rewrite in one tap, keep a record.
 
-## Phase 2 — TV (two channels)
-- Horizontal (1920×1080) and vertical (1080×1920) are separate channels, each switchable on/off, each with its own secret OBS/vMix output URL.
-- Sourcing: YouTube Data API, owner selects/deselects playlists (Shorts → vertical, long videos → horizontal) and lives. Refresh every 10 minutes + instant "Refresh now". Stay inside free quota (no search.list polling for lives).
+## Phase 2 — Rashtrix Live (one live, two formats)
+- There is ONE live: the app's own channel, Rashtrix Live, in a horizontal (1920×1080) and a vertical (1080×1920) format. Each format can be switched on/off.
+- It plays out inside the app exactly like Raisina TV (`src/tv.js`): every viewer's player runs the channel itself. Everything on air (videos, cards, graphics, music, cut-ins) is made and played in the app. No OBS/vMix in making the live.
+- Playout: recency first (newest video first). In-app breaking cards and headline cards between every video.
+- Video sourcing: YouTube Data API; owner selects/deselects playlists (Shorts → vertical, long videos → horizontal). Refresh every 10 minutes + instant "Refresh now". No YouTube lives as sources. Stay inside free quota.
 - YouTube player controls hidden (controls=0 + click-blocking overlay).
 - Vertical: Shorts carry their own jacket; our graphics sit in safe zones (breaking/headline flash over the left of the portrait strip, LIVE tag in video corner, ticker at the bottom). App-made items (breaking cards, graphics, clips) get an app-drawn jacket identical in position to the Shorts jacket. Full-screen 9:16 promo swipe cards (upload or Drive link), on/off, play/skip, repeat rules.
 - Horizontal: full designable jacket (bug, LIVE, clock, lower third, ad box, ticker), L-band, full-screen breaking with music, News Update/Bulletin packages from Raisina Wire.
-- App viewers watch the app's own player (not the YouTube embed of the stream). YouTube/Facebook get the OBS stream.
+- Output link: each format has its own secret full-screen output page of the live. Later, OBS can open that link as a browser source only to restream it to YouTube/Facebook. OBS does no mixing and nothing on air depends on it.
 
 ## Phase 3 — Bulletin producer + PCR
 - Producer space: daily rundowns per channel; item types: YouTube video (trim in/out), live segment (layout + sources), app clip, full-screen breaking, headline set, L-band, promo card, ad break, slate. Drag to reorder; per-item text (lower third, L-band, breaking text, ticker lines); auto durations, back-timing, total vs slot.
 - Midnight IST: archive the day's rundowns + as-run log; working rundowns cleared; archive kept for a set period (default 90 days). PDF generated in the browser (correct Bengali shaping).
 - PCR: preview/program, TAKE/AUTO, transitions (cut, mix, red slash wipe, stinger). Layouts usable any time: full screen, PiP, 2-up, 1 big + 2, 3 equal, host + 4, 6-grid, L-band, full graphic. Source grid with tally. Graphics layers on/off. "Breaking in now". Rundown auto/manual; PCR can cut in anything at any time, then resume or skip.
+- Live bulletins: at set times (or any time) the PCR cuts the live into a live bulletin; every viewer's player switches within about a second, then goes back to the recency playout when the bulletin ends. All from the PCR, in the app.
 - Realtime control to all outputs via Durable Objects (~1 s).
 - Videos: upload or paste Drive link (copied once into Cloudflare R2, 10 GB free; auto-delete old clips). MP4 H.264.
 - Google Drive images for popups/bugs/L-bands copied into app storage on paste.
@@ -44,8 +47,8 @@ Rule: everything must run on free tiers. No paid AI API.
 ## Phase 4 — In-app live studio
 - Guests/reporters join via a link in the browser (no install): camera preview, name + title (fills strap), consent tick box for broadcast/recording, headphones advice.
 - WebRTC via Cloudflare Realtime (SFU + TURN, free monthly allowance). Up to 5–6 debate guests; all see/hear each other plus an on-air return feed. Producer: mute, private talkback, green room with camera/mic/network/headphone checks, countdown + messages on guest's phone.
-- Fallback: VDO.Ninja (free). Last resort: Meet window capture in OBS/vMix.
-- App live stream during live segments: OBS → self-hosted media server on Oracle Cloud Always Free VM → app player (HLS / low-latency WebRTC).
+- Fallback: VDO.Ninja (free), brought into the PCR mixer as a source.
+- Live bulletin mixer runs in the operator's browser (Chrome, laptop/desktop): it mixes anchor, reporters, guests and clips into one picture with the app's graphics and sends one stream to a self-hosted media server on an Oracle Cloud Always Free VM; viewers' players play that stream (HLS / low-latency WebRTC) during the bulletin. No OBS/vMix.
 
 ## Phase 5 — Extras
 - Safety: 5–10 s broadcast delay with DUMP; emergency standby slate (auto if a feed drops 10 s); output health + phone push alerts; audit log (PDF).
