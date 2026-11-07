@@ -44,4 +44,7 @@ jobs:
       - name: Record and upload
         env:
           RW_PUBLISH_TOKEN: ${{ secrets.RW_PUBLISH_TOKEN }}
+          # Short runs (about six minutes), so the newest headlines are recorded within about ten
+          # minutes of reaching the channel; the site lists the opener's breaking headlines first.
+          RW_READS_LIMIT: "12"
         run: python video/live_reads.py
