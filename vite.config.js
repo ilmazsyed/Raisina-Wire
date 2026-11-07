@@ -4,11 +4,11 @@ import { createHash } from "node:crypto";
 import { defineConfig } from "vite";
 
 // Fill the service worker's precache list with this build's files, so an installed app
-// opens offline with the reader, all edition text and artwork. Admin pages are left out.
+// opens offline. Admin pages are left out.
 function precacheServiceWorker() {
   let outDir;
   return {
-    name: "raisina-precache",
+    name: "rashtrix-precache",
     apply: "build",
     configResolved(config) { outDir = resolve(config.root, config.build.outDir); },
     closeBundle() {
@@ -17,7 +17,7 @@ function precacheServiceWorker() {
         return statSync(path).isDirectory() ? walk(path) : [path];
       });
       const files = walk(outDir).map(f => "/" + relative(outDir, f).split("\\").join("/"))
-        .filter(f => !/^\/(sw\.js|_headers|og-image\.jpg|admin|screenshots\/|videos\/|anchors\/)/.test(f) && !f.includes("/admin-"))
+        .filter(f => !/^\/(sw\.js|_headers|og-image[\w-]*\.jpg|admin)/.test(f) && !f.includes("/admin-"))
         .map(f => (f === "/index.html" ? "/" : f))
         .sort();
       const hash = createHash("sha256");

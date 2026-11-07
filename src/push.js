@@ -60,7 +60,7 @@ export async function createAlert(env, ctx, { title, body = "", url = "/", userI
 
 // Send the next batch for each unfinished alert (oldest first).
 export async function drainAlerts(env) {
-  const subject = env.SITE_URL || "mailto:alerts@raisinawire.invalid";
+  const subject = env.SITE_URL || "mailto:alerts@rashtrix.invalid";
   const { results: open } = await env.DB.prepare("SELECT id,cursor,sent FROM alerts WHERE done=0 ORDER BY created_at LIMIT 3").all();
   for (const alert of open) {
     const { results: subs } = await env.DB.prepare("SELECT endpoint FROM push_subscriptions WHERE endpoint>? ORDER BY endpoint LIMIT ?").bind(alert.cursor, BATCH).all();

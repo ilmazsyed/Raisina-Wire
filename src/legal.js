@@ -1,310 +1,273 @@
-// Raisina Wire's About page and legal documents. One source for the app views and the
-// server-rendered pages. Plain HTML strings; edit the text here.
-// These documents were drafted with care but are not a substitute for advice from an
-// Indian lawyer, who should review them before relying on them.
+// Rashtrix's About page and legal documents, in English with Bengali versions (`bn`). One
+// source for the app views and the server-rendered pages. Plain HTML strings; edit the text here.
+// Hindi readers get the English until a Hindi version is saved in the control room
+// (Translations); a version saved there also replaces the bundled Bengali.
+// Drafted with care for Indian law (IT Act 2000 and IT Rules 2021, DPDP Act 2023, Copyright
+// Act 1957) but not a substitute for review by the company's legal officer.
 
-export const LEGAL_UPDATED = "26 October 2026";
-export const CONTACT_EMAIL = "ilmazsyed@gmail.com";
-export const SITE_URL = "https://raisinawire.calibrex.org";
-const mail = `<a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>`;
+export const LEGAL_UPDATED = "7 November 2026";
+// The Grievance Officer required by IT Rules 2021, rule 3(2) and rule 4. Fill these in before
+// launch: the pages say the details are coming until they are set.
+export const GRIEVANCE = { name: "", title: "Chief Legal Officer, Middleton Media Works", email: "", phone: "", address: "" };
+export const CONTACT_EMAIL = GRIEVANCE.email;
+export const SITE_URL = "https://www.rashtrix.live";
+const mail = CONTACT_EMAIL ? `<a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>` : "the address on our <a href=\"/grievance\">Grievance Redressal</a> page";
+const mailBn = CONTACT_EMAIL ? `<a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>` : "<a href=\"/grievance\">অভিযোগ নিষ্পত্তি</a> পাতায় দেওয়া ঠিকানা";
+const officer = (bn = false) => GRIEVANCE.name && GRIEVANCE.email
+  ? `<div class="officer"><b>${bn ? "অভিযোগ আধিকারিক (Grievance Officer)" : "Grievance Officer"}</b><br>${GRIEVANCE.name}, ${GRIEVANCE.title}<br>${bn ? "ইমেল" : "Email"}: <a href="mailto:${GRIEVANCE.email}">${GRIEVANCE.email}</a>${GRIEVANCE.phone ? `<br>${bn ? "ফোন" : "Phone"}: ${GRIEVANCE.phone}` : ""}${GRIEVANCE.address ? `<br>${bn ? "ঠিকানা" : "Address"}: ${GRIEVANCE.address}` : ""}<br>${bn ? "সময়: সোম থেকে শনি, সকাল ১০টা থেকে সন্ধ্যা ৬টা" : "Hours: Monday to Saturday, 10:00 to 18:00 IST"}</div>`
+  : `<div class="officer"><b>${bn ? "অভিযোগ আধিকারিক (Grievance Officer)" : "Grievance Officer"}</b><br>${GRIEVANCE.title}<br>${bn ? "নাম ও যোগাযোগের বিবরণ শিগগির এখানে প্রকাশ করা হবে।" : "The officer’s name and contact details will be published here shortly."}</div>`;
+
+const ORG = "Rashtrix 24×7 News, published by Middleton Media Works";
+const ORG_BN = "রাষ্ট্রিক্স ২৪×৭ নিউজ, প্রকাশক মিডলটন মিডিয়া ওয়ার্কস";
 
 /* ---------- About ---------- */
 export const ABOUT = {
-  title: "About Raisina Wire",
-  description: "Raisina Wire is an independent Indian publication on geopolitics, national security, diplomacy and markets, founded and edited by Ilmaz Syed and built on technology from Calibrex.",
+  title: "About Rashtrix",
+  description: "Rashtrix 24×7 News is a Bengali news channel and app from Kolkata, published by Middleton Media Works: Kolkata, West Bengal, India, Bengalis abroad and the world.",
   html: `
-<p class="lede">Raisina Wire is an independent Indian publication on geopolitics, national security, diplomacy and markets: an Indian perspective on a changing world.</p>
-
+<p class="lede">Rashtrix 24×7 News is a Bengali-first news channel and app from Kolkata. Our line: <b lang="bn">লোক গুনি না, লোকের কথা শুনি</b> — we don’t count people, we listen to them.</p>
 <h2>What we publish</h2>
 <ul>
-  <li><b>Raisina Wire editions and analysis</b>: original, open-source analysis of India’s strategic questions, first published as the Raisina Wire newsletter on LinkedIn.</li>
-  <li><b>The live wire</b>: headlines from named publishers, newest first, with short credited excerpts and a link to every original story.</li>
-  <li><b>Live coverage</b> of developing events, posted by our desk with sources.</li>
-  <li><b>The market board</b>: delayed quotes for Indian and global markets, for information only.</li>
-  <li><b>The community</b>: moderated discussions, briefings and members’ events.</li>
+  <li><b>Rashtrix reports</b>: stories by our own reporters and desk, with their photographs.</li>
+  <li><b>Wire reports and briefs</b>: short reports written by the Rashtrix wire desk from several published sources, checked against each other and written in our own words. They carry no photographs.</li>
+  <li><b>Live coverage</b> of developing events, and alerts when news breaks.</li>
+  <li>Five desks: <b>Kolkata</b>, <b>West Bengal</b>, <b>India</b>, <b>Probashi Bangali</b> (Bengalis outside Bengal and abroad) and the <b>World</b>, in Bengali, English and Hindi.</li>
 </ul>
-
 <h2>How we work</h2>
-<p>We work from public, verifiable information and say where it comes from. We separate fact from analysis, label opinion as opinion, and correct mistakes openly. Other publishers’ stories are always credited and linked; we show only short excerpts so that readers go to the publisher for the full story. Read our <a href="/disclaimer">editorial disclaimer</a> and <a href="/copyright">how we use other publishers’ work</a>.</p>
-<p>Raisina Wire is independent. It is not affiliated with, endorsed by or speaking for the Government of India or any of its offices. The line drawing of Raisina Hill in our masthead is architectural artwork; we do not use the State Emblem of India or any official emblem.</p>
-
-<h2 id="founder">Founder and editor: Ilmaz Syed</h2>
-<figure class="founder-card"><img src="/editions/ilmaz-syed-portrait.jpg" alt="Portrait of Ilmaz Syed" width="160" height="160" loading="lazy"><figcaption><b>Ilmaz Syed</b><span>Founder and Editor, Raisina Wire · Founder, Calibrex</span><span>OSINT expert · Defence investigative journalist · Geopolitical analyst</span></figcaption></figure>
-<p>Ilmaz Syed founded Raisina Wire and edits it. He is an OSINT expert, a defence investigative journalist and a geopolitical analyst, and a senior editor and primetime anchor whose on-ground reporting has covered the India–China LAC standoffs, the Manipur–Myanmar border, the Nagaland insurgency and counter-terror operations in Kashmir. He is a certified OSINT journalist (Basel Institute on Governance, Switzerland).</p>
-<p>He has led newsrooms and on-air programming as Executive Editor of Calcutta News at Calcutta Television Network, at NKTV Media Group and as a senior producer and anchor at News18 Bangla, and earlier worked with Star, ETV News Bangla, NewsX, News Time and The Statesman. He is the founder of Calibrex, the founder and editor-in-chief of Rashtrix, and a partner and deputy managing director at Middleton Media Works. As an Army Wing cadet of the National Cadet Corps he earned the NCC ‘C’ Certificate and was declared Best Army Cadet of the West Bengal and Sikkim Directorate. He studied journalism at St. Xavier’s College, Kolkata, and works in English, Hindi and Bengali.</p>
-<p><a href="https://www.linkedin.com/in/ilmaz-syed" target="_blank" rel="noopener">Ilmaz Syed on LinkedIn ↗</a> · <a href="/author/ilmaz-syed">His Raisina Wire stories</a></p>
-
-<h2 id="calibrex">Powered by Calibrex</h2>
-<a class="cx-card" href="https://calibrex.org/?utm_source=raisinawire&utm_medium=referral&utm_campaign=about" target="_blank" rel="noopener"><img src="/partners/calibrex-mark.svg" alt="" width="52" height="52"><span><span class="cx-word">CALIBRE<span>X</span></span><small>Information is everywhere. Clarity isn’t. · calibrex.org ↗</small></span></a>
-<p>Raisina Wire runs on technology from <a href="https://calibrex.org/?utm_source=raisinawire&utm_medium=referral&utm_campaign=about" target="_blank" rel="noopener">Calibrex</a>, the intelligence, operations and capability company founded by Ilmaz Syed. Calibrex builds <b>OSINT Studio</b>, an open-source intelligence workspace for source-backed research; <b>NRCS</b>, a newsroom management system; the <b>Calibrex Academy</b>, assessed OSINT training with verifiable certificates; and <b>Calibrex Atlas</b>, global situational awareness with the evidence behind every point. Calibrex provides the platform; editorial decisions at Raisina Wire are made by its editors.</p>
-
+<p>We report facts we can stand behind and correct mistakes openly. Wire reports are drafted with the help of an AI language model from facts in at least two published reports wherever possible, and an editor can pull or correct any of them at once; every correction is recorded. See our <a href="/disclaimer">editorial disclaimer</a>, <a href="/copyright">how we use other publishers’ work</a> and our <a href="/corrections">corrections policy</a>.</p>
+<p>Rashtrix is independent. It is not affiliated with any government or political party.</p>
+<h2>Who we are</h2>
+<p>${ORG}. Watch us on YouTube and Facebook, and read us at <a href="${SITE_URL}">rashtrix.live</a>.</p>
 <h2>Contact</h2>
-<p>Editorial, corrections, partnerships and legal matters: ${mail}. For complaints and takedown requests, see <a href="/grievance">Grievance redressal</a>.</p>`
+<p>Editorial, corrections and legal matters: ${mail}. For complaints and takedown requests, see <a href="/grievance">Grievance redressal</a>.</p>`,
+  bn: { title: "রাষ্ট্রিক্স সম্পর্কে", html: `
+<p class="lede">রাষ্ট্রিক্স ২৪×৭ নিউজ কলকাতার একটি বাংলা খবরের চ্যানেল ও অ্যাপ। আমাদের কথা: <b>লোক গুনি না, লোকের কথা শুনি</b>।</p>
+<h2>আমরা কী প্রকাশ করি</h2>
+<ul>
+  <li><b>রাষ্ট্রিক্সের খবর</b>: আমাদের নিজস্ব সাংবাদিক ও ডেস্কের লেখা, তাঁদের তোলা ছবি সহ।</li>
+  <li><b>ওয়্যার খবর ও সংক্ষিপ্ত খবর</b>: একাধিক প্রকাশিত খবর মিলিয়ে, যাচাই করে, আমাদের নিজের ভাষায় লেখা রাষ্ট্রিক্স ওয়্যার ডেস্কের ছোট প্রতিবেদন। এগুলিতে কোনো ছবি থাকে না।</li>
+  <li>ঘটনার <b>লাইভ কভারেজ</b>, আর বড় খবরে সঙ্গে সঙ্গে অ্যালার্ট।</li>
+  <li>পাঁচটি ডেস্ক: <b>কলকাতা</b>, <b>পশ্চিমবঙ্গ</b>, <b>ভারত</b>, <b>প্রবাসী বাঙালি</b> আর <b>বিশ্ব</b> — বাংলা, ইংরেজি ও হিন্দিতে।</li>
+</ul>
+<h2>আমরা কীভাবে কাজ করি</h2>
+<p>যে তথ্যের দায় নিতে পারি, শুধু সেটুকুই প্রকাশ করি, আর ভুল হলে খোলাখুলি সংশোধন করি। ওয়্যার খবর একটি এআই ভাষা-মডেলের সাহায্যে লেখা হয়, যতটা সম্ভব অন্তত দু’টি প্রকাশিত খবরের তথ্য মিলিয়ে; সম্পাদক যে কোনো খবর সঙ্গে সঙ্গে সরিয়ে নিতে বা সংশোধন করতে পারেন, আর প্রতিটি সংশোধনের হিসেব রাখা হয়। পড়ুন আমাদের <a href="/disclaimer">সম্পাদকীয় ঘোষণা</a>, <a href="/copyright">অন্য প্রকাশকের লেখা আমরা কীভাবে ব্যবহার করি</a> আর <a href="/corrections">সংশোধন নীতি</a>।</p>
+<p>রাষ্ট্রিক্স স্বাধীন। কোনো সরকার বা রাজনৈতিক দলের সঙ্গে এর কোনো যোগ নেই।</p>
+<h2>আমরা কারা</h2>
+<p>${ORG_BN}। ইউটিউব আর ফেসবুকে আমাদের দেখুন, পড়ুন <a href="${SITE_URL}">rashtrix.live</a>-এ।</p>
+<h2>যোগাযোগ</h2>
+<p>সম্পাদকীয়, সংশোধন ও আইনি বিষয়ে: ${mailBn}। অভিযোগ ও কিছু সরানোর অনুরোধের জন্য দেখুন <a href="/grievance">অভিযোগ নিষ্পত্তি</a>।</p>` }
 };
 
 /* ---------- Legal documents ---------- */
-const parties = `“Raisina Wire”, “we”, “us” and “our” mean the Raisina Wire publication and its founder, editor and publisher, Ilmaz Syed. “Calibrex” means Calibrex, which provides the technology on which Raisina Wire runs. “Raisina Wire Parties” means Raisina Wire, Ilmaz Syed, Calibrex, and their respective affiliates, officers, employees, editors, contributors, agents, licensors and service providers.`;
-
 export const LEGAL = {
   terms: {
     title: "Terms of Use",
-    description: "The terms that apply when you use Raisina Wire, its app, alerts, community and services.",
+    description: "The terms that apply when you use Rashtrix, its app, alerts, community and services.",
     html: `
-<p>These Terms of Use (“Terms”) govern your access to and use of the Raisina Wire website at ${SITE_URL}, its installable app, alerts, community, events and related services (together, the “Service”). By using the Service you agree to these Terms, our <a href="/privacy">Privacy Policy</a>, our <a href="/disclaimer">Disclaimer</a>, our <a href="/copyright">Copyright and Content Policy</a> and our <a href="/community-guidelines">Community Guidelines</a>, which form part of these Terms. If you do not agree, do not use the Service.</p>
+<p>These Terms of Use govern your use of the Rashtrix website and app, its alerts, community and related services (the “Service”), provided by ${ORG} (“Rashtrix”, “we”, “us”). By using the Service you agree to these Terms, our <a href="/privacy">Privacy Policy</a>, <a href="/disclaimer">Disclaimer</a>, <a href="/copyright">Copyright and Content Policy</a> and <a href="/community-guidelines">Community Guidelines</a>. If you do not agree, do not use the Service.</p>
+<h2>1. Accounts</h2>
+<p>You may read Rashtrix without an account. To create an account or post in the community you must be at least 18. You are responsible for the information you give us, for keeping your password confidential and for activity under your account. You may delete your account at any time from <a href="/account">My account</a>.</p>
+<h2>2. Using the Service</h2>
+<p>You may read, listen to and share links to our content for personal, non-commercial use. You may not copy, republish, sell or systematically download our content, scrape the Service, interfere with its security or operation, or use it for anything unlawful.</p>
+<h2>3. What you post</h2>
+<p>You keep ownership of what you post, and give us a non-exclusive, royalty-free licence to host, display and moderate it on the Service. You must not post anything that is unlawful, defamatory, obscene, hateful, harmful to children, infringing, misleading, impersonating, or that threatens the unity, integrity, defence, security or sovereignty of India, public order or friendly relations with other states (IT Rules 2021, rule 3(1)(b)). We may remove content and suspend accounts that break these Terms.</p>
+<h2>4. Our content</h2>
+<p>The Rashtrix name, logo and our original content belong to Middleton Media Works. Wire reports and briefs are drafted with the help of an AI language model from published reports and checked by our process before and after publication; see the <a href="/disclaimer">Disclaimer</a>.</p>
+<h2>5. Liability</h2>
+<p>The Service is provided “as is”. To the extent the law allows, we are not liable for indirect or consequential loss arising from your use of the Service. Nothing in these Terms limits liability that cannot be limited under Indian law.</p>
+<h2>6. Law and disputes</h2>
+<p>These Terms are governed by the laws of India. Courts at Kolkata, West Bengal have jurisdiction, subject to any remedy available to you under consumer protection law. Complaints first go to our <a href="/grievance">Grievance Officer</a>.</p>
+<h2>7. Changes</h2>
+<p>We may update these Terms; the date at the top shows the latest version. Continued use after a change means you accept it.</p>`,
+    bn: { title: "ব্যবহারের শর্তাবলি", html: `
+<p>রাষ্ট্রিক্সের ওয়েবসাইট ও অ্যাপ, অ্যালার্ট, কমিউনিটি এবং সংশ্লিষ্ট পরিষেবা (“পরিষেবা”) ব্যবহারের ক্ষেত্রে এই শর্তাবলি প্রযোজ্য। পরিষেবা দিচ্ছে ${ORG_BN} (“রাষ্ট্রিক্স”, “আমরা”)। পরিষেবা ব্যবহার করলে আপনি এই শর্তাবলি, আমাদের <a href="/privacy">গোপনীয়তা নীতি</a>, <a href="/disclaimer">ঘোষণা</a>, <a href="/copyright">কপিরাইট ও কনটেন্ট নীতি</a> আর <a href="/community-guidelines">কমিউনিটির নিয়ম</a> মেনে নিচ্ছেন। রাজি না থাকলে পরিষেবা ব্যবহার করবেন না।</p>
+<h2>১. অ্যাকাউন্ট</h2>
+<p>অ্যাকাউন্ট ছাড়াই রাষ্ট্রিক্স পড়া যায়। অ্যাকাউন্ট খুলতে বা কমিউনিটিতে লিখতে আপনার বয়স অন্তত ১৮ হতে হবে। আপনার দেওয়া তথ্য, পাসওয়ার্ড গোপন রাখা আর অ্যাকাউন্টের সব কাজের দায় আপনার। <a href="/account">আমার অ্যাকাউন্ট</a> থেকে যে কোনো সময় অ্যাকাউন্ট মুছে ফেলতে পারেন।</p>
+<h2>২. পরিষেবা ব্যবহার</h2>
+<p>ব্যক্তিগত, অ-বাণিজ্যিক কাজে আমাদের লেখা পড়তে, শুনতে আর লিঙ্ক শেয়ার করতে পারেন। আমাদের লেখা কপি, পুনঃপ্রকাশ, বিক্রি বা একসঙ্গে ডাউনলোড করা, পরিষেবা স্ক্র্যাপ করা, এর নিরাপত্তায় হস্তক্ষেপ বা বেআইনি কাজে ব্যবহার করা চলবে না।</p>
+<h2>৩. আপনি যা পোস্ট করেন</h2>
+<p>আপনার পোস্টের মালিকানা আপনারই থাকে; পরিষেবায় সেটি রাখা, দেখানো ও মডারেট করার অ-একচেটিয়া, বিনামূল্যের অনুমতি আপনি আমাদের দিচ্ছেন। বেআইনি, মানহানিকর, অশ্লীল, ঘৃণা ছড়ানো, শিশুদের পক্ষে ক্ষতিকর, অন্যের অধিকার লঙ্ঘনকারী, বিভ্রান্তিকর বা ছদ্মবেশী কিছু, কিংবা ভারতের ঐক্য, অখণ্ডতা, প্রতিরক্ষা, নিরাপত্তা, সার্বভৌমত্ব, জনশৃঙ্খলা বা বন্ধু-রাষ্ট্রের সঙ্গে সম্পর্কের পক্ষে হুমকি এমন কিছু পোস্ট করা চলবে না (আইটি রুলস ২০২১, রুল ৩(১)(খ))। এই শর্ত ভাঙলে আমরা কনটেন্ট সরাতে ও অ্যাকাউন্ট স্থগিত করতে পারি।</p>
+<h2>৪. আমাদের কনটেন্ট</h2>
+<p>রাষ্ট্রিক্স নাম, লোগো আর আমাদের মৌলিক লেখা মিডলটন মিডিয়া ওয়ার্কসের সম্পত্তি। ওয়্যার খবর ও সংক্ষিপ্ত খবর প্রকাশিত খবর থেকে একটি এআই ভাষা-মডেলের সাহায্যে লেখা, প্রকাশের আগে ও পরে আমাদের প্রক্রিয়ায় যাচাই করা; দেখুন <a href="/disclaimer">ঘোষণা</a>।</p>
+<h2>৫. দায়</h2>
+<p>পরিষেবা “যেমন আছে” সেই অবস্থায় দেওয়া হয়। আইন যতটা অনুমতি দেয়, পরিষেবা ব্যবহারের ফলে পরোক্ষ ক্ষতির দায় আমাদের নয়। ভারতীয় আইনে যে দায় সীমিত করা যায় না, এই শর্তাবলি তা সীমিত করে না।</p>
+<h2>৬. আইন ও বিরোধ</h2>
+<p>এই শর্তাবলি ভারতের আইন মেনে চলবে। ক্রেতা সুরক্ষা আইনে আপনার অধিকার অক্ষুণ্ণ রেখে, কলকাতার আদালতের এক্তিয়ার থাকবে। অভিযোগ প্রথমে আমাদের <a href="/grievance">অভিযোগ আধিকারিকের</a> কাছে জানান।</p>
+<h2>৭. পরিবর্তন</h2>
+<p>আমরা এই শর্তাবলি বদলাতে পারি; ওপরের তারিখ সর্বশেষ সংস্করণের। পরিবর্তনের পরেও পরিষেবা ব্যবহার করলে আপনি তা মেনে নিচ্ছেন।</p>` }
+  },
 
-<h2>1. Who we are</h2>
-<p>${parties} Calibrex provides technology and hosting services only; it does not create, select, edit or approve editorial content published on Raisina Wire, and nothing on the Service is a statement by Calibrex unless expressly attributed to it.</p>
-
-<h2>2. Eligibility and accounts</h2>
-<p>You may read Raisina Wire without an account. To create an account, join discussions or use member features you must be at least 18 years old and able to enter into a binding contract under Indian law. You are responsible for the accuracy of the information you give us, for keeping your password confidential and for all activity under your account. Tell us at once at ${mail} if you suspect unauthorised use. You may delete your account at any time from <a href="/account">My account</a>.</p>
-
-<h2>3. What the Service provides</h2>
+  privacy: {
+    title: "Privacy Notice",
+    description: "What personal data Rashtrix collects, why, and your rights under the Digital Personal Data Protection Act, 2023.",
+    html: `
+<p>This notice is given under section 5 of the Digital Personal Data Protection Act, 2023 (the “DPDP Act”). The Data Fiduciary is ${ORG}.</p>
+<h2>What we collect and why</h2>
 <ul>
-  <li><b>Original journalism</b>: editions, articles and analysis written by Raisina Wire’s writers (“Raisina Wire Content”).</li>
-  <li><b>The live wire</b>: headlines, publisher-provided summaries, short excerpts and links to stories published by third parties (“Third-Party Content”), obtained from public feeds and pages those publishers make available.</li>
-  <li><b>Market information</b>: delayed or last-available quotes and charts from third-party sources.</li>
-  <li><b>Community features</b>: discussions, replies and events, including content posted by users (“User Content”).</li>
-  <li><b>Alerts</b>: in-site alerts for every reader and, with your device’s permission, push notifications.</li>
-  <li><b>Listen</b>: stories read aloud by a computer-generated (synthetic) voice.</li>
+  <li><b>Account</b> (only if you create one): your name, email address and a scrambled form of your password, to run your account, sync saved stories and topics, and let you post in the community.</li>
+  <li><b>What you post</b>: discussions and replies, to show them in the community.</li>
+  <li><b>Alerts</b>: if you allow notifications, your browser’s push address, to send alerts. It is not linked to your name unless you are signed in.</li>
+  <li><b>Contact form</b>: your name, email and message, to reply to you.</li>
+  <li><b>Anonymous counts</b>: daily totals of visits, reading time, app installs and where visits come from. Your browser keeps only the dates of your first and last visit; we keep no cookies for tracking, no IP addresses and nothing that identifies you in these counts.</li>
 </ul>
-<p>We may change, suspend or discontinue any part of the Service at any time, with or without notice.</p>
-
-<h2>4. Third-Party Content</h2>
-<p>Third-Party Content belongs to its publishers and other rights holders. Raisina Wire does not claim ownership of it and does not adopt, endorse or verify it. We show only headlines, publisher-provided summaries and short, credited excerpts with a link to the original, as described in our <a href="/copyright">Copyright and Content Policy</a>. The accuracy, legality and availability of Third-Party Content are the responsibility of its publisher. Links take you to websites we do not control; your use of them is governed by their own terms and policies.</p>
-
-<h2>5. Raisina Wire Content and your licence</h2>
-<p>Raisina Wire Content, the design of the Service, the Raisina Wire name, logo and masthead, and the software are owned by or licensed to the Raisina Wire Parties and are protected by Indian and international copyright, trademark and other laws. Subject to these Terms, we grant you a limited, personal, non-exclusive, non-transferable, revocable licence to read and use the Service for your own non-commercial purposes. You may share links to our stories and quote short passages with clear attribution to Raisina Wire and a link to the source.</p>
-<p>Without our written permission you may not: reproduce, republish, sell, license or distribute Raisina Wire Content in whole or substantial part; frame or mirror the Service; scrape, crawl, harvest or systematically download content or data from the Service other than through our public RSS feed for personal reading; or use any content from the Service to train, fine-tune, test or improve any artificial intelligence or machine-learning system.</p>
-
-<h2>6. Trademarks</h2>
-<p>“Raisina Wire”, its logo and masthead are trademarks of Raisina Wire. “Calibrex”, “OSINT Studio” and related marks belong to Calibrex. Names of publishers and other third parties appear only to identify and credit their content; they remain the property of their owners and their use does not imply any affiliation or endorsement.</p>
-
-<h2>7. User Content</h2>
-<p>You keep ownership of what you post. By posting User Content you grant the Raisina Wire Parties a worldwide, non-exclusive, royalty-free, transferable and sub-licensable licence to host, store, reproduce, display, distribute, adapt (for example for formatting or length), moderate and remove it in connection with the Service and its promotion, for as long as it remains on the Service and for a reasonable period afterwards for backup, legal and record-keeping purposes. You confirm that you own or have permission to post your User Content and that it complies with these Terms and our <a href="/community-guidelines">Community Guidelines</a>.</p>
-<p>User Content is the sole responsibility of the person who posted it. It does not represent the views of the Raisina Wire Parties. In respect of User Content we act as an intermediary within the meaning of the Information Technology Act, 2000; we do not initiate the transmission, select the receiver, or select or modify the information contained in it, and we observe the due-diligence requirements of the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021. We may review, refuse, hide, edit for length or remove any User Content and suspend or terminate accounts at our discretion, including on receipt of a complaint or a lawful order, but we are not obliged to monitor User Content.</p>
-
-<h2>8. What you must not do</h2>
-<p>You must not use the Service to host, display, upload, publish, transmit or share anything that:</p>
+<p>We use one cookie, only when you sign in, to keep you signed in. We do not sell personal data or use it for advertising profiles.</p>
+<h2>Consent</h2>
+<p>We ask for your consent when you create an account, post, allow notifications or send the contact form. You can withdraw it at any time, as easily as you gave it: delete your account in <a href="/account">My account</a>, turn off alerts from the bell, or write to us. Withdrawal does not affect what was done before it.</p>
+<h2>Your rights</h2>
+<p>You may ask for a summary of your personal data and how it is used, its correction, completion, updating or erasure, and you may nominate another person to exercise your rights if you die or become unable to. Write to our Grievance Officer at ${mail}; we respond within the time the DPDP Rules set. If you are not satisfied, you may complain to the Data Protection Board of India.</p>
+<h2>Where it is kept and for how long</h2>
+<p>Data is stored with our hosting provider (Cloudflare) and kept only as long as needed: account data until you delete your account; push addresses until you turn alerts off or they stop working; contact messages for up to two years. Text-to-speech and AI writing services receive story text only, never readers’ personal data.</p>
+<h2>Children</h2>
+<p>Accounts are for people aged 18 and over. We do not knowingly process children’s personal data, or track or target advertising at children.</p>
+<h2>Security and breaches</h2>
+<p>We use encryption in transit, scrambled passwords and limited staff access. If a personal data breach occurs, we will inform the Data Protection Board and affected users as the law requires.</p>`,
+    bn: { title: "গোপনীয়তা নোটিস", html: `
+<p>ডিজিটাল পার্সোনাল ডেটা প্রোটেকশন আইন, ২০২৩ (“ডিপিডিপি আইন”)-এর ৫ নম্বর ধারা মেনে এই নোটিস দেওয়া হচ্ছে। ডেটা ফিডুশিয়ারি: ${ORG_BN}।</p>
+<h2>আমরা কী সংগ্রহ করি, কেন করি</h2>
 <ul>
-  <li>belongs to someone else and that you have no right to share, or infringes any copyright, trademark, patent or other proprietary right;</li>
-  <li>is defamatory, obscene, pornographic, paedophilic, invasive of another’s privacy (including bodily privacy), insulting or harassing on the basis of gender, racially or ethnically objectionable, or promotes enmity between groups, violence or any offence under the Bharatiya Nyaya Sanhita, 2023 or other law;</li>
-  <li>is harmful to children;</li>
-  <li>deceives or misleads about the origin of a message, or knowingly communicates misinformation, or information that is patently false or untrue, or impersonates another person or organisation;</li>
-  <li>threatens the unity, integrity, defence, security or sovereignty of India, friendly relations with foreign states or public order, incites any cognisable offence, or prevents the investigation of any offence;</li>
-  <li>contains software viruses or any code designed to interrupt, destroy or limit the functionality of any computer resource;</li>
-  <li>violates any law in force.</li>
+  <li><b>অ্যাকাউন্ট</b> (শুধু আপনি খুললে): আপনার নাম, ইমেল আর পাসওয়ার্ডের এনক্রিপ্ট-করা রূপ — অ্যাকাউন্ট চালাতে, সেভ করা খবর ও বিষয় সব ডিভাইসে রাখতে, আর কমিউনিটিতে লেখার সুযোগ দিতে।</li>
+  <li><b>আপনার পোস্ট</b>: কমিউনিটিতে দেখানোর জন্য আলোচনা ও উত্তর।</li>
+  <li><b>অ্যালার্ট</b>: নোটিফিকেশনের অনুমতি দিলে আপনার ব্রাউজারের পুশ-ঠিকানা, অ্যালার্ট পাঠানোর জন্য। সাইন ইন না করলে এটি আপনার নামের সঙ্গে যুক্ত থাকে না।</li>
+  <li><b>যোগাযোগ ফর্ম</b>: উত্তর দেওয়ার জন্য আপনার নাম, ইমেল আর বার্তা।</li>
+  <li><b>বেনামি হিসেব</b>: প্রতিদিনের মোট ভিজিট, পড়ার সময়, অ্যাপ ইনস্টল আর কোথা থেকে পাঠকেরা আসছেন। আপনার ব্রাউজারে শুধু প্রথম ও শেষ ভিজিটের তারিখ থাকে; এই হিসেবের জন্য কোনো ট্র্যাকিং কুকি, আইপি ঠিকানা বা আপনাকে চেনা যায় এমন কিছু রাখি না।</li>
 </ul>
-<p>You must also not: attempt to gain unauthorised access to the Service, other accounts or our systems; interfere with or overload the Service; use bots or automated means to access it except our public feeds; circumvent any technical measure; or use the Service for unsolicited advertising.</p>
-
-<h2>9. Market information is not advice</h2>
-<p>Market data on the Service is delayed or last available, comes from third-party sources, may be incomplete or wrong, and is provided for general information only. Nothing on the Service is investment, financial, tax, legal or other professional advice, or a recommendation or offer to buy or sell any security or instrument. Raisina Wire is not registered with the Securities and Exchange Board of India as an investment adviser or research analyst. Consult a qualified adviser before making decisions. You are solely responsible for decisions you take.</p>
-
-<h2>10. Alerts and notifications</h2>
-<p>Alerts appear inside the Service for every reader. Push notifications are sent to a device only after you allow them in your browser or device; you can switch them off at any time from the bell in the Service or in your device settings. Alerts are a convenience: they may be delayed or not delivered, and they are not a substitute for official warnings or advisories.</p>
-
-<h2>11. Listen (synthetic voice)</h2>
-<p>Listen uses computer-generated speech produced by third-party text-to-speech technology, which may mispronounce words or misread text. The written text is the authoritative version. The voice is synthetic and is not the voice of any real person.</p>
-
-<h2>12. Events</h2>
-<p>Events and briefings are subject to change or cancellation. Statements made by speakers or participants are their own.</p>
-
-<h2>13. Disclaimer of warranties</h2>
-<p>To the fullest extent permitted by law, the Service and all content are provided “as is” and “as available”, without warranties of any kind, express or implied, including warranties of accuracy, completeness, timeliness, merchantability, fitness for a particular purpose, non-infringement and uninterrupted or error-free operation. See also our <a href="/disclaimer">Disclaimer</a>.</p>
-
-<h2>14. Limitation of liability</h2>
-<p>To the fullest extent permitted by law, the Raisina Wire Parties shall not be liable for any indirect, incidental, special, consequential, exemplary or punitive damages, or for any loss of profits, revenue, data, goodwill or opportunity, arising out of or in connection with the Service, any content (including Third-Party Content and User Content), any market information, any alert or any reliance on any of them, however caused and whether in contract, tort (including negligence) or otherwise, even if advised of the possibility. The total aggregate liability of the Raisina Wire Parties for all claims relating to the Service shall not exceed the greater of the amount you paid us for the Service in the twelve months before the claim and one thousand Indian rupees (₹1,000). Nothing in these Terms limits liability that cannot be limited under applicable law.</p>
-
-<h2>15. Indemnity</h2>
-<p>You agree to indemnify and hold harmless the Raisina Wire Parties from and against all claims, demands, losses, liabilities, damages, costs and expenses (including reasonable legal fees) arising out of or related to your User Content, your use of the Service, your breach of these Terms or your violation of any law or the rights of any third party.</p>
-
-<h2>16. Suspension and termination</h2>
-<p>We may suspend or end your access to the Service, remove your User Content or delete your account at any time if we reasonably believe you have breached these Terms or the law, or to protect the Service, other users or the Raisina Wire Parties. Sections 4 to 7 and 13 to 20 survive termination.</p>
-
-<h2>17. Changes to these Terms</h2>
-<p>We may update these Terms. The date at the top shows the latest version. Material changes will be highlighted on the Service. Continuing to use the Service after changes take effect means you accept them.</p>
-
-<h2>18. Governing law and jurisdiction</h2>
-<p>These Terms and any dispute arising out of or in connection with them or the Service are governed by the laws of India. Subject to the grievance process below, the courts at Kolkata, West Bengal, India shall have exclusive jurisdiction.</p>
-
-<h2>19. Grievances</h2>
-<p>Complaints about content, accounts or these Terms can be made to our Grievance Officer as set out in <a href="/grievance">Grievance redressal</a>.</p>
-
-<h2>20. General</h2>
-<p>If any provision of these Terms is held invalid or unenforceable, the rest remain in force. Our failure to enforce a provision is not a waiver. You may not assign these Terms; we may assign them in connection with a reorganisation or transfer of the Service. We are not liable for failure or delay caused by events beyond our reasonable control. These Terms, with the documents they refer to, are the entire agreement between you and us about the Service.</p>
-<p>Contact: ${mail}.</p>`
+<p>শুধু সাইন ইন করলে, আপনাকে সাইন ইন রাখতে একটিমাত্র কুকি ব্যবহার করি। ব্যক্তিগত তথ্য বিক্রি করি না, বিজ্ঞাপনের প্রোফাইল তৈরিতেও ব্যবহার করি না।</p>
+<h2>সম্মতি</h2>
+<p>অ্যাকাউন্ট খোলা, পোস্ট করা, নোটিফিকেশনের অনুমতি বা যোগাযোগ ফর্ম পাঠানোর সময় আপনার সম্মতি নিই। যত সহজে দিয়েছেন, তত সহজেই যে কোনো সময় তা প্রত্যাহার করতে পারেন: <a href="/account">আমার অ্যাকাউন্ট</a> থেকে অ্যাকাউন্ট মুছে, ঘণ্টা-চিহ্ন থেকে অ্যালার্ট বন্ধ করে, কিংবা আমাদের লিখে। প্রত্যাহারের আগে যা হয়েছে, তাতে প্রভাব পড়ে না।</p>
+<h2>আপনার অধিকার</h2>
+<p>আপনার ব্যক্তিগত তথ্যের সারাংশ ও তার ব্যবহারের বিবরণ চাইতে, তা সংশোধন, সম্পূর্ণ, হালনাগাদ বা মুছে ফেলতে বলতে পারেন; আপনার মৃত্যু বা অক্ষমতায় আপনার হয়ে অধিকার প্রয়োগের জন্য কাউকে মনোনীত করতে পারেন। লিখুন আমাদের অভিযোগ আধিকারিককে, ${mailBn}-এ; ডিপিডিপি রুলসের নির্ধারিত সময়ের মধ্যে উত্তর দেব। সন্তুষ্ট না হলে ডেটা প্রোটেকশন বোর্ড অফ ইন্ডিয়ার কাছে অভিযোগ জানাতে পারেন।</p>
+<h2>কোথায়, কতদিন রাখা হয়</h2>
+<p>তথ্য রাখা হয় আমাদের হোস্টিং সংস্থা ক্লাউডফ্লেয়ারের কাছে, যতদিন দরকার ততদিন: অ্যাকাউন্ট মোছা পর্যন্ত অ্যাকাউন্টের তথ্য; অ্যালার্ট বন্ধ না করা বা অকেজো না হওয়া পর্যন্ত পুশ-ঠিকানা; যোগাযোগের বার্তা সর্বোচ্চ দু’বছর। টেক্সট-টু-স্পিচ আর এআই লেখার পরিষেবা শুধু খবরের লেখা পায়, পাঠকের ব্যক্তিগত তথ্য কখনও নয়।</p>
+<h2>শিশু</h2>
+<p>অ্যাকাউন্ট শুধু ১৮ বছর বা তার বেশি বয়সিদের জন্য। জেনেশুনে শিশুদের ব্যক্তিগত তথ্য প্রক্রিয়া করি না, শিশুদের ট্র্যাক করি না বা তাদের লক্ষ্য করে বিজ্ঞাপন দিই না।</p>
+<h2>নিরাপত্তা</h2>
+<p>তথ্য আদানপ্রদানে এনক্রিপশন, এনক্রিপ্ট-করা পাসওয়ার্ড আর সীমিত কর্মী-প্রবেশাধিকার ব্যবহার করি। কোনো তথ্য-ফাঁস ঘটলে আইন অনুযায়ী ডেটা প্রোটেকশন বোর্ড ও সংশ্লিষ্ট ব্যবহারকারীদের জানাব।</p>` }
   },
 
   disclaimer: {
     title: "Disclaimer",
-    description: "Editorial, accuracy, third-party content, market data, no-affiliation and other disclaimers for Raisina Wire.",
+    description: "How Rashtrix reports, how wire reports are written with AI assistance, and the limits of what we publish.",
     html: `
-<p>${parties}</p>
-
-<h2>Independence and no affiliation</h2>
-<p>Raisina Wire is an independent publication. It is not affiliated with, endorsed by, sponsored by or speaking for the Government of India, the President’s Secretariat, any ministry, the armed forces, any intelligence or security agency, any political party, or any foreign government. “Raisina” refers to Raisina Hill as a place and a common shorthand in Indian public life. The line drawing of Raisina Hill used in our masthead and logo is original architectural artwork; we do not use the State Emblem of India, the national flag in any official form, or any official seal or emblem.</p>
-
-<h2>Opinion and analysis</h2>
-<p>Editions and articles contain analysis and opinion, which are those of their authors on the date of publication and not necessarily the views of Raisina Wire, Calibrex or any other person or organisation. Analysis may involve assessments of uncertain and developing events and may later prove incomplete or wrong. We label analysis and opinion, distinguish them from reported fact where we can, and state uncertainty rather than hide it.</p>
-
-<h2>Open-source information</h2>
-<p>Our reporting relies on publicly available information, including official records, other publishers’ reporting, imagery and data. Public information can be incomplete, outdated, manipulated or wrong. We take care to corroborate it and to cite sources, but we do not guarantee the accuracy, completeness or reliability of any information on the Service. Nothing on the Service is based on classified material or is intended to compromise national security, and we do not publish information that we believe could endanger lives or operations.</p>
-
-<h2>Corrections</h2>
-<p>If you believe something we published is inaccurate, write to ${mail} with the story link and the correction you propose. We review every request and correct errors of fact openly.</p>
-
-<h2>Third-party content and links</h2>
-<p>Headlines, summaries, excerpts, images and links from other publishers belong to those publishers, are shown with credit and a link to the original, and do not imply endorsement. Their accuracy and legality are the responsibility of their publishers. External websites are not under our control and we are not responsible for their content, availability, policies or practices. See our <a href="/copyright">Copyright and Content Policy</a>.</p>
-
-<h2>Market data</h2>
-<p>Quotes, charts and market information are delayed or last available, come from third-party sources and are for general information only. They are not investment, trading, financial, tax or legal advice, or a recommendation or solicitation to buy or sell anything. Raisina Wire is not a SEBI-registered investment adviser or research analyst. Do your own research and consult a qualified adviser.</p>
-
-<h2>No professional advice</h2>
-<p>Content on the Service is general information and journalism. It is not legal, financial, security, medical, travel or other professional advice and must not be relied on as such.</p>
-
-<h2>User Content</h2>
-<p>Discussions, replies and other User Content are the views of the people who posted them and not of the Raisina Wire Parties. We moderate but do not pre-screen all User Content.</p>
-
-<h2>Images and artwork</h2>
-<p>Some story images are original or computer-generated illustrations and are not photographs of real events. Photographs and third-party images are credited where shown.</p>
-
-<h2>Synthetic voice and automated features</h2>
-<p>Listen uses a computer-generated voice. Automated features such as alerts, the live wire and market data may be delayed, incomplete or unavailable.</p>
-
-<h2>Limitation</h2>
-<p>To the fullest extent permitted by law, the Raisina Wire Parties are not liable for any loss or damage arising from the use of, or reliance on, the Service or any content on it. The <a href="/terms">Terms of Use</a> set out the full disclaimer of warranties and limitation of liability.</p>`
+<h2>Our reporting</h2>
+<p>Rashtrix reports are written and edited by our journalists. We take care to be accurate, fair and up to date, but news develops; check the time on each story.</p>
+<h2>Wire reports and briefs</h2>
+<p>Stories marked <b>Rashtrix Wire</b> or <b>Brief</b> are written by our wire desk with the help of an AI language model (Google Gemini) from facts in reports already published by other news organisations, using two or more independent reports wherever possible. The model is instructed to use only those facts and to write in its own words; the result is checked automatically for copied phrasing. Editors can pull or correct any wire report at once, and every correction is recorded. These stories carry no photographs. If you find an error, tell us: see our <a href="/corrections">corrections policy</a>.</p>
+<h2>Translations and listening</h2>
+<p>Stories are offered in Bengali, English and Hindi. Some versions are produced by machine translation and are marked as such; the original language version prevails. “Listen” uses computer-generated voices.</p>
+<h2>Opinion and external links</h2>
+<p>Opinions of contributors and community members are their own. Links to other websites are for convenience; we are not responsible for their content.</p>`,
+    bn: { title: "ঘোষণা", html: `
+<h2>আমাদের খবর</h2>
+<p>রাষ্ট্রিক্সের খবর লেখেন ও সম্পাদনা করেন আমাদের সাংবাদিকেরা। নির্ভুল, নিরপেক্ষ ও হালনাগাদ থাকার চেষ্টা করি, তবে খবর বদলায়; প্রতিটি খবরের সময় দেখে নিন।</p>
+<h2>ওয়্যার খবর ও সংক্ষিপ্ত খবর</h2>
+<p><b>রাষ্ট্রিক্স ওয়্যার</b> বা <b>সংক্ষেপে</b> চিহ্নিত খবর আমাদের ওয়্যার ডেস্ক লেখে একটি এআই ভাষা-মডেলের (গুগল জেমিনাই) সাহায্যে, অন্য সংবাদ সংস্থার আগেই প্রকাশিত খবরের তথ্য থেকে — যতটা সম্ভব দুই বা ততোধিক স্বাধীন সূত্র মিলিয়ে। মডেলকে শুধু সেই তথ্য ব্যবহার করতে এবং নিজের ভাষায় লিখতে নির্দেশ দেওয়া থাকে; লেখায় কোনো বাক্যাংশ হুবহু তোলা হয়েছে কি না, স্বয়ংক্রিয়ভাবে পরীক্ষা হয়। সম্পাদক যে কোনো ওয়্যার খবর সঙ্গে সঙ্গে সরাতে বা সংশোধন করতে পারেন, প্রতিটি সংশোধনের হিসেব রাখা হয়। এই খবরে কোনো ছবি থাকে না। ভুল চোখে পড়লে জানান: দেখুন আমাদের <a href="/corrections">সংশোধন নীতি</a>।</p>
+<h2>অনুবাদ ও শোনা</h2>
+<p>খবর বাংলা, ইংরেজি ও হিন্দিতে পাওয়া যায়। কিছু সংস্করণ যন্ত্রে অনুবাদ করা, সেগুলি চিহ্নিত থাকে; মূল ভাষার সংস্করণই চূড়ান্ত। “শুনুন” কম্পিউটারে তৈরি কণ্ঠ ব্যবহার করে।</p>
+<h2>মতামত ও বাইরের লিঙ্ক</h2>
+<p>লেখক ও কমিউনিটি সদস্যদের মতামত তাঁদের নিজস্ব। অন্য ওয়েবসাইটের লিঙ্ক সুবিধার জন্য; সেগুলির বিষয়বস্তুর দায় আমাদের নয়।</p>` }
   },
 
   copyright: {
     title: "Copyright and Content Policy",
-    description: "How Raisina Wire uses headlines, summaries and short excerpts from other publishers, how publishers can opt out, and how to report infringement.",
+    description: "How Rashtrix uses facts reported by other publishers, and how to send a copyright notice.",
     html: `
-<p>Raisina Wire respects the work of journalists and publishers. This policy explains how we use other publishers’ content, how they can limit or stop that use, and how anyone can report infringement. ${parties}</p>
-
-<h2>1. What we show from other publishers</h2>
-<p>For the live wire and the in-app reader we show only:</p>
-<ul>
-  <li>the <b>headline</b>, <b>publisher name</b>, <b>publication time</b> and a <b>link</b> to the original story;</li>
-  <li>the <b>summary the publisher provides in its public feed</b> or page description;</li>
-  <li>a <b>short excerpt</b> of the opening of the story (at most about 120 words and never more than the opening paragraphs), clearly labelled as an excerpt, credited to the publisher and followed by a prominent link to read the full story on the publisher’s site; and</li>
-  <li>where the publisher makes one available, a <b>thumbnail or lead image</b> loaded from the publisher’s own servers, credited to the publisher.</li>
-</ul>
-<p>We never reproduce a full article, never remove credits, and never present another publisher’s work as our own. We use this material for the purpose of reporting current events and current affairs and for review, which we believe is fair dealing under Section 52(1)(a) of the Copyright Act, 1957, and we keep each use short so that it directs readers to the publisher rather than substituting for the original.</p>
-
-<h2>2. Publisher signals we respect</h2>
-<ul>
-  <li>Our reader identifies itself honestly as <code>RaisinaWireReader</code> with a link to this page, so publishers can recognise it and, if they wish, block it.</li>
-  <li>If a page carries <code>nosnippet</code>, <code>noarchive</code> or <code>none</code> in its robots meta tag, we show no excerpt, only the headline, summary and link. A <code>max-snippet</code> limit is applied to the excerpt length.</li>
-  <li>We do not store full copies of articles. Excerpts are generated on request and cached briefly for performance.</li>
-  <li>We do not use other publishers’ content to train artificial intelligence systems.</li>
-</ul>
-
-<h2>3. Opting out</h2>
-<p>Any publisher or rights holder can ask us to stop showing excerpts, stop showing images, or remove its stories from Raisina Wire altogether. Write to ${mail} from an address at your organisation’s domain, naming the publication and domain. We act on such requests promptly, normally within 36 hours, and the opt-out applies to future stories as well.</p>
-
-<h2>4. Reporting infringement (notice and takedown)</h2>
-<p>If you believe that material on the Service infringes your copyright or other intellectual property, send a notice to our Grievance Officer at ${mail} with:</p>
-<ol>
-  <li>your name, address, telephone number and email;</li>
-  <li>a description of the work you claim is infringed, and evidence that you own it or are authorised to act for the owner;</li>
-  <li>the exact URL(s) of the material on the Service;</li>
-  <li>a statement that you believe in good faith that the use is not authorised by the owner, its agent or the law;</li>
-  <li>a statement that the information in the notice is accurate; and</li>
-  <li>your physical or electronic signature.</li>
-</ol>
-<p>On receiving a complete notice we will remove or disable access to the material expeditiously, and in any event within 36 hours, consistent with Section 52(1)(c) of the Copyright Act, 1957 read with Rule 75 of the Copyright Rules, 2013, and the Information Technology Act, 2000 and the rules under it. Where the law contemplates it, access may be restored if no order of a competent court is produced within the prescribed period. We will tell the person who posted the material (where applicable), who may send a counter-notice explaining why the material does not infringe.</p>
-<p>Knowingly making a false or misleading notice may expose you to liability. We may share notices with the person concerned.</p>
-
-<h2>5. Repeat infringers</h2>
-<p>We remove User Content that infringes others’ rights and suspend or terminate the accounts of repeat infringers.</p>
-
-<h2>6. Our own content</h2>
-<p>Raisina Wire Content is protected by copyright. To license or republish it, write to ${mail}. To report misuse of our content elsewhere, write to the same address.</p>`
+<h2>Facts, not words</h2>
+<p>Facts are not owned by anyone; the way a publisher expresses them is. Our wire desk reads reports that other news organisations have already published, takes only the facts from them, checks them against each other, and writes a new report in our own words. We do not copy their text, headlines or photographs, and we do not reproduce or excerpt their stories. Source reports are read by our system only to extract facts and are not shown to readers. Publishers who do not want their reports used this way can tell us and will be added to our blocklist.</p>
+<h2>Our content</h2>
+<p>Text, photographs, video and graphics made by Rashtrix belong to Middleton Media Works. You may share links; republishing needs our written permission.</p>
+<h2>Copyright notices</h2>
+<p>If you believe something on Rashtrix infringes your copyright, send our Grievance Officer (${mail}) the work you own, the link to the material, a statement that its use is not authorised, and your contact details and signature. We act on complete notices under section 52(1)(c) of the Copyright Act, 1957 and rule 75 of the Copyright Rules, 2013, within 36 hours.</p>`,
+    bn: { title: "কপিরাইট ও কনটেন্ট নীতি", html: `
+<h2>তথ্য, শব্দ নয়</h2>
+<p>তথ্যের মালিক কেউ নন; কিন্তু একজন প্রকাশক তা যেভাবে লেখেন, সেই প্রকাশভঙ্গি তাঁর। আমাদের ওয়্যার ডেস্ক অন্য সংবাদ সংস্থার আগেই প্রকাশিত খবর পড়ে, সেখান থেকে শুধু তথ্য নেয়, একে অপরের সঙ্গে মিলিয়ে দেখে, তারপর নিজের ভাষায় নতুন খবর লেখে। তাদের লেখা, শিরোনাম বা ছবি আমরা কপি করি না, তাদের খবর পুনঃপ্রকাশ বা উদ্ধৃত করি না। সূত্রের খবর আমাদের ব্যবস্থা শুধু তথ্য বের করতে পড়ে, পাঠককে দেখানো হয় না। কোনো প্রকাশক না চাইলে আমাদের জানান, তাঁর খবর আমাদের ব্লক-তালিকায় যোগ করা হবে।</p>
+<h2>আমাদের কনটেন্ট</h2>
+<p>রাষ্ট্রিক্সের তৈরি লেখা, ছবি, ভিডিও ও গ্রাফিক্সের মালিক মিডলটন মিডিয়া ওয়ার্কস। লিঙ্ক শেয়ার করতে পারেন; পুনঃপ্রকাশের জন্য আমাদের লিখিত অনুমতি লাগবে।</p>
+<h2>কপিরাইট নোটিস</h2>
+<p>রাষ্ট্রিক্সে কিছু আপনার কপিরাইট লঙ্ঘন করছে মনে হলে আমাদের অভিযোগ আধিকারিককে (${mailBn}) পাঠান: আপনার মালিকানাধীন কাজের বিবরণ, সংশ্লিষ্ট লিঙ্ক, ব্যবহারটি অনুমোদিত নয় এই মর্মে বিবৃতি, আর আপনার যোগাযোগের বিবরণ ও স্বাক্ষর। কপিরাইট আইন, ১৯৫৭-র ৫২(১)(গ) ধারা ও কপিরাইট রুলস, ২০১৩-র ৭৫ নম্বর রুল অনুযায়ী সম্পূর্ণ নোটিস পেলে ৩৬ ঘণ্টার মধ্যে ব্যবস্থা নিই।</p>` }
   },
 
-  privacy: {
-    title: "Privacy Policy",
-    description: "What personal data Raisina Wire collects, why, how long we keep it, and your rights under the Digital Personal Data Protection Act, 2023.",
+  corrections: {
+    title: "Corrections Policy",
+    description: "How Rashtrix corrects mistakes and pulls stories, and how to report an error.",
     html: `
-<p>This policy explains how Raisina Wire handles personal data, in line with the Digital Personal Data Protection Act, 2023 (“DPDP Act”), the rules under it and the Information Technology Act, 2000. ${parties}</p>
-
-<h2>1. Who is responsible</h2>
-<p>Raisina Wire (through its publisher, Ilmaz Syed) is the data fiduciary for personal data processed through the Service. Calibrex and our infrastructure providers process data on our behalf as data processors. Contact: ${mail}.</p>
-
-<h2>2. What we collect</h2>
+<p>When we get something wrong, we fix it quickly and say so.</p>
 <ul>
-  <li><b>Account data</b>: your email address, display name, a one-way hash of your password (we never store your password itself), your role, and sign-in session tokens (stored as hashes).</li>
-  <li><b>Your activity as a member</b>: discussions and replies you post, topics you follow and stories you save.</li>
-  <li><b>Contact requests</b>: the name, email, organisation and interest you submit through the briefings and partnerships form.</li>
-  <li><b>Alerts</b>: if you allow push notifications, the anonymous push address issued by your browser’s push service (and, if you are signed in, a link to your account).</li>
-  <li><b>Story view counts</b>: we count how many times each story is opened, per day. We do not record who opened it, and we do not use cookies or identifiers for this.</li>
-  <li><b>Audience totals</b>: to understand whether readers come back, we count per day how many browsers visit and whether they have visited before, whether the site was opened as an installed app, how long stories are actively read, and where visits come from (for example WhatsApp, a search engine or a shared link). Your browser remembers the dates of its first and last visit for this; we keep only daily totals, with no names, emails, IP addresses, cookies or identifiers, and they cannot be linked to you.</li>
-  <li><b>Data on your device</b>: preferences such as text size, light or dark mode, saved stories and alert choices are stored in your browser’s local storage and stay on your device.</li>
-  <li><b>Technical data</b>: like any website, our hosting provider (Cloudflare) processes IP addresses and request data to deliver and protect the Service.</li>
+  <li><b>Corrections</b>: a corrected story shows a note at the top saying what was corrected and when.</li>
+  <li><b>Pulled stories</b>: a story that cannot be fixed by a correction (for example, one built on a false report) is taken down at once.</li>
+  <li><b>Records</b>: every correction and every pulled story is recorded with the text as it was before, the time and the editor responsible.</li>
 </ul>
-<p>We do not use advertising trackers or third-party analytics, and we do not sell personal data.</p>
-
-<h2>3. Why we use it</h2>
-<p>To provide your account and member features; to deliver alerts you allowed; to respond to your requests; to moderate the community and keep the Service secure; to understand which stories are read (in aggregate); and to comply with law. We process personal data on the basis of your consent, which you give when you create an account, post, submit a form or allow notifications, and for the legitimate uses permitted by Section 7 of the DPDP Act, such as complying with law or legal process.</p>
-
-<h2>4. Service providers</h2>
-<p>Cloudflare (hosting, database, content delivery and security); your browser’s push service, such as Google, Apple or Mozilla, to deliver notifications (they receive only an anonymous push address and a wake-up signal, not the content of your account); Google Cloud Text-to-Speech, which receives the text of Raisina Wire stories to generate the Listen voice (no personal data); and Google Fonts, which serves our typefaces and may receive your IP address. These providers may process data outside India.</p>
-
-<h2>5. How long we keep it</h2>
-<p>Account data and your member activity: until you delete your account, after which it is erased within 30 days except where we must keep it by law. Sessions: up to 14 days. Contact requests: up to 24 months after our last exchange. Push addresses: until you switch alerts off or the address expires. Aggregate view counts contain no personal data.</p>
-
-<h2>6. Your rights</h2>
-<p>Under the DPDP Act you may: obtain a summary of your personal data and how it is processed; ask us to correct, complete, update or erase it; withdraw consent at any time (as easily as you gave it); nominate another person to exercise your rights in the event of death or incapacity; and have your grievances addressed. You can change your name and password and <b>delete your account</b> in <a href="/account">My account</a>; for anything else write to ${mail}. We respond within the time limits set by law. If you are not satisfied with our response, you may complain to the Data Protection Board of India.</p>
-
-<h2>7. Children</h2>
-<p>The Service is not directed at children, and member accounts are for people aged 18 or over. We do not knowingly process children’s personal data. If you believe a child has created an account, write to us and we will delete it.</p>
-
-<h2>8. Security</h2>
-<p>We use encryption in transit, hashed passwords and session tokens, access controls and throttling of sign-in attempts. No system is perfectly secure; if a personal data breach occurs we will notify affected people and the Data Protection Board as the law requires.</p>
-
-<h2>9. Changes</h2>
-<p>We may update this policy; the date at the top shows the latest version.</p>`
+<p>To report an error, write to ${mail} with the link and what is wrong. We respond as soon as possible and within the time limits on our <a href="/grievance">Grievance Redressal</a> page.</p>`,
+    bn: { title: "সংশোধন নীতি", html: `
+<p>ভুল হলে আমরা দ্রুত সংশোধন করি, এবং তা জানাই।</p>
+<ul>
+  <li><b>সংশোধন</b>: সংশোধিত খবরের ওপরে লেখা থাকে কী বদলানো হয়েছে, কখন।</li>
+  <li><b>সরিয়ে নেওয়া খবর</b>: সংশোধন করে যে খবর ঠিক করা যায় না (যেমন ভুয়ো তথ্যের ওপর দাঁড়ানো খবর), তা সঙ্গে সঙ্গে সরিয়ে নেওয়া হয়।</li>
+  <li><b>নথি</b>: প্রতিটি সংশোধন আর সরিয়ে নেওয়া খবরের আগের লেখা, সময় আর দায়িত্বপ্রাপ্ত সম্পাদকের নাম রেখে দেওয়া হয়।</li>
+</ul>
+<p>ভুল জানাতে লিঙ্ক আর কী ভুল তা লিখে পাঠান ${mailBn}-এ। যত দ্রুত সম্ভব, এবং <a href="/grievance">অভিযোগ নিষ্পত্তি</a> পাতায় দেওয়া সময়সীমার মধ্যে উত্তর দিই।</p>` }
   },
 
   "community-guidelines": {
     title: "Community Guidelines",
-    description: "Rules for discussions on Raisina Wire: be specific, cite sources, stay civil.",
+    description: "How to take part in Rashtrix community discussions.",
     html: `
-<p>The Raisina Wire community is for serious, civil discussion of India’s strategic questions. These guidelines form part of our <a href="/terms">Terms of Use</a>.</p>
+<p>Discuss the news, not the person. Be civil, stay on topic and back claims with sources.</p>
 <ul>
-  <li><b>Be specific and cite sources.</b> Link to the record, report or data behind a claim. Say what is confirmed and what is not.</li>
-  <li><b>Argue with ideas, not people.</b> No personal attacks, harassment, threats, slurs or abuse, and no content that promotes hatred or enmity between groups.</li>
-  <li><b>No misinformation.</b> Do not post information you know or should know is false, manipulated media, or impersonations.</li>
-  <li><b>Respect privacy and the law.</b> No personal data of private individuals, no doxxing, nothing defamatory, obscene or harmful to children, and nothing that threatens national security or public order.</li>
-  <li><b>Respect copyright.</b> Quote briefly with credit and a link; do not paste whole articles.</li>
-  <li><b>No spam or self-promotion</b> beyond what is relevant to the discussion.</li>
+  <li>No abuse, threats, hate speech, or attacks on anyone’s religion, caste, gender, language or community.</li>
+  <li>No misinformation, unverified rumours presented as fact, or doctored images.</li>
+  <li>No personal information about others, no impersonation, no spam or advertising.</li>
+  <li>Nothing unlawful, including content prohibited by rule 3(1)(b) of the IT Rules, 2021.</li>
 </ul>
-<p>Moderators may edit for length, hide or remove posts, and suspend accounts. To report a post or appeal a decision, write to ${mail} with the link.</p>`
+<p>Moderators may hide or remove posts and suspend accounts. To report a post or appeal a decision, contact our <a href="/grievance">Grievance Officer</a>.</p>`,
+    bn: { title: "কমিউনিটির নিয়ম", html: `
+<p>খবর নিয়ে আলোচনা করুন, মানুষকে নিয়ে নয়। ভদ্র থাকুন, বিষয়ে থাকুন, দাবির পক্ষে সূত্র দিন।</p>
+<ul>
+  <li>গালিগালাজ, হুমকি, ঘৃণাভাষণ বা কারও ধর্ম, জাত, লিঙ্গ, ভাষা বা সম্প্রদায় নিয়ে আক্রমণ চলবে না।</li>
+  <li>ভুল তথ্য, যাচাই না-করা গুজবকে সত্য বলে চালানো বা বিকৃত ছবি চলবে না।</li>
+  <li>অন্যের ব্যক্তিগত তথ্য, ছদ্মবেশ, স্প্যাম বা বিজ্ঞাপন চলবে না।</li>
+  <li>বেআইনি কিছু চলবে না, আইটি রুলস ২০২১-এর রুল ৩(১)(খ)-তে নিষিদ্ধ বিষয় সহ।</li>
+</ul>
+<p>মডারেটররা পোস্ট লুকোতে বা সরাতে এবং অ্যাকাউন্ট স্থগিত করতে পারেন। কোনো পোস্ট নিয়ে অভিযোগ বা সিদ্ধান্তের বিরুদ্ধে আবেদন জানাতে যোগাযোগ করুন আমাদের <a href="/grievance">অভিযোগ আধিকারিকের</a> সঙ্গে।</p>` }
   },
 
   grievance: {
     title: "Grievance Redressal",
-    description: "How to make a complaint to Raisina Wire's Grievance Officer, and the time limits we follow.",
+    description: "How to complain to Rashtrix's Grievance Officer under the IT Rules, 2021, and the time limits we follow.",
     html: `
-<p>In accordance with the Information Technology Act, 2000, the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021, the Copyright Act, 1957 and the Digital Personal Data Protection Act, 2023, Raisina Wire has appointed a Grievance Officer.</p>
-
-<div class="officer"><b>Grievance Officer</b><br>Ilmaz Syed, Founder and Editor, Raisina Wire<br>Email: ${mail}<br>Hours: Monday to Friday, 10:00 to 18:00 IST</div>
-
+<p>Under the Information Technology Act, 2000, the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021, the Copyright Act, 1957 and the Digital Personal Data Protection Act, 2023, ${ORG} has appointed a Grievance Officer.</p>
+${officer()}
 <h2>What you can raise</h2>
 <ul>
-  <li>Content on the Service that you believe is unlawful, infringing, defamatory or in breach of our <a href="/terms">Terms</a>;</li>
-  <li>copyright or trademark complaints (see the <a href="/copyright">Copyright and Content Policy</a> for what to include);</li>
-  <li>corrections to our reporting;</li>
-  <li>your personal data and privacy rights (see the <a href="/privacy">Privacy Policy</a>);</li>
+  <li>Content you believe is unlawful, infringing, defamatory, or in breach of our <a href="/terms">Terms</a> or the Code of Ethics for digital news publishers;</li>
+  <li>errors in our reporting (see the <a href="/corrections">corrections policy</a>);</li>
+  <li>copyright complaints (see the <a href="/copyright">Copyright and Content Policy</a>);</li>
+  <li>your personal data and privacy rights (see the <a href="/privacy">Privacy Notice</a>);</li>
   <li>decisions about your account or posts.</li>
 </ul>
-
 <h2>How to complain</h2>
-<p>Email ${mail} with your name and contact details, the link(s) to the content concerned, what the problem is, and what you would like us to do. Attach any evidence and, for intellectual property complaints, proof of ownership or authority.</p>
-
-<h2>What happens next</h2>
-<p>We acknowledge complaints within 24 hours and resolve them within 15 days of receipt. Requests to remove content in the categories that the IT Rules require us to act on faster, and complete copyright notices, are acted on within the shorter time limits the law sets (for copyright notices, within 36 hours). We comply with orders of courts and competent authorities.</p>
-<p>If you are not satisfied with the Grievance Officer’s decision, you may appeal to the Grievance Appellate Committee under the IT Rules where applicable, complain to the Data Protection Board of India about personal data, or pursue any other remedy available under law.</p>`
+<p>Write to the Grievance Officer with your name and contact details, the link(s) concerned, what the problem is and what you would like us to do, with any evidence.</p>
+<h2>Time limits</h2>
+<p>We acknowledge complaints within 24 hours and decide them within 15 days. Complaints about content that exposes a person’s private area, shows them in full or partial nudity or sexual acts, or impersonates them, are acted on within 24 hours. Complete copyright notices are acted on within 36 hours. We comply with orders of courts and competent authorities.</p>
+<h2>If you are not satisfied</h2>
+<p>You may escalate to the self-regulating body of which we are a member, when we join one, and to the oversight mechanism of the Ministry of Information and Broadcasting under Part III of the IT Rules; for personal data, to the Data Protection Board of India; or pursue any other remedy available under law.</p>`,
+    bn: { title: "অভিযোগ নিষ্পত্তি", html: `
+<p>তথ্যপ্রযুক্তি আইন, ২০০০; তথ্যপ্রযুক্তি (ইন্টারমিডিয়ারি গাইডলাইনস ও ডিজিটাল মিডিয়া এথিক্স কোড) রুলস, ২০২১; কপিরাইট আইন, ১৯৫৭; এবং ডিজিটাল পার্সোনাল ডেটা প্রোটেকশন আইন, ২০২৩ অনুযায়ী ${ORG_BN} একজন অভিযোগ আধিকারিক নিয়োগ করেছে।</p>
+${officer(true)}
+<h2>কী নিয়ে অভিযোগ জানাতে পারেন</h2>
+<ul>
+  <li>বেআইনি, অন্যের অধিকার লঙ্ঘনকারী, মানহানিকর, কিংবা আমাদের <a href="/terms">শর্তাবলি</a> বা ডিজিটাল সংবাদ প্রকাশকদের নৈতিক বিধি ভঙ্গ করছে বলে মনে হওয়া বিষয়;</li>
+  <li>আমাদের খবরে ভুল (দেখুন <a href="/corrections">সংশোধন নীতি</a>);</li>
+  <li>কপিরাইট সংক্রান্ত অভিযোগ (দেখুন <a href="/copyright">কপিরাইট ও কনটেন্ট নীতি</a>);</li>
+  <li>আপনার ব্যক্তিগত তথ্য ও গোপনীয়তার অধিকার (দেখুন <a href="/privacy">গোপনীয়তা নোটিস</a>);</li>
+  <li>আপনার অ্যাকাউন্ট বা পোস্ট নিয়ে আমাদের সিদ্ধান্ত।</li>
+</ul>
+<h2>কীভাবে জানাবেন</h2>
+<p>অভিযোগ আধিকারিককে লিখুন: আপনার নাম ও যোগাযোগের বিবরণ, সংশ্লিষ্ট লিঙ্ক, সমস্যাটা কী আর আপনি কী চান, প্রমাণ সহ।</p>
+<h2>সময়সীমা</h2>
+<p>২৪ ঘণ্টার মধ্যে অভিযোগ পাওয়ার কথা জানাই এবং ১৫ দিনের মধ্যে নিষ্পত্তি করি। কারও গোপন অঙ্গ প্রকাশ, পূর্ণ বা আংশিক নগ্নতা বা যৌন ক্রিয়া দেখানো, কিংবা ছদ্মবেশ ধারণ সংক্রান্ত অভিযোগে ২৪ ঘণ্টার মধ্যে ব্যবস্থা নিই। সম্পূর্ণ কপিরাইট নোটিসে ৩৬ ঘণ্টার মধ্যে ব্যবস্থা নিই। আদালত ও উপযুক্ত কর্তৃপক্ষের নির্দেশ মেনে চলি।</p>
+<h2>সন্তুষ্ট না হলে</h2>
+<p>আমরা যে স্ব-নিয়ন্ত্রক সংস্থার সদস্য হব, তার কাছে এবং আইটি রুলসের তৃতীয় অংশে তথ্য ও সম্প্রচার মন্ত্রকের তদারকি ব্যবস্থার কাছে যেতে পারেন; ব্যক্তিগত তথ্যের ক্ষেত্রে ডেটা প্রোটেকশন বোর্ড অফ ইন্ডিয়ার কাছে; কিংবা আইনে উপলব্ধ অন্য যে কোনো প্রতিকার নিতে পারেন।</p>` }
   }
 };
 
-export const LEGAL_ORDER = [["terms", "Terms of Use"], ["privacy", "Privacy Policy"], ["disclaimer", "Disclaimer"], ["copyright", "Copyright & Content"], ["community-guidelines", "Community Guidelines"], ["grievance", "Grievance Redressal"]];
+export const LEGAL_ORDER = [["terms", "Terms of Use"], ["privacy", "Privacy Notice"], ["disclaimer", "Disclaimer"], ["copyright", "Copyright & Content"], ["corrections", "Corrections Policy"], ["community-guidelines", "Community Guidelines"], ["grievance", "Grievance Redressal"]];

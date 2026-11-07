@@ -1,56 +1,54 @@
 <!doctype html>
-<html lang="en-IN">
+<html lang="bn-IN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f1422" media="(prefers-color-scheme: dark)" />
-  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#AA0404" media="(prefers-color-scheme: light)" />
   <script>document.documentElement.classList.add("js")</script>
-  <style>.js #app:has(>.ssr):after,.js #app>p:only-child{content:"";position:fixed;inset:0;margin:auto;width:64px;height:64px;border-radius:16px;background:#b8141f url(/icon-192.png) center/cover;box-shadow:0 18px 40px -12px rgba(184,20,31,.6);animation:rwboot 1.2s ease-in-out infinite;font-size:0;color:transparent}@keyframes rwboot{50%{transform:scale(.92);opacity:.7}}</style>
+  <style>.js #app:has(>.ssr):after,.js #app>p:only-child{content:"";position:fixed;inset:0;margin:auto;width:72px;height:72px;border-radius:16px;background:#fff url(/icon-192.png) center/cover;box-shadow:0 0 0 2px #D4A017,0 18px 40px -12px rgba(170,4,4,.55);animation:rxboot 1.2s ease-in-out infinite;font-size:0;color:transparent}@keyframes rxboot{50%{transform:scale(.92);opacity:.7}}</style>
   <script>try{var p=JSON.parse(localStorage.getItem("rw-theme")||'"auto"');document.documentElement.dataset.theme=p==="dark"||(p==="auto"&&matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"}catch(e){}</script>
   <meta name="robots" content="index, follow, max-image-preview:large" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Raisina Wire" />
-  <meta name="application-name" content="Raisina Wire" />
+  <meta name="apple-mobile-web-app-title" content="Rashtrix" />
+  <meta name="application-name" content="Rashtrix" />
   <meta name="format-detection" content="telephone=no" />
-  <meta name="description" content="Raisina Wire is an independent Indian news and analysis platform on geopolitics, national security, defence, diplomacy and markets, in English, Hindi and Bengali: original editions, live coverage, video explainers, a live news wire, a market board and a members’ community." />
-  <meta property="og:title" content="Raisina Wire — India’s strategic briefing" />
+  <meta name="description" content="কলকাতার খবর, পশ্চিমবঙ্গের খবর, ভারত, প্রবাসী বাঙালি আর বিশ্বের সর্বশেষ খবর, লাইভ কভারেজ আর অ্যালার্ট — রাষ্ট্রিক্স ২৪×৭ নিউজ। লোক গুনি না, লোকের কথা শুনি।" />
+  <meta property="og:title" content="রাষ্ট্রিক্স ২৪×৭ নিউজ" />
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="Raisina Wire" />
-  <meta property="og:image" content="https://raisinawire.calibrex.org/og-image.jpg" />
+  <meta property="og:site_name" content="রাষ্ট্রিক্স ২৪×৭ নিউজ" />
+  <meta property="og:image" content="/og-image.jpg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:image" content="https://raisinawire.calibrex.org/og-image.jpg" />
-  <meta property="og:description" content="India news and analysis on geopolitics, security, defence, diplomacy and markets, in English, हिन्दी and বাংলা: live coverage, video explainers, a live news wire and a market board." />
-  <meta property="og:locale" content="en_IN" />
-  <meta property="og:image:alt" content="Raisina Wire — India’s strategic briefing, in English, Hindi and Bengali, in light and dark mode" />
-  <meta name="twitter:image:alt" content="Raisina Wire — India’s strategic briefing, in English, Hindi and Bengali" />
-  <title>Raisina Wire — India news, geopolitics, defence &amp; markets in English, Hindi and Bengali</title>
-  <link rel="alternate" type="application/rss+xml" title="Raisina Wire" href="/feed.xml" />
+  <meta name="twitter:image" content="/og-image.jpg" />
+  <meta property="og:description" content="কলকাতা, পশ্চিমবঙ্গ, ভারত, প্রবাসী বাঙালি আর বিশ্বের খবর বাংলায় — রাষ্ট্রিক্স ২৪×৭ নিউজ।" />
+  <meta property="og:locale" content="bn_IN" />
+  <meta property="og:image:alt" content="রাষ্ট্রিক্স ২৪×৭ নিউজ" />
+  <title>রাষ্ট্রিক্স ২৪×৭ নিউজ — কলকাতা, পশ্চিমবঙ্গ, ভারত আর বিশ্বের খবর</title>
+  <link rel="alternate" type="application/rss+xml" title="রাষ্ট্রিক্স ২৪×৭ নিউজ" href="/feed.xml" />
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon.png" type="image/png" sizes="64x64" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,500&family=Noto+Serif+Display:wdth,wght@62.5..100,700..900&family=Manrope:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=Michroma&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@500;600;700;800&family=Hind+Siliguri:wght@400;500;600;700&family=Montserrat:wght@500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
 </head>
 <body>
   <div id="app">
-    <p style="font:500 13px system-ui;color:#596173;text-align:center;margin-top:40vh">Loading Raisina Wire…</p>
+    <p style="font:500 13px system-ui;color:#555;text-align:center;margin-top:40vh">রাষ্ট্রিক্স…</p>
   </div>
   <style>
     /* Page text the server includes for search engines and slow connections; the app replaces it. */
-    .ssr{max-width:760px;margin:0 auto;padding:28px 18px 60px;font:17px/1.7 Newsreader,Georgia,serif;color:#0f1422;background:#f8f8fa}
-    .ssr header{border-bottom:3px solid #0f1422;padding-bottom:12px;margin-bottom:24px}
-    .ssr-brand{font:900 40px/1 "Noto Serif Display",Georgia,serif;font-stretch:66%;color:#0f1422;text-decoration:none}.ssr-brand span{color:#b8141f}
-    .ssr-nav{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font:600 14px Manrope,system-ui,sans-serif}.ssr-nav a{color:#3b414d;text-decoration:none}
-    .ssr h1{font:500 38px/1.12 Newsreader,Georgia,serif;letter-spacing:-.5px;margin:10px 0}.ssr img{max-width:100%;height:auto;border-radius:14px}
-    .ssr-kicker,.ssr-byline,.ssr small{font:500 12px "DM Mono",monospace;letter-spacing:1px;text-transform:uppercase;color:#596173}.ssr-kicker{color:#b8141f}
-    .ssr-dek{font-size:21px;color:#3b414d}.ssr-list{padding-left:18px}.ssr-list li{margin:14px 0}.ssr a{color:#0f1422}
+    .ssr{max-width:760px;margin:0 auto;padding:28px 18px 60px;font:17px/1.75 "Hind Siliguri","Noto Serif Bengali",Georgia,serif;color:#111;background:#fff}
+    .ssr header{border-bottom:3px solid #AA0404;padding-bottom:12px;margin-bottom:24px}
+    .ssr-brand{font:900 34px/1 Montserrat,Arial,sans-serif;letter-spacing:.5px;color:#AA0404;text-decoration:none}.ssr-brand span{display:inline-block;margin-left:8px;padding:2px 8px;background:#AA0404;color:#fff;font-size:16px;vertical-align:middle}
+    .ssr-nav{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font:600 15px "Hind Siliguri",system-ui,sans-serif}.ssr-nav a{color:#333;text-decoration:none}
+    .ssr h1{font:700 34px/1.3 "Noto Serif Bengali",Georgia,serif;margin:10px 0}.ssr img{max-width:100%;height:auto;border-radius:12px}
+    .ssr-kicker,.ssr-byline,.ssr small{font:600 13px "Hind Siliguri",system-ui,sans-serif;color:#666}.ssr-kicker{color:#AA0404}
+    .ssr-dek{font-size:20px;color:#333}.ssr-list{padding-left:18px}.ssr-list li{margin:14px 0}.ssr a{color:#111}
   </style>
   <script type="module" src="/src/main.js"></script>
 </body>

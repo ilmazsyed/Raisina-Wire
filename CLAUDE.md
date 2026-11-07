@@ -1,16 +1,14 @@
-# Raisina Wire: notes for Claude
+# Rashtrix app: notes for Claude
 
-## Raisina TV explainers: ask every time
-Before starting work on any explainer, ask the editor (Ilmaz Syed), each time, never assuming from
-earlier ones:
-1. Which anchor reads the Raisina TV intro?
-2. Is the intro on camera (`intro: "cam"`) or voice only (`intro: "voice"`)?
-3. Which anchor narrates the explainer itself (the script's `voice`)?
+This branch line (`rashtrix`) is the Rashtrix 24×7 News app, a Bengali-first rebuild of Raisina
+Wire. Read `rashtrix/BRIEF.md` (phases and decisions) and `README.md` (what exists and how to set
+it up) before working.
 
-Make lines, recordings and lip sync only for the anchor chosen, never for every anchor. No anchor
-self-introduction ("I'm Kabir") and no "AI narrator" card on intros. Only anchors in `READY`
-(`src/anchors.js`) go on air; add another anchor (Kabir, Bharti, Vikram, Ilmaz) only when the editor
-names them. Steps: `video/README.md` ("Raisina TV anchor intros") and `anchors/README.md`.
-
-## Changes
-Work on a branch and open a pull request; the "Site builds" check must be green before merging.
+- Never merge into `main` (the live Raisina Wire site). Pull requests target `rashtrix`.
+- It deploys as its own Worker (`rashtrix`) and D1 database (`rashtrix-db`), never Raisina Wire's.
+- Free tiers only; no paid AI API. Ask the owner for keys only when a phase needs them, with
+  step-by-step instructions.
+- Bengali is the default language at `/`; English `/en`, Hindi `/hi`. New interface text is written
+  in English in the code and needs an entry in `src/i18n/bn.js` (and `hi.js`).
+- Wire rewrites and briefs never carry photos and never show their sources to readers.
+- The "Site builds" check must be green before merging.

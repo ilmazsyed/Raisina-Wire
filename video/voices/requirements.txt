@@ -1,7 +1,0 @@
-# Chatterbox (MIT) on CPU, for the anchors' voices. Torch from the CPU index:
-#   pip install -r video/voices/requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.6.0
-torchaudio==2.6.0
-chatterbox-tts==0.1.7
-kokoro-onnx
-soundfile

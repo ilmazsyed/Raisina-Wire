@@ -1,4 +1,6 @@
-import { cached, liveWire, readArticle, marketBoard, LANG_FEEDS } from "./feeds.js";
+import { cached, categorize, DESKS } from "./feeds.js";
+import { runWireDesk, wireDeskReport, saveWireSettings, fetchSources, groupItems, writeJob, quota } from "./wiredesk.js";
+import { syncWixFeed, backfillWix, wixStatus, restartWixBackfill } from "./wix.js";
 import m0001 from "../migrations/0001_init.sql";
 import m0002 from "../migrations/0002_platform_modules.sql";
 import m0003 from "../migrations/0003_editorial_console.sql";
@@ -16,26 +18,13 @@ import m0014 from "../migrations/0014_audience.sql";
 import m0015 from "../migrations/0015_guest_writers.sql";
 import m0016 from "../migrations/0016_media_full.sql";
 import m0017 from "../migrations/0017_article_video.sql";
-import m0018 from "../migrations/0018_raisina_tv.sql";
-import { tvSettings, saveTvSettings, setForce, tvPlaylist, tvAds, tvBreaking, saveAd, saveBreaking, saveOrder, tvOrderRows, tvInputs, saveInput, tvMusic, saveMusic } from "./channel.js";
-import m0019 from "../migrations/0019_tv_sequences.sql";
 import m0020 from "../migrations/0020_oauth.sql";
+import m0021 from "../migrations/0021_rashtrix.sql";
 import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
-import { liveResults } from "./results.js";
 import { handleTts } from "./tts.js";
-import { anchorLines, liveReads, lipLines, allLines, ANCHORS, engineOf, lineId, READ, spoken } from "./anchors.js";
-import { LIPPED } from "./anchor-lips.js";
-import { VOICED } from "./anchor-voices.js";
-// Every headline Raisina TV can show (the anchor reads them): breaking lines, Breaking Headlines,
-// the News Update sets and the desk's own set.
-const tvHeads = ({ breaking = [], recent = [], sets = [], pinset = null }) => [...new Set([...breaking, ...recent.map(r => r.text), ...sets.flatMap(st => (st.items || []).map(i => i.text)), ...(pinset?.on ? pinset.items : [])].filter(Boolean))];
-import { editions } from "./editions.js";
-import editionBodies from "./edition-bodies.json";
-import seedHi from "./translations/hi.json";
-import seedBn from "./translations/bn.json";
-import { ARTICLE_COLS, toArticle, listPublished, getBySlug, blocksToText, splitTags, tagSlug, isPublic, textHash, WRITERS, DEFAULT_WRITER } from "./store.js";
-import { LANGS, isLang, localiseArticles, localisePage, PAGES, pageVer } from "./translate.js";
+import { ARTICLE_COLS, toArticle, listPublished, getBySlug, splitTags, tagSlug, isPublic, textHash, WRITERS, DEFAULT_WRITER } from "./store.js";
+import { LANGS, PAGE_LANGS, isLang, localiseArticles, localisePage, PAGES, pageVer } from "./translate.js";
 import { mtReady, translateFields, translateBody } from "./mt.js";
 import { vapidKeys, createAlert, drainAlerts } from "./push.js";
 import { renderPage, sitemap, newsSitemap, robots, feed, PAGE_PATTERN } from "./seo.js";
@@ -82,7 +71,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0018_raisina_tv.sql", m0018], ["0019_tv_sequences.sql", m0019], ["0020_oauth.sql", m0020]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -95,57 +84,13 @@ async function migrate(db) {
     if (applied.has(name)) continue;
     await db.batch([...sqlStatements(sql).map(q => db.prepare(q)), db.prepare("INSERT INTO d1_migrations (name) VALUES (?)").bind(name)]);
   }
-  await seedEditions(db, applied);
   await backfillTextHashes(db);
-  await seedTranslations(db, applied);
 }
 // Stories saved before text fingerprints existed get one, so the control room can tell when the
-// English has changed since a translation was written.
+// original has changed since a translation was written.
 async function backfillTextHashes(db) {
   const { results } = await db.prepare("SELECT id,title,dek,topic,hero_caption,tags,body FROM articles WHERE text_hash='' LIMIT 500").all();
   if (results.length) await db.batch(await Promise.all(results.map(async r => db.prepare("UPDATE articles SET text_hash=? WHERE id=?").bind(await textHash(r), r.id))));
-}
-// Hindi and Bengali versions bundled with the site (src/translations/), written in a Claude
-// session for the existing editions and pages. Copied in once; versions saved in the control
-// room are never overwritten.
-async function seedTranslations(db, applied) {
-  const seeds = { hi: seedHi, bn: seedBn };
-  const count = Object.values(seeds).reduce((n, x) => n + Object.keys(x.articles || {}).length + Object.keys(x.pages || {}).length, 0);
-  const marker = `seed_translations_${count}`;
-  if (!count || applied.has(marker)) return;
-  const now = new Date().toISOString(), stmts = [];
-  const insert = (kind, ref, lang, ver, t, tags = "[]") => db.prepare(`INSERT OR IGNORE INTO translations (kind,ref,lang,src_ver,title,dek,topic,hero_caption,tags,body,status,model,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,'manual','claude-session',?)`)
-    .bind(kind, ref, lang, ver, t.title, t.dek || "", t.topic || "", t.heroCaption || "", tags, t.body ?? t.html ?? "", now);
-  for (const [lang, seed] of Object.entries(seeds)) {
-    for (const [slug, t] of Object.entries(seed.articles || {})) {
-      const e = editions.find(x => x.slug === slug), row = await db.prepare("SELECT id,tags FROM articles WHERE slug=?").bind(slug).first();
-      if (!e || !row) continue;
-      // The English these were translated from: the bundled edition.
-      const tags = splitTags(e.topic.replace(/ · /g, ",")).join(",");
-      const ver = await textHash({ title: e.title, dek: e.dek, topic: e.topic, hero_caption: "", tags, body: blocksToText(editionBodies[e.slug]?.blocks) });
-      const labels = splitTags(row.tags).map((x, i) => t.tags?.[i] || x);
-      stmts.push(insert("article", row.id, lang, ver, t, JSON.stringify(labels)));
-    }
-    for (const [key, t] of Object.entries(seed.pages || {})) if (PAGES[key]) stmts.push(insert("page", key, lang, await pageVer(key), t));
-  }
-  stmts.push(db.prepare("INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)").bind(marker));
-  await db.batch(stmts);
-}
-// The LinkedIn editions bundled with the site are copied into the articles table once, so the
-// CMS can edit them. Existing rows (same slug) are never overwritten.
-const EDITION_CATEGORY = { "shadow-war": "Security", "iron-dome-east": "Security", "dhaka-reset": "Diplomacy", "delhis-red-line": "Security", "deterrence-without-firing": "Security",
-  "naravane-midnight-call": "Security", "cia-invisible-front": "Analysis", "pakistan-1971-moment": "Geopolitics", "begging-bowls-terror-hubs": "Geopolitics",
-  "bangladesh-breaking-point": "Geopolitics", "silent-superpower": "India", "iran-500m-masterstroke": "Diplomacy", "himalayan-tunnel": "Security" };
-async function seedEditions(db, applied) {
-  const marker = `seed_editions_${editions.length}`;
-  if (applied.has(marker)) return;
-  const now = new Date().toISOString();
-  await db.batch([
-    ...editions.map(e => db.prepare(`INSERT OR IGNORE INTO articles (id,slug,kind,title,dek,topic,tags,body,category,status,writer,published_at,image_url,source_url,created_at,updated_at)
-      VALUES (?,?,'edition',?,?,?,?,?,?,'published','ilmaz-syed',?,?,?,?,?)`).bind(`ed-${e.slug}`, e.slug, e.title, e.dek, e.topic, splitTags(e.topic.replace(/ · /g, ",")).join(","), blocksToText(editionBodies[e.slug]?.blocks),
-      EDITION_CATEGORY[e.slug] || "Analysis", new Date(`${e.date}T09:00:00+05:30`).toISOString(), e.image, e.url, now, now)),
-    db.prepare("INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)").bind(marker)
-  ]);
 }
 async function ensureSchema(env) {
   if (!schemaReady) schemaReady = migrate(env.DB).catch(e => { schemaReady = null; throw e; });
@@ -166,11 +111,11 @@ async function refreshWriters(env, force = false) {
 // OAuth 2.1 for external MCP clients. The legacy PUBLISH_TOKEN remains independent.
 const oauthB64url = bytes => b64(bytes).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
 const oauthRandom = (n=32) => oauthB64url(crypto.getRandomValues(new Uint8Array(n)));
-const oauthHtml = body => new Response("<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Raisina Wire authorisation</title><style>body{margin:0;background:#0b1220;color:#eef2f7;font:16px system-ui;display:grid;min-height:100vh;place-items:center}.panel{width:min(440px,calc(100% - 40px));padding:30px;border:1px solid #344154;border-radius:18px;background:#111c2d;box-sizing:border-box}h1{font-size:24px}p{color:#bac7d8;line-height:1.5}input{box-sizing:border-box;width:100%;padding:13px;margin:7px 0 14px;border-radius:8px;border:1px solid #526176;background:#0b1220;color:white}button{width:100%;padding:14px;border:0;border-radius:8px;background:#c49a48;color:#111;font-weight:700;font-size:16px;cursor:pointer}</style></head><body><main class=panel>"+body+"</main></body></html>",{headers:{"content-type":"text/html;charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"no-referrer","content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
+const oauthHtml = body => new Response("<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Rashtrix authorisation</title><style>body{margin:0;background:#0b1220;color:#eef2f7;font:16px system-ui;display:grid;min-height:100vh;place-items:center}.panel{width:min(440px,calc(100% - 40px));padding:30px;border:1px solid #344154;border-radius:18px;background:#111c2d;box-sizing:border-box}h1{font-size:24px}p{color:#bac7d8;line-height:1.5}input{box-sizing:border-box;width:100%;padding:13px;margin:7px 0 14px;border-radius:8px;border:1px solid #526176;background:#0b1220;color:white}button{width:100%;padding:14px;border:0;border-radius:8px;background:#c49a48;color:#111;font-weight:700;font-size:16px;cursor:pointer}</style></head><body><main class=panel>"+body+"</main></body></html>",{headers:{"content-type":"text/html;charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"no-referrer","content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
 const oauthMeta = origin => ({issuer:origin,authorization_endpoint:origin+"/oauth/authorize",token_endpoint:origin+"/oauth/token",registration_endpoint:origin+"/oauth/register",response_types_supported:["code"],grant_types_supported:["authorization_code","refresh_token"],code_challenge_methods_supported:["S256"],token_endpoint_auth_methods_supported:["none"],scopes_supported:["mcp:tools"]});
 async function oauthUser(env,email,password) {
  const row=await env.DB.prepare("SELECT id,email,display_name,role,password_hash FROM users WHERE email=?").bind(email).first();
- if(await isAdminLogin(env,email,password)){const hash=await passwordHash(password,oauthRandom(16));if(row)await env.DB.prepare("UPDATE users SET role='admin',password_hash=? WHERE id=?").bind(hash,row.id).run();else await env.DB.prepare("INSERT INTO users (id,email,display_name,password_hash,role) VALUES (?,?,?,?,'admin')").bind(randomId(),email,"Raisina Wire Administrator",hash).run();return await env.DB.prepare("SELECT id,email,display_name,role FROM users WHERE email=?").bind(email).first();}
+ if(await isAdminLogin(env,email,password)){const hash=await passwordHash(password,oauthRandom(16));if(row)await env.DB.prepare("UPDATE users SET role='admin',password_hash=? WHERE id=?").bind(hash,row.id).run();else await env.DB.prepare("INSERT INTO users (id,email,display_name,password_hash,role) VALUES (?,?,?,?,'admin')").bind(randomId(),email,"Rashtrix Administrator",hash).run();return await env.DB.prepare("SELECT id,email,display_name,role FROM users WHERE email=?").bind(email).first();}
  if(!row || !(await verifyPassword(password,row.password_hash)) || !["admin","editor"].includes(row.role))return null;return row;
 }
 async function oauthHandle(request,env) {
@@ -187,7 +132,7 @@ async function oauthHandle(request,env) {
   const p=u.searchParams,client=await env.DB.prepare("SELECT * FROM oauth_clients WHERE client_id=?").bind(p.get("client_id")||"").first(),redirect=p.get("redirect_uri")||"",resource=p.get("resource")||origin+"/mcp";let allowed=[];try{allowed=JSON.parse(client?.redirect_uris||"[]")}catch{}
   if(!client||!allowed.includes(redirect)||p.get("response_type")!=="code"||p.get("code_challenge_method")!=="S256"||!/^[A-Za-z0-9_-]{43,128}$/.test(p.get("code_challenge")||"")||resource!==origin+"/mcp"||!p.get("state"))return err("Invalid OAuth authorization request.",400);
   const fields=["client_id","redirect_uri","response_type","code_challenge","code_challenge_method","state","scope","resource"].map(k=>"<input type=hidden name='"+k+"' value='"+String(p.get(k)||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;")+"'>").join("");
-  return oauthHtml("<h1>Connect Raisina Wire</h1><p>"+client.client_name.replace(/[&<>"]/g,"") +" is requesting access to Raisina Wire editorial tools. Sign in with your staff account and approve to continue.</p><form method=post action=/oauth/authorize>"+fields+"<label>Email</label><input name=email type=email autocomplete=username required><label>Password</label><input name=password type=password autocomplete=current-password required><label><input style='width:auto' type=checkbox name=approve value=yes required> I approve access to Raisina Wire publishing tools.</label><button>Approve and connect</button></form><p>Access is revocable. Your existing Claude publishing token is not changed.</p>");
+  return oauthHtml("<h1>Connect Rashtrix</h1><p>"+client.client_name.replace(/[&<>"]/g,"") +" is requesting access to Rashtrix editorial tools. Sign in with your staff account and approve to continue.</p><form method=post action=/oauth/authorize>"+fields+"<label>Email</label><input name=email type=email autocomplete=username required><label>Password</label><input name=password type=password autocomplete=current-password required><label><input style='width:auto' type=checkbox name=approve value=yes required> I approve access to Rashtrix publishing tools.</label><button>Approve and connect</button></form><p>Access is revocable. Your existing Claude publishing token is not changed.</p>");
  }
  if(path==="/oauth/authorize"&&request.method==="POST"){
   const p=await request.formData(),get=k=>String(p.get(k)||""),client=await env.DB.prepare("SELECT * FROM oauth_clients WHERE client_id=?").bind(get("client_id")).first();let redirects=[];try{redirects=JSON.parse(client?.redirect_uris||"[]")}catch{}
@@ -232,7 +177,7 @@ async function publisherUser(request, env) {
   if (secret.length >= 24 && adminEmail(env) && (await sha256(bearer)) === (await sha256(secret))) {
     const find = () => env.DB.prepare("SELECT id,email,display_name,role FROM users WHERE email=?").bind(adminEmail(env)).first();
     let row = await find();
-    if (!row) { await env.DB.prepare("INSERT INTO users (id,email,display_name,password_hash,role) VALUES (?,?,?,?,'admin')").bind(randomId(), adminEmail(env), "Ilmaz Syed", "").run(); row = await find(); }
+    if (!row) { await env.DB.prepare("INSERT INTO users (id,email,display_name,password_hash,role) VALUES (?,?,?,?,'admin')").bind(randomId(), adminEmail(env), "Rashtrix Administrator", "").run(); row = await find(); }
     return { ...row, role: "admin" };
   }
   const token = await env.DB.prepare("SELECT users.id,users.email,users.display_name,users.role FROM oauth_access_tokens JOIN users ON users.id=oauth_access_tokens.user_id WHERE oauth_access_tokens.token_hash=? AND oauth_access_tokens.expires_at>? AND oauth_access_tokens.resource=?").bind(await sha256(bearer), Math.floor(Date.now()/1000), new URL(request.url).origin + "/mcp").first();
@@ -250,14 +195,18 @@ async function currentUser(request, env) {
   ).bind(tokenHash, Math.floor(Date.now()/1000)).first();
   return row || null;
 }
-function slugify(s) { return s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,90) || randomId(); }
+// Addresses use Latin letters; a Bengali or Hindi headline gets a short "news-…" address unless one is given.
+function slugify(s) { return String(s).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,90) || `news-${randomId().slice(0, 8)}`; }
 function allowedRoles(user, roles) { return user && roles.includes(user.role); }
 const isStaff = user => allowedRoles(user, ["admin", "editor"]);
 const httpsUrl = (v, max = 1500) => { const s = String(v || "").trim().slice(0, max); return /^https:\/\//i.test(s) ? s : ""; };
-// Images: an HTTPS URL, an uploaded image (/media/…) or bundled artwork (/editions/…).
-// A story video: one of the site's own explainers (/videos/…) or an https MP4/WebM.
-const videoRef = v => { const s = String(v || "").trim().slice(0, 1500); return /^\/videos\/[\w.-]+\.(mp4|webm)$/.test(s) || /^https:\/\/\S+\.(mp4|webm)(\?\S*)?$/.test(s) ? s : ""; };
-const imageRef = v => { const s = String(v || "").trim().slice(0, 1500); return /^\/(media|editions)\/[\w.-]+$/.test(s) ? s : httpsUrl(s); };
+// Images: an HTTPS URL, an uploaded image (/media/…) or the brand artwork (/brand/…).
+// A story video: an https MP4/WebM.
+const videoRef = v => { const s = String(v || "").trim().slice(0, 1500); return /^https:\/\/\S+\.(mp4|webm)(\?\S*)?$/.test(s) ? s : ""; };
+const imageRef = v => { const s = String(v || "").trim().slice(0, 1500); return /^\/(media|brand)\/[\w.-]+$/.test(s) ? s : httpsUrl(s); };
+const STORY_KINDS = ["article", "rewrite", "brief"];
+const kindValue = v => STORY_KINDS.includes(v) ? v : "article";
+const langValue = v => LANGS.includes(v) ? v : "bn";
 const writerKey = v => WRITERS.some(w => w.key === v) ? v : DEFAULT_WRITER;
 const tagsValue = v => splitTags(Array.isArray(v) ? v.join(",") : v).map(t => t.slice(0, 40)).join(",");
 const truthy = v => v === true || v === "on" || v === "true" || v === "1";
@@ -267,7 +216,7 @@ const wantsAlert = v => !(v === false || v === "false" || v === "0" || v === "of
 async function storyAlert(env, ctx, user, row) {
   const live = row.status === "published" && row.published_at && row.published_at <= new Date().toISOString();
   if (!live) { await env.DB.prepare("UPDATE articles SET alert_state='pending' WHERE id=?").bind(row.id).run(); return "pending"; }
-  await createAlert(env, ctx, { title: row.kind === "edition" ? "New Raisina Wire edition" : "New on Raisina Wire", body: row.title, url: `/${row.kind === "edition" ? "edition" : "article"}/${encodeURIComponent(row.slug)}`, userId: user?.id });
+  await createAlert(env, ctx, { title: "রাষ্ট্রিক্স · নতুন খবর", body: row.title, url: `/article/${encodeURIComponent(row.slug)}`, userId: user?.id });
   await env.DB.prepare("UPDATE articles SET alert_state='sent' WHERE id=?").bind(row.id).run();
   return "sent";
 }
@@ -321,182 +270,24 @@ async function isAdminLogin(env, email, password) {
   return (await sha256(password)) === (await sha256(env.ADMIN_PASSWORD));
 }
 
-async function gdeltNews(url) {
-  const q = url.searchParams.get("q") || "(geopolitics OR diplomacy OR security OR conflict)";
-  const safeQ = q.slice(0, 220);
-  const api = new URL("https://api.gdeltproject.org/api/v2/doc/doc");
-  api.searchParams.set("query", safeQ);
-  api.searchParams.set("mode", "ArtList");
-  api.searchParams.set("format", "json");
-  api.searchParams.set("sort", "DateDesc");
-  api.searchParams.set("maxrecords", "30");
-  api.searchParams.set("timespan", "24h");
-  const response = await fetch(api, { headers: { "user-agent": "RaisinaWire/1.0 (editorial research)" } });
-  if (!response.ok) throw new Error(`GDELT returned ${response.status}`);
-  const data = await response.json();
-  const articles = (data.articles || []).map((a, i) => ({
-    id: `${a.url || a.title || i}`,
-    title: a.title || "Untitled report",
-    url: a.url || "#",
-    domain: a.domain || "",
-    sourceCountry: a.sourcecountry || "",
-    language: a.language || "",
-    publishedAt: a.seendate || "",
-    image: a.socialimage || "",
-    tone: a.tone ?? null,
-    source: "GDELT / publisher"
-  })).filter(a => a.url.startsWith("http"));
-  return { source: "GDELT DOC 2.0", updatedAt: new Date().toISOString(), query: safeQ, articles };
-}
-
 // Where a story came from stays in the control room; readers never see it.
 const hideSource = ({ sourceUrl, ...a }) => a;
 
-/* ---------- Hindi and Bengali for news text (src/mt.js) ---------- */
-const reqLang = url => { const l = url.searchParams.get("lang"); return isLang(l) ? l : ""; };
-// The live wire in Hindi or Bengali: the language's own publishers, plus the English headlines
-// and summaries translated. Readers get what is already translated at once; new headlines are
-// translated in the background (and by the cron) and appear on the next refresh.
-async function wireIn(env, ctx, lang) {
-  const w = await liveWire(lang);
-  if (!lang || !mtReady(env)) return w;
-  const own = new Set((LANG_FEEDS[lang] || []).map(f => f.name));
-  const fresh = () => w.items.filter(i => !own.has(i.source)).map(i => ({ ...i, titleEn: i.title }));
-  const job = translateFields(env, lang, fresh(), ["title", "summary"]);
-  if (ctx?.waitUntil) ctx.waitUntil(job.catch(() => {})); else await job;
-  const items = await translateFields(env, lang, fresh(), ["title", "summary"], { cacheOnly: true });
-  const byUrl = new Map(items.map(i => [i.url, i]));
-  return { ...w, items: w.items.map(i => byUrl.get(i.url) || i), mt: items.some(i => i.mt) };
-}
+/* ---------- Languages ---------- */
+// ?lang=bn|en|hi; Bengali when absent.
+const reqLang = url => { const l = url.searchParams.get("lang"); return isLang(l) ? l : "bn"; };
+// Live coverage written in English, machine-translated for Bengali and Hindi readers.
 async function mtLive(env, lang, item, updates) {
+  if (lang === "en" || !mtReady(env)) return;
   await translateFields(env, lang, [item], ["title", "summary"]);
   const bodies = await Promise.all(updates.map(u => translateBody(env, lang, u.body)));
   updates.forEach((u, i) => { if (bodies[i] !== u.body) { u.body = bodies[i]; u.mt = true; } });
 }
-// Ticker text without the editor's formatting marks (**bold**, [links](…), # headings).
-const plainText = t => String(t || "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/\*\*|__|`|^#+\s*/gm, "").replace(/\s+/g, " ").trim();
-// Raisina TV's feed: running order, ad settings, breaking lines, the ticker and the break-in switch.
-// Lip-synced clips the GitHub Action "Raisina TV lip sync" has rendered (kept in D1 as "lip:<id>").
-async function tvLips(env) {
-  const rows = (await env.DB.prepare("SELECT key FROM tts_audio WHERE voice LIKE 'lips:%'").all().catch(() => ({ results: [] }))).results;
-  return new Set(rows.map(r => String(r.key).slice(4)));
-}
-// The live reads the channel is waiting for (recorded by the GitHub Action "Raisina TV live reads").
-async function tvVoiceTodo(env, ctx) {
-  const settings = await tvSettings(env), f = await cached("tv", 5e3, () => tvFeed(env, ctx, ""));
-  const reads = await liveReads({ breaking: (await tvBreaking(env)).map(b => b.text), inputs: (await tvInputs(env)).filter(i => i.source), force: settings.force, heads: tvHeads({ breaking: f.breaking, recent: f.recent, sets: f.sets, pinset: settings.pinset }) });
-  const have = reads.length ? new Set((await env.DB.prepare(`SELECT key FROM tts_audio WHERE key IN (${reads.map(() => "?").join(",")})`).bind(...reads.map(r => r.id)).all()).results.map(r => r.key)) : new Set();
-  return { reads, todo: settings.seq.anchors === false ? [] : reads.filter(r => !have.has(r.id)) };
-}
-// The lip-synced clips the channel is waiting for (rendered by the GitHub Action "Raisina TV lip sync").
-async function tvLipsTodo(env) {
-  const [all, have, lines] = await Promise.all([lipLines(), tvLips(env), tvLines(env)]);
-  const todo = all.filter(l => !LIPPED.has(l.id) && !have.has(l.id) && (VOICED.has(l.id) || lines.has(l.id)))
-    .map(l => ({ ...l, audio: VOICED.has(l.id) ? `/anchors/voice/${l.id}.mp3` : `/api/tv/voice/${l.id}` }));
-  return { all, todo };
-}
-// The anchors' own lines (hello, bulletins, intros…) recorded by the GitHub Action "Raisina TV anchor
-// voices" (Chatterbox) into D1 (voice "line:<anchor>"; kept, unlike live reads).
-async function tvLines(env) {
-  const rows = (await env.DB.prepare("SELECT key FROM tts_audio WHERE voice LIKE 'line:%'").all().catch(() => ({ results: [] }))).results;
-  return new Set(rows.map(r => r.key));
-}
-async function tvLinesTodo(env) {
-  const have = await tvLines(env), todo = [];
-  for (const k of Object.keys(ANCHORS)) {
-    if (engineOf(k) !== "chatterbox") continue;
-    for (const t of allLines(k)) { const id = await lineId(k, t); if (!VOICED.has(id) && !have.has(id)) todo.push({ id, anchor: k, text: t, say: spoken(t), engine: "chatterbox", kokoro: ANCHORS[k].kokoro, ref: `/anchors/${k}-ref.wav` }); }
-  }
-  return todo;
-}
-// GitHub's own schedule runs these Actions only now and then, so the Worker's cron starts them
-// whenever there is work waiting (needs the Worker secret GITHUB_DISPATCH_TOKEN: a fine-grained
-// GitHub token for this repository with "Actions: read and write").
-async function dispatchTv(env) {
-  if (!env.GITHUB_DISPATCH_TOKEN) return;
-  const m = new Date().getUTCMinutes(), repo = env.GITHUB_REPO || "ilmazsyed/Raisina-Wire";
-  const run = async file => {
-    const r = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/${file}/dispatches`, { method: "POST", headers: { authorization: `Bearer ${env.GITHUB_DISPATCH_TOKEN}`, accept: "application/vnd.github+json", "user-agent": "raisina-wire-cron", "content-type": "application/json" }, body: JSON.stringify({ ref: "main" }) });
-    if (!r.ok) console.error(`dispatch ${file}: ${r.status} ${(await r.text()).slice(0, 200)}`);
-  };
-  if (m % 10 === 3 && (await tvVoiceTodo(env, null)).todo.length) await run("live-reads.yml");
-  if (m % 15 === 4 && (await tvLipsTodo(env)).todo.length) await run("anchor-lips.yml");
-  if (m % 15 === 9 && (await tvLinesTodo(env)).length) await run("anchor-voices.yml");
-}
-async function tvFeed(env, ctx, lang) {
-  const settings = await tvSettings(env);
-  const [playlist, ads, breaking, stories, live, inputs, music, liveUps] = await Promise.all([
-    tvPlaylist(env, settings), tvAds(env), tvBreaking(env),
-    listPublished(env, { limit: 40 }).then(l => localiseArticles(env, lang, l)),
-    env.DB.prepare("SELECT c.slug,c.title,(SELECT body FROM live_updates u WHERE u.coverage_id=c.id ORDER BY created_at DESC LIMIT 1) AS latest,(SELECT created_at FROM live_updates u WHERE u.coverage_id=c.id ORDER BY created_at DESC LIMIT 1) AS latestAt FROM live_coverage c WHERE c.status='live' ORDER BY c.started_at DESC LIMIT 5").all().then(r => r.results),
-    tvInputs(env), tvMusic(env),
-    env.DB.prepare("SELECT c.title,u.body,u.created_at AS at FROM live_updates u JOIN live_coverage c ON c.id=u.coverage_id WHERE c.status='live' ORDER BY u.created_at DESC LIMIT 10").all().then(r => r.results)
-  ]);
-  const markets = await cached("markets", 45e3, marketBoard).catch(() => null);
-  const wire = await cached(`wire${lang}`, 90e3, () => wireIn(env, ctx, lang)).catch(() => ({ items: [] }));
-  if (lang) { await translateFields(env, lang, playlist, ["title", "description"], { cacheOnly: true }); await translateFields(env, lang, [...live, ...liveUps], ["title", "latest", "body"], { cacheOnly: true }); }
-  // Short enough for one TV line: end at a full sentence if one fits, else at a word, with "…".
-  const clipText = (t, n) => { if (t.length <= n) return t; const c = t.slice(0, n), end = Math.max(c.lastIndexOf(". "), c.lastIndexOf("? "), c.lastIndexOf("! ")); return end > n * 0.5 ? c.slice(0, end + 1) : `${c.slice(0, c.lastIndexOf(" ")).replace(/[,;:\s]+$/, "")}…`; };
-  // A live update for the screen: whole sentences only. The first sentence, plus the next while
-  // they fit in about 200 characters (the ticker); a very long first sentence is still shown whole.
-  // Headline sets on TV take the first sentence alone (limit 0), so they read at a glance.
-  const sentences = (t, limit = 200) => { const raw = String(t || "").split(/(?<=[.!?]["”’)\]]*)\s+(?=["“‘(]?[A-Z0-9])/), parts = []; for (const p of raw) { if (parts.length && /(?:\b[A-Z]|\b(?:Mr|Mrs|Ms|Dr|St|No|vs|Gen|Lt|Col|Sr|Jr|Rs|approx))\.$/.test(parts[parts.length - 1])) parts[parts.length - 1] += ` ${p}`; else parts.push(p); } let out = ""; for (const p of parts) { if (out && (`${out} ${p}`).length > limit) break; out = out ? `${out} ${p}` : p; } return out.trim(); };
-  // Wire headlines without the publisher's own tail (" | The Hindu", " - BBC News"): the source is shown anyway.
-  const cleanTitle = (t, src) => { let x = String(t || "").trim().replace(/\s+\|\s*[^|]{0,60}$/, ""); if (src) x = x.replace(new RegExp(`\\s+[-–—]\\s+${String(src).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"), ""); return x.trim() || String(t || "").trim(); };
-  // News Update: headline sets by topic, five each (the desk's stories first, then the wire).
-  const byTopic = new Map();
-  const okImg = u => u && /^(https:|\/)/.test(u) ? u : null;
-  for (const h of [...stories.map(a => ({ t: a.title, c: a.category, src: "Raisina Wire", img: okImg(a.heroUrl || a.imageUrl || a.image) })), ...(wire.items || []).map(i => ({ t: cleanTitle(i.title, i.source), c: i.category, src: i.source, img: okImg(i.image) }))]) {
-    if (!h.c || !h.t) continue;
-    const l = byTopic.get(h.c) || []; if (l.length < 5 && !l.some(x => x.t === h.t)) l.push(h); byTopic.set(h.c, l);
-  }
-  const sets = [...byTopic.entries()].filter(([, l]) => l.length >= 5).map(([topic, l]) => ({ topic, items: l.map(x => ({ text: x.t, source: x.src, ...(x.img ? { img: x.img } : {}) })) }));
-  if (liveUps.length >= 3) sets.unshift({ topic: "Live", live: true, items: liveUps.slice(0, 5).map(u => ({ text: sentences(plainText(u.body), 0), source: String(u.title || "").split(/[:;—|]/)[0].trim().slice(0, 28) })) });
-  const input = inputs.find(i => i.onAir && i.source);
-  // The breaking ticker runs from the live wires, newest first across live coverage and the wire
-  // (the editor's breaking lines lead it, added in the player).
-  const isoAt = t => { const x = String(t || ""); return x && !x.includes("T") ? `${x.replace(" ", "T")}Z` : x; };
-  const newest = (a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0);
-  const shortTitle = t => String(t || "").split(/[:;—|]/)[0].trim().slice(0, 28);
-  const wireNew = [...(wire.items || [])].filter(i => i.title).map(i => ({ ...i, at: isoAt(i.publishedAt) })).sort(newest);
-  const ticker = [
-    ...live.map(c => ({ kind: "live", at: isoAt(c.latestAt), text: c.latest ? `${shortTitle(c.title)}: ${sentences(plainText(c.latest))}` : c.title, href: `/coverage/${encodeURIComponent(c.slug)}` })),
-    ...wireNew.slice(0, 24).map(i => ({ kind: "wire", at: i.at, text: cleanTitle(i.title, i.source), source: i.source }))
-  ].sort(newest);
-  // Breaking Headlines (the opener): the newest ten across live updates and the wire, with times.
-  const recent = [
-    ...liveUps.map(u => ({ text: sentences(plainText(u.body), 0), source: shortTitle(u.title), at: isoAt(u.at), live: true })),
-    ...wireNew.slice(0, 20).map(i => ({ text: cleanTitle(i.title, i.source), source: i.source, at: i.at, ...(okImg(i.image) ? { img: okImg(i.image) } : {}) }))
-  ].filter(x => x.text && x.at).sort(newest).slice(0, 10);
-  // If the wire can't be reached, the desk's own latest stories keep the ticker running.
-  if (ticker.length < 8) ticker.push(...stories.slice(0, 8).map(a => ({ kind: "story", text: a.title, href: a.href })));
-  // The AI anchors (English channel): their intros before explainers, and their short lines.
-  // An explainer made from a story Ilmaz Syed wrote is his Editor's Pick.
-  let anchors = null;
-  if (!lang && settings.seq.anchors !== false) {
-    const srcs = playlist.map(v => String(v.mediaUrl || "").split("?")[0]).filter(Boolean);
-    const picks = srcs.length ? new Set((await env.DB.prepare(`SELECT video_url FROM articles WHERE status='published' AND writer='ilmaz-syed' AND video_url IN (${srcs.map(() => "?").join(",")})`).bind(...srcs).all()).results.map(r => r.video_url)) : new Set();
-    const heads = tvHeads({ breaking: breaking.map(b => b.text), recent, sets, pinset: settings.pinset });
-    const reads = await liveReads({ breaking: breaking.map(b => b.text), inputs: input ? [input] : [], force: settings.force, heads });
-    const voiced = reads.length ? new Set((await env.DB.prepare(`SELECT key FROM tts_audio WHERE key IN (${reads.map(() => "?").join(",")})`).bind(...reads.map(r => r.id)).all()).results.map(r => r.key)) : new Set();
-    // Headlines the anchor has recorded: shown text -> its read.
-    const headReads = Object.fromEntries(heads.map(t => [t, reads.find(r => r.text === READ.head(t) && voiced.has(r.id))]).filter(([, r]) => r).map(([t, r]) => [t, `/api/tv/voice/${r.id}`]));
-    const [lips, lines] = await Promise.all([tvLips(env), tvLines(env)]);
-    anchors = { ...await anchorLines({ playlist: playlist.map(v => ({ id: v.id, src: v.mediaUrl, editorPick: picks.has(String(v.mediaUrl || "").split("?")[0]) })), input, breaking: breaking.map(b => b.text), force: settings.force, voiced, lips, lines }), reads: headReads };
-  }
-  return { anchors, on: settings.on, qr: settings.qr, every: settings.every, perBreak: settings.perBreak, skippable: settings.skippable, force: settings.force || null,
-    playlist: playlist.map(v => ({ id: v.id, title: v.title, description: v.description, category: v.category, src: v.mediaUrl, thumb: v.thumbnailUrl, publishedAt: v.publishedAt })),
-    ads: ads.filter(a => a.src).map(a => ({ id: a.id, title: a.title, src: a.src })), breaking: breaking.map(b => b.text), ticker, recent,
-    seq: settings.seq, pinset: settings.pinset?.on && settings.pinset.items.length ? settings.pinset : null, sets,
-    markets: (markets?.overview || []).filter(q => q.value != null).slice(0, 8).map(q => ({ label: q.label, value: q.value, pct: q.changePct, currency: q.currency })),
-    promo: [...new Set([...stories.map(a => a.heroUrl || a.imageUrl || a.image), ...playlist.map(v => v.thumbnailUrl)].filter(x => x && /^(https:|\/)/.test(x)))].slice(0, 18),
-    input: input ? { id: input.id, title: input.title, ...input.source } : null,
-    music: music.filter(m => m.src).map(m => ({ id: m.id, title: m.title, src: m.src })),
-    updatedAt: new Date().toISOString() };
-}
-// Stories without an editor's translation: machine-translated, and marked so the reader says so.
+// Stories written in English without a Bengali or Hindi version: machine-translated (Workers AI
+// translates only from English), and marked so the reader says so.
 async function mtArticles(env, lang, list, opts) {
-  if (!list.length || !mtReady(env)) return;
+  list = list.filter(a => a.original === "en" && a.lang === "en");
+  if (lang === "en" || !list.length || !mtReady(env)) return;
   await translateFields(env, lang, list, ["title", "dek", "topic", "heroCaption"], opts);
   for (const a of list) {
     if (a.body !== undefined) { const b = await translateBody(env, lang, a.body); if (b !== a.body) { a.body = b; a.mt = true; } }
@@ -507,23 +298,22 @@ async function mtArticles(env, lang, list, opts) {
 // come from the D1 cache. Every five minutes; the daily cap in src/mt.js still applies.
 async function mtWarm(env) {
   if (!mtReady(env) || new Date().getUTCMinutes() % 5) return;
-  for (const lang of LANGS) {
-    await wireIn(env, null, lang);
+  for (const lang of ["bn", "hi"]) {
     const live = await env.DB.prepare("SELECT id,title,summary FROM live_coverage WHERE status='live'").all();
     for (const c of live.results) {
       const ups = await env.DB.prepare("SELECT body FROM live_updates WHERE coverage_id=? ORDER BY created_at DESC LIMIT 30").bind(c.id).all();
       await mtLive(env, lang, c, ups.results);
     }
-    const list = (await localiseArticles(env, lang, await listPublished(env, { limit: 40 }))).filter(a => a.lang === "en");
+    const list = (await localiseArticles(env, lang, await listPublished(env, { limit: 40 }))).filter(a => a.lang === "en" && a.original === "en");
     const at = (Math.floor(Date.now() / 300e3) * 3) % Math.max(list.length, 1);
-    for (const a of list.slice(at, at + 3)) { const full = await getBySlug(env, a.slug); if (full) await mtArticles(env, lang, [full]); }
+    for (const a of list.slice(at, at + 3)) { const full = await getBySlug(env, a.slug); if (full && full.lang === "en") await mtArticles(env, lang, [{ ...full, original: "en" }]); }
   }
 }
 
 const MCP_TOOLS = [
-  { name:"publisher_health", description:"Check public Raisina Wire API health.", inputSchema:{type:"object",properties:{}} },
-  { name:"list_articles", description:"List articles and editions in the editorial system.", inputSchema:{type:"object",properties:{}} },
-  { name:"create_article_draft", description:"Create an article or edition as a draft. Never publishes or sends alerts.", inputSchema:{type:"object",required:["title","body"],properties:{kind:{type:"string",enum:["article","edition"]},title:{type:"string"},dek:{type:"string"},topic:{type:"string"},category:{type:"string"},tags:{type:"array",items:{type:"string"}},writer:{type:"string"},body:{type:"string"},sourceUrl:{type:"string"},imageUrl:{type:"string"},heroUrl:{type:"string"},heroCaption:{type:"string"},videoUrl:{type:"string"}}} },
+  { name:"publisher_health", description:"Check public Rashtrix API health.", inputSchema:{type:"object",properties:{}} },
+  { name:"list_articles", description:"List stories (articles, wire rewrites and briefs) in the editorial system.", inputSchema:{type:"object",properties:{}} },
+  { name:"create_article_draft", description:"Create a story as a draft. Never publishes or sends alerts. Write it in Bengali (lang bn) unless told otherwise.", inputSchema:{type:"object",required:["title","body"],properties:{kind:{type:"string",enum:["article","rewrite","brief"]},lang:{type:"string",enum:["bn","en","hi"]},title:{type:"string"},dek:{type:"string"},topic:{type:"string"},category:{type:"string"},tags:{type:"array",items:{type:"string"}},writer:{type:"string"},body:{type:"string"},sourceUrl:{type:"string"},imageUrl:{type:"string"},heroUrl:{type:"string"},heroCaption:{type:"string"},videoUrl:{type:"string"}}} },
   { name:"update_article", description:"Update an existing article. Publishing requires explicit editor approval; notify remains false.", inputSchema:{type:"object",required:["id","changes"],properties:{id:{type:"string"},changes:{type:"object"}}} },
   { name:"list_live_coverage", description:"List live coverage records.", inputSchema:{type:"object",properties:{}} },
   { name:"create_live_draft", description:"Create live coverage in draft status.", inputSchema:{type:"object",required:["title"],properties:{title:{type:"string"},summary:{type:"string"},slug:{type:"string"},imageUrl:{type:"string"},socialUrl:{type:"string"},heroCaption:{type:"string"}}} },
@@ -534,13 +324,13 @@ const MCP_TOOLS = [
   { name:"create_event", description:"Create an event. This publishes immediately; call only after explicit editor approval.", inputSchema:{type:"object",required:["title","startsAt"],properties:{title:{type:"string"},description:{type:"string"},eventType:{type:"string"},startsAt:{type:"string"},access:{type:"string",enum:["public","member","premium"]},notify:{type:"boolean",default:false}}} },
   { name:"list_alerts", description:"List recent reader alerts.", inputSchema:{type:"object",properties:{}} },
   { name:"send_reader_alert", description:"Send a reader alert immediately. Call only after explicit approval of exact headline, body and destination.", inputSchema:{type:"object",required:["title","url"],properties:{title:{type:"string"},body:{type:"string"},url:{type:"string"}}} },
-  { name:"list_translations", description:"List articles and pages with Hindi and Bengali translation status.", inputSchema:{type:"object",properties:{}} },
-  { name:"get_translation", description:"Get the English source and existing Hindi or Bengali translation for an article or page.", inputSchema:{type:"object",required:["ref","lang"],properties:{kind:{type:"string",enum:["article","page"],default:"article"},ref:{type:"string"},lang:{type:"string",enum:["hi","bn"]}}} },
-  { name:"save_translation", description:"Save a complete Hindi or Bengali translation for an article or page. Save only after editorial review; this does not publish a new English article.", inputSchema:{type:"object",required:["ref","lang","translation"],properties:{kind:{type:"string",enum:["article","page"],default:"article"},ref:{type:"string"},lang:{type:"string",enum:["hi","bn"]},translation:{type:"object",required:["title","body"],properties:{title:{type:"string"},dek:{type:"string"},topic:{type:"string"},heroCaption:{type:"string"},tags:{type:"array",items:{type:"string"}},body:{type:"string"}}}}} }
+  { name:"list_translations", description:"List stories and pages with their Bengali, English and Hindi versions.", inputSchema:{type:"object",properties:{}} },
+  { name:"get_translation", description:"Get the original and an existing version in another language for a story or page.", inputSchema:{type:"object",required:["ref","lang"],properties:{kind:{type:"string",enum:["article","page"],default:"article"},ref:{type:"string"},lang:{type:"string",enum:["bn","en","hi"]}}} },
+  { name:"save_translation", description:"Save a complete version of a story or page in another language. Save only after editorial review; this does not publish a new story.", inputSchema:{type:"object",required:["ref","lang","translation"],properties:{kind:{type:"string",enum:["article","page"],default:"article"},ref:{type:"string"},lang:{type:"string",enum:["bn","en","hi"]},translation:{type:"object",required:["title","body"],properties:{title:{type:"string"},dek:{type:"string"},topic:{type:"string"},heroCaption:{type:"string"},tags:{type:"array",items:{type:"string"}},body:{type:"string"}}}}} }
 ];
 async function handleMcp(request, env, ctx) {
   const url = new URL(request.url);
-  if (request.method === "GET") return new Response("Raisina Wire MCP endpoint. Use Streamable HTTP POST.", {status:405,headers:{"content-type":"text/plain","allow":"POST, OPTIONS"}});
+  if (request.method === "GET") return new Response("Rashtrix MCP endpoint. Use Streamable HTTP POST.", {status:405,headers:{"content-type":"text/plain","allow":"POST, OPTIONS"}});
   if (request.method !== "POST") return new Response("Method not allowed",{status:405});
   const user = await currentUser(request, env);
   if (!isStaff(user)) return json({error:"Publisher authentication required."},401,{"cache-control":"no-store","www-authenticate":'Bearer resource_metadata="' + url.origin + '/.well-known/oauth-protected-resource/mcp", scope="mcp:tools"'});
@@ -550,7 +340,7 @@ async function handleMcp(request, env, ctx) {
   if (rpc.method === "notifications/initialized" && !("id" in rpc)) return new Response(null,{status:202,headers:{"cache-control":"no-store"}});
   if (!("id" in rpc)) return new Response(null,{status:202,headers:{"cache-control":"no-store"}});
   const result = (value) => json({jsonrpc:"2.0",id:rpc.id,result:value},200,{"cache-control":"no-store"});
-  if (rpc.method === "initialize") return result({protocolVersion:"2025-03-26",capabilities:{tools:{}},serverInfo:{name:"raisina-wire-publisher",version:"1.0.0"}});
+  if (rpc.method === "initialize") return result({protocolVersion:"2025-03-26",capabilities:{tools:{}},serverInfo:{name:"rashtrix-publisher",version:"1.0.0"}});
   if (rpc.method === "ping") return result({});
   if (rpc.method === "tools/list") return result({tools:MCP_TOOLS});
   if (rpc.method !== "tools/call") return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32601,message:"Method not found"}},200);
@@ -573,7 +363,7 @@ async function handleMcp(request, env, ctx) {
   };
   if(name==="get_translation" || name==="save_translation") {
     const kind=a.kind==="page"?"page":"article", ref=String(a.ref||""), lang=String(a.lang||"");
-    if(!ref || !["hi","bn"].includes(lang)) return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32602,message:"ref and lang (hi or bn) are required"}},200);
+    if(!ref || !LANGS.includes(lang)) return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32602,message:"ref and lang (bn, en or hi) are required"}},200);
     const path="/api/admin/translations/"+kind+"/"+encodeURIComponent(ref)+"/"+lang;
     routes[name]=[name==="get_translation"?"GET":"PUT",path,name==="save_translation"?a.translation:null];
     if(name==="save_translation" && (!a.translation || typeof a.translation!=="object")) return json({jsonrpc:"2.0",id:rpc.id,error:{code:-32602,message:"translation object is required"}},200);
@@ -597,33 +387,10 @@ async function api(request, env, ctx) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: JSON_HEADERS });
   if (url.pathname === "/mcp") return handleMcp(request, env, ctx);
 
-  if (url.pathname === "/api/health") return json({ ok: true, service: "Raisina Wire API", time: new Date().toISOString(), database: Boolean(env.DB) }, 200, { "cache-control":"no-store" });
+  if (url.pathname === "/api/health") return json({ ok: true, service: "Rashtrix API", time: new Date().toISOString(), database: Boolean(env.DB) }, 200, { "cache-control":"no-store" });
 
-  if (url.pathname === "/api/news") {
-    try { return json(await gdeltNews(url)); }
-    catch (e) { return json({ source: "GDELT DOC 2.0", updatedAt: null, articles: [], error: "Live news feed temporarily unavailable", detail: e.message }, 502); }
-  }
-  if (url.pathname === "/api/markets") {
-    return json(await cached("markets", 45e3, marketBoard), 200, { "cache-control":"public, max-age=45, s-maxage=60" });
-  }
-  if (url.pathname === "/api/wire") {
-    const lang = reqLang(url);
-    return json(await cached(`wire${lang}`, 90e3, () => wireIn(env, ctx, lang)), 200, { "cache-control":"public, max-age=60, s-maxage=90" });
-  }
-  if (url.pathname === "/api/read") {
-    const target = url.searchParams.get("url") || "";
-    const optOut = String(env.PUBLISHER_OPT_OUT || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
-    const lang = reqLang(url);
-    const result = await cached(`read:${lang}:${target}`, 10 * 60e3, async () => {
-      const r = await readArticle(target, { optOut });
-      if (lang && r.ok) { await translateFields(env, lang, [r], ["title", "description"]); await translateFields(env, lang, r.blocks || [], ["x"]); if ((r.blocks || []).some(b => b.mt)) r.mt = true; }
-      else if (lang && r.title) await translateFields(env, lang, [r], ["title"]);
-      return r;
-    });
-    return json(result, 200, { "cache-control":"public, max-age=600, s-maxage=600" });
-  }
   if (url.pathname === "/api/config") {
-    return json({ appName: env.APP_NAME || "Raisina Wire", linkedinUrl: env.LINKEDIN_URL || "", registrationEnabled: Boolean(env.DB), marketProviderConfigured: true, marketProvider: "keyless public feeds", marketRefreshSeconds: 60 });
+    return json({ appName: env.APP_NAME || "Rashtrix 24×7 News", siteUrl: env.SITE_URL || "", youtubeUrl: env.YOUTUBE_URL || "", facebookUrl: env.FACEBOOK_URL || "", registrationEnabled: Boolean(env.DB) });
   }
 
   if (!env.DB) return err("Database is not configured. Add a D1 binding before using account and publishing features.", 503);
@@ -657,7 +424,7 @@ async function api(request, env, ctx) {
       // The secret is the source of truth: create the admin account on first sign-in, keep it admin afterwards.
       const hash = await passwordHash(password, b64(crypto.getRandomValues(new Uint8Array(16))));
       if (row) await env.DB.prepare("UPDATE users SET role='admin', password_hash=? WHERE id=?").bind(hash,row.id).run();
-      else await env.DB.prepare("INSERT INTO users (id,email,display_name,password_hash,role) VALUES (?,?,?,?,'admin')").bind(randomId(),email,"Ilmaz Syed",hash).run();
+      else await env.DB.prepare("INSERT INTO users (id,email,display_name,password_hash,role) VALUES (?,?,?,?,'admin')").bind(randomId(),email,"Rashtrix Administrator",hash).run();
       row = await env.DB.prepare("SELECT id,email,display_name,role,password_hash FROM users WHERE email=?").bind(email).first();
     } else if (!row || !(await verifyPassword(password, row.password_hash))) { await recordLoginFailure(env, keys); return err("Email or password is incorrect.", 401); }
     await clearLoginFailures(env, keys);
@@ -797,7 +564,7 @@ async function api(request, env, ctx) {
     await env.DB.prepare("INSERT INTO live_coverage (id,slug,title,summary,status,author_id,started_at,image_url,social_url,hero_caption) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id,slug,title,String(b.summary||"").slice(0,500),status,user.id,status==="live"?new Date().toISOString():null,
       String(b.imageUrl||"").slice(0,1500),String(b.socialUrl||"").slice(0,1500),String(b.heroCaption||"").slice(0,300)).run();
     await audit(env,user,"live.create","live_coverage",id,{title,status});
-    if (status === "live" && wantsAlert(b.notify)) await createAlert(env, ctx, { title: "LIVE · Raisina Wire", body: title, url: `/coverage/${encodeURIComponent(slug)}`, userId: user.id });
+    if (status === "live" && wantsAlert(b.notify)) await createAlert(env, ctx, { title: "লাইভ · রাষ্ট্রিক্স", body: title, url: `/coverage/${encodeURIComponent(slug)}`, userId: user.id });
     return json({ok:true,id,slug},201,{"cache-control":"no-store"});
   }
   // ---- Editing live coverage after posting: each update can be corrected or removed.
@@ -851,7 +618,7 @@ async function api(request, env, ctx) {
     await audit(env,user,"live.status","live_coverage",id,{status});
     if (status === "live" && wantsAlert(b.notify) && b.notify !== undefined) {
       const row = await env.DB.prepare("SELECT slug,title FROM live_coverage WHERE id=?").bind(id).first();
-      await createAlert(env, ctx, { title: "LIVE · Raisina Wire", body: row.title, url: `/coverage/${encodeURIComponent(row.slug)}`, userId: user.id });
+      await createAlert(env, ctx, { title: "লাইভ · রাষ্ট্রিক্স", body: row.title, url: `/coverage/${encodeURIComponent(row.slug)}`, userId: user.id });
     }
     return json({ok:true},200,{"cache-control":"no-store"});
   }
@@ -872,22 +639,15 @@ async function api(request, env, ctx) {
   }
   if (url.pathname === "/api/live" && request.method === "GET") {
     const rows=await env.DB.prepare("SELECT id,slug,title,summary,status,started_at AS startedAt,ended_at AS endedAt FROM live_coverage WHERE status='live' ORDER BY started_at DESC LIMIT 20").all();
-    const lang=reqLang(url); if(lang) await translateFields(env,lang,rows.results,["title","summary"]);
+    const lang=reqLang(url); if(lang!=="en" && mtReady(env)) await translateFields(env,lang,rows.results,["title","summary"]);
     return json({items:rows.results});
-  }
-  if (url.pathname.startsWith("/api/live/") && url.pathname.endsWith("/results") && request.method === "GET") {
-    const slug=decodeURIComponent(url.pathname.split("/")[3]||"");
-    const row=await env.DB.prepare("SELECT id,results,updated_at FROM live_coverage WHERE slug=? AND status IN ('live','ended')").bind(slug).first();
-    const out=row && await liveResults(env,row);
-    if(!out) return err("No results counter for this coverage.",404);
-    return json(out,200,{"cache-control":"public, max-age=10"});
   }
   if (url.pathname.startsWith("/api/live/") && request.method === "GET") {
     const slug=decodeURIComponent(url.pathname.split("/").pop()||"");
     const item=await env.DB.prepare("SELECT id,slug,title,summary,status,started_at AS startedAt,ended_at AS endedAt,image_url AS imageUrl,hero_caption AS heroCaption,(COALESCE(results,'')<>'') AS hasResults FROM live_coverage WHERE slug=? AND status IN ('live','ended')").bind(slug).first();
     if(!item) return err("Live coverage not found.",404);
     const updates=await env.DB.prepare("SELECT body,media_url AS mediaUrl,created_at AS createdAt,edited_at AS editedAt FROM live_updates WHERE coverage_id=? ORDER BY created_at DESC LIMIT 100").bind(item.id).all();
-    const lang=reqLang(url); if(lang) await mtLive(env,lang,item,updates.results);
+    await mtLive(env,reqLang(url),item,updates.results);
     return json({item,updates:updates.results});
   }
   if (url.pathname === "/api/media" && request.method === "GET") {
@@ -903,10 +663,10 @@ async function api(request, env, ctx) {
     const list = await listPublished(env, { writerKey: WRITERS.some(x => x.key === w) ? w : null, tag: url.searchParams.get("tag"), limit: 300 });
     const lang = reqLang(url);
     const out = await localiseArticles(env, lang, list);
-    // Readers get what is already translated at once; new stories are translated in the
-    // background (and by the cron) and switch over on the next refresh.
-    if (lang) {
-      const todo = out.filter(a => a.lang === "en");
+    // English stories without a Bengali or Hindi version: readers get what is already machine-
+    // translated at once; the rest is translated in the background and switches on the next refresh.
+    if (lang !== "en") {
+      const todo = out.filter(a => a.lang === "en" && a.original === "en");
       ctx.waitUntil(mtArticles(env, lang, todo.map(a => ({ ...a }))).catch(() => {}));
       await mtArticles(env, lang, todo, { cacheOnly: true });
     }
@@ -924,7 +684,12 @@ async function api(request, env, ctx) {
     const lang = reqLang(url);
     const [localised] = await localiseArticles(env, lang, [a]);
     let article = localised;
-    if (lang && localised.lang === "en" && mtReady(env)) {
+    // Languages this story can be read in, and its public corrections.
+    const { results: have } = await env.DB.prepare("SELECT lang FROM translations WHERE kind='article' AND ref=? AND title<>''").bind(a.id).all();
+    localised.versions = [...new Set([a.lang, ...have.map(r => r.lang)])];
+    const { results: fixes } = await env.DB.prepare("SELECT note,created_at AS at FROM corrections WHERE article_id=? AND action='correct' AND public=1 AND note<>'' ORDER BY created_at DESC LIMIT 10").bind(a.id).all();
+    localised.corrections = fixes;
+    if (lang !== "en" && localised.lang === "en" && localised.original === "en" && mtReady(env)) {
       // A few seconds to translate a story nobody has opened in this language yet; if it takes
       // longer the English is shown (marked) and the translation finishes in the background.
       const copy = { ...localised }, job = mtArticles(env, lang, [copy]);
@@ -938,7 +703,7 @@ async function api(request, env, ctx) {
   if (/^\/api\/pages\/[\w-]+$/.test(url.pathname) && request.method === "GET") {
     const key = url.pathname.split("/").pop();
     if (!PAGES[key]) return err("Page not found.", 404);
-    const p = await localisePage(env, url.searchParams.get("lang"), key);
+    const p = await localisePage(env, reqLang(url), key);
     return json({ page: { key, title: p.title, html: p.html, lang: p.lang } });
   }
   // Translations in the control room: which stories and pages have Hindi and Bengali versions,
@@ -947,22 +712,23 @@ async function api(request, env, ctx) {
     if (!isStaff(await currentUser(request, env))) return err("Editor access required.", 403);
     const { results: rows } = await env.DB.prepare("SELECT kind,ref,lang,src_ver,updated_at FROM translations WHERE title<>''").all();
     const rowOf = new Map(rows.map(r => [`${r.kind}|${r.ref}|${r.lang}`, r]));
-    const state = (kind, ref, ver) => Object.fromEntries(LANGS.map(l => {
+    const state = (kind, ref, ver, own) => Object.fromEntries(LANGS.map(l => {
+      if (l === own) return [l, { status: "original", exists: true, original: true }];
       const r = rowOf.get(`${kind}|${ref}|${l}`);
-      return [l, { status: !r ? "missing" : r.src_ver === ver ? "ready" : "English changed", exists: !!r, updatedAt: r?.updated_at || "" }];
+      return [l, { status: !r ? "missing" : r.src_ver === ver ? "ready" : "original changed", exists: !!r, updatedAt: r?.updated_at || "" }];
     }));
-    const { results: arts } = await env.DB.prepare("SELECT id,slug,kind,title,status,text_hash FROM articles ORDER BY COALESCE(published_at,updated_at) DESC LIMIT 500").all();
-    const items = arts.map(a => ({ kind: "article", ref: a.id, slug: a.slug, title: a.title, status: a.status, href: `/${a.kind === "edition" ? "edition" : "article"}/${a.slug}`, langs: state("article", a.id, a.text_hash) }));
-    for (const key of Object.keys(PAGES)) items.push({ kind: "page", ref: key, title: PAGES[key].title, href: `/${key}`, langs: state("page", key, await pageVer(key)) });
+    const { results: arts } = await env.DB.prepare("SELECT id,slug,kind,title,status,text_hash,lang FROM articles ORDER BY COALESCE(published_at,updated_at) DESC LIMIT 500").all();
+    const items = arts.map(a => ({ kind: "article", ref: a.id, slug: a.slug, title: a.title, status: a.status, storyKind: a.kind, lang: a.lang, href: `/article/${a.slug}`, langs: state("article", a.id, a.text_hash, a.lang) }));
+    for (const key of Object.keys(PAGES)) items.push({ kind: "page", ref: key, title: PAGES[key].title, lang: "en", href: `/${key}`, langs: state("page", key, await pageVer(key), "en") });
     return json({ langs: LANGS, items }, 200, { "cache-control": "no-store" });
   }
-  const trMatch = url.pathname.match(/^\/api\/admin\/translations\/(article|page)\/([^/]+)\/(hi|bn)$/);
+  const trMatch = url.pathname.match(/^\/api\/admin\/translations\/(article|page)\/([^/]+)\/(bn|en|hi)$/);
   if (trMatch) {
     const user = await currentUser(request, env);
     if (!isStaff(user)) return err("Editor access required.", 403);
     const [, kind, ref, lang] = trMatch.map(x => x && decodeURIComponent(x));
     const src = kind === "page" ? (PAGES[ref] ? { title: PAGES[ref].title, body: PAGES[ref].html, ver: await pageVer(ref) } : null)
-      : await env.DB.prepare("SELECT title,dek,topic,hero_caption,tags,body,text_hash AS ver FROM articles WHERE id=?").bind(ref).first();
+      : await env.DB.prepare("SELECT title,dek,topic,hero_caption,tags,body,text_hash AS ver,lang FROM articles WHERE id=?").bind(ref).first();
     if (!src) return err("Not found.", 404);
     if (request.method === "GET") {
       const t = await env.DB.prepare("SELECT title,dek,topic,hero_caption,tags,body,src_ver FROM translations WHERE kind=? AND ref=? AND lang=? AND title<>''").bind(kind, ref, lang).first();
@@ -973,7 +739,8 @@ async function api(request, env, ctx) {
     if (request.method === "PUT") {
       const b = await request.json().catch(() => ({}));
       const title = String(b.title || "").trim().slice(0, 300), body = String(b.body || "").slice(0, 200000);
-      if (!title || !body.trim()) return err(`The ${lang === "hi" ? "Hindi" : "Bengali"} version needs a headline and text.`);
+      if (!title || !body.trim()) return err(`The ${{ hi: "Hindi", bn: "Bengali", en: "English" }[lang]} version needs a headline and text.`);
+      if (kind === "article" && src.lang === lang) return err("That is the story's own language. Edit the story itself.");
       const tags = JSON.stringify(splitTags(src.tags).map((t, i) => String(b.tags?.[i] || t).trim().slice(0, 60)));
       await env.DB.prepare(`INSERT INTO translations (kind,ref,lang,src_ver,title,dek,topic,hero_caption,tags,body,status,model,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,'manual','editor',?)
         ON CONFLICT(kind,ref,lang) DO UPDATE SET src_ver=excluded.src_ver, title=excluded.title, dek=excluded.dek, topic=excluded.topic, hero_caption=excluded.hero_caption, tags=excluded.tags, body=excluded.body, status='manual', model='editor', updated_at=excluded.updated_at`)
@@ -1003,7 +770,7 @@ async function api(request, env, ctx) {
     const user = await currentUser(request, env);
     if (!isStaff(user)) return err("Editor access required.", 403);
     const key = request.method === "POST" ? null : url.pathname.split("/").pop();
-    if (key && isBuiltIn(key)) return err("The founder and the desk are fixed. Only guest writers can be changed here.");
+    if (key && isBuiltIn(key)) return err("The desks are fixed. Only reporters and guest writers can be changed here.");
     if (key && !(await env.DB.prepare("SELECT 1 FROM writers WHERE key=?").bind(key).first())) return err("Writer not found.", 404);
     if (request.method === "DELETE") {
       const used = await env.DB.prepare("SELECT COUNT(*) AS n FROM articles WHERE writer=?").bind(key).first();
@@ -1048,13 +815,14 @@ async function api(request, env, ctx) {
     if (title.length < 8) return err("Title must be at least 8 characters.");
     const id = randomId(), slug = await uniqueSlug(env, "articles", b.slug || title), status = b.status === "published" ? "published" : "draft";
     const publishedAt = status === "published" ? (Date.parse(b.publishedAt) ? new Date(b.publishedAt).toISOString() : new Date().toISOString()) : null;
-    const category = String(b.category||"Analysis").slice(0,40);
+    const category = DESKS.includes(b.category) ? b.category : categorize(`${title} ${b.body || ""}`.slice(0, 1500));
     const text = { title, dek: String(b.dek||"").trim().slice(0,400), topic: String(b.topic||"").trim().slice(0,80), tags: tagsValue(b.tags), body: String(b.body||"").slice(0,100000), hero_caption: String(b.heroCaption||"").trim().slice(0,300) };
-    await env.DB.prepare("INSERT INTO articles (id,slug,kind,title,dek,topic,tags,body,category,status,author_id,writer,published_at,image_url,hero_url,hero_caption,source_url,text_hash,video_url) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(
-      id, slug, b.kind === "edition" ? "edition" : "article", title, text.dek, text.topic, text.tags, text.body,
-      category, status, user.id, writerKey(b.writer), publishedAt, imageRef(b.imageUrl), imageRef(b.heroUrl), text.hero_caption, httpsUrl(b.sourceUrl), await textHash(text), videoRef(b.videoUrl)).run();
+    const kind = kindValue(b.kind);
+    await env.DB.prepare("INSERT INTO articles (id,slug,kind,title,dek,topic,tags,body,category,status,author_id,writer,published_at,image_url,hero_url,hero_caption,source_url,text_hash,video_url,lang,origin) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'desk')").bind(
+      id, slug, kind, title, text.dek, text.topic, text.tags, text.body,
+      category, status, user.id, writerKey(b.writer), publishedAt, imageRef(b.imageUrl), imageRef(b.heroUrl), text.hero_caption, httpsUrl(b.sourceUrl), await textHash(text), videoRef(b.videoUrl), langValue(b.lang)).run();
     await audit(env, user, "article.create", "article", id, { title, status });
-    const alert = wantsAlert(b.notify) && status === "published" ? await storyAlert(env, ctx, user, { id, slug, title, status, kind: b.kind === "edition" ? "edition" : "article", published_at: publishedAt }) : "";
+    const alert = wantsAlert(b.notify) && status === "published" ? await storyAlert(env, ctx, user, { id, slug, title, status, kind, published_at: publishedAt }) : "";
     return json({ok:true,id,slug,alert},201,{"cache-control":"no-store"});
   }
   if (url.pathname.startsWith("/api/admin/articles/") && request.method === "PUT") {
@@ -1071,22 +839,131 @@ async function api(request, env, ctx) {
     const publishedAt = status === "published" ? (Date.parse(b.publishedAt) ? new Date(b.publishedAt).toISOString() : (c.published_at || new Date().toISOString())) : c.published_at;
     const text = { title, dek: pick("dek", v => String(v).trim().slice(0,400), c.dek), topic: pick("topic", v => String(v).trim().slice(0,80), c.topic),
       tags: pick("tags", tagsValue, c.tags), body: pick("body", v => String(v).slice(0,100000), c.body), hero_caption: pick("heroCaption", v => String(v).trim().slice(0,300), c.hero_caption) };
-    await env.DB.prepare("UPDATE articles SET title=?,dek=?,topic=?,tags=?,body=?,category=?,kind=?,writer=?,status=?,published_at=?,image_url=?,hero_url=?,hero_caption=?,source_url=?,updated_at=?,text_hash=?,video_url=?,alert_state=CASE WHEN ?<>'published' AND alert_state='pending' THEN '' ELSE alert_state END WHERE id=?").bind(
+    await env.DB.prepare("UPDATE articles SET title=?,dek=?,topic=?,tags=?,body=?,category=?,kind=?,writer=?,status=?,published_at=?,image_url=?,hero_url=?,hero_caption=?,source_url=?,updated_at=?,text_hash=?,video_url=?,lang=?,alert_state=CASE WHEN ?<>'published' AND alert_state='pending' THEN '' ELSE alert_state END WHERE id=?").bind(
       title, text.dek, text.topic, text.tags, text.body,
-      pick("category", v => String(v).slice(0,40), c.category),
-      pick("kind", v => v === "edition" ? "edition" : "article", c.kind),
+      pick("category", v => DESKS.includes(v) ? v : c.category, c.category),
+      pick("kind", kindValue, c.kind),
       pick("writer", writerKey, c.writer),
       status, publishedAt,
       pick("imageUrl", imageRef, c.image_url),
       pick("heroUrl", imageRef, c.hero_url),
       text.hero_caption,
       pick("sourceUrl", httpsUrl, c.source_url),
-      new Date().toISOString(), await textHash(text), pick("videoUrl", videoRef, c.video_url || ""), status, id).run();
+      new Date().toISOString(), await textHash(text), pick("videoUrl", videoRef, c.video_url || ""), pick("lang", langValue, c.lang), status, id).run();
     await audit(env,user,"article.update","article",id,{title,status});
     // First publication of a story sends its alert (unless switched off); later edits never re-send.
     const firstPublish = c.status !== "published" || c.alert_state === "pending";
-    const alert = wantsAlert(b.notify) && status === "published" && firstPublish && c.alert_state !== "sent" ? await storyAlert(env, ctx, user, { id, slug: c.slug, title, status, kind: b.kind === "edition" || (b.kind === undefined && c.kind === "edition") ? "edition" : "article", published_at: publishedAt }) : "";
+    const alert = wantsAlert(b.notify) && status === "published" && firstPublish && c.alert_state !== "sent" ? await storyAlert(env, ctx, user, { id, slug: c.slug, title, status, kind: c.kind, published_at: publishedAt }) : "";
     return json({ok:true,slug:c.slug,alert},200,{"cache-control":"no-store"});
+  }
+
+  // ---- Corrections: pull a story in one tap, put it back, or correct it with a public note.
+  // Every action is logged with the text as it was before (corrections table).
+  const fixMatch = url.pathname.match(/^\/api\/admin\/articles\/([^/]+)\/(pull|restore|correct)$/);
+  if (fixMatch && request.method === "POST") {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const [, id, action] = fixMatch.map(decodeURIComponent);
+    const c = await env.DB.prepare("SELECT * FROM articles WHERE id=?").bind(id).first();
+    if (!c) return err("Story not found.", 404);
+    const b = await request.json().catch(() => ({})), at = new Date().toISOString(), note = String(b.note || "").trim().slice(0, 500);
+    const log = (pub = 1) => env.DB.prepare("INSERT INTO corrections (id,article_id,action,note,public,before_title,before_body,actor_id) VALUES (?,?,?,?,?,?,?,?)").bind(randomId(), id, action, note, pub, c.title, c.body, user.id);
+    if (action === "pull") {
+      await env.DB.batch([env.DB.prepare("UPDATE articles SET status='archived', pulled_at=?, updated_at=? WHERE id=?").bind(at, at, id), log(0)]);
+    } else if (action === "restore") {
+      await env.DB.batch([env.DB.prepare("UPDATE articles SET status='published', pulled_at=NULL, published_at=COALESCE(published_at,?), updated_at=? WHERE id=?").bind(at, at, id), log(0)]);
+    } else {
+      const title = b.title !== undefined ? String(b.title).trim().slice(0, 180) : c.title, body = b.body !== undefined ? String(b.body).slice(0, 100000) : c.body;
+      const dek = b.dek !== undefined ? String(b.dek).trim().slice(0, 400) : c.dek;
+      if (title.length < 8 || !body.trim()) return err("The corrected story needs a headline and text.");
+      const pub = b.public === false ? 0 : 1;
+      if (pub && !note) return err("Write the correction note readers will see, or untick “Show a correction note”.");
+      const text = { title, dek, topic: c.topic, tags: c.tags, body, hero_caption: c.hero_caption };
+      // Versions in other languages written by the machine no longer match: they go, and readers
+      // in those languages see the corrected original until a new version is written.
+      await env.DB.batch([
+        env.DB.prepare("UPDATE articles SET title=?,dek=?,body=?,text_hash=?,updated_at=?,corrected_at=CASE WHEN ?=1 THEN ? ELSE corrected_at END,correction_note=CASE WHEN ?=1 THEN ? ELSE correction_note END WHERE id=?").bind(title, dek, body, await textHash(text), at, pub, at, pub, note, id),
+        env.DB.prepare("DELETE FROM translations WHERE kind='article' AND ref=? AND model IN ('gemini','indictrans2')").bind(id),
+        log(pub)
+      ]);
+    }
+    await audit(env, user, `article.${action}`, "article", id, { note });
+    return json({ ok: true }, 200, { "cache-control": "no-store" });
+  }
+  if (url.pathname === "/api/admin/corrections" && request.method === "GET") {
+    if (!isStaff(await currentUser(request, env))) return err("Editor access required.", 403);
+    const { results } = await env.DB.prepare(`SELECT c.id,c.article_id AS articleId,c.action,c.note,c.public,c.before_title AS beforeTitle,c.created_at AS createdAt,u.display_name AS actor,a.title,a.slug,a.kind,a.status
+      FROM corrections c LEFT JOIN users u ON u.id=c.actor_id LEFT JOIN articles a ON a.id=c.article_id ORDER BY c.created_at DESC LIMIT 300`).all();
+    return json({ corrections: results }, 200, { "cache-control": "no-store" });
+  }
+
+  // ---- Wire desk (src/wiredesk.js): approved sources, blocklist, settings, queue and log.
+  if (url.pathname.startsWith("/api/admin/wire")) {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const b = ["GET", "DELETE"].includes(request.method) ? {} : await request.json().catch(() => ({}));
+    const sid = decodeURIComponent(url.pathname.split("/")[5] || "");
+    try {
+      if (url.pathname === "/api/admin/wire" && request.method === "GET") return json(await wireDeskReport(env), 200, { "cache-control": "no-store" });
+      if (url.pathname === "/api/admin/wire/settings" && request.method === "PUT") { await saveWireSettings(env, b); await audit(env, user, "wire.settings", "settings", "wire", b); }
+      else if (url.pathname === "/api/admin/wire/run" && request.method === "POST") {
+        const out = await runWireDesk(env, { budget: 3, onAlert: a => storyAlert(env, ctx, user, { ...a, status: "published", kind: "rewrite", published_at: new Date().toISOString() }) });
+        return json({ ok: true, ...out }, 200, { "cache-control": "no-store" });
+      }
+      else if (url.pathname === "/api/admin/wire/fetch" && request.method === "POST") return json({ ok: true, ...(await fetchSources(env, { force: true })), grouped: await groupItems(env) }, 200, { "cache-control": "no-store" });
+      else if (url.pathname.startsWith("/api/admin/wire/jobs/") && request.method === "POST") {
+        // Write this story now (or again), whatever its state.
+        const job = await env.DB.prepare("SELECT * FROM wire_jobs WHERE id=?").bind(sid).first();
+        if (!job) return err("Not found.", 404);
+        if (job.status === "done" && job.article_id) return err("This story has already been written. Correct or pull it instead.");
+        if (!(await quota(env)).left) return err("The free Gemini quota for today is used up. The queue carries on after it resets.");
+        await env.DB.prepare("UPDATE wire_jobs SET status='working', attempts=attempts+1, updated_at=? WHERE id=?").bind(new Date().toISOString(), sid).run();
+        try { await writeJob(env, job); }
+        catch (e) { await env.DB.prepare("UPDATE wire_jobs SET status='failed', error=? WHERE id=?").bind(String(e.message || e).slice(0, 300), sid).run(); return err(e.message || "Writing failed."); }
+      }
+      else if (url.pathname.startsWith("/api/admin/wire/jobs/") && request.method === "DELETE") await env.DB.prepare("UPDATE wire_jobs SET status='skipped', error='skipped by an editor' WHERE id=? AND status<>'done'").bind(sid).run();
+      else if (url.pathname.startsWith("/api/admin/wire/sources")) {
+        if (request.method === "DELETE") await env.DB.prepare("DELETE FROM wire_sources WHERE id=?").bind(sid).run();
+        else {
+          const name = String(b.name || "").trim().slice(0, 80), feed = httpsUrl(b.feedUrl || b.feed_url || "") || (/^http:\/\//.test(b.feedUrl || "") ? String(b.feedUrl).trim().slice(0, 1500) : "");
+          const lang = ["bn", "en", "hi"].includes(b.lang) ? b.lang : "bn", active = b.active === false ? 0 : 1;
+          if (request.method === "POST") {
+            if (name.length < 2 || !feed) return err("Give the outlet’s name and its RSS feed address.");
+            await env.DB.prepare("INSERT INTO wire_sources (id,name,feed_url,lang,active,notes) VALUES (?,?,?,?,?,?)").bind(randomId(), name, feed, lang, active, String(b.notes || "").slice(0, 300)).run();
+          } else {
+            const cur = await env.DB.prepare("SELECT * FROM wire_sources WHERE id=?").bind(sid).first();
+            if (!cur) return err("Not found.", 404);
+            await env.DB.prepare("UPDATE wire_sources SET name=?,feed_url=?,lang=?,active=?,notes=? WHERE id=?").bind(name || cur.name, feed || cur.feed_url, b.lang ? lang : cur.lang, b.active === undefined ? cur.active : active, b.notes !== undefined ? String(b.notes).slice(0, 300) : cur.notes, sid).run();
+          }
+        }
+        await audit(env, user, `wire.source.${request.method.toLowerCase()}`, "wire_source", sid, { name: b.name });
+      }
+      else if (url.pathname.startsWith("/api/admin/wire/blocklist")) {
+        if (request.method === "DELETE") await env.DB.prepare("DELETE FROM wire_blocklist WHERE id=?").bind(sid).run();
+        else {
+          let pattern = String(b.pattern || "").trim().toLowerCase().slice(0, 120);
+          const kind = b.kind === "domain" || /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(pattern.replace(/^https?:\/\/(www\.)?/, "").replace(/\/.*$/, "")) && b.kind !== "word" ? "domain" : "word";
+          if (kind === "domain") pattern = pattern.replace(/^https?:\/\/(www\.)?/, "").replace(/\/.*$/, "");
+          if (pattern.length < 2) return err("Write a domain or a word to block.");
+          await env.DB.prepare("INSERT OR IGNORE INTO wire_blocklist (id,pattern,kind,note) VALUES (?,?,?,?)").bind(randomId(), pattern, kind, String(b.note || "").slice(0, 200)).run();
+          // Items already read that match are kept out of every story still to be written.
+          if (kind === "domain") await env.DB.prepare("UPDATE wire_items SET status='blocked' WHERE (url LIKE ? OR url LIKE ?) AND job_id IN (SELECT id FROM wire_jobs WHERE status IN ('waiting','queued'))").bind(`%://${pattern}/%`, `%.${pattern}/%`).run();
+        }
+        await audit(env, user, `wire.block.${request.method.toLowerCase()}`, "wire_blocklist", sid, { pattern: b.pattern });
+      }
+      else return err("Not found.", 404);
+    } catch (e) { return err(e.message); }
+    return json({ ok: true }, 200, { "cache-control": "no-store" });
+  }
+
+  // ---- Wix import (src/wix.js): rashtrix.live posts, kept in sync.
+  if (url.pathname.startsWith("/api/admin/wix")) {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    if (url.pathname === "/api/admin/wix" && request.method === "GET") return json(await wixStatus(env), 200, { "cache-control": "no-store" });
+    if (url.pathname === "/api/admin/wix/sync" && request.method === "POST") return json({ ok: true, feed: await syncWixFeed(env, { force: true }), backfill: await backfillWix(env, { perRun: 4 }) }, 200, { "cache-control": "no-store" });
+    if (url.pathname === "/api/admin/wix/restart" && request.method === "POST") { await restartWixBackfill(env); return json({ ok: true }, 200, { "cache-control": "no-store" }); }
+    return err("Not found.", 404);
   }
 
   // Images uploaded by writers: stored in D1 (resized in the browser first) and served from /media/.
@@ -1110,116 +987,6 @@ async function api(request, env, ctx) {
     return json({ images: results.map(r => ({ ...r, url: `/media/${r.id}.${r.mime.split("/")[1].replace("jpeg", "jpg")}` })) }, 200, { "cache-control": "no-store" });
   }
 
-  // ---- Raisina TV (src/channel.js): the channel, its ticker, ads and the break-in switch
-  if (url.pathname === "/api/tv" && request.method === "GET") {
-    const lang = reqLang(url);
-    return json(await cached(`tv${lang}`, 5e3, () => tvFeed(env, ctx, lang)), 200, { "cache-control": "no-cache" });
-  }
-  // Raisina TV lip-synced clips rendered by the GitHub Action (video/lips/action.py), kept in D1.
-  // Served with byte ranges: iPhones only play a video whose server answers them.
-  if (url.pathname.startsWith("/api/tv/lip/") && request.method === "GET") {
-    const row = await env.DB.prepare("SELECT data FROM tts_audio WHERE key=?").bind(`lip:${url.pathname.slice(12)}`).first();
-    if (!row) return err("No such clip.", 404);
-    const data = new Uint8Array(row.data), size = data.length, m = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get("range") || "");
-    const head = { "content-type": "video/mp4", "accept-ranges": "bytes", "cache-control": "public, max-age=31536000, immutable" };
-    if (!m || (m[1] === "" && m[2] === "")) return new Response(data, { headers: { ...head, "content-length": String(size) } });
-    let a = m[1] === "" ? size - Number(m[2]) : Number(m[1]), b = m[1] === "" || m[2] === "" ? size - 1 : Math.min(Number(m[2]), size - 1);
-    a = Math.max(0, a);
-    if (a > b || a >= size) return new Response(null, { status: 416, headers: { ...head, "content-range": `bytes */${size}` } });
-    return new Response(data.slice(a, b + 1), { status: 206, headers: { ...head, "content-range": `bytes ${a}-${b}/${size}`, "content-length": String(b - a + 1) } });
-  }
-  // The anchors' own lines to record (Chatterbox), and their upload (MP3 or WAV under 1.8 MB).
-  if ((url.pathname === "/api/admin/tv/lines-todo" && request.method === "GET") || (url.pathname.startsWith("/api/admin/tv/line/") && request.method === "PUT")) {
-    const user = await currentUser(request, env);
-    if (!isStaff(user)) return err("Editor access required.", 403);
-    const todo = await tvLinesTodo(env);
-    if (request.method === "GET") return json({ todo }, 200, { "cache-control": "no-store" });
-    const id = url.pathname.slice(19), l = todo.find(x => x.id === id);
-    if (!l) return err("That line isn't waiting for a recording.", 404);
-    const data = new Uint8Array(await request.arrayBuffer());
-    const head = String.fromCharCode(...data.slice(0, 4)), mp3 = head.startsWith("ID3") || (data[0] === 0xff && (data[1] & 0xe0) === 0xe0);
-    if (data.length < 1000 || data.length > 1.8e6 || !(head === "RIFF" || mp3)) return err("Send a WAV or MP3 recording under 1.8 MB.");
-    await env.DB.prepare("INSERT OR REPLACE INTO tts_audio (key,voice,chars,data) VALUES (?,?,?,?)").bind(id, `line:${l.anchor}`, l.text.length, data.buffer).run();
-    return json({ ok: true }, 200, { "cache-control": "no-store" });
-  }
-  // What the lip-sync Action should render: lines needing a clip that has none yet and whose voice
-  // is recorded. It uploads each clip (a silent MP4 under 1.9 MB) with a PUT.
-  if ((url.pathname === "/api/admin/tv/lips-todo" && request.method === "GET") || (url.pathname.startsWith("/api/admin/tv/lip/") && request.method === "PUT")) {
-    const user = await currentUser(request, env);
-    if (!isStaff(user)) return err("Editor access required.", 403);
-    const { all, todo } = await tvLipsTodo(env);
-    if (request.method === "GET") return json({ todo }, 200, { "cache-control": "no-store" });
-    const id = url.pathname.slice(18), l = all.find(x => x.id === id);
-    if (!l) return err("That line doesn't need a clip.", 404);
-    const data = new Uint8Array(await request.arrayBuffer());
-    if (data.length < 2000 || data.length > 1.9e6 || String.fromCharCode(...data.slice(4, 8)) !== "ftyp") return err("Send an MP4 clip under 1.9 MB.");
-    await env.DB.prepare("INSERT OR REPLACE INTO tts_audio (key,voice,chars,data) VALUES (?,?,?,?)").bind(`lip:${id}`, `lips:${l.anchor}`, l.text.length, data.buffer).run();
-    return json({ ok: true }, 200, { "cache-control": "no-store" });
-  }
-  // Raisina TV live reads (src/anchors.js): recorded in the editor's browser, kept in D1, played by the channel.
-  if (url.pathname.startsWith("/api/tv/voice/") && request.method === "GET") {
-    const row = await env.DB.prepare("SELECT data FROM tts_audio WHERE key=?").bind(url.pathname.slice(14)).first();
-    if (!row) return err("No such recording.", 404);
-    const data = new Uint8Array(row.data), wav = data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46;
-    return new Response(data, { headers: { "content-type": wav ? "audio/wav" : "audio/mpeg", "cache-control": "public, max-age=31536000, immutable" } });
-  }
-  if ((url.pathname === "/api/admin/tv/voice-todo" && request.method === "GET") || (url.pathname.startsWith("/api/admin/tv/voice/") && request.method === "PUT")) {
-    const user = await currentUser(request, env);
-    if (!isStaff(user)) return err("Editor access required.", 403);
-    const { reads, todo } = await tvVoiceTodo(env, ctx);
-    if (request.method === "GET") return json({ todo: todo.map(r => ({ ...r, say: spoken(r.text) })) }, 200, { "cache-control": "no-store" });
-    // Only a read the channel needs, as a WAV or MP3 file of reasonable size.
-    const id = url.pathname.slice(20), r = todo.find(x => x.id === id) || reads.find(x => x.id === id);
-    if (!r) return err("That line isn't needed on air.", 404);
-    const data = new Uint8Array(await request.arrayBuffer());
-    const head = String.fromCharCode(...data.slice(0, 4)), mp3 = head.startsWith("ID3") || (data[0] === 0xff && (data[1] & 0xe0) === 0xe0);
-    if (data.length < 1000 || data.length > 1.8e6 || !(head === "RIFF" || mp3)) return err("Send a WAV or MP3 recording under 1.8 MB.");
-    await env.DB.prepare("INSERT OR REPLACE INTO tts_audio (key,voice,chars,data) VALUES (?,?,?,?)").bind(id, `kokoro:${r.voice}`, r.text.length, data.buffer).run();
-    return json({ ok: true }, 200, { "cache-control": "no-store" });
-  }
-  if (url.pathname.startsWith("/api/admin/tv")) {
-    const user = await currentUser(request, env);
-    if (!isStaff(user)) return err("Editor access required.", 403);
-    const b = request.method === "GET" || request.method === "DELETE" ? {} : await request.json().catch(() => ({}));
-    const id = decodeURIComponent(url.pathname.split("/")[5] || "");
-    try {
-      if (url.pathname === "/api/admin/tv" && request.method === "GET") {
-        const settings = await tvSettings(env), playlist = await tvPlaylist(env, settings);
-        const { results: all } = await env.DB.prepare("SELECT id,title,thumbnail_url AS thumbnailUrl,category,published_at AS publishedAt FROM media_items WHERE status='published' AND media_type='video' ORDER BY published_at DESC LIMIT 200").all();
-        const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
-        const { results: st } = await env.DB.prepare("SELECT metric,dim,SUM(n) AS n FROM metrics_daily WHERE day>=? AND metric IN ('tv','adimp','addone','play') GROUP BY metric,dim").bind(since).all();
-        return json({ settings, playlist: playlist.slice(0, 12), videos: all, order: await tvOrderRows(env), ads: await tvAds(env, true), breaking: await tvBreaking(env, true), inputs: await tvInputs(env), music: await tvMusic(env, true), stats: st }, 200, { "cache-control": "no-store" });
-      }
-      if (url.pathname === "/api/admin/tv/settings" && request.method === "PUT") await saveTvSettings(env, b);
-      else if (url.pathname === "/api/admin/tv/order" && request.method === "PUT") await saveOrder(env, Array.isArray(b.rows) ? b.rows : []);
-      else if (url.pathname === "/api/admin/tv/force" && request.method === "POST") {
-        // Break in now: a video and/or the breaking sting; null clears it.
-        const force = b.clear ? null : { id: String(b.id || "").slice(0, 64) || null, breaking: b.breaking !== false, text: String(b.text || "").trim().slice(0, 160), at: new Date().toISOString() };
-        if (force && force.id && !(await env.DB.prepare("SELECT 1 FROM media_items WHERE id=? AND media_type='video'").bind(force.id).first())) return err("Pick a video to break in with.");
-        await setForce(env, force);
-        await audit(env, user, force ? "tv.breakin" : "tv.breakin.clear", "tv", force?.id || "", force || {});
-      }
-      else if (url.pathname.startsWith("/api/admin/tv/ads")) {
-        if (request.method === "DELETE") await env.DB.prepare("DELETE FROM tv_ads WHERE id=?").bind(id).run();
-        else await saveAd(env, request.method === "POST" ? null : id, b);
-      }
-      else if (url.pathname.startsWith("/api/admin/tv/inputs")) {
-        if (request.method === "DELETE") await env.DB.prepare("DELETE FROM tv_inputs WHERE id=?").bind(id).run();
-        else await saveInput(env, request.method === "POST" ? null : id, b);
-        if (request.method === "PUT") await audit(env, user, b.onAir ? "tv.input.on" : "tv.input.off", "tv_input", id, {});
-      }
-      else if (url.pathname.startsWith("/api/admin/tv/music")) {
-        if (request.method === "DELETE") await env.DB.prepare("DELETE FROM tv_music WHERE id=?").bind(id).run();
-        else await saveMusic(env, request.method === "POST" ? null : id, b);
-      }
-      else if (url.pathname.startsWith("/api/admin/tv/breaking")) {
-        if (request.method === "DELETE") await env.DB.prepare("DELETE FROM tv_breaking WHERE id=?").bind(id).run();
-        else await saveBreaking(env, request.method === "POST" ? null : id, b);
-      }
-      else return err("Not found.", 404);
-    } catch (e) { return err(e.message); }
-    return json({ ok: true }, 200, { "cache-control": "no-store" });
-  }
   // ---- Audience events from readers' browsers (src/audience.js); daily totals only
   if (url.pathname === "/api/m" && request.method === "POST") {
     if (!BOT_UA.test(request.headers.get("user-agent") || "")) {
@@ -1454,7 +1221,7 @@ async function api(request, env, ctx) {
 
   if (url.pathname === "/api/events" && request.method === "GET") {
     const rows = await env.DB.prepare("SELECT id,title,description,event_type AS eventType,starts_at AS startsAt,access FROM events WHERE status='published' AND starts_at >= ? ORDER BY starts_at LIMIT 30").bind(new Date().toISOString()).all();
-    const lang = reqLang(url); if (lang) await translateFields(env, lang, rows.results, ["title", "description"]);
+    const lang = reqLang(url); if (lang !== "en" && mtReady(env)) await translateFields(env, lang, rows.results, ["title", "description"]);
     return json({events:rows.results});
   }
   if (url.pathname === "/api/events" && request.method === "POST") {
@@ -1467,7 +1234,7 @@ async function api(request, env, ctx) {
     await env.DB.prepare("INSERT INTO events (id,title,description,event_type,starts_at,access,status,created_by) VALUES (?,?,?,?,?,?,?,?)").bind(id,title,String(b.description||"").slice(0,3000),String(b.eventType||"Briefing").slice(0,40),new Date(starts).toISOString(),["public","member","premium"].includes(b.access)?b.access:"public","published",user.id).run();
     if (wantsAlert(b.notify)) {
       const when = new Date(starts).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
-      await createAlert(env, ctx, { title: `New ${String(b.eventType || "briefing").toLowerCase()}: ${title}`.slice(0, 140), body: `${when} IST. Add it to your calendar on Raisina Wire.`, url: "/events", userId: user.id });
+      await createAlert(env, ctx, { title: `New ${String(b.eventType || "briefing").toLowerCase()}: ${title}`.slice(0, 140), body: `${when} IST. Add it to your calendar on Rashtrix.`, url: "/events", userId: user.id });
     }
     return json({ok:true,id},201,{"cache-control":"no-store"});
   }
@@ -1493,7 +1260,7 @@ async function api(request, env, ctx) {
     const name=String(b.name||"").trim().slice(0,120), email=String(b.email||"").trim().toLowerCase().slice(0,180);
     if(name.length<2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return err("Enter a name and valid email address.");
     const id=randomId();
-    await env.DB.prepare("INSERT INTO leads (id,name,email,organisation,interest,source) VALUES (?,?,?,?,?,?)").bind(id,name,email,String(b.organisation||"").slice(0,180),String(b.interest||"General").slice(0,100),String(b.source||"Raisina Wire website").slice(0,100)).run();
+    await env.DB.prepare("INSERT INTO leads (id,name,email,organisation,interest,source) VALUES (?,?,?,?,?,?)").bind(id,name,email,String(b.organisation||"").slice(0,180),String(b.interest||"General").slice(0,100),String(b.source||"Rashtrix website").slice(0,100)).run();
     return json({ok:true,message:"Thanks. Your request has been received."},201,{"cache-control":"no-store"});
   }
   if (url.pathname === "/api/admin/leads" && request.method === "GET") {
@@ -1571,12 +1338,11 @@ async function serveMedia(request, env, ctx) {
   return res;
 }
 
-// Every minute: alerts for scheduled stories that have just gone live, then the next batch of pushes.
+// Every minute: alerts for scheduled stories that have just gone live, the next batch of pushes,
+// the wire desk and the Wix import.
 async function scheduled(env) {
   if (!env.DB) return;
   await ensureSchema(env);
-  // Once an hour: Raisina TV live reads older than four days go (headlines move on; fixed lines are files).
-  if (new Date().getUTCMinutes() === 7) await env.DB.prepare("DELETE FROM tts_audio WHERE voice LIKE 'kokoro:%' AND created_at < datetime('now','-4 days')").run().catch(e => console.log("reads", e.message));
   const { results } = await env.DB.prepare(`SELECT id,slug,title,kind,status,published_at FROM articles WHERE alert_state='pending' AND status='published' AND published_at<=? LIMIT 5`).bind(new Date().toISOString()).all();
   // Each step runs on its own, so one failure can't hold up the others; errors go to the Worker logs.
   const step = async (name, fn) => { try { await fn(); } catch (e) { console.error(`cron ${name} failed:`, e?.stack || e); } };
@@ -1585,7 +1351,10 @@ async function scheduled(env) {
   await step("push delivery", () => drainAlerts(env));
   await step("translations", () => mtWarm(env));
   await step("translation cache", () => env.DB.prepare("DELETE FROM mt_cache WHERE created_at < datetime('now','-45 days')").run());
-  await step("Raisina TV actions", () => dispatchTv(env));
+  // The wire desk (approved sources → rewrites and briefs) and the Wix import (rashtrix.live).
+  await step("wire desk", () => runWireDesk(env, { onAlert: a => storyAlert(env, null, null, { ...a, status: "published", kind: "rewrite", published_at: new Date().toISOString() }) }));
+  await step("wix feed", () => syncWixFeed(env));
+  await step("wix backfill", () => backfillWix(env));
 }
 // 9 am and 9 pm India time, every day (unless switched off in the control room).
 // The settings row makes each one send exactly once, even if two cron runs overlap.
@@ -1604,8 +1373,8 @@ async function dailyAlerts(env, now = new Date()) {
 async function sendDaily(env, slot) {
   const latest = (await listPublished(env, { limit: 1 }))[0];
   const alert = slot === "am"
-    ? { title: "Good morning from Raisina Wire", body: `Markets open at 9:15. Check the market board, the live wire and today’s briefing.${latest ? ` Latest analysis: ${latest.title}` : ""}`, url: "/" }
-    : { title: "Tonight on Raisina Wire", body: `Catch up on what happened today: the day’s headlines, markets at the close and live coverage.${latest ? ` Latest analysis: ${latest.title}` : ""}`, url: "/" };
+    ? { title: "সুপ্রভাত, রাষ্ট্রিক্স", body: `কলকাতা, রাজ্য, দেশ আর বিদেশের সকালের খবর এক জায়গায়।${latest ? ` সর্বশেষ: ${latest.title}` : ""}`, url: "/" }
+    : { title: "আজকের খবর · রাষ্ট্রিক্স", body: `সারা দিনের গুরুত্বপূর্ণ খবরে চোখ রাখুন।${latest ? ` সর্বশেষ: ${latest.title}` : ""}`, url: "/" };
   await createAlert(env, null, { ...alert, body: alert.body.slice(0, 240) });
   return slot;
 }
@@ -1628,6 +1397,8 @@ export default {
       const target = new URL(url.pathname + url.search, env.SITE_URL);
       if (target.host !== url.host) return Response.redirect(target.toString(), 301);
     }
+    // Bengali is the default language: old /bn/… addresses go to the bare address.
+    if (/^\/bn(\/|$)/.test(url.pathname) && ["GET", "HEAD"].includes(request.method)) return Response.redirect(new URL((url.pathname.replace(/^\/bn/, "") || "/") + url.search, request.url).toString(), 301);
     try {
       if (url.pathname.startsWith("/media/")) return await serveMedia(request, env, ctx);
       if (url.pathname === "/robots.txt") return robots(request, env);
@@ -1635,9 +1406,9 @@ export default {
       if (url.pathname === "/sitemap.xml" && env.DB) return await sitemap(request, env, ensureSchema);
       if (url.pathname === "/news-sitemap.xml" && env.DB) return await newsSitemap(request, env, ensureSchema);
       if ((url.pathname === "/feed.xml" || url.pathname === "/rss.xml") && env.DB) return await feed(request, env, ensureSchema);
-      if (env.ASSETS && request.method === "GET" && PAGE_PATTERN.test(url.pathname.replace(/^\/(hi|bn)(?=\/|$)/, "") || "/")) return await renderPage(request, env, ensureSchema);
+      if (env.ASSETS && request.method === "GET" && PAGE_PATTERN.test(url.pathname.replace(/^\/(en|hi)(?=\/|$)/, "") || "/")) return await renderPage(request, env, ensureSchema);
     } catch (e) { /* fall through to the static app */ }
     if (env.ASSETS) return env.ASSETS.fetch(request);
-    return new Response("Raisina Wire assets are not built. Run npm run build.", { status: 503 });
+    return new Response("Rashtrix assets are not built. Run npm run build.", { status: 503 });
   }
 };

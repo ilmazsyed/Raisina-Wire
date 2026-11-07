@@ -1,4 +1,5 @@
-name = "raisina-wire"
+# Rashtrix 24×7 News: its own Worker and its own D1 database, never Raisina Wire's.
+name = "rashtrix"
 main = "src/worker.js"
 compatibility_date = "2026-10-16"
 
@@ -8,42 +9,47 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 # The Worker renders public pages (titles, social cards, schema.org data, story text for
 # search engines), uploaded images, sitemaps, robots.txt and the RSS feed. Everything else
-# is served straight from the built files.
+# is served straight from the built files. Bengali pages are at the bare addresses; English
+# under /en, Hindi under /hi; old /bn addresses redirect.
 run_worker_first = [
-  "/api/*", "/mcp", "/oauth/*", "/.well-known/*", "/media/*", "/", "/editions", "/edition/*", "/article/*", "/author/*", "/tag/*",
-  "/live", "/live/*", "/markets", "/community", "/discussion/*", "/events", "/coverage/*", "/watch", "/tv", "/t",
-  "/about", "/terms", "/privacy", "/disclaimer", "/copyright", "/community-guidelines", "/grievance", "/privacy.html", "/terms.html",
-  "/hi", "/hi/*", "/bn", "/bn/*",
+  "/api/*", "/mcp", "/oauth/*", "/.well-known/*", "/media/*", "/", "/edition/*", "/article/*", "/author/*", "/tag/*", "/desk/*",
+  "/live", "/briefs", "/community", "/discussion/*", "/events", "/coverage/*",
+  "/about", "/terms", "/privacy", "/disclaimer", "/copyright", "/corrections", "/community-guidelines", "/grievance", "/privacy.html", "/terms.html",
+  "/en", "/en/*", "/hi", "/hi/*", "/bn", "/bn/*",
   "/sitemap.xml", "/news-sitemap.xml", "/robots.txt", "/feed.xml", "/rss.xml"
 ]
 
-# Every minute: send alerts for scheduled stories that have gone live, and the next batch
-# of breaking-news pushes.
+# Every minute: alerts for scheduled stories, pushes, the wire desk (sources → rewrites and
+# briefs) and the Wix import.
 [triggers]
 crons = ["* * * * *"]
 
+# Create the database once with `npx wrangler d1 create rashtrix-db` and paste its id here.
+# Tables are created automatically on first use (migrations/).
 [[d1_databases]]
 binding = "DB"
-database_name = "raisina-wire-db"
-database_id = "edf1ed45-d413-404e-bd96-a15707bbdec3"
+database_name = "rashtrix-db"
+database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "migrations"
 
 [vars]
-APP_NAME = "Raisina Wire"
-# Built-in admin account. Its password is the ADMIN_PASSWORD secret, set in the
-# Cloudflare dashboard (Worker → Settings → Variables and Secrets), never here.
-ADMIN_EMAIL = "ilmazsyed@gmail.com"
-# The site's public address, used in canonical links, sitemaps, the RSS feed and social
-# cards. Page visits to the workers.dev address are redirected here.
-SITE_URL = "https://raisinawire.calibrex.org"
-# "Listen" voice: a natural Indian English woman's voice from Google Cloud Text-to-Speech.
-# Needs the GOOGLE_TTS_API_KEY secret (see README). Other female en-IN voices: Aoede, Kore,
-# Leda, Achernar, Vindemiatrix, Despina (en-IN-Chirp3-HD-<name>).
-TTS_VOICE = "en-IN-Chirp3-HD-Sulafat"
-# Publishers who asked not to be excerpted (comma-separated domains): headline, summary and link only.
-PUBLISHER_OPT_OUT = ""
-
-# Market pulse uses keyless public feeds; no market-data secret is required.
+APP_NAME = "Rashtrix 24×7 News"
+# Built-in admin account. Its password is the ADMIN_PASSWORD secret, set in the Cloudflare
+# dashboard (Worker → Settings → Variables and Secrets), never here.
+ADMIN_EMAIL = ""
+# The app's public address, used in canonical links, sitemaps, the RSS feed and social cards.
+# Page visits to the workers.dev address are redirected here. Leave empty until the domain is
+# connected (the workers.dev address is used meanwhile).
+SITE_URL = ""
+# Rashtrix's Wix blog, imported and kept in sync (src/wix.js).
+WIX_SITE = "https://www.rashtrix.live"
+# The wire desk (src/wiredesk.js): needs the GEMINI_API_KEY secret (Google AI Studio, free tier).
+GEMINI_MODEL = "gemini-2.5-flash"
+# Calls a day the desk may make (keep under the free tier's daily limit for the model).
+GEMINI_DAILY_LIMIT = "200"
+# "Listen" voices (Google Cloud Text-to-Speech, Chirp 3 HD; needs GOOGLE_TTS_API_KEY).
+# Defaults: bn-IN-Chirp3-HD-Sulafat (female) and bn-IN-Chirp3-HD-Charon (male); override with
+# TTS_VOICE_BN_FEMALE, TTS_VOICE_BN_MALE, TTS_VOICE_EN_FEMALE … here.
 
 [ai]
 binding = "AI"
