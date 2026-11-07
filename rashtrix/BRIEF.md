@@ -27,9 +27,9 @@ Rule: everything must run on free tiers. No paid AI API.
 
 ## Phase 2 — Rashtrix Live (one live, two formats)
 - There is ONE live: the app's own channel, Rashtrix Live, in a horizontal (1920×1080) and a vertical (1080×1920) format. Each format can be switched on/off.
-- It plays out inside the app exactly like Raisina TV (`src/tv.js`): every viewer's player runs the channel itself. Everything on air (videos, cards, graphics, music, cut-ins) is made and played in the app. No OBS/vMix in making the live.
+- It plays out inside the app exactly like Raisina TV (`src/tv.js`): every viewer's player runs the channel itself. The videos (Shorts and horizontal videos) are NOT made in the app: they are sourced from the Rashtrix YouTube channel's playlists and played in the app's player. The breaking cards, headline cards, graphics, music and cut-ins are made in the app. No OBS/vMix in making the live.
 - Playout: recency first (newest video first). In-app breaking cards and headline cards between every video.
-- Video sourcing: YouTube Data API; owner selects/deselects playlists (Shorts → vertical, long videos → horizontal). Refresh every 10 minutes + instant "Refresh now". No YouTube lives as sources. Stay inside free quota.
+- Video sourcing: YouTube Data API, from the Rashtrix channel's own playlists; owner selects/deselects playlists (Shorts → vertical, long videos → horizontal). Refresh every 10 minutes + instant "Refresh now". No YouTube lives as sources. Stay inside free quota.
 - YouTube player controls hidden (controls=0 + click-blocking overlay).
 - Vertical: Shorts carry their own jacket; our graphics sit in safe zones (breaking/headline flash over the left of the portrait strip, LIVE tag in video corner, ticker at the bottom). App-made items (breaking cards, graphics, clips) get an app-drawn jacket identical in position to the Shorts jacket. Full-screen 9:16 promo swipe cards (upload or Drive link), on/off, play/skip, repeat rules.
 - Horizontal: full designable jacket (bug, LIVE, clock, lower third, ad box, ticker), L-band, full-screen breaking with music, News Update/Bulletin packages from Raisina Wire.
