@@ -1,10 +1,12 @@
-// Bengali interface text, in the colloquial Bengali (চলিত) of a Kolkata daily. Keys are the English text the app draws;
+// Bengali interface text, in the house style of Anandabazar Patrika and The Wall: standard
+// চলিত বাংলা, short plain sentences, Bengali digits. Keys are the English text the app draws;
 // add an entry here whenever a new English string appears on the site. Patterns translate
 // text with numbers or names in it. Story text is translated on the server (src/translate.js).
 import { digits as n } from "../i18n.js";
 const MONTHS = { January: 1, February: 2, March: 3, April: 4, May: 5, June: 6, July: 7, August: 8, September: 9, October: 10, November: 11, December: 12 };
 const longDate = s => { const m = s.match(/^(\d{1,2}) (\w+) (\d{4})$/); return m && MONTHS[m[2]] ? new Date(Date.UTC(+m[3], MONTHS[m[2]] - 1, +m[1])).toLocaleDateString("bn-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : s; };
 export const patterns = [
+  [/^© (\d{4}) Middleton Media Works\. Rashtrix 24×7 News\. All rights reserved\. Wire reports are written by the Rashtrix wire desk with AI assistance from several published reports; see the Disclaimer\.$/, m => `© ${n(m[1])} মিডলটন মিডিয়া ওয়ার্কস। রাষ্ট্রিক্স ২৪×৭ নিউজ। সর্বস্বত্ব সংরক্ষিত। ওয়্যার খবর একাধিক প্রকাশিত খবর মিলিয়ে, এআই-এর সাহায্যে লেখে রাষ্ট্রিক্স ওয়্যার ডেস্ক। বিস্তারিত ঘোষণা পাতায়।`],
   [/^(\d+) stor(?:y|ies) on Rashtrix$/, m => `রাষ্ট্রিক্সে ${n(m[1])}টি খবর`],
   [/^(\d+) stor(?:y|ies), newest first\. Follow the topic to see it on your own front page, My Rashtrix\.$/, m => `${n(m[1])}টি খবর, নতুনগুলি আগে। নিজের প্রথম পাতা ‘আমার রাষ্ট্রিক্স’-এ দেখতে বিষয়টি ফলো করুন।`],
   [/^(\d+) stor(?:y|ies)$/, m => `${n(m[1])}টি খবর`],
@@ -679,7 +681,6 @@ export default {
   "About Rashtrix": "রাষ্ট্রিক্স সম্পর্কে",
   "Corrections Policy": "সংশোধন নীতি",
   "rashtrix.live ↗": "rashtrix.live ↗",
-  "© 2026 Middleton Media Works. Rashtrix 24×7 News. All rights reserved. Wire reports are written by the Rashtrix wire desk with AI assistance from several published reports; see the Disclaimer.": "© ২০২৬ মিডলটন মিডিয়া ওয়ার্কস। রাষ্ট্রিক্স ২৪×৭ নিউজ। সর্বস্বত্ব সংরক্ষিত। ওয়্যার খবর একাধিক প্রকাশিত খবর থেকে এআই-এর সাহায্যে লেখে রাষ্ট্রিক্স ওয়্যার ডেস্ক; দেখুন ঘোষণা।",
   "You’re offline. Stories you opened recently and saved stories still open.": "আপনি অফলাইন। সম্প্রতি খোলা আর সেভ করা খবর এখনও পড়া যাবে।",
   "Saved. You’ll find it in Saved stories.": "সেভ হয়েছে। ‘সেভ করা খবর’-এ পাবেন।",
   "No events are scheduled right now.": "এই মুহূর্তে কোনো অনুষ্ঠান নির্ধারিত নেই।",

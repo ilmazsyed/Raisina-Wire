@@ -10,5 +10,8 @@ it up) before working.
   step-by-step instructions.
 - Bengali is the default language at `/`; English `/en`, Hindi `/hi`. New interface text is written
   in English in the code and needs an entry in `src/i18n/bn.js` (and `hi.js`).
+- All Bengali (pages, interface, articles, wire rewrites and briefs) is written in the house style of
+  Anandabazar Patrika and The Wall: standard চলিত বাংলা, short plain sentences, Bengali digits. The
+  rules the wire desk follows are `BENGALI_STYLE` in `src/wiredesk.js`; use them for any Bengali you write.
 - Wire rewrites and briefs never carry photos and never show their sources to readers.
 - The "Site builds" check must be green before merging.
