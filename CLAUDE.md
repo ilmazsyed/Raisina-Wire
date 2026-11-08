@@ -13,5 +13,7 @@ it up) before working.
 - All Bengali (pages, interface, articles, wire rewrites and briefs) is written in the house style of
   Anandabazar Patrika and The Wall: standard চলিত বাংলা, short plain sentences, Bengali digits. The
   rules the wire desk follows are `BENGALI_STYLE` in `src/wiredesk.js`; use them for any Bengali you write.
+- The Rashtrix logo is a trademark: always use the full logo (`public/brand/logo*.webp`), never a
+  crop of the R mark or a redrawn wordmark.
 - Wire rewrites and briefs never carry photos and never show their sources to readers.
 - The "Site builds" check must be green before merging.

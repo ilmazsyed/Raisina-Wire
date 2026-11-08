@@ -39,7 +39,8 @@ channels, the producer and PCR, the live studio and the extras are Phases 2–5.
 - **Listen** with Google Chirp 3 HD, **female or male voice, reader's choice**, in the story's
   language (Bengali `bn-IN-Chirp3-HD-Sulafat` / `bn-IN-Chirp3-HD-Charon`). Each paragraph is made
   once per voice and kept in D1. Without the key, the device's own voice is used.
-- **Brand:** the gold R mark and RASHTRIX / 24X7 NEWS logo (icons cut from `rashtrix/brand/logo.png`),
+- **Brand:** the full Rashtrix logo (a trademark: always shown whole, never cropped) in the header,
+  icons and text cards, from `rashtrix/brand/logo.png`;
   brand red `#AA0404`, maroon `#A43F44`, gold accents `#D4A017`; Noto Serif Bengali, Hind Siliguri,
   Montserrat; tagline লোক গুনি না, লোকের কথা শুনি; share card `public/og-image.jpg`.
 - **Legal and compliance** (`src/legal.js`, English with Bengali versions): Terms, **DPDP privacy

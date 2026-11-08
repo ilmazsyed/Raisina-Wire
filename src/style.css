@@ -1603,3 +1603,14 @@ h1,h2,h3{font-family:var(--serif)}
 .nameplate-tag p.tagline{font:700 22px/1.3 "Noto Serif Bengali",serif;color:var(--maroon);text-transform:none;letter-spacing:0}
 .nameplate-tag p.tag-sub{font:600 12px/1.4 var(--sans);letter-spacing:.6px;margin-top:4px}
 @media(max-width:760px){.nameplate-tag p.tagline{font-size:16px}}
+
+/* The full Rashtrix logo, never cropped (trademark) */
+.brand-mark{width:auto;height:44px;border-radius:0;background:none;box-shadow:none;overflow:visible}
+.brand-mark img{width:auto;height:100%;object-fit:contain}
+.mast-logo{display:block;width:auto;height:118px}
+.nav-brand .brand-mark{width:auto;height:38px;border-radius:0}
+.tc-top img{width:auto;height:40px;border-radius:0;box-shadow:none}
+.text-card.big .tc-top img{width:auto;height:64px}
+.aside-link .thumb .text-card .tc-top img{width:auto;height:30px}
+:root[data-theme=dark] .mast-logo,:root[data-theme=dark] .brand-mark img,:root[data-theme=dark] .tc-top img{background:#fff;border-radius:4px}
+@media(max-width:760px){.mast-logo{height:84px}}

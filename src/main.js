@@ -1,5 +1,5 @@
 import "./style.css";
-import { brandMark, wordmark, fullLogo, BRAND } from "./brand.js";
+import { brandMark, fullLogo, BRAND } from "./brand.js";
 import { WRITERS, writer, setGuestWriters } from "./writers.js";
 import { ABOUT, LEGAL, LEGAL_ORDER, LEGAL_UPDATED } from "./legal.js";
 import { lang, LOCALE, LANGUAGES, DEFAULT_LANG, stripLang, withLang, tr, ago, digits, loadLanguage, startTranslator, languageLinks } from "./i18n.js";
@@ -34,7 +34,7 @@ const img = (src, alt = "") => src ? `<img class="img-cover" src="${esc(src)}" a
 // Wire rewrites, briefs and stories without a photo show a branded text card instead: the
 // maroon jacket frame, the logo card and the desk, with the headline set large.
 function textCard(a, { big = false } = {}) {
-  return `<span class="text-card${big ? " big" : ""}" aria-hidden="true"><span class="tc-top"><img src="/brand/mark.webp" alt="" width="34" height="34"><span class="tc-desk">${esc(tr(a.category || ""))}</span>${kindLabel(a) ? `<span class="tc-kind">${esc(tr(kindLabel(a)))}</span>` : ""}</span><span class="tc-head">${esc(a.title)}</span><span class="tc-foot">RASHTRIX <b>24X7 NEWS</b></span></span>`;
+  return `<span class="text-card${big ? " big" : ""}" aria-hidden="true"><span class="tc-top"><img src="/brand/logo-xs.webp" alt="" width="24" height="34"><span class="tc-desk">${esc(tr(a.category || ""))}</span>${kindLabel(a) ? `<span class="tc-kind">${esc(tr(kindLabel(a)))}</span>` : ""}</span><span class="tc-head">${esc(a.title)}</span><span class="tc-foot">RASHTRIX <b>24X7 NEWS</b></span></span>`;
 }
 // A story's picture, or its text card.
 const pic = (a, opts) => a.image ? img(a.image) : textCard(a, opts);
@@ -169,7 +169,7 @@ function renderShell() {
       </div>
     </div>
     <div class="masthead" id="masthead">
-      <div class="nameplate"><a class="nameplate-link" href="/" aria-label="Rashtrix 24×7 News home">${brandMark("brand-mark big")}<span class="wordmark">${wordmark()}</span></a>
+      <div class="nameplate"><a class="nameplate-link" href="/" aria-label="Rashtrix 24×7 News home">${fullLogo("mast-logo")}</a>
         <div class="nameplate-tag"><p class="tagline" lang="bn" data-no-tr>${BRAND.tagline}</p><p class="tag-sub"><span class="l">Kolkata</span> <span class="l">·</span> <span class="l">West Bengal</span> <span class="l">·</span> <span class="l">India</span> <span class="l">·</span> <span class="l">World</span></p></div></div>
       <span class="mast-rule" aria-hidden="true"></span>
     </div>
@@ -318,7 +318,7 @@ function renderShell() {
 }
 
 function renderNav(route) {
-  $("#siteNav").innerHTML = `<a class="nav-brand" href="/" aria-label="Rashtrix 24×7 News home" tabindex="-1">${brandMark()}<span class="wordmark">${wordmark()}</span></a>` + NAV.map(([label, href, active]) => `<a href="${href}"${active(route) ? ' aria-current="page"' : ""}>${label === "Latest" && state.coverage.length ? `<span class="nav-live" aria-label="Live coverage running"></span>` : ""}${label}</a>`).join("")
+  $("#siteNav").innerHTML = `<a class="nav-brand" href="/" aria-label="Rashtrix 24×7 News home" tabindex="-1">${brandMark()}</a>` + NAV.map(([label, href, active]) => `<a href="${href}"${active(route) ? ' aria-current="page"' : ""}>${label === "Latest" && state.coverage.length ? `<span class="nav-live" aria-label="Live coverage running"></span>` : ""}${label}</a>`).join("")
     + `<button class="search-btn" type="button" data-action="search" aria-label="Search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>`;
   $("#siteNav").dispatchEvent(new Event("scroll"));
 }
