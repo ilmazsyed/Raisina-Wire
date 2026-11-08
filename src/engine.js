@@ -224,7 +224,14 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (mode === "scene") return fixedScene ? { ...fixedScene, key: JSON.stringify(fixedScene) } : null;
     if (st.tv && !st.tv.on && !(c && (c.mode === "manual" || c.rundown))) return { off: true, key: "off" };
     if (now() < st.dumpUntil || c?.standby?.on) return { standby: true, key: "standby" };
-    if (c?.mode === "manual" && c.program) return { ...c.program, startAt: c.program.takenAt, key: `m:${c.program.takenAt}` };
+    if (c?.mode === "manual" && c.program) {
+      // "Running order" taken to air follows the channel's own schedule, Short by Short: the
+      // scene is rebuilt whenever the segment changes (and once the schedule has loaded).
+      const cont = c.program.sources?.some(x => x.kind === "continuity");
+      if (cont && c.program.sources.length === 1) { const sc = continuityScene(); if (sc) return { ...sc, key: `m:${c.program.takenAt}:${sc.key}` }; }
+      const seg = cont ? continuitySeg() : null;
+      return { ...c.program, startAt: c.program.takenAt, key: `m:${c.program.takenAt}${cont ? `:${seg ? `${seg.ytId || seg.type}:${seg.start}` : "none"}` : ""}` };
+    }
     const r = c?.rundown;
     if (r && r.items?.[r.index]) { const it = r.items[r.index]; return { ...it.scene, startAt: r.pausedAt ? now() - (r.pausedAt - r.itemStartedAt) : r.itemStartedAt, key: `r:${r.id}:${r.index}:${r.itemStartedAt}` }; }
     return continuityScene();
