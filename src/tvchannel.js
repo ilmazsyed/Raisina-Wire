@@ -9,8 +9,6 @@
 // Every viewer and output computes the same running order from the channel's clock (epoch), so
 // the app's player and the OBS output show the same thing at the same moment. Control changes
 // (on/off, break-in, live on air, L-band) reach every screen within about five seconds.
-import { listPublished } from "./store.js";
-import { localiseArticles } from "./translate.js";
 
 export const CHANNELS = ["h", "v"];
 const SHORT_MAX = 180;          // seconds: a Short (vertical channel)
@@ -148,13 +146,20 @@ export function scheduleAt(loop, epoch, t = Date.now(), ahead = 5400) {
 /* ---------- What every screen reads ---------- */
 // The bulletin: the six newest Bengali stories (wire briefs and reports, and the desk's own),
 // each with about a hundred words of its text.
-async function bulletinStories(env) {
-  const { results } = await env.DB.prepare("SELECT title, category, kind, body FROM articles WHERE status='published' AND lang='bn' AND pulled_at IS NULL ORDER BY published_at DESC LIMIT 6").all().catch(() => ({ results: [] }));
-  return results.map(r => {
-    const words = String(r.body || "").replace(/<[^>]+>/g, " ").replace(/[#*_>]+/g, " ").replace(/\s+/g, " ").trim().split(" ");
-    return { title: r.title, desk: r.category, kind: r.kind, text: words.slice(0, 100).join(" ") + (words.length > 100 ? "…" : "") };
-  });
+// What the channel's headlines, flashes and bulletins show: the wire's stories (reports and
+// briefs) from the last twelve hours, newest first. Older stories never go on air.
+const FRESH_HOURS = 12;
+async function wireStories(env, limit = 20) {
+  const pick = hours => env.DB.prepare(`SELECT title, category, kind, body FROM articles WHERE status='published' AND lang='bn' AND pulled_at IS NULL
+    AND kind IN ('rewrite','brief') AND published_at>=? ORDER BY published_at DESC LIMIT ?`).bind(new Date(Date.now() - hours * 3600e3).toISOString(), limit).all().then(r => r.results).catch(() => []);
+  // A quiet night: look back a day rather than show an empty screen, never further.
+  const fresh = await pick(FRESH_HOURS);
+  return fresh.length >= 4 ? fresh : pick(24);
 }
+const firstWords = (body, n = 100) => {
+  const words = String(body || "").replace(/<[^>]+>/g, " ").replace(/[#*_>]+/g, " ").replace(/\s+/g, " ").trim().split(" ");
+  return words.slice(0, n).join(" ") + (words.length > n ? "…" : "");
+};
 const memo = new Map();
 export async function tvState(env, ch) {
   const hit = memo.get(ch);
@@ -163,10 +168,10 @@ export async function tvState(env, ch) {
   const [videos, cards, live, stories] = await Promise.all([
     playable(env, ch), ch === "v" ? promos(env) : [],
     env.DB.prepare("SELECT CASE WHEN live_video<>'' THEN live_video ELSE yt_id END AS ytId, title FROM tv_sources WHERE channel=? AND kind='live' AND active=1 AND on_air=1 AND live_now=1 LIMIT 1").bind(ch).first(),
-    listPublished(env, { limit: 30 }).then(l => localiseArticles(env, "bn", l))
+    wireStories(env)
   ]);
-  const headlines = stories.filter(a => a.lang === "bn").map(a => ({ text: a.title, desk: a.category, kind: a.kind }));
-  const bulletin = await bulletinStories(env);
+  const headlines = stories.map(a => ({ text: a.title, desk: a.category, kind: a.kind }));
+  const bulletin = stories.slice(0, 6).map(r => ({ title: r.title, desk: r.category, kind: r.kind, text: firstWords(r.body) }));
   const value = {
     channel: ch, on: s.on, serverTime: Date.now(),
     live: live || null,
