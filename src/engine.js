@@ -419,12 +419,18 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         el.innerHTML = wrapV(setHTML("শিরোনাম", "সর্বশেষ", items, sc.dur || 10), "শিরোনাম");
       }
     } else if (g.kind === "bulletin") {   // three minutes at :00 and :30, the latest stories in detail
-      if (!st.muted && st.audio && mode === "app") st.bed = newsBed(st.audio, Math.max(2, (sc.dur || 180) - (now() - (sc.startAt || now())) / 1000));
-      const list = (st.tv?.bulletin || []).slice(0, 6), intro = 8, per = list.length ? (180 - intro) / list.length : 180;
+      if (!st.muted && st.audio && mode === "app") st.bed = newsBed(st.audio, Math.max(2, (sc.dur || 120) - (now() - (sc.startAt || now())) / 1000));
+      const total = sc.dur || 120, list = (st.tv?.bulletin || []).slice(0, 6), intro = 6, per = list.length ? (total - intro) / list.length : total;
       const title = () => `<div class="nu-title${channel === "v" ? " v" : ""}"><img src="${LOGO}" alt=""><b>বুলেটিন</b><small>${ist()}</small></div>`;
       const story = (x, k) => `<div class="bl-story${channel === "v" ? " v" : ""}"><div class="bl-head"><span>বুলেটিন</span><em>${bnDigits(k + 1)}/${bnDigits(list.length)}</em><b>${esc(x.desk || "")}</b><i style="--d:${per}s"></i></div><h2>${esc(x.title)}</h2><p>${esc(x.text)}</p></div>`;
       let shown = -2;
-      const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = e < intro || !list.length ? -1 : Math.min(list.length - 1, Math.floor((e - intro) / per)); if (k === shown) return; shown = k; el.innerHTML = k < 0 ? title() : story(list[k], k); };
+      const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = e < intro || !list.length ? -1 : Math.min(list.length - 1, Math.floor((e - intro) / per)); if (k === shown) return; const first = shown === -2; shown = k;
+        const paint = () => { el.innerHTML = k < 0 ? title() : story(list[k], k); };
+        // A stinger at every change within the bulletin.
+        if (first || !el.isConnected) return paint();
+        const w = document.createElement("div"); w.className = "tvp-stinger"; w.innerHTML = `<img src="${LOGO}" alt="">`;
+        stage.append(w); if (!st.muted) whoosh(st.audio);
+        setTimeout(paint, 650); setTimeout(() => w.remove(), 1400); };
       draw(); const t = setInterval(() => el.isConnected ? draw() : clearInterval(t), 1000);
     } else if (g.kind === "headlines") {
       const items = g.lines?.length ? g.lines : (st.tv?.headlines || []).slice(0, 5).map(h => h.text);
@@ -468,7 +474,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     let gfx = "", ovl = "";
     const c = st.ctl || {}, L = c.layers || { bug: true, live: true, clock: true, lower: true, ticker: true, ad: true, weather: true }, s = st.tv || {};
     const sc = st.current?.scene, fullGfx = stage.classList.contains("full-gfx");
-    if (!sc || sc.off || sc.standby || fullGfx || mode === "scene" && !sc.sources?.length && !sc.graphic) { put(".tvp-gfx", ""); put(".tvp-ovl", ""); return; }
+    if (!sc || sc.off || sc.standby || mode === "scene" && !sc.sources?.length && !sc.graphic) { put(".tvp-gfx", ""); put(".tvp-ovl", ""); return; }
+    // Full-screen graphics (the bulletin, promos): LIVE and the clock stay on screen.
+    if (fullGfx) { put(".tvp-gfx", `<div class="tv-liveclock">${L.live ? `<span class="tv-live"><i></i>LIVE</span>` : ""}${L.clock ? `<span class="tv-clock">${ist()}</span>` : ""}</div>`); put(".tvp-ovl", ""); return; }
     const isVideo = (sc.sources || []).length && !sc.graphic, lband = sc.layout === "lband";
     const ticker = [...(c.ticker || []), ...(sc.ticker || []), ...(L.weather && s.weather ? [s.weather] : []), ...(s.ticker || [])];
     const strap = c.lower && L.lower ? c.lower : sc.lower && L.lower ? sc.lower : null;
@@ -483,7 +491,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const flash = s.band || (s.headlines || [])[st.flash % Math.max(1, (s.headlines || []).length)]?.text || "";
       gfx = `
         ${isVideo && L.lower ? `<div class="v-flash"><span>${strap ? "রাষ্ট্রিক্স" : s.band ? "রাষ্ট্রিক্স" : "শিরোনাম"}</span><b>${esc(strap ? `${strap.name}${strap.title ? ` · ${strap.title}` : ""}` : flash)}</b></div>` : ""}
-        ${isVideo && L.live ? `<div class="tv-live v"><i></i>LIVE</div>` : ""}
+        ${L.live ? `<div class="tv-live v"><i></i>LIVE</div>` : ""}${L.clock ? `<div class="tv-clock v">${ist()}</div>` : ""}
         ${L.ticker ? `<div class="tv-ticker v"><span class="tk-label">খবর</span><div class="tk-track">${tickerHTML(ticker)}</div></div>` : ""}`;
     }
     // Overlays: poll bar, results bar, curated comments.

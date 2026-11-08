@@ -92,10 +92,10 @@ export async function promos(env, all = false) {
 // - a 10-second full-screen flash of the headlines (or the breaking story) after every video, so
 //   two videos never play back to back; vertical promo cards keep their own repeat rule;
 // - a stinger, picked at random but the same on every screen, on about one change in three;
-// - at the top of every hour and at every half hour, a three-minute bulletin of the latest
+// - at the top of every hour and at every half hour, a two-minute bulletin of the latest
 //   stories with their details. The loop stops for it and carries on where it stopped.
 export const FLASH_SECONDS = 10;
-export const BULLETIN_MS = 180e3, HALF_HOUR = 1800e3;
+export const BULLETIN_MS = 120e3, HALF_HOUR = 1800e3;
 const hash = str => { let h = 2166136261; for (const c of String(str)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
 export function buildLoop(s, videos, cards = []) {
   const loop = []; let k = 0, slot = 0;
