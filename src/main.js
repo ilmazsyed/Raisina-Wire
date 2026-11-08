@@ -456,7 +456,6 @@ function viewHome() {
   $("#view").innerHTML = `
   <div class="wrap home">
     <section id="liveBanner" class="band-tight" aria-label="Live coverage" hidden></section>
-    <section id="shortsRail" class="shorts-rail" aria-label="Shorts" hidden></section>
     <div class="lead-grid">
       ${side.length ? `<section class="side-stack" aria-label="More top stories"><div class="kicker">Top stories</div>
         ${side.map(e => `<a class="side-item" href="${edHref(e)}"><div class="thumb">${pic(e)}</div><span class="kicker">${newTag(e)}${esc(e.category)}</span><h3>${esc(e.title)}</h3><span class="meta">${ago(e.publishedAt)}</span></a>`).join("")}
@@ -471,7 +470,8 @@ function viewHome() {
           </div></article>`).join("")}</div>
         <div class="lc-nav"><button class="carousel-btn" type="button" data-action="lead-step" data-dir="-1" aria-label="Previous story">‹</button><span class="lc-dots" id="lcDots">${top.map((_, i) => `<i class="${i ? "" : "on"}"></i>`).join("")}</span><span class="lc-count" id="lcCount">${digits(1)} / ${digits(top.length)}</span><button class="carousel-btn" type="button" data-action="lead-step" data-dir="1" aria-label="Next story">›</button></div>
       </section>
-      <aside class="live-rail glass" aria-label="Latest news"><div class="live-title"><b><span class="dot-live"></span>Latest</b><a class="link-gold" href="/live" style="font-size:13px">All →</a></div><div id="rail"></div></aside>
+      <div class="latest-col"><section id="shortsRail" class="shorts-rail" aria-label="Shorts" hidden></section>
+      <aside class="live-rail glass" aria-label="Latest news"><div class="live-title"><b><span class="dot-live"></span>Latest</b><a class="link-gold" href="/live" style="font-size:13px">All →</a></div><div id="rail"></div></aside></div>
     </div>
 
     <section id="briefBand" class="band briefs-band" aria-labelledby="briefTitle"></section>

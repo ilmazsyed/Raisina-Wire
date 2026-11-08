@@ -405,7 +405,23 @@ async function api(request, env, ctx) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: JSON_HEADERS });
   if (url.pathname === "/mcp") return handleMcp(request, env, ctx);
 
-  if (url.pathname === "/api/health") return json({ ok: true, service: "Rashtrix API", time: new Date().toISOString(), database: Boolean(env.DB) }, 200, { "cache-control":"no-store" });
+  if (url.pathname === "/api/health") {
+    // ?wire=1 adds the wire desk's state: counts, the day's model calls and the commonest recent
+    // error (quoted text and links stripped), so its health can be seen without signing in.
+    const out = { ok: true, service: "Rashtrix API", time: new Date().toISOString(), database: Boolean(env.DB) };
+    if (url.searchParams.get("wire") && env.DB) {
+      const since = new Date(Date.now() - 24 * 3600e3).toISOString().replace("T", " ").slice(0, 19);
+      const [jobs, errs, items, last, q] = await Promise.all([
+        env.DB.prepare("SELECT status, COUNT(*) AS n FROM wire_jobs WHERE created_at>=? GROUP BY status").bind(since).all().then(r => r.results).catch(() => []),
+        env.DB.prepare("SELECT error, COUNT(*) AS n FROM wire_jobs WHERE error<>'' AND updated_at>=? GROUP BY error ORDER BY n DESC LIMIT 3").bind(new Date(Date.now() - 6 * 3600e3).toISOString()).all().then(r => r.results).catch(() => []),
+        env.DB.prepare("SELECT COUNT(*) AS n FROM wire_items WHERE fetched_at>=?").bind(new Date(Date.now() - 3600e3).toISOString()).first().catch(() => null),
+        env.DB.prepare("SELECT MAX(published_at) AS at FROM articles WHERE kind IN ('rewrite','brief') AND status='published'").first().catch(() => null),
+        quota(env).catch(() => null)]);
+      const clean = e => String(e || "").replace(/"[^"]*"|“[^”]*”|\([^)]*\)/g, "…").replace(/https?:\/\/\S+/g, "").slice(0, 120);
+      out.wire = { jobs24h: Object.fromEntries(jobs.map(j => [j.status, j.n])), errors6h: errs.map(e => ({ error: clean(e.error), n: e.n })), itemsLastHour: items?.n ?? null, lastPublished: last?.at || null, calls: q ? { today: q.calls, limit: q.limit, blockedUntil: q.blockedUntil } : null, model: env.GEMINI_MODEL || null, keySet: Boolean(env.GEMINI_API_KEY) };
+    }
+    return json(out, 200, { "cache-control": "no-store" });
+  }
 
   if (url.pathname === "/api/config") {
     return json({ appName: env.APP_NAME || "Rashtrix 24×7 News", siteUrl: env.SITE_URL || "", youtubeUrl: env.YOUTUBE_URL || "", facebookUrl: env.FACEBOOK_URL || "", registrationEnabled: Boolean(env.DB) });

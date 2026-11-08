@@ -205,8 +205,11 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const s = st.tv; if (!s) return null;
     if (s.live) return { layout: "full", sources: [{ kind: "yt", id: s.live.ytId }], label: s.live.title, key: `live:${s.live.ytId}` };
     const seg = continuitySeg(); if (!seg) return { layout: "graphic", graphic: { kind: "headlines" }, key: "c:none" };
-    if (seg.type === "video") return { layout: "full", sources: [{ kind: "yt", id: seg.ytId, in: 0 }], label: seg.title, startAt: seg.start, key: `c:${seg.ytId}:${seg.start}` };
-    if (seg.type === "news") return { layout: "graphic", graphic: { kind: "news" }, startAt: seg.start, dur: seg.dur, key: `c:news:${seg.start}` };
+    const transition = seg.sting ? { type: "stinger", ms: 1200 } : { type: "mix", ms: 500 };
+    if (seg.type === "video") return { layout: "full", sources: [{ kind: "yt", id: seg.ytId, in: seg.in || 0 }], label: seg.title, startAt: seg.start, key: `c:${seg.ytId}:${seg.start}`, transition };
+    if (seg.type === "flash") return { layout: "graphic", graphic: { kind: "flash", n: seg.n || 0 }, startAt: seg.start, dur: seg.dur, key: `c:flash:${seg.start}`, transition };
+    if (seg.type === "bulletin") return { layout: "graphic", graphic: { kind: "bulletin" }, startAt: seg.start, dur: seg.dur, key: `c:bulletin:${seg.start}`, transition, full: true };
+    if (seg.type === "news") return { layout: "graphic", graphic: { kind: "news" }, startAt: seg.start, dur: seg.dur, key: `c:news:${seg.start}`, transition };
     if (seg.type === "promo") return { layout: "graphic", graphic: { kind: "promo", image: seg.image }, key: `c:promo:${seg.start}`, full: true };
     return null;
   }
@@ -255,7 +258,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (sc.graphic) box.append(graphic(sc));
     }
     stage.querySelector(".tvp-stage").append(box);
-    const t = old ? (st.ctl?.transition || { type: "mix", ms: 600 }) : { type: "cut", ms: 0 };
+    const t = old ? (sc?.transition || st.ctl?.transition || { type: "mix", ms: 600 }) : { type: "cut", ms: 0 };
     const finish = () => { old?.box.remove(); old?.slots.forEach(s => s.destroy()); };
     if (!old || t.type === "cut" || mode === "scene") finish();
     else if (t.type === "mix") { box.style.animation = `tvmix ${t.ms}ms ease both`; setTimeout(finish, t.ms); }
@@ -292,6 +295,21 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const name = new Date(sc.startAt || now()).getMinutes() < 5 ? "বুলেটিন" : "নিউজ আপডেট", sets = headlineSets(), step = st.tv?.setSeconds || 7;
       const card = () => wrapV(`<div class="nu-title${channel === "v" ? " v" : ""}"><img src="${LOGO}" alt=""><b>${name}</b><small>${ist()}</small></div>`, name);
       const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = Math.floor((e - 5) / step), x = sets[Math.min(sets.length - 1, k)]; el.innerHTML = e < 5 || !x ? card() : wrapV(setHTML(name, x.label, x.items, step), x.label); };
+      draw(); const t = setInterval(() => el.isConnected ? draw() : clearInterval(t), 1000);
+    } else if (g.kind === "flash") {   // 10 seconds between videos: the breaking story, or the headlines
+      const br = st.ctl?.breaking || st.tv?.breaking;
+      if (br?.text) el.innerHTML = channel === "h" ? `<div class="tv-breaking static"><div class="br-slash"></div><div class="br-in"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(br.text)}</b><img src="${LOGO}" alt=""></div><div class="br-bar"></div></div>` : vJacket(`<div class="br-v"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(br.text)}</b></div>`, "এইমাত্র পাওয়া খবর");
+      else {
+        const Hs = st.tv?.headlines || [], per = 4, from = Hs.length > per ? (g.n * per) % Hs.length : 0;
+        const items = [...Hs.slice(from), ...Hs.slice(0, from)].slice(0, per).map(h => h.text);
+        el.innerHTML = wrapV(setHTML("শিরোনাম", "সর্বশেষ", items, sc.dur || 10), "শিরোনাম");
+      }
+    } else if (g.kind === "bulletin") {   // three minutes at :00 and :30, the latest stories in detail
+      const list = (st.tv?.bulletin || []).slice(0, 6), intro = 8, per = list.length ? (180 - intro) / list.length : 180;
+      const title = () => `<div class="nu-title${channel === "v" ? " v" : ""}"><img src="${LOGO}" alt=""><b>বুলেটিন</b><small>${ist()}</small></div>`;
+      const story = (x, k) => `<div class="bl-story${channel === "v" ? " v" : ""}"><div class="bl-head"><span>বুলেটিন</span><em>${bnDigits(k + 1)}/${bnDigits(list.length)}</em><b>${esc(x.desk || "")}</b><i style="--d:${per}s"></i></div><h2>${esc(x.title)}</h2><p>${esc(x.text)}</p></div>`;
+      let shown = -2;
+      const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = e < intro || !list.length ? -1 : Math.min(list.length - 1, Math.floor((e - intro) / per)); if (k === shown) return; shown = k; el.innerHTML = k < 0 ? title() : story(list[k], k); };
       draw(); const t = setInterval(() => el.isConnected ? draw() : clearInterval(t), 1000);
     } else if (g.kind === "headlines") {
       const items = g.lines?.length ? g.lines : (st.tv?.headlines || []).slice(0, 5).map(h => h.text);
