@@ -320,7 +320,7 @@ function renderShell() {
 }
 
 function renderNav(route) {
-  $("#siteNav").innerHTML = `<a class="nav-brand" href="/" aria-label="Rashtrix 24×7 News home" tabindex="-1">${brandMark()}</a>` + NAV.map(([label, href, active]) => `<a href="${href}"${active(route) ? ' aria-current="page"' : ""}>${label === "Latest" && state.coverage.length ? `<span class="nav-live" aria-label="Live coverage running"></span>` : ""}${label}</a>`).join("")
+  $("#siteNav").innerHTML = NAV.map(([label, href, active]) => `<a href="${href}"${active(route) ? ' aria-current="page"' : ""}>${label === "Latest" && state.coverage.length ? `<span class="nav-live" aria-label="Live coverage running"></span>` : ""}${label}</a>`).join("")
     + `<button class="search-btn" type="button" data-action="search" aria-label="Search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>`;
   $("#siteNav").dispatchEvent(new Event("scroll"));
 }
@@ -396,7 +396,8 @@ function watchScroll() {
     if (ticking) return; ticking = true;
     requestAnimationFrame(() => { ticking = false; updateProgress(); });
   }, { passive: true });
-  // The compact wordmark appears in the pinned menu once the masthead has scrolled away.
+  // The menu gets its pinned look once the masthead has scrolled away (no logo in it: the full
+  // logo stays in the masthead, never shrunk into the menu).
   new IntersectionObserver(([entry]) => document.body.classList.toggle("nav-stuck", !entry.isIntersecting), { rootMargin: "-20px 0px 0px 0px" }).observe($("#masthead"));
   // On narrow screens the menu scrolls sideways; fade its edge until the end is reached.
   const nav = $("#siteNav");
