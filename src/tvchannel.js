@@ -89,32 +89,72 @@ export async function promos(env, all = false) {
   const { results } = await env.DB.prepare(`SELECT id,title,image_url AS image,seconds,active,sort FROM tv_promos ${all ? "" : "WHERE active=1"} ORDER BY sort, created_at`).all();
   return results;
 }
-// One loop of the channel: videos newest first, with a News Update every `newsEvery` videos and
-// (vertical) a promo card every `promoEvery` videos, rotating through the active promos.
+// The running order (both channels):
+// - videos newest first, on a loop; a newly sourced video restarts the loop (src/youtube.js);
+// - a 10-second full-screen flash of the headlines (or the breaking story) after every video, so
+//   two videos never play back to back; vertical promo cards keep their own repeat rule;
+// - a stinger, picked at random but the same on every screen, on about one change in three;
+// - at the top of every hour and at every half hour, a three-minute bulletin of the latest
+//   stories with their details. The loop stops for it and carries on where it stopped.
+export const FLASH_SECONDS = 10;
+export const BULLETIN_MS = 180e3, HALF_HOUR = 1800e3;
+const hash = str => { let h = 2166136261; for (const c of String(str)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
 export function buildLoop(s, videos, cards = []) {
   const loop = []; let k = 0, slot = 0;
   for (const v of videos) {
     loop.push({ type: "video", ytId: v.ytId, title: v.title, dur: v.duration, thumb: v.thumb });
+    loop.push({ type: "flash", dur: FLASH_SECONDS, n: k });
     k++;
-    if (s.newsEvery && k % s.newsEvery === 0) loop.push({ type: "news", dur: s.sets * s.setSeconds + 5 });
     if (s.promosOn && cards.length && s.promoEvery && k % s.promoEvery === 0) { const p = cards[slot++ % cards.length]; loop.push({ type: "promo", id: p.id, image: p.image, title: p.title, dur: p.seconds }); }
   }
   if (!videos.length && cards.length && s.promosOn) cards.forEach(p => loop.push({ type: "promo", id: p.id, image: p.image, title: p.title, dur: p.seconds }));
-  if (!loop.length || (!videos.length && s.newsEvery !== 0)) loop.push({ type: "news", dur: s.sets * s.setSeconds + 5 });
+  if (!loop.length) loop.push({ type: "flash", dur: FLASH_SECONDS, n: 0 });
+  loop.forEach((x, i) => { x.sting = hash(`${x.ytId || x.type}:${i}`) % 3 === 0; });
   return loop;
 }
-// Where the channel is now, and what follows for the next `ahead` seconds.
+// Bulletin time in [0, x): three minutes at the start of every half hour.
+const bulletinMs = x => Math.floor(x / HALF_HOUR) * BULLETIN_MS + Math.min(x % HALF_HOUR, BULLETIN_MS);
+// Where the channel is now, and what follows for the next `ahead` seconds. Loop time runs only
+// outside bulletins, so after a bulletin the loop resumes where it stopped (a video cut by the
+// bulletin carries on from the same second).
 export function scheduleAt(loop, epoch, t = Date.now(), ahead = 5400) {
   const total = loop.reduce((n, x) => n + x.dur, 0) * 1000;
   if (!total) return [];
-  let pos = ((t - epoch) % total + total) % total, i = 0, start = t - pos;
-  while (pos >= loop[i].dur * 1000) { pos -= loop[i].dur * 1000; start += loop[i].dur * 1000; i = (i + 1) % loop.length; }
-  const out = [];
-  for (let n = 0, at = start; at < t + ahead * 1000 && n < 400; n++) { const x = loop[(i + n) % loop.length]; out.push({ ...x, start: at }); at += x.dur * 1000; }
+  const out = [], end = t + ahead * 1000, bulletin = start => ({ type: "bulletin", start, dur: BULLETIN_MS / 1000, sting: true });
+  let at = t;
+  const ws = Math.floor(at / HALF_HOUR) * HALF_HOUR;
+  if (at - ws < BULLETIN_MS) { out.push(bulletin(ws)); at = ws + BULLETIN_MS; }
+  // Position in the loop (loop time leaves the bulletins out).
+  let lt = ((at - epoch - (bulletinMs(at) - bulletinMs(epoch))) % total + total) % total, i = 0;
+  while (lt >= loop[i].dur * 1000) { lt -= loop[i].dur * 1000; i = (i + 1) % loop.length; }
+  let into = lt;
+  // Each piece keeps a fixed start: an item cut by a bulletin resumes as a new piece that starts
+  // when the bulletin ends, from the second it stopped at ("in").
+  const lastEnd = Math.floor(at / HALF_HOUR) * HALF_HOUR + BULLETIN_MS;
+  let runStart = at - into < lastEnd ? lastEnd : at - into, inMs = at - into < lastEnd ? into - (at - lastEnd) : 0;
+  for (let n = 0; at < end && n < 500; n++) {
+    const x = loop[i], left = x.dur * 1000 - into, next = Math.floor(at / HALF_HOUR) * HALF_HOUR + HALF_HOUR;
+    if (at + left <= next) {
+      out.push({ ...x, start: runStart, in: inMs / 1000, dur: (at + left - runStart) / 1000 });
+      at += left; into = 0; i = (i + 1) % loop.length; runStart = at; inMs = 0;
+    } else {
+      out.push({ ...x, start: runStart, in: inMs / 1000, dur: (next - runStart) / 1000, cut: true });
+      into += next - at; out.push(bulletin(next)); at = next + BULLETIN_MS; runStart = at; inMs = into;
+    }
+  }
   return out;
 }
 
 /* ---------- What every screen reads ---------- */
+// The bulletin: the six newest Bengali stories (wire briefs and reports, and the desk's own),
+// each with about a hundred words of its text.
+async function bulletinStories(env) {
+  const { results } = await env.DB.prepare("SELECT title, category, kind, body FROM articles WHERE status='published' AND lang='bn' AND pulled_at IS NULL ORDER BY published_at DESC LIMIT 6").all().catch(() => ({ results: [] }));
+  return results.map(r => {
+    const words = String(r.body || "").replace(/<[^>]+>/g, " ").replace(/[#*_>]+/g, " ").replace(/\s+/g, " ").trim().split(" ");
+    return { title: r.title, desk: r.category, kind: r.kind, text: words.slice(0, 100).join(" ") + (words.length > 100 ? "…" : "") };
+  });
+}
 const memo = new Map();
 export async function tvState(env, ch) {
   const hit = memo.get(ch);
@@ -126,6 +166,7 @@ export async function tvState(env, ch) {
     listPublished(env, { limit: 30 }).then(l => localiseArticles(env, "bn", l))
   ]);
   const headlines = stories.filter(a => a.lang === "bn").map(a => ({ text: a.title, desk: a.category, kind: a.kind }));
+  const bulletin = await bulletinStories(env);
   const value = {
     channel: ch, on: s.on, serverTime: Date.now(),
     live: live || null,
@@ -134,7 +175,7 @@ export async function tvState(env, ch) {
     lband: ch === "h" ? s.lband : null, lowerThird: s.lowerThird || "", band: s.band || "", appStream: s.appStream || null,
     ad: s.ad, sets: s.sets, setSeconds: s.setSeconds,
     ticker: [...s.ticker, ...headlines.slice(0, 14).map(h => h.text)],
-    headlines
+    headlines, bulletin
   };
   memo.set(ch, { at: Date.now(), value });
   return value;

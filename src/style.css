@@ -1820,3 +1820,7 @@ html:is([data-lang=bn],[data-lang=hi]) :is(.sf-col h3,.sf-form h3){font-size:15p
 .lc-card.lc-text .lc-title{font-size:clamp(26px,2.8vw,38px);-webkit-line-clamp:5}
 .lc-card.lc-text .lc-dek{-webkit-line-clamp:5}
 @media (max-width:640px){.lc-card.lc-text .lc-title{font-size:26px}}
+
+/* Home: the Shorts row sits directly above the Latest cards. */
+.latest-col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.latest-col .shorts-rail{margin:0}
