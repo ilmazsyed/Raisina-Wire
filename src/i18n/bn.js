@@ -1228,4 +1228,7 @@ export default {
   "Add the YouTube key first: a channel address needs it.": "আগে ইউটিউব কী যোগ করুন। চ্যানেলের ঠিকানার জন্য সেটি লাগবে।",
   "That YouTube channel was not found.": "ওই ইউটিউব চ্যানেলটি পাওয়া যায়নি।",
   "That source is already on this channel.": "এই উৎসটি এই চ্যানেলে আগেই আছে।",
+  "Only Shorts and videos from the Rashtrix YouTube channel can be added. Lives can come from any channel: tick Live.": "শুধু রাষ্ট্রিক্সের ইউটিউব চ্যানেলের শর্টস আর ভিডিও যোগ করা যায়। লাইভ যে কোনও চ্যানেলের হতে পারে। তার জন্য ‘লাইভ’ বেছে নিন।",
+  "Add the YouTube key first: it is needed to check the channel.": "আগে ইউটিউব কী যোগ করুন। চ্যানেল যাচাই করতে সেটি লাগবে।",
+  "That YouTube address was not found.": "ওই ইউটিউব ঠিকানাটি পাওয়া যায়নি।",
 };

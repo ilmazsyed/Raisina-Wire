@@ -89,7 +89,13 @@ export async function refreshSource(env, src) {
       .catch(e => { if (/YouTube 404/.test(e.message)) return { items: [] }; throw e; });
     ids = (d.items || []).map(i => i.contentDetails?.videoId).filter(Boolean);
   } else ids = [src.yt_id];
-  const vids = await videoDetails(env, ids);
+  let vids = await videoDetails(env, ids);
+  // Shorts and videos: only the Rashtrix channel's own (a playlist may hold others' videos).
+  let dropped = 0;
+  if (src.kind !== "live") {
+    const own = (await ownChannel(env)).id, all = vids.length;
+    vids = vids.filter(v => v.snippet?.channelId === own); dropped = all - vids.length;
+  }
   const at = now(), stmts = [];
   const order = new Map(ids.map((id, i) => [id, i]));
   let liveNow = 0, liveVideo = "";
@@ -104,7 +110,7 @@ export async function refreshSource(env, src) {
   // Videos that left the playlist leave the channel.
   if (src.kind === "playlist") stmts.push(env.DB.prepare("DELETE FROM tv_items WHERE source_id=? AND seen_at<>?").bind(src.id, at));
   const title = src.kind === "playlist" ? src.title : (vids[0]?.snippet?.title || src.title || "");
-  stmts.push(env.DB.prepare("UPDATE tv_sources SET last_refresh=?, last_error='', item_count=?, live_now=?, live_video=?, title=CASE WHEN title='' THEN ? ELSE title END WHERE id=?").bind(at, src.kind === "live" ? 0 : vids.length, liveNow, liveVideo, String(title).slice(0, 200), src.id));
+  stmts.push(env.DB.prepare("UPDATE tv_sources SET last_refresh=?, last_error=?, item_count=?, live_now=?, live_video=?, title=CASE WHEN title='' THEN ? ELSE title END WHERE id=?").bind(at, dropped && !vids.length ? NOT_OWN.slice(0, 200) : "", src.kind === "live" ? 0 : vids.length, liveNow, liveVideo, String(title).slice(0, 200), src.id));
   for (let i = 0; i < stmts.length; i += 80) await env.DB.batch(stmts.slice(i, i + 80));
   return { videos: vids.length, liveNow };
 }
@@ -124,17 +130,32 @@ export async function resolveChannel(env, ref) {
 export const channelPlaylist = (channelId, type) => `${type}${channelId.slice(2)}`;
 const isChannelId = id => /^UC[\w-]{22}$/.test(id);
 
-// Your approved outlets' YouTube channels: added once, the first time the key is set, so Shorts
-// and Live TV have videos from the start. Removing one in the TV screen is kept.
-const DEFAULT_CHANNELS = [
-  { ref: "UCv3rFzn-GHGtqzXiaq3sWNg", name: "ABP Ananda" },
-  { ref: "@SangbadPratidin", name: "Sangbad Pratidin" },
-  { ref: "@TheWallNews", name: "The Wall" },
-  { ref: "UChPD2BQ2dJ-w00klQQkc-Qg", name: "BBC News Bangla" },
-  { ref: "@dwbangla", name: "DW Bangla" }
-];
+// Shorts and videos come only from the Rashtrix YouTube channel (YOUTUBE_CHANNEL, default
+// @rashtrixnews). Lives may come from any channel. The channel's id is looked up once and kept.
+const OWN_HANDLE = env => String(env.YOUTUBE_CHANNEL || "@rashtrixnews").trim();
+export async function ownChannel(env) {
+  const want = OWN_HANDLE(env);
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE key='tv_own_channel'").first();
+  try { const c = JSON.parse(row?.value || "null"); if (c?.id && c.ref === want) return c; } catch { /* look it up */ }
+  const ref = parseYouTubeRef(want);
+  if (ref?.kind !== "channel") throw new Error("YOUTUBE_CHANNEL is not a YouTube channel address.");
+  const c = { ...(await resolveChannel(env, ref)), ref: want };
+  await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('tv_own_channel',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(JSON.stringify(c)).run();
+  return c;
+}
+export const NOT_OWN = "Only Shorts and videos from the Rashtrix YouTube channel can be added. Lives can come from any channel: tick Live.";
+// Which channel a playlist or a video belongs to (1 unit).
+export async function ownerOf(env, ref) {
+  if (ref.kind === "channel") return (await resolveChannel(env, ref)).id;
+  const d = ref.kind === "playlist" ? await call(env, "playlists", { part: "snippet", id: ref.id }) : await call(env, "videos", { part: "snippet", id: ref.id });
+  const it = d.items?.[0];
+  if (!it) throw new Error("That YouTube address was not found.");
+  return it.snippet?.channelId || "";
+}
+
 export async function addChannelSource(env, ch, ref, { title = "", live = false } = {}) {
   const c = await resolveChannel(env, ref);
+  if (!live && c.id !== (await ownChannel(env)).id) throw new Error(NOT_OWN);
   const kind = live ? "live" : "playlist";
   const ytId = live ? c.id : channelPlaylist(c.id, ch === "v" ? "UUSH" : "UULF");
   const name = title || `${c.title}${live ? " · Live" : ch === "v" ? " · Shorts" : ""}`;
@@ -143,19 +164,23 @@ export async function addChannelSource(env, ch, ref, { title = "", live = false 
     .catch(e => { throw new Error(/UNIQUE/.test(e.message) ? "That source is already on this channel." : e.message); });
   return { id, kind, ytId };
 }
+// Once the key works: the Rashtrix channel's Shorts on the vertical channel and its long videos on
+// the horizontal one; sources from other channels' uploads (other than lives) are taken off.
 async function seedDefaults(env) {
-  if (await env.DB.prepare("SELECT value FROM settings WHERE key='tv_seeded'").first()) return;
-  // At most one try an hour while it keeps failing (a wrong key, say).
-  const last = await env.DB.prepare("SELECT value FROM settings WHERE key='tv_seed_try'").first();
+  const own = await ownChannel(env);
+  const mine = own.id.slice(2);
+  const others = await env.DB.prepare("SELECT id FROM tv_sources WHERE kind<>'live' AND yt_id LIKE 'UU%' AND substr(yt_id, -22)<>?").bind(mine).all();
+  for (const r of others.results) await env.DB.batch([env.DB.prepare("DELETE FROM tv_items WHERE source_id=?").bind(r.id), env.DB.prepare("DELETE FROM tv_sources WHERE id=?").bind(r.id)]);
+  if (await env.DB.prepare("SELECT value FROM settings WHERE key='tv_seeded_own'").first()) return;
+  for (const ch of ["v", "h"]) await addChannelSource(env, ch, { kind: "channel", id: own.id }).catch(e => { if (!/already/.test(e.message)) throw e; });
+  await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('tv_seeded_own',?) ON CONFLICT(key) DO NOTHING").bind(now()).run();
+}
+async function trySeed(env) {
+  // Once an hour (the first time at once): cheap, and a wrong key is not tried every minute.
+  const last = await env.DB.prepare("SELECT value FROM settings WHERE key='tv_own_try'").first();
   if (last && Date.now() - Date.parse(last.value) < 3600e3) return;
-  await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('tv_seed_try',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(now()).run();
-  let added = 0;
-  for (const d of DEFAULT_CHANNELS) {
-    const ref = parseYouTubeRef(d.ref);
-    for (const ch of ["v", "h"]) await addChannelSource(env, ch, ref).then(() => added++, e => { if (/already/.test(e.message)) added++; });
-  }
-  // Marked done only once something was added, so a wrong key is tried again after it is fixed.
-  if (added) await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('tv_seeded',?) ON CONFLICT(key) DO NOTHING").bind(now()).run();
+  await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('tv_own_try',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(now()).run();
+  await seedDefaults(env);
 }
 
 // Playlist title (1 unit), for a source added without one.
@@ -166,7 +191,7 @@ export async function playlistTitle(env, id) {
 // Cron (and "Refresh now"): every active source older than ten minutes, inside the daily cap.
 export async function refreshSources(env, { force = false, channel = null } = {}) {
   if (!ytReady(env)) return { skipped: "YOUTUBE_API_KEY not set" };
-  await seedDefaults(env).catch(() => {});
+  await trySeed(env).catch(() => {});
   const { results } = await env.DB.prepare(`SELECT * FROM tv_sources WHERE active=1 ${channel ? "AND channel=?" : ""} ORDER BY last_refresh`).bind(...(channel ? [channel] : [])).all();
   let done = 0, failed = 0;
   for (const src of results) {
