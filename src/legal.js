@@ -8,7 +8,7 @@
 export const LEGAL_UPDATED = "7 November 2026";
 // The Grievance Officer required by IT Rules 2021, rule 3(2) and rule 4. Fill these in before
 // launch: the pages say the details are coming until they are set.
-export const GRIEVANCE = { name: "", title: "Chief Legal Officer, Middleton Media Works", email: "", phone: "", address: "" };
+export const GRIEVANCE = { name: "", title: "Grievance Officer, Rashtrix 24×7 News", email: "", phone: "", address: "" };
 export const CONTACT_EMAIL = GRIEVANCE.email;
 export const SITE_URL = "https://www.rashtrix.live";
 const mail = CONTACT_EMAIL ? `<a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>` : "the address on our <a href=\"/grievance\">Grievance Redressal</a> page";
@@ -17,13 +17,15 @@ const officer = (bn = false) => GRIEVANCE.name && GRIEVANCE.email
   ? `<div class="officer"><b>${bn ? "অভিযোগ আধিকারিক (Grievance Officer)" : "Grievance Officer"}</b><br>${GRIEVANCE.name}, ${GRIEVANCE.title}<br>${bn ? "ইমেল" : "Email"}: <a href="mailto:${GRIEVANCE.email}">${GRIEVANCE.email}</a>${GRIEVANCE.phone ? `<br>${bn ? "ফোন" : "Phone"}: ${GRIEVANCE.phone}` : ""}${GRIEVANCE.address ? `<br>${bn ? "ঠিকানা" : "Address"}: ${GRIEVANCE.address}` : ""}<br>${bn ? "সময়: সোম থেকে শনি, সকাল ১০টা থেকে সন্ধ্যা ৬টা" : "Hours: Monday to Saturday, 10:00 to 18:00 IST"}</div>`
   : `<div class="officer"><b>${bn ? "অভিযোগ আধিকারিক (Grievance Officer)" : "Grievance Officer"}</b><br>${GRIEVANCE.title}<br>${bn ? "নাম ও যোগাযোগের বিবরণ শিগগির এখানে প্রকাশ করা হবে।" : "The officer’s name and contact details will be published here shortly."}</div>`;
 
-const ORG = "Rashtrix 24×7 News, published by Middleton Media Works";
-const ORG_BN = "রাষ্ট্রিক্স ২৪×৭ নিউজ, প্রকাশক মিডলটন মিডিয়া ওয়ার্কস";
+const ORG = "Rashtrix 24×7 News";
+const CREDITS = "Founder and Editor-in-Chief: Ilmaz Syed. Powered by Calibrex";
+const ORG_BN = "রাষ্ট্রিক্স ২৪×৭ নিউজ";
+const CREDITS_BN = "প্রতিষ্ঠাতা ও প্রধান সম্পাদক: Ilmaz Syed। প্রযুক্তি সহায়তায়: Calibrex";
 
 /* ---------- About ---------- */
 export const ABOUT = {
   title: "About Rashtrix",
-  description: "Rashtrix 24×7 News is a Bengali news channel and app from Kolkata, published by Middleton Media Works: Kolkata, West Bengal, India, Bengalis abroad and the world.",
+  description: "Rashtrix 24×7 News is a Bengali news channel and app from Kolkata, founded by its editor-in-chief Ilmaz Syed: Kolkata, West Bengal, India, Bengalis abroad and the world.",
   html: `
 <p class="lede">Rashtrix 24×7 News is a Bengali-first news channel and app from Kolkata. Our line: <b lang="bn">দেশ প্রথম । বলিদান পরম ধর্ম</b>: the nation first; sacrifice is the highest duty.</p>
 <h2>What we publish</h2>
@@ -37,7 +39,7 @@ export const ABOUT = {
 <p>We report facts we can stand behind and correct mistakes openly. Wire reports are drafted with the help of an AI language model from facts in at least two published reports wherever possible, and an editor can pull or correct any of them at once; every correction is recorded. See our <a href="/disclaimer">editorial disclaimer</a>, <a href="/copyright">how we use other publishers’ work</a> and our <a href="/corrections">corrections policy</a>.</p>
 <p>Rashtrix is independent. It is not affiliated with any government or political party.</p>
 <h2>Who we are</h2>
-<p>${ORG}. Watch us on YouTube and Facebook, and read us at <a href="${SITE_URL}">rashtrix.live</a>.</p>
+<p>${ORG}. ${CREDITS}. Watch us on YouTube and Facebook, and read us at <a href="${SITE_URL}">rashtrix.live</a>.</p>
 <h2>Contact</h2>
 <p>Editorial, corrections and legal matters: ${mail}. For complaints and takedown requests, see <a href="/grievance">Grievance redressal</a>.</p>`,
   bn: { title: "রাষ্ট্রিক্স সম্পর্কে", html: `
@@ -53,7 +55,7 @@ export const ABOUT = {
 <p>যে তথ্যের দায় নিতে পারি, শুধু সেটুকুই প্রকাশ করি, আর ভুল হলে খোলাখুলি সংশোধন করি। ওয়্যার খবর একটি এআই ভাষা-মডেলের সাহায্যে লেখা হয়, যতটা সম্ভব অন্তত দু’টি প্রকাশিত খবরের তথ্য মিলিয়ে; সম্পাদক যে কোনো খবর সঙ্গে সঙ্গে সরিয়ে নিতে বা সংশোধন করতে পারেন, আর প্রতিটি সংশোধনের হিসেব রাখা হয়। পড়ুন আমাদের <a href="/disclaimer">সম্পাদকীয় ঘোষণা</a>, <a href="/copyright">অন্য প্রকাশকের লেখা আমরা কীভাবে ব্যবহার করি</a> আর <a href="/corrections">সংশোধন নীতি</a>।</p>
 <p>রাষ্ট্রিক্স স্বাধীন। কোনো সরকার বা রাজনৈতিক দলের সঙ্গে এর কোনো যোগ নেই।</p>
 <h2>আমরা কারা</h2>
-<p>${ORG_BN}। ইউটিউব আর ফেসবুকে আমাদের দেখুন, পড়ুন <a href="${SITE_URL}">rashtrix.live</a>-এ।</p>
+<p>${ORG_BN}। ${CREDITS_BN}। ইউটিউব আর ফেসবুকে আমাদের দেখুন, পড়ুন <a href="${SITE_URL}">rashtrix.live</a>-এ।</p>
 <h2>যোগাযোগ</h2>
 <p>সম্পাদকীয়, সংশোধন ও আইনি বিষয়ে: ${mailBn}। অভিযোগ ও কিছু সরানোর অনুরোধের জন্য দেখুন <a href="/grievance">অভিযোগ নিষ্পত্তি</a>।</p>` }
 };
@@ -72,7 +74,7 @@ export const LEGAL = {
 <h2>3. What you post</h2>
 <p>You keep ownership of what you post, and give us a non-exclusive, royalty-free licence to host, display and moderate it on the Service. You must not post anything that is unlawful, defamatory, obscene, hateful, harmful to children, infringing, misleading, impersonating, or that threatens the unity, integrity, defence, security or sovereignty of India, public order or friendly relations with other states (IT Rules 2021, rule 3(1)(b)). We may remove content and suspend accounts that break these Terms.</p>
 <h2>4. Our content</h2>
-<p>The Rashtrix name, logo and our original content belong to Middleton Media Works. Wire reports and briefs are drafted with the help of an AI language model from published reports and checked by our process before and after publication; see the <a href="/disclaimer">Disclaimer</a>.</p>
+<p>The Rashtrix name, logo and our original content belong to Rashtrix 24×7 News. Wire reports and briefs are drafted with the help of an AI language model from published reports and checked by our process before and after publication; see the <a href="/disclaimer">Disclaimer</a>.</p>
 <h2>5. Liability</h2>
 <p>The Service is provided “as is”. To the extent the law allows, we are not liable for indirect or consequential loss arising from your use of the Service. Nothing in these Terms limits liability that cannot be limited under Indian law.</p>
 <h2>6. Law and disputes</h2>
@@ -88,7 +90,7 @@ export const LEGAL = {
 <h2>৩. আপনি যা পোস্ট করেন</h2>
 <p>আপনার পোস্টের মালিকানা আপনারই থাকে; পরিষেবায় সেটি রাখা, দেখানো ও মডারেট করার অ-একচেটিয়া, বিনামূল্যের অনুমতি আপনি আমাদের দিচ্ছেন। বেআইনি, মানহানিকর, অশ্লীল, ঘৃণা ছড়ানো, শিশুদের পক্ষে ক্ষতিকর, অন্যের অধিকার লঙ্ঘনকারী, বিভ্রান্তিকর বা ছদ্মবেশী কিছু, কিংবা ভারতের ঐক্য, অখণ্ডতা, প্রতিরক্ষা, নিরাপত্তা, সার্বভৌমত্ব, জনশৃঙ্খলা বা বন্ধু-রাষ্ট্রের সঙ্গে সম্পর্কের পক্ষে হুমকি এমন কিছু পোস্ট করা চলবে না (আইটি রুলস ২০২১, রুল ৩(১)(খ))। এই শর্ত ভাঙলে আমরা কনটেন্ট সরাতে ও অ্যাকাউন্ট স্থগিত করতে পারি।</p>
 <h2>৪. আমাদের কনটেন্ট</h2>
-<p>রাষ্ট্রিক্স নাম, লোগো আর আমাদের মৌলিক লেখা মিডলটন মিডিয়া ওয়ার্কসের সম্পত্তি। ওয়্যার খবর ও সংক্ষিপ্ত খবর প্রকাশিত খবর থেকে একটি এআই ভাষা-মডেলের সাহায্যে লেখা, প্রকাশের আগে ও পরে আমাদের প্রক্রিয়ায় যাচাই করা; দেখুন <a href="/disclaimer">ঘোষণা</a>।</p>
+<p>রাষ্ট্রিক্স নাম, লোগো আর আমাদের মৌলিক লেখা রাষ্ট্রিক্স ২৪×৭ নিউজের সম্পত্তি। ওয়্যার খবর ও সংক্ষিপ্ত খবর প্রকাশিত খবর থেকে একটি এআই ভাষা-মডেলের সাহায্যে লেখা, প্রকাশের আগে ও পরে আমাদের প্রক্রিয়ায় যাচাই করা; দেখুন <a href="/disclaimer">ঘোষণা</a>।</p>
 <h2>৫. দায়</h2>
 <p>পরিষেবা “যেমন আছে” সেই অবস্থায় দেওয়া হয়। আইন যতটা অনুমতি দেয়, পরিষেবা ব্যবহারের ফলে পরোক্ষ ক্ষতির দায় আমাদের নয়। ভারতীয় আইনে যে দায় সীমিত করা যায় না, এই শর্তাবলি তা সীমিত করে না।</p>
 <h2>৬. আইন ও বিরোধ</h2>
@@ -174,14 +176,14 @@ export const LEGAL = {
 <h2>Facts, not words</h2>
 <p>Facts are not owned by anyone; the way a publisher expresses them is. Our wire desk reads reports that other news organisations have already published, takes only the facts from them, checks them against each other, and writes a new report in our own words. We do not copy their text, headlines or photographs, and we do not reproduce or excerpt their stories. Source reports are read by our system only to extract facts and are not shown to readers. Publishers who do not want their reports used this way can tell us and will be added to our blocklist.</p>
 <h2>Our content</h2>
-<p>Text, photographs, video and graphics made by Rashtrix belong to Middleton Media Works. You may share links; republishing needs our written permission.</p>
+<p>Text, photographs, video and graphics made by Rashtrix belong to Rashtrix 24×7 News. You may share links; republishing needs our written permission.</p>
 <h2>Copyright notices</h2>
 <p>If you believe something on Rashtrix infringes your copyright, send our Grievance Officer (${mail}) the work you own, the link to the material, a statement that its use is not authorised, and your contact details and signature. We act on complete notices under section 52(1)(c) of the Copyright Act, 1957 and rule 75 of the Copyright Rules, 2013, within 36 hours.</p>`,
     bn: { title: "কপিরাইট ও কনটেন্ট নীতি", html: `
 <h2>তথ্য, শব্দ নয়</h2>
 <p>তথ্যের মালিক কেউ নন; কিন্তু একজন প্রকাশক তা যেভাবে লেখেন, সেই প্রকাশভঙ্গি তাঁর। আমাদের ওয়্যার ডেস্ক অন্য সংবাদ সংস্থার আগেই প্রকাশিত খবর পড়ে, সেখান থেকে শুধু তথ্য নেয়, একে অপরের সঙ্গে মিলিয়ে দেখে, তারপর নিজের ভাষায় নতুন খবর লেখে। তাদের লেখা, শিরোনাম বা ছবি আমরা কপি করি না, তাদের খবর পুনঃপ্রকাশ বা উদ্ধৃত করি না। সূত্রের খবর আমাদের ব্যবস্থা শুধু তথ্য বের করতে পড়ে, পাঠককে দেখানো হয় না। কোনো প্রকাশক না চাইলে আমাদের জানান, তাঁর খবর আমাদের ব্লক-তালিকায় যোগ করা হবে।</p>
 <h2>আমাদের কনটেন্ট</h2>
-<p>রাষ্ট্রিক্সের তৈরি লেখা, ছবি, ভিডিও ও গ্রাফিক্সের মালিক মিডলটন মিডিয়া ওয়ার্কস। লিঙ্ক শেয়ার করতে পারেন; পুনঃপ্রকাশের জন্য আমাদের লিখিত অনুমতি লাগবে।</p>
+<p>রাষ্ট্রিক্সের তৈরি লেখা, ছবি, ভিডিও ও গ্রাফিক্সের মালিক রাষ্ট্রিক্স ২৪×৭ নিউজ। লিঙ্ক শেয়ার করতে পারেন; পুনঃপ্রকাশের জন্য আমাদের লিখিত অনুমতি লাগবে।</p>
 <h2>কপিরাইট নোটিস</h2>
 <p>রাষ্ট্রিক্সে কিছু আপনার কপিরাইট লঙ্ঘন করছে মনে হলে আমাদের অভিযোগ আধিকারিককে (${mailBn}) পাঠান: আপনার মালিকানাধীন কাজের বিবরণ, সংশ্লিষ্ট লিঙ্ক, ব্যবহারটি অনুমোদিত নয় এই মর্মে বিবৃতি, আর আপনার যোগাযোগের বিবরণ ও স্বাক্ষর। কপিরাইট আইন, ১৯৫৭-র ৫২(১)(গ) ধারা ও কপিরাইট রুলস, ২০১৩-র ৭৫ নম্বর রুল অনুযায়ী সম্পূর্ণ নোটিস পেলে ৩৬ ঘণ্টার মধ্যে ব্যবস্থা নিই।</p>` }
   },

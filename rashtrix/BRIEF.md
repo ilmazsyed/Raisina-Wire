@@ -1,6 +1,6 @@
 # Rashtrix App — Build Brief (handoff for Claude Code)
 
-Owner: Rashtrix 24×7 News (Middleton Media Works)
+Owner: Rashtrix 24×7 News (founder and editor-in-chief Ilmaz Syed; powered by Calibrex)
 Base code: fork of `ilmazsyed/Raisina-Wire` (Cloudflare Worker + D1 + Vite PWA)
 Design mockups (approved direction): https://claude.ai/artifact/CtopbLrBdTaJpNmYv5c4UV
 Rule: everything must run on free tiers. No paid AI API.
