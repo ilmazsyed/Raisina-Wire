@@ -1,0 +1,389 @@
+// Rashtrix TV program engine. One renderer for every screen:
+//   - the OBS / vMix outputs (tv.html?ch=h|v&key=…): the clean picture, with sound;
+//   - the PCR's preview and program monitors (a given scene, or what is on air, muted);
+//   - the app's own player (Watch), muted until the viewer taps;
+//   - the guests' return feed in the live studio.
+// It follows the channel's realtime state (src/control.js, over WebSocket, about a second) and
+// the channel's running order and headlines (/api/tv/<ch>), and draws:
+//   scenes in nine layouts (full, PiP, 2-up, 1 big + 2, 3 equal, host + 4, 6-grid, L-band, full
+//   graphic) from YouTube (controls hidden, clicks blocked), app clips, HLS / WHEP streams, live
+//   guests (Cloudflare Realtime or VDO.Ninja) and pictures; transitions (cut, mix, red slash wipe,
+//   stinger); the channel jacket with each graphics layer on or off; overlays (poll bar,
+//   viewer comments, results board); breaking news with music; the standby slate.
+// Outputs apply changes after the broadcast delay; DUMP throws away what is waiting and puts the
+// standby slate up. Outputs report their health every five seconds.
+// On-air graphics are in Bengali whatever the reader's language.
+import { LAYOUTS } from "./scenes.js";
+
+const esc = (s = "") => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const bnDigits = s => String(s).replace(/\d/g, d => "০১২৩৪৫৬৭৮৯"[d]);
+const DESK_BN = { Kolkata: "কলকাতা", "West Bengal": "পশ্চিমবঙ্গ", India: "ভারত", "Probashi Bangali": "প্রবাসী বাঙালি", World: "বিশ্ব" };
+const SIZE = { h: [1920, 1080], v: [1080, 1920] };
+const LOGO = "/brand/logo.webp";
+
+// Slot rectangles (percent of the frame: x, y, w, h) for each layout and orientation.
+const RECTS = {
+  h: {
+    full: [[0, 0, 100, 100]], lband: [[25, 0, 75, 75]], graphic: [],
+    pip: [[0, 0, 100, 100], [66, 50, 30, 30]],
+    "2up": [[2, 12, 47.5, 66], [50.5, 12, 47.5, 66]],
+    "1big2": [[2, 8, 62, 74], [66, 8, 32, 36], [66, 46, 32, 36]],
+    "3eq": [[1.5, 18, 31.5, 54], [34.25, 18, 31.5, 54], [67, 18, 31.5, 54]],
+    host4: [[2, 8, 46, 74], [50, 8, 23.5, 36], [74.5, 8, 23.5, 36], [50, 46, 23.5, 36], [74.5, 46, 23.5, 36]],
+    grid6: [[2, 8, 31, 36], [34.5, 8, 31, 36], [67, 8, 31, 36], [2, 46, 31, 36], [34.5, 46, 31, 36], [67, 46, 31, 36]]
+  },
+  v: {
+    full: [[0, 0, 100, 100]], lband: [[0, 0, 100, 68]], graphic: [],
+    pip: [[0, 0, 100, 100], [52, 62, 44, 24]],
+    "2up": [[3, 13, 94, 37], [3, 51, 94, 37]],
+    "1big2": [[3, 13, 94, 42], [3, 56, 46, 30], [51, 56, 46, 30]],
+    "3eq": [[3, 13, 94, 24], [3, 38.5, 94, 24], [3, 64, 94, 24]],
+    host4: [[3, 13, 94, 36], [3, 50, 46, 18], [51, 50, 46, 18], [3, 69, 46, 18], [51, 69, 46, 18]],
+    grid6: [[3, 13, 46, 24], [51, 13, 46, 24], [3, 38, 46, 24], [51, 38, 46, 24], [3, 63, 46, 24], [51, 63, 46, 24]]
+  }
+};
+
+/* ---------- YouTube ---------- */
+let ytReady = null;
+function loadYT() {
+  if (ytReady) return ytReady;
+  ytReady = new Promise(res => {
+    if (window.YT?.Player) return res(window.YT);
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { prev?.(); res(window.YT); };
+    const s = document.createElement("script"); s.src = "https://www.youtube.com/iframe_api"; s.async = true;
+    s.onerror = () => res(null);
+    document.head.append(s);
+    setTimeout(() => res(window.YT?.Player ? window.YT : null), 8000);
+  });
+  return ytReady;
+}
+
+/* ---------- Music: original stings made in the browser (nothing licensed) ---------- */
+export function breakingSting(ctx, seconds = 6) {
+  if (!ctx) return;
+  const t0 = ctx.currentTime + 0.05, out = ctx.createGain(); out.gain.value = 0.22; out.connect(ctx.destination);
+  const tone = (f, at, len, type = "sawtooth", vol = 0.5) => {
+    const o = ctx.createOscillator(), g = ctx.createGain(), lp = ctx.createBiquadFilter();
+    o.type = type; o.frequency.value = f; lp.type = "lowpass"; lp.frequency.value = 2400;
+    g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(vol, at + 0.02); g.gain.exponentialRampToValueAtTime(0.001, at + len);
+    o.connect(lp).connect(g).connect(out); o.start(at); o.stop(at + len + 0.05);
+  };
+  [0, 0.32, 0.64].forEach((d, i) => { tone(110, t0 + d, 0.28, "square", 0.6); tone(220 * (i === 2 ? 1.19 : 1), t0 + d, 0.25, "sawtooth", 0.35); });
+  [220, 261.6, 329.6, 440].forEach(f => tone(f, t0 + 1.0, seconds - 1.2, "sawtooth", 0.18));
+  for (let b = 1.0; b < seconds - 0.3; b += 0.5) tone(55, t0 + b, 0.3, "triangle", 0.7);
+}
+function whoosh(ctx) {
+  if (!ctx) return;
+  const t = ctx.currentTime, len = 0.5, buf = ctx.createBuffer(1, ctx.sampleRate * len, ctx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / d.length);
+  const src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+  src.buffer = buf; bp.type = "bandpass"; bp.frequency.setValueAtTime(400, t); bp.frequency.exponentialRampToValueAtTime(3000, t + len); g.gain.value = 0.25;
+  src.connect(bp).connect(g).connect(ctx.destination); src.start(t);
+}
+
+/* ---------- Live guests over Cloudflare Realtime (pull their published tracks) ---------- */
+async function pullGuest(video, guest, auth) {
+  const q = new URLSearchParams(auth).toString();
+  const ice = await fetch(`/api/rtc/ice?${q}`).then(r => r.json()).catch(() => ({ iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }] }));
+  const pc = new RTCPeerConnection({ iceServers: ice.iceServers, bundlePolicy: "max-bundle" });
+  const stream = new MediaStream(); video.srcObject = stream;
+  pc.ontrack = e => { stream.addTrack(e.track); video.play().catch(() => {}); };
+  const s = await fetch(`/api/rtc/session?${q}`, { method: "POST" }).then(r => r.json());
+  if (!s.sessionId) throw new Error(s.error || "no session");
+  const tracks = Object.values(guest.tracks || {}).filter(Boolean).map(trackName => ({ location: "remote", sessionId: guest.sessionId, trackName }));
+  const r = await fetch(`/api/rtc/${s.sessionId}/tracks?${q}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tracks }) }).then(r => r.json());
+  if (r.requiresImmediateRenegotiation && r.sessionDescription) {
+    await pc.setRemoteDescription(r.sessionDescription);
+    const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
+    await fetch(`/api/rtc/${s.sessionId}/renegotiate?${q}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sessionDescription: { type: "answer", sdp: answer.sdp } }) });
+  }
+  return pc;
+}
+// A WHEP stream (low-latency WebRTC, e.g. MediaMTX on the Oracle Cloud VM).
+async function playWhep(video, url) {
+  const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }] });
+  pc.addTransceiver("video", { direction: "recvonly" }); pc.addTransceiver("audio", { direction: "recvonly" });
+  const stream = new MediaStream(); video.srcObject = stream; pc.ontrack = e => { stream.addTrack(e.track); video.play().catch(() => {}); };
+  const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+  const r = await fetch(url, { method: "POST", headers: { "content-type": "application/sdp" }, body: offer.sdp });
+  if (!r.ok) throw new Error(`WHEP ${r.status}`);
+  await pc.setRemoteDescription({ type: "answer", sdp: await r.text() });
+  return pc;
+}
+async function playHls(video, url, delay = 0) {
+  if (video.canPlayType("application/vnd.apple.mpegurl")) { video.src = url; return null; }
+  const { default: Hls } = await import("hls.js");
+  if (!Hls.isSupported()) { video.src = url; return null; }
+  const hls = new Hls({ liveSyncDuration: 3 + delay, lowLatencyMode: !delay });
+  hls.loadSource(url); hls.attachMedia(video);
+  return hls;
+}
+
+/* ---------- The engine ---------- */
+// mode: "program" (follow the channel), "scene" (draw a given scene: PCR preview), "app" (program
+// in the app, muted until tapped). key: an output key (outputs) – sends heartbeats.
+export function mountTV(host, { channel = "h", output = false, mode, key = "", scene: fixedScene = null, guestToken = "", onState, muted } = {}) {
+  mode ||= output ? "program" : "app";
+  const [W, H] = SIZE[channel];
+  host.innerHTML = `<div class="tvp-fit"><div class="tvp tvp-${channel}" style="width:${W}px;height:${H}px">
+      <div class="tvp-bg"><i class="dots"></i><i class="arc a1"></i><i class="arc a2"></i><i class="sheen"></i></div>
+      <div class="tvp-stage"></div>
+      <div class="tvp-gfx"></div><div class="tvp-ovl"></div>
+      <div class="tvp-standby" hidden><img src="${LOGO}" alt=""><b>অনুষ্ঠান একটু পরেই</b><small>আমাদের সঙ্গে থাকুন</small></div>
+      <div class="tvp-off" hidden><img src="${LOGO}" alt=""><b>শিগগির ফিরছি</b></div>
+    </div></div>${mode === "app" ? `<button class="tvp-sound" type="button">🔇 শব্দ চালু করতে ট্যাপ করুন</button>` : ""}`;
+  const fit = host.querySelector(".tvp-fit"), stage = host.querySelector(".tvp");
+  const $ = s => stage.querySelector(s);
+  const scale = () => { const k = Math.min(fit.clientWidth / W, (output ? fit.clientHeight : fit.clientWidth * H / W) / H); stage.style.transform = `scale(${k})`; if (!output) fit.style.height = `${H * (fit.clientWidth / W)}px`; };
+  const ro = new ResizeObserver(scale); ro.observe(fit); scale();
+
+  const st = { tv: null, ctl: null, queue: [], skew: 0, alive: true, muted: muted ?? !output, audio: null, current: null, shownBreaking: "", flash: 0, stalledSince: 0, playing: false, ws: null, dumpUntil: 0, pkgTimer: null };
+  const now = () => Date.now() + st.skew;
+  const auth = key ? { ch: channel, key } : guestToken ? { t: guestToken } : {};
+
+  /* sound */
+  const soundBtn = host.querySelector(".tvp-sound");
+  const unmute = () => { st.muted = false; soundBtn?.remove(); try { st.audio ||= new (window.AudioContext || window.webkitAudioContext)(); st.audio.resume(); } catch { /* none */ } st.current?.slots.forEach(sl => sl.setMuted?.(false)); };
+  soundBtn?.addEventListener("click", unmute);
+  if (!st.muted) { try { st.audio = new (window.AudioContext || window.webkitAudioContext)(); } catch { /* none */ } }
+
+  /* ---------- sources ---------- */
+  function makeSource(el, src, offset, isMain) {
+    const slot = { el, src, destroy() {}, setMuted() {}, stalled: () => false };
+    const mute = () => st.muted || !isMain;
+    if (src.kind === "yt" && src.id) {
+      el.innerHTML = `<div class="tvs-yt"></div><img class="tvs-poster" src="https://i.ytimg.com/vi/${esc(src.id)}/hqdefault.jpg" alt="" onerror="this.hidden=true"><div class="tvp-shield"></div>`;
+      let player = null, state = -1, since = Date.now();
+      loadYT().then(YT => {
+        if (!YT || !st.alive || !el.isConnected) return;
+        player = new YT.Player(el.querySelector(".tvs-yt"), { width: "100%", height: "100%", videoId: src.id,
+          playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, playsinline: 1, fs: 0, autoplay: 1, mute: mute() ? 1 : 0, start: Math.floor((src.in || 0) + offset), ...(src.out ? { end: Math.floor(src.out) } : {}), origin: location.origin },
+          events: { onStateChange: e => { state = e.data; since = Date.now(); if (e.data === 1) el.querySelector(".tvs-poster")?.remove(); }, onReady: e => { mute() ? e.target.mute() : e.target.unMute(); e.target.playVideo(); } } });
+      });
+      slot.destroy = () => { try { player?.destroy(); } catch { /* none */ } };
+      slot.setMuted = m => { try { m || !isMain ? player?.mute() : player?.unMute(); } catch { /* none */ } };
+      slot.stalled = () => state === 3 && Date.now() - since > 10000;
+      slot.playing = () => state === 1;
+    } else if (["clip", "hls", "whep", "guest"].includes(src.kind)) {
+      el.innerHTML = `<video playsinline autoplay ${mute() ? "muted" : ""}></video><div class="tvp-shield"></div>${src.kind === "guest" && src.name ? `<span class="tvs-name"><b>${esc(src.name)}</b>${src.title ? `<small>${esc(src.title)}</small>` : ""}</span>` : ""}`;
+      const v = el.querySelector("video"); let extra = null, last = 0, lastT = Date.now();
+      v.muted = mute();
+      if (src.kind === "clip") { v.src = src.url; v.addEventListener("loadedmetadata", () => { v.currentTime = (src.in || 0) + offset; v.play().catch(() => {}); }, { once: true }); }
+      if (src.kind === "hls") playHls(v, src.url, st.ctl?.delay || 0).then(x => { extra = x; v.play().catch(() => {}); }).catch(() => {});
+      if (src.kind === "whep") playWhep(v, src.url).then(x => { extra = x; }).catch(() => {});
+      if (src.kind === "guest") { const g = st.room?.guests?.[src.id] || src; if (g.sessionId) pullGuest(v, g, auth).then(x => { extra = x; }).catch(() => {}); }
+      if (src.kind === "clip" && src.out) v.addEventListener("timeupdate", () => { if (v.currentTime >= src.out) v.pause(); });
+      slot.destroy = () => { try { extra?.destroy?.(); extra?.close?.(); } catch { /* none */ } v.pause(); v.removeAttribute("src"); v.srcObject = null; };
+      slot.setMuted = m => { v.muted = m || !isMain; };
+      slot.stalled = () => { if (v.currentTime !== last) { last = v.currentTime; lastT = Date.now(); } return src.kind !== "clip" && Date.now() - lastT > 10000; };
+      slot.playing = () => !v.paused && v.readyState >= 2;
+    } else if (src.kind === "vdo" && src.url) {
+      el.innerHTML = `<iframe src="${esc(src.url)}" allow="autoplay; camera; microphone; fullscreen" title=""></iframe><div class="tvp-shield"></div>${src.name ? `<span class="tvs-name"><b>${esc(src.name)}</b></span>` : ""}`;
+    } else if (src.kind === "image" && src.url) {
+      el.innerHTML = `<img class="tvs-img" src="${esc(src.url)}" alt="">`;
+    } else if (src.kind === "continuity") {
+      const seg = continuitySeg();
+      if (seg?.type === "video") return makeSource(el, { kind: "yt", id: seg.ytId, in: (now() - seg.start) / 1000 }, 0, isMain);
+      el.innerHTML = `<div class="tvs-logo"><img src="${LOGO}" alt=""></div>`;
+    } else el.innerHTML = `<div class="tvs-logo"><img src="${LOGO}" alt=""></div>`;
+    return slot;
+  }
+
+  /* ---------- the channel's own running order (no rundown on air) ---------- */
+  function continuitySeg() { const t = now(); return st.tv?.schedule?.find(x => x.start <= t && t < x.start + x.dur * 1000) || null; }
+  function continuityScene() {
+    const s = st.tv; if (!s) return null;
+    if (s.live) return { layout: "full", sources: [{ kind: "yt", id: s.live.ytId }], label: s.live.title, key: `live:${s.live.ytId}` };
+    const seg = continuitySeg(); if (!seg) return { layout: "graphic", graphic: { kind: "headlines" }, key: "c:none" };
+    if (seg.type === "video") return { layout: "full", sources: [{ kind: "yt", id: seg.ytId, in: 0 }], label: seg.title, startAt: seg.start, key: `c:${seg.ytId}:${seg.start}` };
+    if (seg.type === "news") return { layout: "graphic", graphic: { kind: "news" }, startAt: seg.start, dur: seg.dur, key: `c:news:${seg.start}` };
+    if (seg.type === "promo") return { layout: "graphic", graphic: { kind: "promo", image: seg.image }, key: `c:promo:${seg.start}`, full: true };
+    return null;
+  }
+
+  /* ---------- what is on air now ---------- */
+  function resolve() {
+    const c = st.ctl;
+    if (mode === "scene") return fixedScene ? { ...fixedScene, key: JSON.stringify(fixedScene) } : null;
+    if (st.tv && !st.tv.on && !(c && (c.mode === "manual" || c.rundown))) return { off: true, key: "off" };
+    if (now() < st.dumpUntil || c?.standby?.on) return { standby: true, key: "standby" };
+    if (c?.mode === "manual" && c.program) return { ...c.program, startAt: c.program.takenAt, key: `m:${c.program.takenAt}` };
+    const r = c?.rundown;
+    if (r && r.items?.[r.index]) { const it = r.items[r.index]; return { ...it.scene, startAt: r.pausedAt ? now() - (r.pausedAt - r.itemStartedAt) : r.itemStartedAt, key: `r:${r.id}:${r.index}:${r.itemStartedAt}` }; }
+    return continuityScene();
+  }
+
+  /* ---------- drawing a scene, with a transition ---------- */
+  function drawScene(sc) {
+    const old = st.current;
+    const box = document.createElement("div"); box.className = "tvp-scene";
+    const slots = [];
+    $(".tvp-standby").hidden = !sc?.standby; $(".tvp-off").hidden = !sc?.off;
+    if (sc && !sc.standby && !sc.off) {
+      const offset = sc.startAt ? Math.max(0, (now() - sc.startAt) / 1000) : 0;
+      const rects = RECTS[channel][sc.layout] || RECTS[channel].full;
+      (sc.sources || []).slice(0, rects.length || 1).forEach((src, i) => {
+        const r = rects[i] || rects[0]; if (!r) return;
+        const el = document.createElement("div"); el.className = `tvs ${rects.length > 1 ? "multi" : ""}`;
+        el.style.cssText = `left:${r[0]}%;top:${r[1]}%;width:${r[2]}%;height:${r[3]}%`;
+        box.append(el); slots.push(makeSource(el, src, offset, i === 0));
+      });
+      if (sc.graphic) box.append(graphic(sc));
+    }
+    stage.querySelector(".tvp-stage").append(box);
+    const t = old ? (st.ctl?.transition || { type: "mix", ms: 600 }) : { type: "cut", ms: 0 };
+    const finish = () => { old?.box.remove(); old?.slots.forEach(s => s.destroy()); };
+    if (!old || t.type === "cut" || mode === "scene") finish();
+    else if (t.type === "mix") { box.style.animation = `tvmix ${t.ms}ms ease both`; setTimeout(finish, t.ms); }
+    else if (t.type === "wipe" || t.type === "stinger") {
+      const w = document.createElement("div"); w.className = t.type === "wipe" ? "tvp-wipe" : "tvp-stinger";
+      if (t.type === "stinger") w.innerHTML = `<img src="${LOGO}" alt="">`;
+      stage.append(w); box.style.visibility = "hidden";
+      if (!st.muted) whoosh(st.audio);
+      setTimeout(() => { box.style.visibility = ""; finish(); }, t.type === "wipe" ? 450 : 700);
+      setTimeout(() => w.remove(), t.type === "wipe" ? 1000 : 1400);
+    }
+    st.current = { key: sc?.key, scene: sc, box, slots };
+    stage.classList.toggle("lband", sc?.layout === "lband");
+    stage.classList.toggle("full-gfx", !!sc?.full || sc?.graphic?.kind === "promo" || sc?.graphic?.kind === "ads");
+  }
+
+  /* ---------- graphics ---------- */
+  const ist = () => bnDigits(new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }));
+  const tickerHTML = list => { const items = list.map(t => `<span>${esc(t)}</span>`).join("<i>◆</i>"); return `<div class="tk-move" style="--dur:${Math.max(40, list.length * 9)}s"><div>${items}<i>◆</i></div><div aria-hidden="true">${items}<i>◆</i></div></div>`; };
+  const adBox = ad => ad?.image ? `<div class="tv-ad img"><img src="${esc(ad.image)}" alt=""></div>` : `<div class="tv-ad"><b>${esc(ad?.line1 || "")}</b><hr><small>${esc(ad?.line2 || "")}</small><hr><small>${esc(ad?.line3 || "")}</small></div>`;
+  const vJacket = (inner, band) => `<div class="vj"><img class="vj-strip" src="/brand/jacket-strip.webp" alt=""><div class="vj-logo"><img src="${LOGO}" alt=""></div><div class="vj-frame">${inner}</div><div class="vj-band"><b>${esc(band)}</b>${adBox(sponsorAd())}</div></div>`;
+  const sponsorAd = () => st.ctl?.sponsor ? { image: st.ctl.sponsor.image, line1: st.ctl.sponsor.line1, line2: st.ctl.sponsor.line2, line3: st.ctl.sponsor.line3 } : st.tv?.ad;
+  function headlineSets() {
+    const Hs = st.tv?.headlines || [], sets = [], used = new Set();
+    const take = (pred, label) => { const l = Hs.filter(h => !used.has(h.text) && pred(h)).slice(0, 5); l.forEach(h => used.add(h.text)); if (l.length >= 3) sets.push({ label, items: l.map(h => h.text) }); };
+    take(() => true, "সর্বশেষ"); take(h => h.desk === "Kolkata" || h.desk === "West Bengal", "কলকাতা ও রাজ্য"); take(h => h.desk === "India" || h.desk === "Probashi Bangali", "দেশ"); take(h => h.desk === "World", "বিশ্ব"); take(() => true, "আরও খবর");
+    return sets.slice(0, st.tv?.sets || 3);
+  }
+  const setHTML = (name, label, items, step) => `<div class="nu-set"><div class="nu-head"><span>${esc(name)}</span><b>${esc(label)}</b><i style="--d:${step}s"></i></div><ol>${items.map((h, n) => `<li style="--n:${n}"><em>${bnDigits(n + 1)}</em><span>${esc(h)}</span></li>`).join("")}</ol></div>`;
+  function graphic(sc) {
+    const g = sc.graphic, el = document.createElement("div"); el.className = "tvp-pkg";
+    const wrapV = (inner, band) => channel === "v" ? vJacket(inner, band) : inner;
+    if (g.kind === "news") {   // News Update / Bulletin from the latest headlines
+      const name = new Date(sc.startAt || now()).getMinutes() < 5 ? "বুলেটিন" : "নিউজ আপডেট", sets = headlineSets(), step = st.tv?.setSeconds || 7;
+      const card = () => wrapV(`<div class="nu-title${channel === "v" ? " v" : ""}"><img src="${LOGO}" alt=""><b>${name}</b><small>${ist()}</small></div>`, name);
+      const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = Math.floor((e - 5) / step), x = sets[Math.min(sets.length - 1, k)]; el.innerHTML = e < 5 || !x ? card() : wrapV(setHTML(name, x.label, x.items, step), x.label); };
+      draw(); const t = setInterval(() => el.isConnected ? draw() : clearInterval(t), 1000);
+    } else if (g.kind === "headlines") {
+      const items = g.lines?.length ? g.lines : (st.tv?.headlines || []).slice(0, 5).map(h => h.text);
+      el.innerHTML = wrapV(setHTML("শিরোনাম", g.title || "সর্বশেষ", items, sc.dur || 10), g.title || "শিরোনাম");
+    } else if (g.kind === "breaking") {
+      el.innerHTML = channel === "h" ? `<div class="tv-breaking static"><div class="br-slash"></div><div class="br-in"><span class="br-tag">ব্রেকিং নিউজ</span><b>${esc(g.text)}</b><img src="${LOGO}" alt=""></div><div class="br-bar"></div></div>` : vJacket(`<div class="br-v"><span class="br-tag">ব্রেকিং নিউজ</span><b>${esc(g.text)}</b></div>`, "ব্রেকিং নিউজ");
+      if (g.music && !st.muted) breakingSting(st.audio, Math.min(8, sc.dur || 8));
+    } else if (g.kind === "slate") {
+      el.innerHTML = g.image ? `<div class="tv-promo"><img src="${esc(g.image)}" alt=""></div>` : wrapV(`<div class="nu-title${channel === "v" ? " v" : ""}"><img src="${LOGO}" alt=""><b>${esc(g.text || "রাষ্ট্রিক্স")}</b></div>`, g.text || "");
+    } else if (g.kind === "promo") {
+      el.innerHTML = `<div class="tv-promo"><img src="${esc(g.image)}" alt=""></div>`;
+    } else if (g.kind === "ads") {   // an ad break: each card for its seconds
+      const items = g.items || []; let i = -1;
+      const next = () => { if (!el.isConnected && i >= 0) return; i++; const x = items[i % Math.max(1, items.length)]; if (!x) return; el.innerHTML = `<div class="tv-promo"><img src="${esc(x.image)}" alt=""></div>`; setTimeout(next, (x.seconds || 10) * 1000); };
+      next();
+    } else if (g.kind === "lband") {
+      el.className = "tvp-lband";
+      const lines = g.lines?.length ? g.lines : (st.tv?.headlines || []).slice(0, 5).map(h => h.text);
+      el.innerHTML = channel === "h"
+        ? `<div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${lines.map(t => `<p>${esc(t)}</p>`).join("")}</div><div class="lb-bottom"><b>${esc(g.text || lines[0] || "")}</b>${adBox(sponsorAd())}</div>`
+        : `<div class="lbv-bottom"><b>${esc(g.text || lines[0] || "")}</b>${lines.slice(0, 3).map(t => `<p>${esc(t)}</p>`).join("")}</div>`;
+    } else if (g.kind === "results") el.innerHTML = resultsHTML(g.id, true);
+    else if (g.kind === "poll") el.innerHTML = pollHTML(g.id, true);
+    return el;
+  }
+  function resultsHTML(id, full) {
+    const b = (st.tv?.boards || []).find(x => x.id === id); if (!b) return "";
+    if (b.blackout) return full ? `<div class="res-full"><div class="res-head"><b>${esc(b.title)}</b></div><p class="res-block">ফল প্রকাশের সময় হয়নি। নির্বাচন কমিশনের নির্দেশ অনুযায়ী এখন কোনো ফল বা বুথফেরত সমীক্ষা দেখানো যাবে না।</p></div>` : "";
+    const max = Math.max(1, ...b.rows.map(r => (r.won || 0) + (r.leading || 0)));
+    const rows = b.rows.map(r => `<li style="--c:${esc(r.colour || "#AA0404")}"><b>${esc(r.party)}</b><span class="res-bar"><i style="width:${100 * ((r.won || 0) + (r.leading || 0)) / max}%"></i></span><em>${bnDigits(r.won || 0)}${b.kind === "seats" ? ` <small>+${bnDigits(r.leading || 0)}</small>` : ""}</em></li>`).join("");
+    return `<div class="${full ? "res-full" : "res-bar-ovl"}"><div class="res-head"><b>${esc(b.title)}</b><small>${b.kind === "seats" ? `জয়ী + এগিয়ে · মোট আসন ${bnDigits(b.total)}` : "প্রাপ্ত ভোট"}</small></div><ol>${rows}</ol><p class="res-src">সূত্র: ${esc(b.source || "নির্বাচন কমিশন")} · শুধু সরকারি তথ্য</p></div>`;
+  }
+  function pollHTML(id, full) {
+    const p = (st.tv?.polls || []).find(x => x.id === id); if (!p) return "";
+    const total = p.counts.reduce((a, b) => a + b, 0) || 1;
+    return `<div class="${full ? "poll-full" : "poll-bar"}"><div class="poll-q"><span>জনমত</span><b>${esc(p.question)}</b></div><div class="poll-opts">${p.options.map((o, i) => `<span><b>${esc(o)}</b><i style="width:${Math.round(100 * p.counts[i] / total)}%"></i><em>${bnDigits(Math.round(100 * p.counts[i] / total))}%</em></span>`).join("")}</div><small class="poll-note">অ্যাপে ভোট দিন · এটি বৈজ্ঞানিক সমীক্ষা নয় · মোট ${bnDigits(p.counts.reduce((a, b) => a + b, 0))} ভোট</small></div>`;
+  }
+  function drawJacket() {
+    const c = st.ctl || {}, L = c.layers || { bug: true, live: true, clock: true, lower: true, ticker: true, ad: true, weather: true }, s = st.tv || {};
+    const sc = st.current?.scene, fullGfx = stage.classList.contains("full-gfx");
+    if (!sc || sc.off || sc.standby || fullGfx || mode === "scene" && !sc.sources?.length && !sc.graphic) { $(".tvp-gfx").innerHTML = ""; $(".tvp-ovl").innerHTML = ""; return; }
+    const isVideo = (sc.sources || []).length && !sc.graphic, lband = sc.layout === "lband";
+    const ticker = [...(c.ticker || []), ...(sc.ticker || []), ...(L.weather && s.weather ? [s.weather] : []), ...(s.ticker || [])];
+    const strap = c.lower && L.lower ? c.lower : sc.lower && L.lower ? sc.lower : null;
+    if (channel === "h") {
+      $(".tvp-gfx").innerHTML = `
+        ${L.bug ? `<div class="tv-bug"><img src="${LOGO}" alt=""></div>` : ""}
+        ${L.live ? `<div class="tv-live"><i></i>LIVE</div>` : ""}${L.clock ? `<div class="tv-clock">${ist()}${s.bangabda ? `<small>${esc(s.bangabda)}</small>` : ""}</div>` : ""}
+        ${!lband && L.lower && (strap || isVideo) ? `<div class="tv-l3"><span class="lt-tag">${strap ? esc(strap.title ? "রাষ্ট্রিক্স" : "রাষ্ট্রিক্স") : "রাষ্ট্রিক্স"}</span><span class="lt-text">${strap ? `${esc(strap.name)}${strap.title ? `<small>${esc(strap.title)}</small>` : ""}` : esc(s.lowerThird || sc.label || "")}</span></div>` : ""}
+        ${!lband && L.ad && isVideo ? adBox(sponsorAd()) : ""}
+        ${L.ticker ? `<div class="tv-ticker"><span class="tk-label">শিরোনাম</span><div class="tk-track">${tickerHTML(ticker)}</div></div>` : ""}`;
+    } else {
+      const flash = s.band || (s.headlines || [])[st.flash % Math.max(1, (s.headlines || []).length)]?.text || "";
+      $(".tvp-gfx").innerHTML = `
+        ${isVideo && L.lower ? `<div class="v-flash"><span>${strap ? "রাষ্ট্রিক্স" : s.band ? "রাষ্ট্রিক্স" : "শিরোনাম"}</span><b>${esc(strap ? `${strap.name}${strap.title ? ` · ${strap.title}` : ""}` : flash)}</b></div>` : ""}
+        ${isVideo && L.live ? `<div class="tv-live v"><i></i>LIVE</div>` : ""}
+        ${L.ticker ? `<div class="tv-ticker v"><span class="tk-label">খবর</span><div class="tk-track">${tickerHTML(ticker)}</div></div>` : ""}`;
+    }
+    // Overlays: poll bar, results bar, curated comments.
+    const o = c.overlay || {};
+    $(".tvp-ovl").innerHTML = `${o.poll ? pollHTML(o.poll, false) : ""}${o.results ? resultsHTML(o.results, false) : ""}${o.comments?.length ? `<div class="cm-box">${o.comments.slice(0, 3).map(x => `<p><b>${esc(x.author)}</b><span>${esc(x.text)}</span><small>${x.platform === "youtube" ? "ইউটিউব" : x.platform === "facebook" ? "ফেসবুক" : "রাষ্ট্রিক্স অ্যাপ"}</small></p>`).join("")}</div>` : ""}`;
+  }
+  function showBreaking(b) {
+    const el = document.createElement("div"); el.className = "tv-breaking";
+    el.innerHTML = channel === "h"
+      ? `<div class="br-slash"></div><div class="br-in"><span class="br-tag">ব্রেকিং নিউজ</span><b>${esc(b.text)}</b><img src="${LOGO}" alt=""></div><div class="br-bar"></div>`
+      : vJacket(`<div class="br-v"><span class="br-tag">ব্রেকিং নিউজ</span><b>${esc(b.text)}</b></div>`, "ব্রেকিং নিউজ");
+    stage.append(el);
+    if (b.music && !st.muted) breakingSting(st.audio, Math.min(b.seconds, 8));
+    st.current?.slots.forEach(s => s.setMuted(true));
+    setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 600); st.current?.slots.forEach(s => s.setMuted(st.muted)); }, b.seconds * 1000);
+  }
+
+  /* ---------- the clock ---------- */
+  function tick() {
+    if (!st.alive) return;
+    // Outputs apply realtime changes after the broadcast delay.
+    while (st.queue.length && st.queue[0].at <= Date.now()) { st.ctl = st.queue.shift().state; onState?.(st.ctl); }
+    const sc = resolve();
+    if (sc?.key !== st.current?.key) drawScene(sc);
+    const b = st.ctl?.breaking || st.tv?.breaking;
+    if (mode !== "scene" && b && st.shownBreaking !== b.at && now() - Date.parse(b.at) < 90e3) { st.shownBreaking = b.at; showBreaking(b); }
+    drawJacket();
+    // Health: a source that has not moved for ten seconds is reported (outputs only).
+    const stalled = st.current?.slots.some(s => s.stalled());
+    st.stalledSince = stalled ? st.stalledSince || Date.now() : 0;
+  }
+  /* ---------- data ---------- */
+  async function loadTv() {
+    if (mode === "scene" && !fixedScene?.needsTv) { /* the PCR preview still wants headlines for graphics */ }
+    try { const r = await fetch(`/api/tv/${channel}`, { cache: "no-store" }); if (r.ok) { const s = await r.json(); st.skew = s.serverTime - Date.now(); st.tv = s; } } catch { /* keep */ }
+  }
+  function applyCtl(state, serverTime) {
+    if (serverTime) st.skew = serverTime - Date.now();
+    const delay = mode === "program" && output ? (state.delay || 0) * 1000 : 0;
+    if (state.dumpAt && state.dumpAt !== st.ctl?.dumpAt && Date.now() - state.dumpAt < 15000) { st.queue = []; st.dumpUntil = now() + delay; st.ctl = state; return; }
+    if (!delay) { st.queue = []; st.ctl = state; onState?.(state); }
+    else st.queue.push({ at: Date.now() + delay, state });
+  }
+  function connect() {
+    if (mode === "scene" || !st.alive) return;
+    const q = new URLSearchParams({ ...(key ? { key } : {}), ...(guestToken ? { t: guestToken } : {}) });
+    let ws; try { ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/ws/ctl/${channel}?${q}`); } catch { return setTimeout(connect, 5000); }
+    st.ws = ws;
+    ws.onmessage = e => { try { const m = JSON.parse(e.data); if (m.type === "state") applyCtl(m.state, m.serverTime); if (m.type === "room") st.room = m.state; } catch { /* bad message */ } };
+    ws.onclose = () => { st.ws = null; if (st.alive) setTimeout(connect, 3000); };
+  }
+  // Without WebSockets the state is read every five seconds.
+  async function poll() { if (st.ws?.readyState === 1 || mode === "scene") return; try { const r = await fetch(`/api/ctl/${channel}/state`, { cache: "no-store" }); if (r.ok) { const d = await r.json(); applyCtl(d.state, d.serverTime); } } catch { /* offline */ } }
+  function heartbeat() { if (!output || st.ws?.readyState !== 1) return; st.ws.send(JSON.stringify({ type: "hb", playing: st.current?.slots.some(s => s.playing?.()) || !!st.current?.scene?.graphic, stalledFor: st.stalledSince ? Math.round((Date.now() - st.stalledSince) / 1000) : 0, item: st.current?.scene?.label || "", ua: navigator.userAgent })); }
+
+  loadTv().then(tick); connect(); poll();
+  const timers = [setInterval(loadTv, 15000), setInterval(tick, 500), setInterval(() => { st.flash++; }, 8000), setInterval(poll, 5000), setInterval(heartbeat, 5000)];
+  return {
+    destroy() { st.alive = false; timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
+    unmute, setScene(sc) { fixedScene = sc; tick(); }, get state() { return st.ctl; }
+  };
+}

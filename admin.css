@@ -19,7 +19,7 @@ header{height:68px;border-bottom:1px solid var(--line);display:flex;align-items:
 .layout{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:calc(100vh - 68px)}
 .sidebar{border-right:1px solid var(--line);padding:24px 14px;display:flex;flex-direction:column;gap:4px;background:rgba(255,255,255,.45)}
 .side-label{font:500 11px var(--mono);letter-spacing:1.6px;color:var(--muted);padding:0 12px 14px}
-.nav{background:none;border:1px solid transparent;border-radius:10px;text-align:left;color:var(--ink-2);padding:10px 12px;font-size:14px;font-weight:600;cursor:pointer}
+.nav{display:block;text-decoration:none;background:none;border:1px solid transparent;border-radius:10px;text-align:left;color:var(--ink-2);padding:10px 12px;font-size:14px;font-weight:600;cursor:pointer}
 .nav:hover{background:rgba(15,20,34,.04)}
 .nav.active{background:var(--ink);color:#fff}
 .sidebar-note{margin-top:auto;padding:14px 12px;color:var(--muted);font-size:12px;line-height:1.6}

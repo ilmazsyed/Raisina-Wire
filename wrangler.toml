@@ -12,7 +12,7 @@ not_found_handling = "single-page-application"
 # is served straight from the built files. Bengali pages are at the bare addresses; English
 # under /en, Hindi under /hi; old /bn addresses redirect.
 run_worker_first = [
-  "/api/*", "/mcp", "/oauth/*", "/.well-known/*", "/media/*", "/", "/edition/*", "/article/*", "/author/*", "/tag/*", "/desk/*",
+  "/api/*", "/mcp", "/oauth/*", "/.well-known/*", "/media/*", "/clips/*", "/", "/edition/*", "/article/*", "/author/*", "/tag/*", "/desk/*",
   "/live", "/briefs", "/community", "/discussion/*", "/events", "/coverage/*",
   "/about", "/terms", "/privacy", "/disclaimer", "/copyright", "/corrections", "/community-guidelines", "/grievance", "/privacy.html", "/terms.html",
   "/en", "/en/*", "/hi", "/hi/*", "/bn", "/bn/*",
@@ -54,6 +54,25 @@ GEMINI_DAILY_LIMIT = "200"
 # Rashtrix TV (src/youtube.js): needs the YOUTUBE_API_KEY secret (YouTube Data API v3, free quota).
 # Units a day the TV may use refreshing sources (the free quota is 10,000).
 YOUTUBE_DAILY_UNITS = "8000"
+# The control room: rundowns and the as-run log are kept this many days; clips this many days unused.
+ARCHIVE_DAYS = "90"
+CLIP_RETENTION_DAYS = "30"
 
 [ai]
 binding = "AI"
+
+# Realtime control (src/control.js): one Durable Object per channel and per live-studio room.
+# SQLite-backed, so it runs on the Workers free plan.
+[[durable_objects.bindings]]
+name = "CONTROL"
+class_name = "TvControl"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TvControl"]
+
+# Video clips (src/clips.js). Create the bucket once with `npx wrangler r2 bucket create rashtrix-clips`
+# (R2 free tier: 10 GB). Clips not marked "keep" are deleted after CLIP_RETENTION_DAYS without use.
+[[r2_buckets]]
+binding = "CLIPS"
+bucket_name = "rashtrix-clips"

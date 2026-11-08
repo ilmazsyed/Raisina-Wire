@@ -12,8 +12,10 @@ export const LANGUAGES = {
 export const DEFAULT_LANG = "bn";
 const PREFIX = /^\/(en|hi)(?=\/|$)/;
 export const langOf = path => path.match(PREFIX)?.[1] || DEFAULT_LANG;
-export const lang = langOf(location.pathname);
-export const LOCALE = LANGUAGES[lang].locale;
+export let lang = langOf(location.pathname);
+export let LOCALE = LANGUAGES[lang].locale;
+// Control-room and guest screens choose their language themselves (remembered per person).
+export function setLang(l) { if (LANGUAGES[l]) { lang = l; LOCALE = LANGUAGES[l].locale; } }
 export const stripLang = path => path.replace(PREFIX, "") || "/";
 const isAppPath = href => href.startsWith("/") && !href.startsWith("//") && !/^\/(api|admin|media|cdn-cgi)(\/|$)|\.(html|xml|txt|json|js|css|webmanifest|jpe?g|png|gif|avif|webp|svg|ico|pdf|ics|mp3)(\?|#|$)/i.test(href);
 // "/article/x" -> "/en/article/x" while reading in English.

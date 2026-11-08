@@ -112,3 +112,54 @@ body.tv-output{margin:0;background:#000;overflow:hidden}
 body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 .tv-denied{display:grid;place-content:center;height:100vh;color:#fff;font:600 20px system-ui;text-align:center}
 .tvp [hidden]{display:none!important}
+
+/* ---------- Program engine: scenes, layouts, transitions (Phase 3) ---------- */
+.tvp-stage{position:absolute;inset:0;z-index:1}
+.tvp-scene{position:absolute;inset:0}
+.tvs{position:absolute;overflow:hidden;background:#000}
+.tvs.multi{border-radius:14px;box-shadow:0 0 0 3px #fff,0 14px 30px rgba(0,0,0,.35)}
+.tvs iframe,.tvs video,.tvs .tvs-yt,.tvs .tvs-yt iframe{position:absolute;inset:0;width:100%!important;height:100%!important;border:0;object-fit:cover}
+.tvs-poster,.tvs-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.tvs-logo{position:absolute;inset:0;display:grid;place-items:center;background:#fff}.tvs-logo img{height:40%}
+.tvs-name{position:absolute;left:12px;bottom:12px;z-index:4;display:flex;flex-direction:column;padding:6px 12px;background:rgba(255,255,255,.95);border-left:6px solid var(--red);border-radius:6px;font:700 26px/1.2 "Hind Siliguri",sans-serif;color:#111}
+.tvs-name small{font-weight:600;font-size:18px;color:#444}
+.tvp-stage .tvp-pkg{position:absolute;inset:0;z-index:3}
+@keyframes tvmix{from{opacity:0}to{opacity:1}}
+.tvp-wipe{position:absolute;inset:0;z-index:12;background:linear-gradient(115deg,transparent 0 30%,var(--red) 30% 62%,#fff 62% 64%,var(--maroon) 64% 76%,transparent 76%);background-size:300% 100%;animation:tvwipe 1s cubic-bezier(.6,0,.4,1) both}
+@keyframes tvwipe{from{background-position:100% 0}to{background-position:0 0}}
+.tvp-stinger{position:absolute;inset:0;z-index:12;display:grid;place-items:center;background:var(--red);animation:tvsting 1.4s cubic-bezier(.6,0,.4,1) both}
+.tvp-stinger img{height:40%;background:#fff;padding:2%;border-radius:18px;animation:tvzoom .7s ease both}
+@keyframes tvsting{0%{clip-path:circle(0% at 50% 50%)}40%,60%{clip-path:circle(80% at 50% 50%)}100%{clip-path:circle(80% at 50% 50%);opacity:0}}
+.tvp-standby{position:absolute;inset:0;z-index:18;display:grid;place-content:center;justify-items:center;gap:24px;background:#fff;font:700 64px "Noto Serif Bengali",serif;color:var(--maroon)}
+.tvp-standby img{height:320px}.tvp-standby small{font:600 34px "Hind Siliguri",sans-serif;color:#333}
+.tv-clock small{display:block;font:600 18px "Hind Siliguri",sans-serif;color:#444;text-align:center}
+.tv-l3 .lt-text small{display:block;font:600 26px "Hind Siliguri",sans-serif;color:#444}
+.tvp-lband{position:absolute;inset:0;z-index:2}
+.tvp-v .lbv-bottom{position:absolute;left:0;right:0;top:68%;bottom:64px;padding:30px 40px;background:linear-gradient(160deg,var(--red),var(--maroon));color:#fff;display:flex;flex-direction:column;gap:14px}
+.lbv-bottom b{font:700 50px/1.25 "Noto Serif Bengali",serif}.lbv-bottom p{margin:0;font:600 30px/1.3 "Hind Siliguri",sans-serif;border-top:1px solid rgba(255,255,255,.3);padding-top:10px}
+.tv-breaking.static{position:absolute;animation:none}
+.full-gfx .tvp-gfx,.full-gfx .tvp-ovl{display:none}
+/* overlays: poll bar, results, comments */
+.tvp-ovl{position:absolute;inset:0;z-index:7;pointer-events:none}
+.poll-bar{position:absolute;left:56px;right:440px;bottom:96px;padding:16px 22px;border-radius:14px;background:rgba(255,255,255,.96);box-shadow:0 14px 30px rgba(0,0,0,.3);border-top:5px solid var(--red)}
+.tvp-v .poll-bar{left:30px;right:30px;bottom:90px}
+.poll-q{display:flex;gap:14px;align-items:center}.poll-q span{padding:4px 12px;background:var(--red);color:#fff;border-radius:6px;font:800 24px "Hind Siliguri",sans-serif}.poll-q b{font:700 32px/1.25 "Noto Serif Bengali",serif}
+.poll-opts{display:grid;gap:8px;margin-top:12px}.poll-opts span{position:relative;display:flex;justify-content:space-between;padding:8px 14px;border-radius:8px;background:#f3f3f3;overflow:hidden;font:700 26px "Hind Siliguri",sans-serif}
+.poll-opts span i{position:absolute;left:0;top:0;bottom:0;background:rgba(170,4,4,.18)}.poll-opts span b,.poll-opts span em{position:relative;font-style:normal}
+.poll-note{display:block;margin-top:8px;font:600 18px "Hind Siliguri",sans-serif;color:#555}
+.poll-full{position:absolute;inset:120px 160px;padding:40px;border-radius:24px;background:rgba(255,255,255,.96)}
+.poll-full .poll-q b{font-size:52px}.poll-full .poll-opts span{font-size:38px;padding:16px 22px}.poll-full .poll-note{font-size:26px}
+.res-full{position:absolute;inset:90px 120px 110px;padding:36px 44px;border-radius:24px;background:rgba(255,255,255,.97);box-shadow:0 20px 50px rgba(0,0,0,.15)}
+.tvp-v .res-full{inset:300px 40px 120px}
+.res-head{display:flex;align-items:baseline;justify-content:space-between;gap:20px;border-bottom:2px solid var(--gold);padding-bottom:12px}.res-head b{font:800 48px "Noto Serif Bengali",serif}.res-head small{font:600 24px "Hind Siliguri",sans-serif;color:#444}
+.res-full ol,.res-bar-ovl ol{list-style:none;margin:20px 0 0;padding:0;display:grid;gap:14px}
+.res-full li,.res-bar-ovl li{display:grid;grid-template-columns:260px 1fr 140px;align-items:center;gap:18px;font:700 34px "Hind Siliguri",sans-serif}
+.res-bar{height:34px;border-radius:8px;background:#eee;overflow:hidden}.res-bar i{display:block;height:100%;background:var(--c)}
+.res-full li em,.res-bar-ovl li em{font-style:normal;text-align:right}.res-full li em small{font-size:22px;color:#666}
+.res-src{margin:18px 0 0;font:600 22px "Hind Siliguri",sans-serif;color:#555}.res-block{font:700 40px/1.4 "Noto Serif Bengali",serif;color:var(--maroon);margin-top:40px}
+.res-bar-ovl{position:absolute;right:40px;top:230px;width:620px;padding:20px 24px;border-radius:16px;background:rgba(255,255,255,.96);box-shadow:0 14px 30px rgba(0,0,0,.3)}
+.res-bar-ovl .res-head b{font-size:30px}.res-bar-ovl .res-head small{font-size:16px}.res-bar-ovl li{grid-template-columns:150px 1fr 90px;font-size:24px}.res-bar-ovl .res-bar{height:22px}.res-bar-ovl .res-src{font-size:15px}
+.cm-box{position:absolute;right:40px;top:230px;width:560px;display:grid;gap:12px}
+.tvp-v .cm-box{left:30px;right:30px;top:auto;bottom:90px;width:auto}
+.cm-box p{margin:0;padding:12px 16px;border-radius:12px;background:rgba(255,255,255,.96);box-shadow:0 10px 24px rgba(0,0,0,.25);border-left:6px solid var(--gold);display:grid;gap:2px;animation:tvin .6s both}
+.cm-box b{font:800 22px "Hind Siliguri",sans-serif;color:var(--red)}.cm-box span{font:600 26px/1.35 "Hind Siliguri",sans-serif}.cm-box small{font:600 16px "Hind Siliguri",sans-serif;color:#666}

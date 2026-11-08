@@ -75,3 +75,17 @@ export async function drainAlerts(env) {
     break; // one batch per run keeps each invocation small
   }
 }
+
+// Alerts for the newsroom only (an output went quiet, the standby slate went up): sent to the
+// devices of signed-in editors and administrators. Pushes carry no payload; a staff device that
+// asks /api/alerts/latest within five minutes gets this alert instead of the public one.
+export async function staffAlert(env, { title, body = "", url = "/admin.html" }) {
+  const last = await env.DB.prepare("SELECT value FROM settings WHERE key='staff_alert'").first();
+  const prev = last ? JSON.parse(last.value) : null;
+  if (prev && prev.title === title && Date.now() - Date.parse(prev.at) < 10 * 60e3) return;   // no repeats within 10 minutes
+  await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('staff_alert',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+    .bind(JSON.stringify({ title: String(title).slice(0, 140), body: String(body).slice(0, 240), url, at: new Date().toISOString() })).run();
+  const { results } = await env.DB.prepare("SELECT p.endpoint FROM push_subscriptions p JOIN users u ON u.id=p.user_id WHERE u.role IN ('admin','editor') LIMIT 40").all();
+  const subject = env.SITE_URL || "mailto:alerts@rashtrix.invalid";
+  await Promise.all(results.map(s => sendPush(env, s.endpoint, subject)));
+}

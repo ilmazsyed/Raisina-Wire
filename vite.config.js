@@ -17,7 +17,7 @@ function precacheServiceWorker() {
         return statSync(path).isDirectory() ? walk(path) : [path];
       });
       const files = walk(outDir).map(f => "/" + relative(outDir, f).split("\\").join("/"))
-        .filter(f => !/^\/(sw\.js|_headers|og-image[\w-]*\.jpg|admin|tv\.html)/.test(f) && !f.includes("/admin-") && !f.includes("/tv-"))
+        .filter(f => !/^\/(sw\.js|_headers|og-image[\w-]*\.jpg|admin|tv\.html|producer|pcr|studio|prompter|guest)/.test(f) && !/\/(admin|tv|producer|pcr|studio|prompter|guest|crshell|control|uilang)-/.test(f))
         .map(f => (f === "/index.html" ? "/" : f))
         .sort();
       const hash = createHash("sha256");
@@ -39,7 +39,9 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, "index.html"),
         admin: resolve(import.meta.dirname, "admin.html"),
-        tv: resolve(import.meta.dirname, "tv.html")
+        tv: resolve(import.meta.dirname, "tv.html"),
+        producer: resolve(import.meta.dirname, "producer.html"),
+        pcr: resolve(import.meta.dirname, "pcr.html")
       }
     }
   }

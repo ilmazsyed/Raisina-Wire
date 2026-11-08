@@ -21,6 +21,11 @@ import m0017 from "../migrations/0017_article_video.sql";
 import m0020 from "../migrations/0020_oauth.sql";
 import m0021 from "../migrations/0021_rashtrix.sql";
 import m0022 from "../migrations/0022_tv.sql";
+import m0023 from "../migrations/0023_studio.sql";
+import { handleControlRoom, control as ctlCommand } from "./controlroom.js";
+import { serveClip, clipHousekeeping } from "./clips.js";
+import { rundownHousekeeping } from "./rundown.js";
+export { TvControl } from "./control.js";
 import { CHANNELS, tvSettings, saveTvSettings, newOutputKey, setBreaking, tvState, clearTvCache, checkKey, promos as tvPromos, copyImage } from "./tvchannel.js";
 import { parseYouTubeRef, refreshSources, refreshSource, playlistTitle, ytUsage, ytReady } from "./youtube.js";
 import { setGuestWriters, isBuiltIn } from "./writers.js";
@@ -74,7 +79,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -449,6 +454,18 @@ async function api(request, env, ctx) {
     return json({ user: user ? { id:user.id,email:user.email,displayName:user.display_name,role:user.role } : null },200,{ "cache-control":"no-store" });
   }
 
+  // The language of the control-room and studio screens, remembered per person.
+  if (url.pathname === "/api/auth/ui-lang") {
+    const user = await currentUser(request, env);
+    if (!user) return json({ lang: null }, 200, { "cache-control": "no-store" });
+    if (request.method === "PUT") {
+      const b = await request.json().catch(() => ({}));
+      await env.DB.prepare("UPDATE users SET ui_lang=? WHERE id=?").bind(LANGS.includes(b.lang) ? b.lang : "", user.id).run();
+      return json({ ok: true }, 200, { "cache-control": "no-store" });
+    }
+    const row = await env.DB.prepare("SELECT ui_lang FROM users WHERE id=?").bind(user.id).first();
+    return json({ lang: row?.ui_lang || null }, 200, { "cache-control": "no-store" });
+  }
   if (url.pathname === "/api/auth/me" && request.method === "PUT") {
     const user = await currentUser(request, env);
     if (!user) return err("Sign in required.", 401);
@@ -997,6 +1014,11 @@ async function api(request, env, ctx) {
     if (tvMatch[2]) return json({ ok: await checkKey(env, tvMatch[1], url.searchParams.get("key")) }, 200, { "cache-control": "no-store" });
     return json(await tvState(env, tvMatch[1]), 200, { "cache-control": "no-cache" });
   }
+  // ---- The control room (src/controlroom.js): realtime control, PCR commands, Companion, rundowns, clips.
+  if (/^\/api\/(ws\/ctl|ctl|companion|admin\/(rundowns|templates|asrun|proof|clips|macros|companion|copy-image|inputs))(\/|$)/.test(url.pathname)) {
+    const out = await handleControlRoom(request, env, url, { json, err, currentUser, isStaff, auditFn: (u, ...a) => audit(env, u, ...a) });
+    if (out) return out;
+  }
   if (url.pathname.startsWith("/api/admin/tv")) {
     const user = await currentUser(request, env);
     if (!isStaff(user)) return err("Editor access required.", 403);
@@ -1015,7 +1037,7 @@ async function api(request, env, ctx) {
       if (CHANNELS.includes(first)) {
         if (!second && request.method === "PUT") { await saveTvSettings(env, first, b); await audit(env, user, "tv.settings", "tv", first, { keys: Object.keys(b) }); return done(); }
         if (second === "key" && request.method === "POST") { const key = await newOutputKey(env, first); await audit(env, user, "tv.key", "tv", first, {}); return done({ ok: true, key }); }
-        if (second === "breaking" && request.method === "POST") { const br = await setBreaking(env, first, b); await audit(env, user, br ? "tv.breaking" : "tv.breaking.clear", "tv", first, br || {}); return done({ ok: true, breaking: br }); }
+        if (second === "breaking" && request.method === "POST") { const br = await setBreaking(env, first, b); await ctlCommand(env, first, "breaking", br ? br : { clear: true }, user.display_name || user.email, "breaking").catch(() => {}); await audit(env, user, br ? "tv.breaking" : "tv.breaking.clear", "tv", first, br || {}); return done({ ok: true, breaking: br }); }
         if (second === "items" && request.method === "GET") {
           const { results } = await env.DB.prepare("SELECT i.yt_id AS ytId,i.title,i.duration,i.thumb,i.published_at AS publishedAt,i.excluded,i.playable,s.title AS source FROM tv_items i LEFT JOIN tv_sources s ON s.id=i.source_id WHERE i.channel=? ORDER BY i.published_at DESC LIMIT 400").bind(first).all();
           return json({ items: results }, 200, { "cache-control": "no-store" });
@@ -1157,6 +1179,13 @@ async function api(request, env, ctx) {
     return json({ ok: true }, 200, { "cache-control": "no-store" });
   }
   if (url.pathname === "/api/alerts/latest" && request.method === "GET") {
+    // Staff devices get a newsroom alert (an output problem) when there is a fresh one.
+    if (request.headers.get("cookie")?.includes("rw_session")) {
+      const user = await currentUser(request, env).catch(() => null);
+      const row = isStaff(user) && await env.DB.prepare("SELECT value FROM settings WHERE key='staff_alert'").first();
+      const sa = row ? JSON.parse(row.value) : null;
+      if (sa && Date.now() - Date.parse(sa.at) < 5 * 60e3) return json({ alert: { title: sa.title, body: sa.body, url: sa.url, createdAt: sa.at } }, 200, { "cache-control": "no-store" });
+    }
     const a = await env.DB.prepare("SELECT title,body,url,created_at AS createdAt FROM alerts ORDER BY created_at DESC LIMIT 1").first();
     return json({ alert: a || null }, 200, { "cache-control": "no-store" });
   }
@@ -1437,6 +1466,9 @@ async function scheduled(env) {
   await step("wix backfill", () => backfillWix(env));
   // Rashtrix TV: refresh YouTube sources (each at most every ten minutes).
   await step("tv sources", () => refreshSources(env));
+  // The control room: midnight archive and the day's rundowns from templates; old clips go.
+  await step("rundowns", () => rundownHousekeeping(env));
+  await step("clips", () => clipHousekeeping(env));
 }
 // 9 am and 9 pm India time, every day (unless switched off in the control room).
 // The settings row makes each one send exactly once, even if two cron runs overlap.
@@ -1483,6 +1515,7 @@ export default {
     if (/^\/bn(\/|$)/.test(url.pathname) && ["GET", "HEAD"].includes(request.method)) return Response.redirect(new URL((url.pathname.replace(/^\/bn/, "") || "/") + url.search, request.url).toString(), 301);
     try {
       if (url.pathname.startsWith("/media/")) return await serveMedia(request, env, ctx);
+      if (url.pathname.startsWith("/clips/")) return await serveClip(request, env);
       if (url.pathname === "/robots.txt") return robots(request, env);
       if (url.pathname === "/privacy.html" || url.pathname === "/terms.html") return Response.redirect(new URL(url.pathname.replace(".html", ""), request.url).toString(), 301);
       if (url.pathname === "/sitemap.xml" && env.DB) return await sitemap(request, env, ensureSchema);
