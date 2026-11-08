@@ -30,7 +30,7 @@ import { rundownHousekeeping } from "./rundown.js";
 export { TvControl } from "./control.js";
 import { shortsList } from "./tvchannel.js";
 import { CHANNELS, tvSettings, saveTvSettings, newOutputKey, setBreaking, tvState, clearTvCache, checkKey, promos as tvPromos, copyImage } from "./tvchannel.js";
-import { parseYouTubeRef, refreshSources, refreshSource, playlistTitle, ytUsage, ytReady, addChannelSource } from "./youtube.js";
+import { parseYouTubeRef, refreshSources, refreshSource, playlistTitle, ytUsage, ytReady, addChannelSource, ownChannel, ownerOf, NOT_OWN } from "./youtube.js";
 import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { handleTts } from "./tts.js";
@@ -1073,6 +1073,11 @@ async function api(request, env, ctx) {
           if (!ref) return err("Paste a YouTube channel, playlist, video, Short or live address.");
           // A playlist is never a live, even with Live ticked.
           let kind = ref.kind === "playlist" ? "playlist" : b.kind === "live" || ref.kind === "live" ? "live" : ref.kind, id = randomId();
+          // Shorts and videos only from the Rashtrix channel; lives from any channel.
+          if (kind !== "live") {
+            if (!ytReady(env)) return err("Add the YouTube key first: it is needed to check the channel.");
+            if (await ownerOf(env, ref) !== (await ownChannel(env)).id) return err(NOT_OWN);
+          }
           if (ref.kind === "channel") {
             // A whole channel: its Shorts (vertical), its long videos (horizontal), or its live.
             if (!ytReady(env)) return err("Add the YouTube key first: a channel address needs it.");
@@ -1090,6 +1095,8 @@ async function api(request, env, ctx) {
           if (!src) return err("Not found.", 404);
           // One live on air per channel.
           if (b.onAir) await env.DB.prepare("UPDATE tv_sources SET on_air=0 WHERE channel=?").bind(src.channel).run();
+          // Straight to air: read the live's state now rather than at the next ten-minute refresh.
+          if (b.onAir && src.kind === "live" && ytReady(env)) await refreshSource(env, src).catch(() => {});
           await env.DB.prepare("UPDATE tv_sources SET active=?, on_air=?, title=? WHERE id=?").bind(b.active === undefined ? src.active : b.active ? 1 : 0, b.onAir === undefined ? src.on_air : b.onAir ? 1 : 0, b.title !== undefined ? clean(b.title, 200) : src.title, second).run();
           await audit(env, user, b.onAir !== undefined ? (b.onAir ? "tv.live.on" : "tv.live.off") : "tv.source.edit", "tv_source", second, b);
           return done();
