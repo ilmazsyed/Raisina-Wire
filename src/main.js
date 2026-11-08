@@ -462,8 +462,8 @@ function viewHome() {
         ${side.map(e => `<a class="side-item" href="${edHref(e)}"><div class="thumb">${pic(e)}</div><span class="kicker">${newTag(e)}${esc(e.category)}</span><h3>${esc(e.title)}</h3><span class="meta">${ago(e.publishedAt)}</span></a>`).join("")}
       </section>` : ""}
       <section class="lead-carousel" aria-roledescription="carousel" aria-label="Latest stories">
-        <div class="lc-track" id="lcTrack" tabindex="0">${top.map((e, i) => `<article class="lc-card glass" aria-roledescription="slide" aria-label="${digits(i + 1)} / ${digits(top.length)}">
-          <a class="lc-media" href="${edHref(e)}" tabindex="-1" aria-hidden="true">${e.image ? img(e.image, "") : textCard(e, { big: true })}</a>
+        <div class="lc-track" id="lcTrack" tabindex="0">${top.map((e, i) => `<article class="lc-card glass${e.image ? "" : " lc-text"}" aria-roledescription="slide" aria-label="${digits(i + 1)} / ${digits(top.length)}">
+          ${e.image ? `<a class="lc-media" href="${edHref(e)}" tabindex="-1" aria-hidden="true">${img(e.image, "")}</a>` : ""}
           <div class="lc-body">
             <div class="lc-meta"><span class="tag tag-red">${esc(e.category)}</span>${kindLabel(e) ? `<span class="kicker">${kindLabel(e)}</span>` : ""}${newTag(e)}</div>
             <h${i ? 2 : 1} class="lc-title"><a href="${edHref(e)}">${esc(e.title)}</a></h${i ? 2 : 1}>${e.dek ? `<p class="lc-dek">${esc(e.dek)}</p>` : ""}

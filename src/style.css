@@ -1812,3 +1812,11 @@ html:is([data-lang=bn],[data-lang=hi]) :is(.sf-col h3,.sf-form h3){font-size:15p
 .lc-media .text-card .tc-desk{font-size:14px;padding:3px 12px}
 .lc-media .text-card .tc-kind{font-size:13px}
 .lc-media .text-card .tc-foot{font-size:12px}
+
+/* Stories without a photo (wire briefs): no picture panel, a larger headline and more of the
+   standfirst, with a red rule along the top. The byline's small desk logo stays. */
+.lc-card.lc-text{border-top:4px solid var(--red)}
+.lc-card.lc-text .lc-body{padding-top:24px;gap:14px}
+.lc-card.lc-text .lc-title{font-size:clamp(26px,2.8vw,38px);-webkit-line-clamp:5}
+.lc-card.lc-text .lc-dek{-webkit-line-clamp:5}
+@media (max-width:640px){.lc-card.lc-text .lc-title{font-size:26px}}
