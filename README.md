@@ -182,7 +182,7 @@ You need a Cloudflare account. Do these once, in order.
 4. **Gemini (wire desk), free:** go to aistudio.google.com → **Get API key** → **Create API key**
    (no billing needed for the free tier). Then `npx wrangler secret put GEMINI_API_KEY` and paste it.
    The daily cap is `GEMINI_DAILY_LIMIT` in `wrangler.toml` (default 200 calls; keep it under the
-   free tier's daily limit for `GEMINI_MODEL`).
+   free tier's daily limit for `GEMINI_MODEL`, default `gemini-3.8-flash`; if Google retires a model, the desk switches to the one Google names by itself).
 5. **Approved outlets:** control room → **Wire desk** → *Approved sources*: add each outlet's name,
    RSS feed address and language. Add anything to avoid under *Blocklist*.
 6. **Listen voices (optional):** Google Cloud console → enable **Cloud Text-to-Speech API** (billing
