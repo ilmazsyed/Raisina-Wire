@@ -290,7 +290,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const items = g.lines?.length ? g.lines : (st.tv?.headlines || []).slice(0, 5).map(h => h.text);
       el.innerHTML = wrapV(setHTML("শিরোনাম", g.title || "সর্বশেষ", items, sc.dur || 10), g.title || "শিরোনাম");
     } else if (g.kind === "breaking") {
-      el.innerHTML = channel === "h" ? `<div class="tv-breaking static"><div class="br-slash"></div><div class="br-in"><span class="br-tag">ব্রেকিং নিউজ</span><b>${esc(g.text)}</b><img src="${LOGO}" alt=""></div><div class="br-bar"></div></div>` : vJacket(`<div class="br-v"><span class="br-tag">ব্রেকিং নিউজ</span><b>${esc(g.text)}</b></div>`, "ব্রেকিং নিউজ");
+      el.innerHTML = channel === "h" ? `<div class="tv-breaking static"><div class="br-slash"></div><div class="br-in"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(g.text)}</b><img src="${LOGO}" alt=""></div><div class="br-bar"></div></div>` : vJacket(`<div class="br-v"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(g.text)}</b></div>`, "এইমাত্র পাওয়া খবর");
       if (g.music && !st.muted) breakingSting(st.audio, Math.min(8, sc.dur || 8));
     } else if (g.kind === "slate") {
       el.innerHTML = g.image ? `<div class="tv-promo"><img src="${esc(g.image)}" alt=""></div>` : wrapV(`<div class="nu-title${channel === "v" ? " v" : ""}"><img src="${LOGO}" alt=""><b>${esc(g.text || "রাষ্ট্রিক্স")}</b></div>`, g.text || "");
@@ -350,8 +350,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   function showBreaking(b) {
     const el = document.createElement("div"); el.className = "tv-breaking";
     el.innerHTML = channel === "h"
-      ? `<div class="br-slash"></div><div class="br-in"><span class="br-tag">ব্রেকিং নিউজ</span><b>${esc(b.text)}</b><img src="${LOGO}" alt=""></div><div class="br-bar"></div>`
-      : vJacket(`<div class="br-v"><span class="br-tag">ব্রেকিং নিউজ</span><b>${esc(b.text)}</b></div>`, "ব্রেকিং নিউজ");
+      ? `<div class="br-slash"></div><div class="br-in"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(b.text)}</b><img src="${LOGO}" alt=""></div><div class="br-bar"></div>`
+      : vJacket(`<div class="br-v"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(b.text)}</b></div>`, "এইমাত্র পাওয়া খবর");
     stage.append(el);
     if (b.music && !st.muted) breakingSting(st.audio, Math.min(b.seconds, 8));
     st.current?.slots.forEach(s => s.setMuted(true));

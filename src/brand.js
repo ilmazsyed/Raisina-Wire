@@ -3,7 +3,7 @@
 // the owner's logo (rashtrix/brand/logo.png → public/brand/).
 export const BRAND = {
   name: "Rashtrix 24×7 News", short: "Rashtrix", nameBn: "রাষ্ট্রিক্স ২৪×৭ নিউজ", nameHi: "राष्ट्रिक्स 24×7 न्यूज़",
-  owner: "Middleton Media Works", tagline: "লোক গুনি না, লোকের কথা শুনি",
+  owner: "Middleton Media Works", tagline: "দেশ প্রথম । বলিদান পরম ধর্ম",
   red: "#AA0404", maroon: "#A43F44", gold: "#D4A017", ink: "#111111"
 };
 export const brandMark = (cls = "brand-mark") => `<span class="${cls}" aria-hidden="true"><img src="/brand/logo-xs.webp" alt="" width="120" height="172" decoding="async"></span>`;

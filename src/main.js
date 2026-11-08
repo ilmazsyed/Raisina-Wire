@@ -151,7 +151,7 @@ function renderShell() {
   document.body.insertAdjacentHTML("afterbegin", `<a class="skip-link" href="#view">Skip to content</a>`);
   $("#app").innerHTML = `
   <div class="ticker" role="region" aria-label="Latest headlines"><div class="wrap ticker-in">
-    <span class="ticker-label"><span class="pulse"></span>Breaking</span>
+    <span class="ticker-label"><span class="pulse"></span><span id="tickerLabel">Breaking</span></span>
     <div class="ticker-track"><div class="ticker-move" id="tickerMove"><span class="ticker-item muted">Loading the latest news…</span></div></div>
     <button class="ticker-toggle" type="button" data-action="ticker-toggle" aria-label="Pause headlines" aria-pressed="false"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path class="i-pause" d="M3 2h2v8H3zM7 2h2v8H7z" fill="currentColor"/><path class="i-play" d="M3 1.5l7 4.5-7 4.5z" fill="currentColor"/></svg></button>
     <div class="clocks" id="clocks" aria-label="World clocks"></div>
@@ -160,6 +160,7 @@ function renderShell() {
     <div class="utility">
       <div class="utility-left"><span id="today"></span><button class="fresh-btn" id="freshBtn" type="button" data-action="refresh-all" aria-label="Refresh the news">${ICON_REFRESH}<span id="freshText">Updated just now</span></button></div>
       <div class="utility-right">
+        <a class="live-tv-btn" href="/watch" aria-label="Live TV"><span class="live-dot" aria-hidden="true"></span><span class="live-word">LIVE</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2.5" y="6" width="19" height="13" rx="2"/><path d="M8 2.5l4 3.5 4-3.5"/></svg><span class="live-tv-word">TV</span></a>
         <details class="lang-menu" id="langMenu"><summary class="icon-btn lang-btn" aria-label="Language" title="Language">${ICON_GLOBE}<span lang="${lang}">${LANGUAGES[lang].short}</span></summary>
           <div class="lang-pop glass" id="langPop" data-no-tr role="menu">${languageLinks()}</div></details>
         <button class="icon-btn" type="button" data-action="theme" aria-label="Switch between light and dark" title="Light or dark"><svg class="i-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg><svg class="i-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
@@ -172,7 +173,7 @@ function renderShell() {
     </div>
     <div class="masthead" id="masthead">
       <div class="nameplate"><a class="nameplate-link" href="/" aria-label="Rashtrix 24×7 News home">${fullLogo("mast-logo")}</a>
-        <div class="nameplate-tag"><p class="tagline" lang="bn" data-no-tr>${BRAND.tagline}</p><p class="tag-sub"><span class="l">Kolkata</span> <span class="l">·</span> <span class="l">West Bengal</span> <span class="l">·</span> <span class="l">India</span> <span class="l">·</span> <span class="l">World</span></p></div></div>
+        <div class="nameplate-tag"><p class="tagline" lang="bn" data-no-tr>${BRAND.tagline.split("।").map((x, i, all) => `<span class="tl-part">${x.trim()}${i < all.length - 1 ? " ।" : ""}</span>`).join(" ")}</p><p class="tag-sub"><span class="l">Kolkata</span> <span class="l">·</span> <span class="l">West Bengal</span> <span class="l">·</span> <span class="l">India</span> <span class="l">·</span> <span class="l">World</span></p></div></div>
       <span class="mast-rule" aria-hidden="true"></span>
     </div>
   </header>
@@ -509,7 +510,7 @@ function joinBand() {
   return `<section class="band join" id="community" aria-labelledby="joinTitle"><div class="join-panel">
     <div class="join-copy">
       <span class="join-eyebrow"><span class="pulse"></span>The Rashtrix community</span>
-      <h2 id="joinTitle">We don’t count people. <em>We listen to them.</em></h2>
+      <h2 id="joinTitle">Nation first. <em>Sacrifice is the highest duty.</em></h2>
       <p class="join-lede">Tell us what is happening where you live, discuss the news with other readers and follow the desks you care about. Membership is free and takes thirty seconds.</p>
       <ul class="perks">${PERKS.map(([icon, title, text]) => `<li><span class="perk-icon">${PERK_ICONS[icon]}</span><span><b>${title}</b><span>${text}</span></span></li>`).join("")}</ul>
       <div class="join-actions" id="joinActions"></div>
@@ -1148,7 +1149,12 @@ function renderClocks() {
 function renderTicker() {
   const host = $("#tickerMove"); if (!host) return;
   const live = state.coverage.slice(0, 2).map(c => `<a class="ticker-item is-live" href="/coverage/${encodeURIComponent(c.slug)}"><b>Live</b>${esc(c.title)}</a>`);
-  const wire = stories().filter(a => Date.now() - Date.parse(a.publishedAt) < 36 * 3600e3).slice(0, 14).map(i => `<a class="ticker-item" href="${edHref(i)}"><time>${clock(i.publishedAt)}</time>${esc(i.title)}</a>`);
+  // News from the last 36 hours runs under "Breaking"; with none, the latest headlines run
+  // under "Headlines", so the ticker is never empty.
+  const fresh = stories().filter(a => Date.now() - Date.parse(a.publishedAt) < 36 * 3600e3);
+  const pick = fresh.length ? fresh : stories().slice(0, 10);
+  const wire = pick.slice(0, 14).map(i => `<a class="ticker-item" href="${edHref(i)}"><time>${fresh.length ? clock(i.publishedAt) : ago(i.publishedAt)}</time>${esc(i.title)}</a>`);
+  const label = $("#tickerLabel"); if (label) label.textContent = live.length || fresh.length ? "Breaking" : "Headlines";
   const items = [...live, ...wire];
   if (!items.length) { host.innerHTML = `<span class="ticker-item muted">${articlesSettled ? "Rashtrix 24×7 News" : "Loading the latest news…"}</span>`; host.classList.remove("moving"); return; }
   // Two copies make the loop seamless; the second is hidden from assistive tech.

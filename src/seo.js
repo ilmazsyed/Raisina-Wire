@@ -19,7 +19,7 @@ const DESK_NAMES = {
 };
 const SITE = { bn: "রাষ্ট্রিক্স ২৪×৭ নিউজ", en: "Rashtrix 24×7 News", hi: "राष्ट्रिक्स 24×7 न्यूज़" };
 const HOME = {
-  bn: { title: "রাষ্ট্রিক্স ২৪×৭ নিউজ — কলকাতা, পশ্চিমবঙ্গ, ভারত আর বিশ্বের খবর বাংলায়", description: "কলকাতার খবর, পশ্চিমবঙ্গের খবর, ভারত, প্রবাসী বাঙালি আর বিশ্বের সর্বশেষ খবর, লাইভ কভারেজ আর অ্যালার্ট — রাষ্ট্রিক্স ২৪×৭ নিউজ। লোক গুনি না, লোকের কথা শুনি।", latest: "সর্বশেষ খবর" },
+  bn: { title: "রাষ্ট্রিক্স ২৪×৭ নিউজ — কলকাতা, পশ্চিমবঙ্গ, ভারত আর বিশ্বের খবর বাংলায়", description: "কলকাতার খবর, পশ্চিমবঙ্গের খবর, ভারত, প্রবাসী বাঙালি আর বিশ্বের সর্বশেষ খবর, লাইভ কভারেজ আর অ্যালার্ট — রাষ্ট্রিক্স ২৪×৭ নিউজ। দেশ প্রথম । বলিদান পরম ধর্ম।", latest: "সর্বশেষ খবর" },
   en: { title: "Rashtrix 24×7 News — Kolkata, West Bengal, India and world news", description: "Latest news from Kolkata, West Bengal, India, Bengalis abroad and the world, with live coverage and alerts, from Rashtrix 24×7 News in Bengali, English and Hindi.", latest: "Latest news" },
   hi: { title: "राष्ट्रिक्स 24×7 न्यूज़ — कोलकाता, पश्चिम बंगाल, भारत और दुनिया की खबरें", description: "कोलकाता, पश्चिम बंगाल, भारत, प्रवासी बंगाली और दुनिया की ताज़ा खबरें, लाइव कवरेज और अलर्ट — राष्ट्रिक्स 24×7 न्यूज़।", latest: "ताज़ा खबरें" }
 };
@@ -37,7 +37,7 @@ export const origin = (request, env) => String(env.SITE_URL || new URL(request.u
 
 function organization(o) {
   return { "@type": "NewsMediaOrganization", "@id": `${o}/#organization`, name: SITE.en, url: `${o}/`,
-    alternateName: [SITE.bn, SITE.hi, "Rashtrix", "রাষ্ট্রিক্স"], slogan: "লোক গুনি না, লোকের কথা শুনি",
+    alternateName: [SITE.bn, SITE.hi, "Rashtrix", "রাষ্ট্রিক্স"], slogan: "দেশ প্রথম । বলিদান পরম ধর্ম",
     knowsLanguage: ["bn-IN", "en-IN", "hi-IN"], foundingLocation: { "@type": "Place", name: "Kolkata, West Bengal, India" },
     areaServed: [{ "@type": "State", name: "West Bengal" }, { "@type": "Country", name: "India" }],
     publishingPrinciples: `${o}/disclaimer`, correctionsPolicy: `${o}/corrections`, actionableFeedbackPolicy: `${o}/grievance`,

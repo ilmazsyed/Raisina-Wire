@@ -25,7 +25,7 @@ export const ABOUT = {
   title: "About Rashtrix",
   description: "Rashtrix 24×7 News is a Bengali news channel and app from Kolkata, published by Middleton Media Works: Kolkata, West Bengal, India, Bengalis abroad and the world.",
   html: `
-<p class="lede">Rashtrix 24×7 News is a Bengali-first news channel and app from Kolkata. Our line: <b lang="bn">লোক গুনি না, লোকের কথা শুনি</b> — we don’t count people, we listen to them.</p>
+<p class="lede">Rashtrix 24×7 News is a Bengali-first news channel and app from Kolkata. Our line: <b lang="bn">দেশ প্রথম । বলিদান পরম ধর্ম</b>: the nation first; sacrifice is the highest duty.</p>
 <h2>What we publish</h2>
 <ul>
   <li><b>Rashtrix reports</b>: stories by our own reporters and desk, with their photographs.</li>
@@ -41,7 +41,7 @@ export const ABOUT = {
 <h2>Contact</h2>
 <p>Editorial, corrections and legal matters: ${mail}. For complaints and takedown requests, see <a href="/grievance">Grievance redressal</a>.</p>`,
   bn: { title: "রাষ্ট্রিক্স সম্পর্কে", html: `
-<p class="lede">রাষ্ট্রিক্স ২৪×৭ নিউজ কলকাতার একটি বাংলা খবরের চ্যানেল ও অ্যাপ। আমাদের কথা: <b>লোক গুনি না, লোকের কথা শুনি</b>।</p>
+<p class="lede">রাষ্ট্রিক্স ২৪×৭ নিউজ কলকাতার একটি বাংলা খবরের চ্যানেল ও অ্যাপ। আমাদের কথা: <b>দেশ প্রথম । বলিদান পরম ধর্ম</b>।</p>
 <h2>আমরা কী প্রকাশ করি</h2>
 <ul>
   <li><b>রাষ্ট্রিক্সের খবর</b>: আমাদের নিজস্ব সাংবাদিক ও ডেস্কের লেখা, তাঁদের তোলা ছবি সহ।</li>

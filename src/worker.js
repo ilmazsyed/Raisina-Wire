@@ -294,30 +294,35 @@ async function mtLive(env, lang, item, updates) {
   const bodies = await Promise.all(updates.map(u => translateBody(env, lang, u.body)));
   updates.forEach((u, i) => { if (bodies[i] !== u.body) { u.body = bodies[i]; u.mt = true; } });
 }
-// Stories written in English without a Bengali or Hindi version: machine-translated (Workers AI
-// translates only from English), and marked so the reader says so.
-async function mtArticles(env, lang, list, opts) {
-  list = list.filter(a => a.original === "en" && a.lang === "en");
-  if (lang === "en" || !list.length || !mtReady(env)) return;
-  await translateFields(env, lang, list, ["title", "dek", "topic", "heroCaption"], opts);
-  for (const a of list) {
-    if (a.body !== undefined) { const b = await translateBody(env, lang, a.body); if (b !== a.body) { a.body = b; a.mt = true; } }
-    if (a.mt) { a.lang = lang; a.machine = true; }
+// Stories with no version in the reader's language: machine-translated with Workers AI (English
+// to Bengali/Hindi with IndicTrans2, Bengali and Hindi with M2M100), and marked so the reader says so.
+async function mtArticles(env, lang, list, opts = {}) {
+  list = list.filter(a => a.original && a.original !== lang && a.lang === a.original);
+  if (!list.length || !mtReady(env)) return;
+  for (const from of [...new Set(list.map(a => a.original))]) {
+    const group = list.filter(a => a.original === from), o = { ...opts, from };
+    await translateFields(env, lang, group, ["title", "dek", "topic", "heroCaption"], o);
+    for (const a of group) {
+      if (a.body !== undefined) { const b = await translateBody(env, lang, a.body, o); if (b !== a.body) { a.body = b; a.mt = true; } }
+      if (a.mt) { a.lang = lang; a.machine = true; }
+    }
   }
 }
 // Cron: translate new headlines, live coverage and stories ahead of readers, so their pages
 // come from the D1 cache. Every five minutes; the daily cap in src/mt.js still applies.
 async function mtWarm(env) {
   if (!mtReady(env) || new Date().getUTCMinutes() % 5) return;
-  for (const lang of ["bn", "hi"]) {
+  for (const lang of ["bn", "hi", "en"]) {
+    if (lang !== "en") {
     const live = await env.DB.prepare("SELECT id,title,summary FROM live_coverage WHERE status='live'").all();
     for (const c of live.results) {
       const ups = await env.DB.prepare("SELECT body FROM live_updates WHERE coverage_id=? ORDER BY created_at DESC LIMIT 30").bind(c.id).all();
       await mtLive(env, lang, c, ups.results);
     }
-    const list = (await localiseArticles(env, lang, await listPublished(env, { limit: 40 }))).filter(a => a.lang === "en" && a.original === "en");
+    }
+    const list = (await localiseArticles(env, lang, await listPublished(env, { limit: 40 }))).filter(a => a.original !== lang && a.lang === a.original);
     const at = (Math.floor(Date.now() / 300e3) * 3) % Math.max(list.length, 1);
-    for (const a of list.slice(at, at + 3)) { const full = await getBySlug(env, a.slug); if (full && full.lang === "en") await mtArticles(env, lang, [{ ...full, original: "en" }]); }
+    for (const a of list.slice(at, at + 3)) { const full = await getBySlug(env, a.slug); if (full) await mtArticles(env, lang, [{ ...full, original: full.lang || "bn", lang: full.lang || "bn" }]); }
   }
 }
 
@@ -686,10 +691,10 @@ async function api(request, env, ctx) {
     const list = await listPublished(env, { writerKey: WRITERS.some(x => x.key === w) ? w : null, tag: url.searchParams.get("tag"), limit: 300 });
     const lang = reqLang(url);
     const out = await localiseArticles(env, lang, list);
-    // English stories without a Bengali or Hindi version: readers get what is already machine-
+    // Stories without a version in the reader's language: readers get what is already machine-
     // translated at once; the rest is translated in the background and switches on the next refresh.
-    if (lang !== "en") {
-      const todo = out.filter(a => a.lang === "en" && a.original === "en");
+    {
+      const todo = out.filter(a => a.original !== lang && a.lang === a.original);
       ctx.waitUntil(mtArticles(env, lang, todo.map(a => ({ ...a }))).catch(() => {}));
       await mtArticles(env, lang, todo, { cacheOnly: true });
     }
@@ -712,7 +717,7 @@ async function api(request, env, ctx) {
     localised.versions = [...new Set([a.lang, ...have.map(r => r.lang)])];
     const { results: fixes } = await env.DB.prepare("SELECT note,created_at AS at FROM corrections WHERE article_id=? AND action='correct' AND public=1 AND note<>'' ORDER BY created_at DESC LIMIT 10").bind(a.id).all();
     localised.corrections = fixes;
-    if (lang !== "en" && localised.lang === "en" && localised.original === "en" && mtReady(env)) {
+    if (localised.original !== lang && localised.lang === localised.original && mtReady(env)) {
       // A few seconds to translate a story nobody has opened in this language yet; if it takes
       // longer the English is shown (marked) and the translation finishes in the background.
       const copy = { ...localised }, job = mtArticles(env, lang, [copy]);

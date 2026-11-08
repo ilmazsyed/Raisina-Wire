@@ -1674,3 +1674,22 @@ header.wrap .mast-rule{grid-column:1/-1;grid-row:3;margin-top:12px;height:3px}
 }
 .utility .icon-btn[data-count]:not([data-count=""]):after{top:-5px;right:-5px}
 @media(max-width:760px){.nav-dock{margin-top:6px}header.wrap .mast-rule{margin-top:7px}}
+
+/* The article font everywhere in the app (Noto Serif Bengali; Hindi uses its own serif). */
+html{--sans:var(--serif)!important;--display:var(--serif)!important;--mono:var(--serif)!important}
+body,button,input,select,textarea{font-family:var(--serif)}
+
+/* LIVE TV, always at the top: straight to the channel. */
+.live-tv-btn{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 13px 0 11px;border-radius:999px;background:var(--red);color:#fff!important;font:700 13px/1 var(--serif);letter-spacing:.3px;text-decoration:none;box-shadow:0 6px 16px -8px rgba(170,4,4,.6);white-space:nowrap}
+.live-tv-btn:hover{background:var(--red-deep,#8a0303)}
+.live-tv-btn .live-dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:livepulse 1.4s ease-in-out infinite}
+.live-tv-btn svg{opacity:.95}
+@keyframes livepulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+@media(prefers-reduced-motion:reduce){.live-tv-btn .live-dot{animation:none}}
+@media(max-width:760px){.live-tv-btn{height:32px;padding:0 9px;gap:4px;font-size:12px}.live-tv-btn .live-tv-word{display:none}.live-tv-btn svg{width:14px;height:14px}}
+.tagline .tl-part{display:inline-block;white-space:nowrap}
+@media(max-width:760px){
+  header.wrap .nameplate{flex-wrap:nowrap}
+  header.wrap .nameplate-tag p.tagline{max-width:none}
+  .utility-right [data-action=theme]{display:none}
+}
