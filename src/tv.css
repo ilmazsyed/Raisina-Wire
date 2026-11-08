@@ -205,3 +205,11 @@ body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 .tvp-ytlayer .tvp-shield{position:absolute;inset:0;z-index:3}
 /* While a tap is needed, taps pass through the graphics to the video. */
 .tvp.yt-tap .tvp-stage,.tvp.yt-tap .tvp-gfx,.tvp.yt-tap .tvp-ovl{pointer-events:none}
+
+/* LIVE and the clock are always on screen: under LIVE on the vertical channel, and in the top
+   corner over full-screen graphics (the bulletin). */
+.tvp-v .tv-clock.v{position:absolute;left:64px;top:340px;padding:6px 14px;border-radius:8px;background:rgba(255,255,255,.94);font:700 30px Montserrat,"Hind Siliguri",sans-serif;color:#111;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.tv-liveclock{position:absolute;right:40px;top:24px;z-index:20;display:flex;align-items:center;gap:12px}
+.tv-liveclock .tv-live{position:static}
+.tv-liveclock .tv-clock{position:static;padding:6px 14px;border-radius:8px;background:rgba(255,255,255,.94);font:700 30px Montserrat,"Hind Siliguri",sans-serif;color:#111;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.tvp-v .tv-liveclock{top:60px;right:60px}
