@@ -1708,3 +1708,12 @@ body,button,input,select,textarea{font-family:var(--serif)}
 .sf-tools .update-share{color:#fff;border-color:rgba(255,255,255,.4);background:rgba(0,0,0,.25)}
 .sf-hint{text-align:center;font-size:12.5px;margin:8px 0 0}
 @media(max-width:760px){.shorts-page{padding:0 10px}.shorts-feed{height:calc(100dvh - 150px);border-radius:16px}}
+/* Footer credits: the founder and editor-in-chief, and Calibrex. */
+.credits{margin-top:22px;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;font-size:14px;color:var(--ink-2,#3a3f4b)}
+.credits b{color:var(--maroon,#7a0e14);font-weight:700}
+.credits a{color:var(--red);font-weight:700;text-decoration:none}
+.credits a:hover{text-decoration:underline}
+.credits .sep{color:var(--muted);margin:0 4px}
+.credits+.copyright{margin-top:8px}
+.credits .cr-item{display:inline-flex;align-items:baseline;gap:6px}
+@media(max-width:760px){.credits{flex-direction:column;align-items:flex-start;gap:4px}.credits .sep{display:none}}

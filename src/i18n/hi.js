@@ -5,7 +5,7 @@ const n = x => x;
 const MONTHS = { January: 1, February: 2, March: 3, April: 4, May: 5, June: 6, July: 7, August: 8, September: 9, October: 10, November: 11, December: 12 };
 const longDate = s => { const m = s.match(/^(\d{1,2}) (\w+) (\d{4})$/); return m && MONTHS[m[2]] ? new Date(Date.UTC(+m[3], MONTHS[m[2]] - 1, +m[1])).toLocaleDateString("hi-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : s; };
 export const patterns = [
-  [/^© (\d{4}) Middleton Media Works\. Rashtrix 24×7 News\. All rights reserved\. Wire reports are written by the Rashtrix wire desk with AI assistance from several published reports; see the Disclaimer\.$/, m => `© ${m[1]} मिडलटन मीडिया वर्क्स। राष्ट्रिक्स 24×7 न्यूज़। सर्वाधिकार सुरक्षित। वायर ख़बरें कई प्रकाशित ख़बरों को मिलाकर, एआई की मदद से राष्ट्रिक्स वायर डेस्क लिखता है। विस्तार घोषणा पेज पर।`],
+  [/^© (\d{4}) Rashtrix 24×7 News\. All rights reserved\. Wire reports are written by the Rashtrix wire desk with AI assistance from several published reports; see the Disclaimer\.$/, m => `© ${m[1]} राष्ट्रिक्स 24×7 न्यूज़। सर्वाधिकार सुरक्षित। वायर ख़बरें कई प्रकाशित ख़बरों को मिलाकर, एआई की मदद से राष्ट्रिक्स वायर डेस्क लिखता है। विस्तार घोषणा पेज पर।`],
   // The control-room screens (Phases 3–5).
   [/^(\d+) items$/, m => `${m[1]} आइटम`],
   [/^(\d+) guests$/, m => `${m[1]} मेहमान`],
@@ -1170,4 +1170,5 @@ export default {
   "Live TV": "लाइव टीवी",
   "No shorts yet.": "अभी कोई शॉर्ट्स नहीं।",
   "Swipe up for the next one": "अगला देखने के लिए ऊपर स्वाइप करें",
+  "Founder and Editor-in-Chief": "संस्थापक और प्रधान संपादक",
 };

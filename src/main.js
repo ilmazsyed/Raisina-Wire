@@ -192,7 +192,8 @@ function renderShell() {
       <button class="btn btn-dark" type="submit">Request contact</button><small id="leadMessage" aria-live="polite"></small></form>
     <nav class="lang-foot" id="langFoot" data-no-tr aria-label="Language">${languageLinks()}</nav>
     <nav class="legal-links" aria-label="Legal"><a href="/about">About Rashtrix</a>${LEGAL_ORDER.map(([k, t]) => `<a href="/${k}">${t}</a>`).join("")}</nav>
-    <p class="copyright">© ${new Date().getFullYear()} Middleton Media Works. Rashtrix 24×7 News. All rights reserved. Wire reports are written by the Rashtrix wire desk with AI assistance from several published reports; see the Disclaimer.</p>
+    <p class="credits"><span class="cr-item"><span>Founder and Editor-in-Chief</span> <b data-no-tr>Ilmaz Syed</b></span><span class="sep" aria-hidden="true">·</span><span class="cr-item"><span>Powered by</span> <a href="https://calibrex.org" target="_blank" rel="noopener" data-no-tr>Calibrex</a></span></p>
+    <p class="copyright">© ${new Date().getFullYear()} Rashtrix 24×7 News. All rights reserved. Wire reports are written by the Rashtrix wire desk with AI assistance from several published reports; see the Disclaimer.</p>
   </div></footer>
   <div class="modal-backdrop hidden" id="modalBackdrop"><section class="modal glass" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <button class="modal-close" id="modalClose" type="button" aria-label="Close">×</button>
