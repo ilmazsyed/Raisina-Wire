@@ -186,3 +186,22 @@ body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 .tvs.tap-play .tvp-shield,.tvs.tap-play .tvs-poster{display:none}
 .tvs-hint{position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:4;pointer-events:none;padding:16px 34px;border-radius:999px;background:rgba(17,17,17,.82);color:#fff;font:700 44px "Hind Siliguri",sans-serif;white-space:nowrap}
 .tvp-h .tvs-hint{font-size:34px;bottom:18%}
+
+/* The app's single YouTube player sits under the scenes; scenes over it are transparent. */
+.tvp-ytlayer{position:absolute;inset:0;z-index:0}
+.tvp-ytlayer[hidden]{display:none}
+.tvp-ytlayer.tap .tvp-shield{display:none}
+.tvp-stage{z-index:1}
+.tvp-taphint{position:absolute;left:50%;bottom:16%;transform:translateX(-50%);z-index:30;pointer-events:none;padding:8px 16px;border-radius:999px;background:rgba(17,17,17,.82);color:#fff;font:600 14px "Hind Siliguri",sans-serif;white-space:nowrap}
+/* Like and share on the player */
+.tvp-actions{position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:30;display:flex;flex-direction:column;gap:10px}
+.tvp-actions button{border:0;border-radius:999px;padding:9px 12px;background:rgba(17,17,17,.72);color:#fff;font:700 13px "Hind Siliguri",sans-serif;cursor:pointer;backdrop-filter:none}
+.tvp-like.on{background:#AA0404}
+.tvp-like[hidden]{display:none}
+.tvs.tvs-shared{background:transparent}
+.tvp-ytlayer{background:#000}
+.tvp-ytlayer .tvs-ytwrap{position:absolute;left:0;top:0;width:calc(100% * var(--k,1));height:calc(100% * var(--k,1));transform:scale(calc(1 / var(--k,1)));transform-origin:0 0;overflow:hidden}
+.tvp-ytlayer .tvs-yt,.tvp-ytlayer iframe{position:absolute;inset:0;width:100%!important;height:100%!important;border:0}
+.tvp-ytlayer .tvp-shield{position:absolute;inset:0;z-index:3}
+/* While a tap is needed, taps pass through the graphics to the video. */
+.tvp.yt-tap .tvp-stage,.tvp.yt-tap .tvp-gfx,.tvp.yt-tap .tvp-ovl{pointer-events:none}
