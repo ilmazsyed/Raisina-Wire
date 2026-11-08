@@ -21,7 +21,7 @@ export const patterns = [
   [/^Box ([\d০-৯]+)$/, m => `বাক্স ${n(m[1])}`],
   [/^Answer (\d)( \(optional\))?$/, m => `উত্তর ${n(m[1])}${m[2] ? " (ইচ্ছে হলে)" : ""}`],
   [/^Show ends (.+) · (.+) left$/, m => `অনুষ্ঠান শেষ ${m[1]} · বাকি ${m[2]}`],
-  [/^© (\d{4}) Middleton Media Works\. Rashtrix 24×7 News\. All rights reserved\. Wire reports are written by the Rashtrix wire desk with AI assistance from several published reports; see the Disclaimer\.$/, m => `© ${n(m[1])} মিডলটন মিডিয়া ওয়ার্কস। রাষ্ট্রিক্স ২৪×৭ নিউজ। সর্বস্বত্ব সংরক্ষিত। ওয়্যার খবর একাধিক প্রকাশিত খবর মিলিয়ে, এআই-এর সাহায্যে লেখে রাষ্ট্রিক্স ওয়্যার ডেস্ক। বিস্তারিত ঘোষণা পাতায়।`],
+  [/^© (\d{4}) Rashtrix 24×7 News\. All rights reserved\. Wire reports are written by the Rashtrix wire desk with AI assistance from several published reports; see the Disclaimer\.$/, m => `© ${n(m[1])} রাষ্ট্রিক্স ২৪×৭ নিউজ। সর্বস্বত্ব সংরক্ষিত। ওয়্যার খবর একাধিক প্রকাশিত খবর মিলিয়ে, এআই-এর সাহায্যে লেখে রাষ্ট্রিক্স ওয়্যার ডেস্ক। বিস্তারিত ঘোষণা পাতায়।`],
   [/^(\d+) stor(?:y|ies) on Rashtrix$/, m => `রাষ্ট্রিক্সে ${n(m[1])}টি খবর`],
   [/^(\d+) stor(?:y|ies), newest first\. Follow the topic to see it on your own front page, My Rashtrix\.$/, m => `${n(m[1])}টি খবর, নতুনগুলি আগে। নিজের প্রথম পাতা ‘আমার রাষ্ট্রিক্স’-এ দেখতে বিষয়টি ফলো করুন।`],
   [/^(\d+) stor(?:y|ies)$/, m => `${n(m[1])}টি খবর`],
@@ -124,7 +124,7 @@ export default {
   "Copyright and Content Policy": "কপিরাইট ও বিষয়বস্তু নীতি",
   "Community Guidelines": "কমিউনিটির নির্দেশিকা",
   "Grievance Redressal": "অভিযোগের প্রতিকার",
-  "Powered by": "সহায়তায়",
+  "Powered by": "প্রযুক্তি সহায়তায়",
   "Ad": "বিজ্ঞাপন",
   "Make research defensible.": "এমন গবেষণা, যা যে কোনও প্রশ্নের মুখে টেকে।",
   "50+ live sources": "৫০+ লাইভ সূত্র",
@@ -1222,4 +1222,5 @@ export default {
   "Live TV": "লাইভ টিভি",
   "No shorts yet.": "এখনও কোনও শর্টস নেই।",
   "Swipe up for the next one": "পরেরটি দেখতে উপরে সোয়াইপ করুন",
+  "Founder and Editor-in-Chief": "প্রতিষ্ঠাতা ও প্রধান সম্পাদক",
 };
