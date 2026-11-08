@@ -1717,3 +1717,66 @@ body,button,input,select,textarea{font-family:var(--serif)}
 .credits+.copyright{margin-top:8px}
 .credits .cr-item{display:inline-flex;align-items:baseline;gap:6px}
 @media(max-width:760px){.credits{flex-direction:column;align-items:flex-start;gap:4px}.credits .sep{display:none}}
+
+/* ---------- Footer: a deep maroon band with gold, the logo beside the tagline ---------- */
+.site-footer{position:relative;overflow:hidden;margin-top:70px;padding:48px 0 34px;border-top:0;color:#e9e3dc;
+  background:radial-gradient(120% 80% at 0% 0%,#5a0a10 0%,#2a0508 42%,#120a0d 100%)}
+.site-footer:before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,var(--red) 0 46%,#d6a64a 46% 54%,var(--red) 54%)}
+.site-footer .sf-glow{position:absolute;right:-120px;top:-120px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(214,166,74,.18),transparent 65%);pointer-events:none}
+.site-footer .wrap{position:relative}
+.site-footer a{color:#efe7dd;text-decoration:none}
+.site-footer a:hover{color:#f3c56b}
+.sf-brand{display:flex;align-items:center;gap:22px}
+.site-footer .footer-logo{width:auto;height:118px;border-radius:6px;box-shadow:0 18px 40px -18px rgba(0,0,0,.7),0 0 0 1px rgba(214,166,74,.35)}
+.sf-brand-text{min-width:0}
+.sf-tagline{margin:0;font:800 34px/1.25 "Noto Serif Bengali",serif;letter-spacing:0;background:linear-gradient(180deg,#f7d58c,#c9902e);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sf-tagline span{display:block}
+.sf-sub{margin:10px 0 0;display:flex;flex-wrap:wrap;gap:4px 8px;font:600 13.5px var(--serif);color:#c9b9ad}
+.sf-sub i{font-style:normal;color:#d6a64a}
+.sf-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.sf-install{display:inline-flex;align-items:center;height:38px;padding:0 16px;border-radius:999px;border:1px solid rgba(214,166,74,.55);font:700 13px var(--serif);color:#f3dcae!important}
+.sf-install:hover{background:rgba(214,166,74,.12)}
+.sf-grid{display:grid;grid-template-columns:1fr 1fr 1.6fr;gap:28px;margin-top:38px}
+.sf-col{display:flex;flex-direction:column;gap:9px}
+.sf-col h3,.sf-form h3{margin:0 0 6px;font:800 12px/1 var(--serif);letter-spacing:.14em;text-transform:uppercase;color:#d6a64a}
+html:is([data-lang=bn],[data-lang=hi]) :is(.sf-col h3,.sf-form h3){font-size:15px;letter-spacing:0}
+.sf-col a{font:500 15px/1.35 var(--serif);color:#e9e3dc;opacity:.92}
+.site-footer .lead-form.sf-form{margin:0;padding:20px;border-radius:18px;display:grid;grid-template-columns:1fr 1fr;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(214,166,74,.25);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.sf-form h3{grid-column:1/-1}
+.site-footer .lead-form input,.site-footer .lead-form select{min-height:44px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:12px}
+.site-footer .lead-form input::placeholder{color:#b9aca2}
+.site-footer .lead-form select option{color:#111}
+.site-footer .lead-form input:focus,.site-footer .lead-form select:focus{border-color:#d6a64a}
+.sf-send{grid-column:1/-1;min-height:46px;border:0;border-radius:12px;background:linear-gradient(180deg,#e7b75a,#c08a2b);color:#2a0508;font:800 15px var(--serif);cursor:pointer;box-shadow:0 10px 24px -12px rgba(214,166,74,.8)}
+.sf-send:hover{filter:brightness(1.06)}
+.site-footer .lead-form small{color:#f3c56b}
+.sf-rule{height:1px;margin:34px 0 22px;background:linear-gradient(90deg,transparent,rgba(214,166,74,.45),transparent)}
+.sf-bottom{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px}
+.site-footer .credits{margin:0;color:#d9cfc6;font-size:14.5px}
+.site-footer .credits b{color:#f7d58c}
+.site-footer .credits a{color:#f3c56b}
+.site-footer .lang-foot{margin:0;justify-content:flex-end}
+.site-footer .lang-foot a{border-color:rgba(255,255,255,.18);color:#efe7dd;padding:7px 15px}
+.site-footer .lang-foot a[aria-current]{background:#d6a64a;border-color:#d6a64a;color:#2a0508}
+.site-footer .legal-links{justify-content:flex-start;margin-top:20px;gap:6px 18px}
+.site-footer .legal-links a{color:#b9aca2;font-weight:500}
+.site-footer .legal-links a:hover{color:#f3c56b}
+.site-footer .copyright{margin-top:14px;color:#9d8f86;font-size:12.5px;line-height:1.6}
+@media(max-width:860px){.sf-grid{grid-template-columns:1fr 1fr}.sf-form{grid-column:1/-1}}
+@media(max-width:760px){
+  .site-footer{padding:36px 0 28px;margin-top:48px}
+  .sf-brand{gap:16px;align-items:center}
+  .site-footer .footer-logo{height:96px}
+  .sf-tagline{font-size:25px}
+  .sf-sub{font-size:12.5px}
+  .sf-grid{gap:26px 18px;margin-top:30px}
+  .site-footer .lead-form.sf-form{grid-template-columns:1fr;padding:18px}
+  .sf-bottom{flex-direction:column;align-items:flex-start}
+  .site-footer .lang-foot{justify-content:flex-start}
+  .site-footer .credits{flex-direction:column;align-items:flex-start;gap:4px}
+}
+@media(max-width:760px){
+  .sf-grid{grid-template-columns:1fr}
+  .sf-col{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
+  .sf-col h3{grid-column:1/-1}
+}

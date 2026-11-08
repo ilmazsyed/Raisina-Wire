@@ -181,18 +181,31 @@ function renderShell() {
   <div class="nav-dock"><div class="wrap"><nav class="site-nav glass" id="siteNav" aria-label="Sections"></nav></div></div>
   <div class="read-progress" id="readProgress" aria-hidden="true"></div>
   <main id="view" tabindex="-1"></main>
-  <footer class="site-footer"><div class="wrap">
-    <div class="footer-top"><a class="footer-brand" href="/" aria-label="Rashtrix 24×7 News home">${fullLogo("footer-logo")}</a>
-      <div class="footer-links">${DESKS.map(d => `<a href="${deskHref(d)}">${d}</a>`).join("")}<a href="/live">Latest</a><a href="/briefs">Briefs</a><a href="https://www.rashtrix.live" target="_blank" rel="noopener">rashtrix.live ↗</a><a href="/about">About</a><a href="#" data-action="install" class="install-link">Install the app</a></div></div>
-    <form class="lead-form glass" id="leadForm"><span class="kicker">Advertising &amp; contact</span>
-      <label class="sr-only" for="leadName">Your name</label><input id="leadName" name="name" placeholder="Your name" required minlength="2" autocomplete="name">
-      <label class="sr-only" for="leadEmail">Work email</label><input id="leadEmail" name="email" type="email" placeholder="Work email" required autocomplete="email">
-      <label class="sr-only" for="leadOrg">Organisation</label><input id="leadOrg" name="organisation" placeholder="Organisation (optional)" autocomplete="organization">
-      <label class="sr-only" for="leadInterest">Interest</label><select id="leadInterest" name="interest"><option>Advertising</option><option>News tip</option><option>Correction</option><option>Partnership</option><option>Other</option></select>
-      <button class="btn btn-dark" type="submit">Request contact</button><small id="leadMessage" aria-live="polite"></small></form>
-    <nav class="lang-foot" id="langFoot" data-no-tr aria-label="Language">${languageLinks()}</nav>
-    <nav class="legal-links" aria-label="Legal"><a href="/about">About Rashtrix</a>${LEGAL_ORDER.map(([k, t]) => `<a href="/${k}">${t}</a>`).join("")}</nav>
-    <p class="credits"><span class="cr-item"><span>Founder and Editor-in-Chief</span> <b data-no-tr>Ilmaz Syed</b></span><span class="sep" aria-hidden="true">·</span><span class="cr-item"><span>Powered by</span> <a href="https://calibrex.org" target="_blank" rel="noopener" data-no-tr>Calibrex</a></span></p>
+  <footer class="site-footer"><div class="sf-glow" aria-hidden="true"></div><div class="wrap">
+    <div class="sf-brand">
+      <a class="footer-brand" href="/" aria-label="Rashtrix 24×7 News home">${fullLogo("footer-logo")}</a>
+      <div class="sf-brand-text">
+        <p class="sf-tagline" lang="bn" data-no-tr>${BRAND.tagline.split("।").map((x, i, all) => `<span>${x.trim()}${i < all.length - 1 ? " ।" : ""}</span>`).join("")}</p>
+        <p class="sf-sub"><span>Kolkata</span><i aria-hidden="true">·</i><span>West Bengal</span><i aria-hidden="true">·</i><span>India</span><i aria-hidden="true">·</i><span>World</span></p>
+        <div class="sf-cta"><a class="live-tv-btn" href="/watch"><span class="live-dot" aria-hidden="true"></span><span class="live-word">LIVE</span><span class="live-tv-word">TV</span></a><a class="sf-install install-link" href="#" data-action="install">Install the app</a></div>
+      </div>
+    </div>
+    <div class="sf-grid">
+      <nav class="sf-col" aria-label="Sections"><h3>Sections</h3>${DESKS.map(d => `<a href="${deskHref(d)}">${d}</a>`).join("")}<a href="/live">Latest</a><a href="/briefs">Briefs</a><a href="/shorts">Shorts</a><a href="/watch">Watch</a></nav>
+      <nav class="sf-col" aria-label="Rashtrix"><h3>Rashtrix</h3><a href="/about">About Rashtrix</a><a href="/community">Community</a><a href="/corrections">Corrections Policy</a><a href="/grievance">Grievance Redressal</a><a href="https://www.rashtrix.live" target="_blank" rel="noopener">rashtrix.live ↗</a></nav>
+      <form class="lead-form sf-form" id="leadForm"><h3 class="kicker">Advertising &amp; contact</h3>
+        <label class="sr-only" for="leadName">Your name</label><input id="leadName" name="name" placeholder="Your name" required minlength="2" autocomplete="name">
+        <label class="sr-only" for="leadEmail">Work email</label><input id="leadEmail" name="email" type="email" placeholder="Work email" required autocomplete="email">
+        <label class="sr-only" for="leadOrg">Organisation</label><input id="leadOrg" name="organisation" placeholder="Organisation (optional)" autocomplete="organization">
+        <label class="sr-only" for="leadInterest">Interest</label><select id="leadInterest" name="interest"><option>Advertising</option><option>News tip</option><option>Correction</option><option>Partnership</option><option>Other</option></select>
+        <button class="btn sf-send" type="submit">Request contact</button><small id="leadMessage" aria-live="polite"></small></form>
+    </div>
+    <div class="sf-rule" aria-hidden="true"></div>
+    <div class="sf-bottom">
+      <p class="credits"><span class="cr-item"><span>Founder and Editor-in-Chief</span> <b data-no-tr>Ilmaz Syed</b></span><span class="sep" aria-hidden="true">·</span><span class="cr-item"><span>Powered by</span> <a href="https://calibrex.org" target="_blank" rel="noopener" data-no-tr>Calibrex</a></span></p>
+      <nav class="lang-foot" id="langFoot" data-no-tr aria-label="Language">${languageLinks()}</nav>
+    </div>
+    <nav class="legal-links" aria-label="Legal">${LEGAL_ORDER.map(([k, t]) => `<a href="/${k}">${t}</a>`).join("")}</nav>
     <p class="copyright">© ${new Date().getFullYear()} Rashtrix 24×7 News. All rights reserved. Wire reports are written by the Rashtrix wire desk with AI assistance from several published reports; see the Disclaimer.</p>
   </div></footer>
   <div class="modal-backdrop hidden" id="modalBackdrop"><section class="modal glass" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
