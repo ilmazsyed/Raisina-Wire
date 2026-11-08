@@ -41,7 +41,7 @@ function organization(o) {
     knowsLanguage: ["bn-IN", "en-IN", "hi-IN"], foundingLocation: { "@type": "Place", name: "Kolkata, West Bengal, India" },
     areaServed: [{ "@type": "State", name: "West Bengal" }, { "@type": "Country", name: "India" }],
     publishingPrinciples: `${o}/disclaimer`, correctionsPolicy: `${o}/corrections`, actionableFeedbackPolicy: `${o}/grievance`,
-    parentOrganization: { "@type": "Organization", name: "Middleton Media Works" },
+    founder: { "@type": "Person", name: "Ilmaz Syed", jobTitle: "Founder and Editor-in-Chief" },
     logo: { "@type": "ImageObject", url: `${o}/icon-512.png`, width: 512, height: 512 }, sameAs: ["https://www.rashtrix.live"] };
 }
 function personLd(o, w) {

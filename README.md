@@ -1,6 +1,6 @@
 # Rashtrix 24×7 News — the app
 
-Bengali-first news app for Rashtrix 24×7 News (Middleton Media Works), built on the Raisina Wire
+Bengali-first news app for Rashtrix 24×7 News (founder and editor-in-chief Ilmaz Syed; powered by Calibrex), built on the Raisina Wire
 code base: a Cloudflare Worker with a D1 database and an installable web app (PWA). It runs as its
 **own Worker (`rashtrix`) and its own D1 database (`rashtrix-db`)**, never Raisina Wire's.
 Everything runs on free tiers; there is no paid AI API.
