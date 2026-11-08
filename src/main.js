@@ -143,6 +143,7 @@ const NAV = [
   ...DESKS.map(d => [d, deskHref(d), r => r.page === "desk" && deskOf(r.arg) === d]),
   ["Latest", "/live", r => r.page === "live"],
   ["Briefs", "/briefs", r => r.page === "briefs"],
+  ["Shorts", "/shorts", r => r.page === "shorts"],
   ["Watch", "/watch", r => r.page === "watch"],
   ["Community", "/community", r => r.page === "community" || r.page === "discussion"]
 ];
@@ -323,6 +324,7 @@ function renderShell() {
 function renderNav(route) {
   $("#siteNav").innerHTML = NAV.map(([label, href, active]) => `<a href="${href}"${active(route) ? ' aria-current="page"' : ""}>${label === "Latest" && state.coverage.length ? `<span class="nav-live" aria-label="Live coverage running"></span>` : ""}${label}</a>`).join("")
     + `<button class="search-btn" type="button" data-action="search" aria-label="Search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>`;
+  { const nav = $("#siteNav"), cur = nav.querySelector("[aria-current=page]"); if (cur && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = Math.max(0, cur.offsetLeft - (nav.clientWidth - cur.offsetWidth) / 2); }
   $("#siteNav").dispatchEvent(new Event("scroll"));
 }
 
@@ -353,7 +355,7 @@ function interceptLinks(e) {
   a.closest("dialog")?.close();
   navigate(href);
 }
-const views = { about: viewAbout, ...Object.fromEntries(LEGAL_ORDER.map(([k]) => [k, viewLegal])), coverage: viewCoverage, home: viewHome, desk: viewDesk, briefs: viewBriefs, editions: viewLive, edition: viewStory, article: viewStory, author: viewAuthor, tag: viewTag, my: viewMy, live: viewLive, community: viewCommunity, discussion: viewDiscussion, events: viewEvents, watch: viewWatch, tv: viewWatch, account: viewAccount, saved: viewSaved, search: viewSearch };
+const views = { about: viewAbout, ...Object.fromEntries(LEGAL_ORDER.map(([k]) => [k, viewLegal])), coverage: viewCoverage, home: viewHome, desk: viewDesk, briefs: viewBriefs, editions: viewLive, edition: viewStory, article: viewStory, author: viewAuthor, tag: viewTag, my: viewMy, live: viewLive, community: viewCommunity, discussion: viewDiscussion, events: viewEvents, watch: viewWatch, tv: viewWatch, shorts: viewShorts, account: viewAccount, saved: viewSaved, search: viewSearch };
 const DEFAULT_TITLE = "Rashtrix 24×7 News";
 let routeSeq = 0;
 async function route({ restoreY = null } = {}) {
@@ -369,6 +371,7 @@ async function route({ restoreY = null } = {}) {
   // Lists that mix in control-room articles wait briefly for them, so the lead story doesn't flash.
   stopListening();
   if (!["watch", "tv"].includes(r.page) && tvInstance) { tvInstance.destroy(); tvInstance = null; }
+  if (r.page !== "shorts" && shortsObserver) { shortsObserver.disconnect(); shortsObserver = null; }
   if (["home", "editions", "search", "author", "edition", "article", "tag", "my", "desk", "briefs", "live"].includes(r.page)) {
     await Promise.race([Promise.all([articlesReady, writersReady]), new Promise(res => setTimeout(res, 1200))]);
     if (!articlesSettled && ["home", "desk", "briefs", "live", "author"].includes(r.page)) state.drewWithoutArticles = true;
@@ -433,6 +436,7 @@ function viewHome() {
   $("#view").innerHTML = `
   <div class="wrap home">
     <section id="liveBanner" class="band-tight" aria-label="Live coverage" hidden></section>
+    <section id="shortsRail" class="shorts-rail" aria-label="Shorts" hidden></section>
     <div class="lead-grid">
       <section class="side-stack" aria-label="More top stories"><div class="kicker">Top stories</div>
         ${side.map(e => `<a class="side-item" href="${edHref(e)}"><div class="thumb">${pic(e)}</div><span class="kicker">${newTag(e)}${esc(e.category)}</span><h3>${esc(e.title)}</h3><span class="meta">${ago(e.publishedAt)}</span></a>`).join("")}
@@ -1456,6 +1460,32 @@ function viewEvents() {
 }
 
 /* ---------- Watch & listen (multimedia from the control room) ---------- */
+/* ---------- Shorts: YouTube Shorts from the vertical channel, in a swipe-up feed ---------- */
+async function loadYtShorts() {
+  try { const r = await fetch("/api/shorts"); state.ytShorts = r.ok ? (await r.json()).shorts || [] : []; } catch { state.ytShorts = []; }
+  if (parseRoute().page === "home") renderHomeMedia();
+}
+const ytThumb = s => s.thumb || `https://i.ytimg.com/vi/${s.id}/hqdefault.jpg`;
+let shortsObserver = null;
+async function viewShorts() {
+  document.title = `${tr("Shorts")} · ${tr("Rashtrix 24×7 News")}`;
+  if (!state.ytShorts) await loadYtShorts();
+  const list = state.ytShorts || [], want = parseRoute().params.get("v");
+  $("#view").innerHTML = `<div class="shorts-page"><h1 class="sr-only">Shorts</h1>${list.length ? `<div class="shorts-feed" id="shortsFeed">${list.map(s => `<section class="sf-item" data-yt="${esc(s.id)}" id="s-${esc(s.id)}">
+      <div class="sf-frame"><img src="${esc(ytThumb(s))}" alt="" loading="lazy"><span class="play-badge" aria-hidden="true"></span></div>
+      <div class="sf-info"><b data-no-tr>${esc(s.title)}</b><span class="sf-tools">${shareBtn(s.title, `${location.origin}${withLang("/shorts")}?v=${encodeURIComponent(s.id)}`)}</span></div></section>`).join("")}</div>
+      <p class="sf-hint muted">Swipe up for the next one</p>` : `<div class="empty" style="margin-top:30px">No shorts yet.</div>`}</div>`;
+  if (!list.length) return;
+  const feed = $("#shortsFeed");
+  // The short in view plays (muted until the viewer turns the sound on); the others stop.
+  shortsObserver?.disconnect();
+  const play = el => { const id = el.dataset.yt, f = el.querySelector(".sf-frame"); if (f.querySelector("iframe")) return;
+    f.insertAdjacentHTML("beforeend", `<iframe src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&loop=1&playlist=${id}&rel=0&modestbranding=1" title="" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`); };
+  const stop = el => el.querySelector(".sf-frame iframe")?.remove();
+  shortsObserver = new IntersectionObserver(es => es.forEach(e => e.intersectionRatio >= 0.6 ? play(e.target) : stop(e.target)), { threshold: [0, 0.6] });
+  feed.querySelectorAll(".sf-item").forEach(el => shortsObserver.observe(el));
+  if (want) document.getElementById(`s-${want}`)?.scrollIntoView({ block: "start" });
+}
 async function loadMedia() {
   try { const r = await fetch("/api/media"); state.media = r.ok ? (await r.json()).items || [] : []; } catch { state.media = []; }
   if (["tv", "watch"].includes(parseRoute().page)) viewWatch();
@@ -1480,9 +1510,9 @@ function videoCard(m) {
 function renderHomeMedia() {
   const rail = $("#shortsRail"), band = $("#videoBand");
   if (rail) {
-    const list = shorts();
-    rail.hidden = !list.length;
-    rail.innerHTML = list.length ? `<div class="shorts-head"><span class="kicker">Shorts</span><a class="link-gold" href="/watch#shorts">All shorts →</a></div><div class="shorts-row">${shortBubbles(list)}</div>` : "";
+    const list = shorts(), yt = (state.ytShorts || []).slice(0, 20);
+    rail.hidden = !list.length && !yt.length;
+    rail.innerHTML = list.length || yt.length ? `<div class="shorts-head"><span class="kicker">Shorts</span><a class="link-gold" href="/shorts">All shorts →</a></div><div class="shorts-row">${shortBubbles(list)}${yt.map((s, i) => `<a class="short-bubble" href="/shorts?v=${encodeURIComponent(s.id)}" aria-label="Play: ${esc(s.title)}"><span class="short-ring"><span class="short-face"><img src="${esc(ytThumb(s))}" alt="" ${i < 5 ? "" : 'loading="lazy"'}></span></span><span class="short-name" data-no-tr>${esc(s.title)}</span></a>`).join("")}</div>` : "";
   }
   if (band) {
     const films = (state.media || []).filter(isFilm);
@@ -2092,7 +2122,7 @@ navigator.serviceWorker?.ready.then(async () => { if (pushSupported() && Notific
 loadAlerts(); setInterval(() => { if (!document.hidden) loadAlerts(); }, 60e3);
 document.addEventListener("click", interceptLinks);
 route();
-loadCommunity(); loadCoverage(); loadMedia();
+loadCommunity(); loadCoverage(); loadMedia(); loadYtShorts();
 renderClocks(); setInterval(renderClocks, 20e3);
 setInterval(() => { if (!document.hidden) loadCoverage(); }, 60e3);
 setInterval(() => { if (!document.hidden) loadArticles(); }, 2 * 60e3);

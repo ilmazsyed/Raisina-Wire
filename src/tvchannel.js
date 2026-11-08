@@ -71,6 +71,13 @@ export async function setBreaking(env, ch, b) {
   return s.breaking;
 }
 
+/* ---------- The Shorts tab: the vertical channel's YouTube Shorts, newest first ---------- */
+export async function shortsList(env, limit = 60) {
+  const { results } = await env.DB.prepare(`SELECT i.yt_id AS id, i.title, i.thumb, i.duration, i.published_at AS publishedAt FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
+    WHERE i.channel='v' AND i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0 AND i.duration<=${SHORT_MAX} ORDER BY i.published_at DESC LIMIT ?`).bind(limit).all();
+  return results;
+}
+
 /* ---------- The running order ---------- */
 async function playable(env, ch) {
   const { results } = await env.DB.prepare(`SELECT i.yt_id AS ytId, i.title, i.duration, i.thumb FROM tv_items i JOIN tv_sources s ON s.id=i.source_id

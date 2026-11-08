@@ -1168,4 +1168,6 @@ export default {
   "Space": "स्पेस",
   "Enter": "एंटर",
   "Live TV": "लाइव टीवी",
+  "No shorts yet.": "अभी कोई शॉर्ट्स नहीं।",
+  "Swipe up for the next one": "अगला देखने के लिए ऊपर स्वाइप करें",
 };

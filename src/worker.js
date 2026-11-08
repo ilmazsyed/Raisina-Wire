@@ -28,6 +28,7 @@ import { handleStudio } from "./studioapi.js";
 import { handleExtras, tvExtras } from "./extras.js";
 import { rundownHousekeeping } from "./rundown.js";
 export { TvControl } from "./control.js";
+import { shortsList } from "./tvchannel.js";
 import { CHANNELS, tvSettings, saveTvSettings, newOutputKey, setBreaking, tvState, clearTvCache, checkKey, promos as tvPromos, copyImage } from "./tvchannel.js";
 import { parseYouTubeRef, refreshSources, refreshSource, playlistTitle, ytUsage, ytReady } from "./youtube.js";
 import { setGuestWriters, isBuiltIn } from "./writers.js";
@@ -1015,6 +1016,8 @@ async function api(request, env, ctx) {
     return json({ images: results.map(r => ({ ...r, url: `/media/${r.id}.${r.mime.split("/")[1].replace("jpeg", "jpg")}` })) }, 200, { "cache-control": "no-store" });
   }
 
+  // ---- The Shorts tab: YouTube Shorts from the vertical channel's sources.
+  if (url.pathname === "/api/shorts" && request.method === "GET") return json({ shorts: await shortsList(env) }, 200, { "cache-control": "public, max-age=60" });
   // ---- Rashtrix TV (src/tvchannel.js, src/youtube.js): two channels, sources, promos, controls.
   const tvMatch = url.pathname.match(/^\/api\/tv\/(h|v)(\/key)?$/);
   if (tvMatch && request.method === "GET") {
