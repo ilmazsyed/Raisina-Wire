@@ -135,7 +135,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     </div></div>${mode === "app" ? `<button class="tvp-sound" type="button">🔇 শব্দ চালু করতে ট্যাপ করুন</button>` : ""}`;
   const fit = host.querySelector(".tvp-fit"), stage = host.querySelector(".tvp");
   const $ = s => stage.querySelector(s);
-  const scale = () => { const k = Math.min(fit.clientWidth / W, (output ? fit.clientHeight : fit.clientWidth * H / W) / H); stage.style.transform = `scale(${k})`; if (!output) fit.style.height = `${H * (fit.clientWidth / W)}px`; };
+  const scale = () => { const k = Math.min(fit.clientWidth / W, (output ? fit.clientHeight : fit.clientWidth * H / W) / H); stage.style.transform = `scale(${k})`; stage.style.setProperty("--k", String(k || 1)); if (!output) fit.style.height = `${H * (fit.clientWidth / W)}px`; };
   const ro = new ResizeObserver(scale); ro.observe(fit); scale();
 
   const st = { tv: null, ctl: null, queue: [], skew: 0, alive: true, muted: muted ?? !output, audio: null, current: null, shownBreaking: "", flash: 0, stalledSince: 0, playing: false, ws: null, dumpUntil: 0, pkgTimer: null };
@@ -153,7 +153,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const slot = { el, src, destroy() {}, setMuted() {}, stalled: () => false };
     const mute = () => st.muted || !isMain;
     if (src.kind === "yt" && src.id) {
-      el.innerHTML = `<div class="tvs-yt"></div><img class="tvs-poster" src="https://i.ytimg.com/vi/${esc(src.id)}/hqdefault.jpg" alt="" onerror="this.hidden=true"><div class="tvp-shield"></div>`;
+      // The YouTube player is laid out at the size it is seen at (the stage is 1080 or 1920 wide
+      // and scaled down), so phones do not draw a full-HD video layer and run out of memory.
+      el.innerHTML = `<div class="tvs-ytwrap"><div class="tvs-yt"></div></div><img class="tvs-poster" src="https://i.ytimg.com/vi/${esc(src.id)}/hqdefault.jpg" alt="" onerror="this.hidden=true"><div class="tvp-shield"></div>`;
       let player = null, state = -1, since = Date.now();
       loadYT().then(YT => {
         if (!YT || !st.alive || !el.isConnected) return;
