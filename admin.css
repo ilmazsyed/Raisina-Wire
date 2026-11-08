@@ -19,7 +19,7 @@ header{height:68px;border-bottom:1px solid var(--line);display:flex;align-items:
 .layout{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:calc(100vh - 68px)}
 .sidebar{border-right:1px solid var(--line);padding:24px 14px;display:flex;flex-direction:column;gap:4px;background:rgba(255,255,255,.45)}
 .side-label{font:500 11px var(--mono);letter-spacing:1.6px;color:var(--muted);padding:0 12px 14px}
-.nav{background:none;border:1px solid transparent;border-radius:10px;text-align:left;color:var(--ink-2);padding:10px 12px;font-size:14px;font-weight:600;cursor:pointer}
+.nav{display:block;text-decoration:none;background:none;border:1px solid transparent;border-radius:10px;text-align:left;color:var(--ink-2);padding:10px 12px;font-size:14px;font-weight:600;cursor:pointer}
 .nav:hover{background:rgba(15,20,34,.04)}
 .nav.active{background:var(--ink);color:#fff}
 .sidebar-note{margin-top:auto;padding:14px 12px;color:var(--muted);font-size:12px;line-height:1.6}
@@ -231,3 +231,13 @@ td .row-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .tv-breakin{border-color:rgba(200,20,31,.3)!important}
 .tv-inputs{border-color:rgba(200,20,31,.25)!important}.tv-list li.on-air{border-color:#c8141f;background:rgba(200,20,31,.06)}
 .pill.bad{background:#c8141f;color:#fff}
+
+/* Rashtrix additions */
+.inline-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
+.inline-form input,.inline-form select{flex:1;min-width:140px}
+.action.danger{color:#AA0404;border-color:rgba(170,4,4,.4)}
+.chips-list,.src-list{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px}
+.tv-ch h3,.tv-break h3,.tv-set h3{margin:18px 0 6px;font-size:15px}
+.promo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-top:14px}
+.promo-card{display:grid;gap:4px;font-size:13px}.promo-card img{width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:10px}.promo-card.off img{opacity:.35}
+.pill.red{background:#AA0404;color:#fff}

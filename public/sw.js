@@ -1,11 +1,11 @@
-// Raisina Wire service worker.
+// Rashtrix service worker.
 // The build replaces __BUILD_ID__ and __PRECACHE__ (see vite.config.js), so every deploy
-// installs a fresh copy of the app shell, all edition text and artwork.
+// installs a fresh copy of the app shell.
 const BUILD = "__BUILD_ID__";
 const PRECACHE = __PRECACHE__;
 const SHELL_CACHE = `rw-shell-${BUILD}`;
-const DATA_CACHE = "rw-data";      // last good copy of live wire, markets, coverage, events
-const READ_CACHE = "rw-reader";    // reader-view articles recently opened
+const DATA_CACHE = "rw-data";      // last good copy of the story lists, live coverage, events
+const READ_CACHE = "rw-reader";    // stories recently opened
 const SAVED_CACHE = "rw-saved";    // articles the reader saved for later
 const FONT_CACHE = "rw-fonts";
 const KEEP = [SHELL_CACHE, DATA_CACHE, READ_CACHE, SAVED_CACHE, FONT_CACHE];
@@ -27,7 +27,7 @@ self.addEventListener("activate", event => {
 self.addEventListener("message", event => {
   const msg = event.data || {};
   if (msg.type === "SKIP_WAITING") self.skipWaiting();
-  if (msg.type === "SAVE_ARTICLE" && typeof msg.url === "string" && msg.url.startsWith("/api/read?")) {
+  if (msg.type === "SAVE_ARTICLE" && typeof msg.url === "string" && msg.url.startsWith("/api/articles/")) {
     event.waitUntil(fetch(msg.url).then(r => r.ok ? caches.open(SAVED_CACHE).then(c => c.put(msg.url, r)) : null).catch(() => {}));
   }
 });
@@ -37,8 +37,8 @@ self.addEventListener("push", event => {
   event.waitUntil((async () => {
     let alert = null;
     try { alert = (await fetch("/api/alerts/latest", { cache: "no-store" }).then(r => r.json())).alert; } catch { /* offline */ }
-    await self.registration.showNotification(alert?.title || "Raisina Wire", {
-      body: alert?.body || "New on Raisina Wire", icon: "/icon-192.png", badge: "/favicon.png", tag: "rw-alert", renotify: true,
+    await self.registration.showNotification(alert?.title || "রাষ্ট্রিক্স", {
+      body: alert?.body || "নতুন খবর", icon: "/icon-192.png", badge: "/favicon.png", tag: "rw-alert", renotify: true,
       data: { url: alert?.url || "/" }
     });
   })());
@@ -99,7 +99,7 @@ async function staleWhileRevalidate(request, cacheName) {
   return cached || network;
 }
 
-const LIVE_DATA = ["/api/wire", "/api/markets", "/api/live", "/api/events", "/api/community/posts", "/api/community/stats", "/api/config", "/api/articles", "/api/media"];
+const LIVE_DATA = ["/api/live", "/api/events", "/api/community/posts", "/api/community/stats", "/api/config", "/api/articles", "/api/media"];
 
 self.addEventListener("fetch", event => {
   const { request } = event;
@@ -111,13 +111,10 @@ self.addEventListener("fetch", event => {
     return;
   }
   if (url.origin !== self.location.origin) return;
-  // Videos stream straight from the network (range requests, large files), never from the cache,
-  // so a re-rendered film reaches readers at once.
-  if (url.pathname.startsWith("/videos/")) return;
 
   if (url.pathname.startsWith("/api/")) {
-    if (url.pathname === "/api/read") event.respondWith(networkFirst(request, READ_CACHE, { wait: 10000, max: 60 }));
-    else if (LIVE_DATA.includes(url.pathname) || url.pathname.startsWith("/api/live/") || url.pathname.startsWith("/api/articles/")) event.respondWith(networkFirst(request, DATA_CACHE, { wait: 6000, max: 40 }));
+    if (url.pathname.startsWith("/api/articles/")) event.respondWith(networkFirst(request, READ_CACHE, { wait: 8000, max: 80 }));
+    else if (LIVE_DATA.includes(url.pathname) || url.pathname.startsWith("/api/live/")) event.respondWith(networkFirst(request, DATA_CACHE, { wait: 6000, max: 40 }));
     return; // accounts and admin always go to the network
   }
 

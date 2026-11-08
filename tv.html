@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="bn-IN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Rashtrix TV output</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@600;700;800&family=Hind+Siliguri:wght@500;600;700&family=Montserrat:wght@700;800;900&display=block" rel="stylesheet" />
+</head>
+<body class="tv-output">
+  <!-- The clean channel picture for OBS / vMix: add it as a Browser Source at 1920×1080
+       (horizontal) or 1080×1920 (vertical), with "Control audio via OBS" ticked. The address is
+       secret: tv.html?ch=h&key=… (control room → TV channels). -->
+  <div id="tvHost"></div>
+  <script type="module" src="/src/tvoutput.js"></script>
+</body>
+</html>

@@ -1,4 +1,5 @@
-name = "raisina-wire"
+# Rashtrix 24×7 News: its own Worker and its own D1 database, never Raisina Wire's.
+name = "rashtrix"
 main = "src/worker.js"
 compatibility_date = "2026-10-16"
 
@@ -8,42 +9,76 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 # The Worker renders public pages (titles, social cards, schema.org data, story text for
 # search engines), uploaded images, sitemaps, robots.txt and the RSS feed. Everything else
-# is served straight from the built files.
+# is served straight from the built files. Bengali pages are at the bare addresses; English
+# under /en, Hindi under /hi; old /bn addresses redirect.
 run_worker_first = [
-  "/api/*", "/mcp", "/oauth/*", "/.well-known/*", "/media/*", "/", "/editions", "/edition/*", "/article/*", "/author/*", "/tag/*",
-  "/live", "/live/*", "/markets", "/community", "/discussion/*", "/events", "/coverage/*", "/watch", "/tv", "/t",
-  "/about", "/terms", "/privacy", "/disclaimer", "/copyright", "/community-guidelines", "/grievance", "/privacy.html", "/terms.html",
-  "/hi", "/hi/*", "/bn", "/bn/*",
+  "/api/*", "/mcp", "/oauth/*", "/.well-known/*", "/media/*", "/clips/*", "/", "/edition/*", "/article/*", "/author/*", "/tag/*", "/desk/*",
+  "/live", "/briefs", "/community", "/discussion/*", "/events", "/coverage/*",
+  "/about", "/terms", "/privacy", "/disclaimer", "/copyright", "/corrections", "/community-guidelines", "/grievance", "/privacy.html", "/terms.html",
+  "/en", "/en/*", "/hi", "/hi/*", "/bn", "/bn/*",
   "/sitemap.xml", "/news-sitemap.xml", "/robots.txt", "/feed.xml", "/rss.xml"
 ]
 
-# Every minute: send alerts for scheduled stories that have gone live, and the next batch
-# of breaking-news pushes.
+# Every minute: alerts for scheduled stories, pushes, the wire desk (sources → rewrites and
+# briefs) and the Wix import.
 [triggers]
 crons = ["* * * * *"]
 
+# The rashtrix-db database (created with `npx wrangler d1 create rashtrix-db`).
+# Tables are created automatically on first use (migrations/).
 [[d1_databases]]
 binding = "DB"
-database_name = "raisina-wire-db"
-database_id = "edf1ed45-d413-404e-bd96-a15707bbdec3"
+database_name = "rashtrix-db"
+database_id = "bb54e3c7-eb77-46db-8863-5a1f3e27f303"
 migrations_dir = "migrations"
 
 [vars]
-APP_NAME = "Raisina Wire"
-# Built-in admin account. Its password is the ADMIN_PASSWORD secret, set in the
-# Cloudflare dashboard (Worker → Settings → Variables and Secrets), never here.
+APP_NAME = "Rashtrix 24×7 News"
+# Built-in admin account. Its password is the ADMIN_PASSWORD secret, set in the Cloudflare
+# dashboard (Worker → Settings → Variables and Secrets), never here.
 ADMIN_EMAIL = "ilmazsyed@gmail.com"
-# The site's public address, used in canonical links, sitemaps, the RSS feed and social
-# cards. Page visits to the workers.dev address are redirected here.
-SITE_URL = "https://raisinawire.calibrex.org"
-# "Listen" voice: a natural Indian English woman's voice from Google Cloud Text-to-Speech.
-# Needs the GOOGLE_TTS_API_KEY secret (see README). Other female en-IN voices: Aoede, Kore,
-# Leda, Achernar, Vindemiatrix, Despina (en-IN-Chirp3-HD-<name>).
-TTS_VOICE = "en-IN-Chirp3-HD-Sulafat"
-# Publishers who asked not to be excerpted (comma-separated domains): headline, summary and link only.
-PUBLISHER_OPT_OUT = ""
+# The app's public address, used in canonical links, sitemaps, the RSS feed and social cards.
+# Page visits to the workers.dev address are redirected here. Leave empty until the domain is
+# connected (the workers.dev address is used meanwhile).
+SITE_URL = ""
+# Rashtrix's Wix blog, imported and kept in sync (src/wix.js).
+WIX_SITE = "https://www.rashtrix.live"
+# The wire desk (src/wiredesk.js): needs the GEMINI_API_KEY secret (Google AI Studio, free tier).
+GEMINI_MODEL = "gemini-2.5-flash"
+# Calls a day the desk may make (keep under the free tier's daily limit for the model).
+GEMINI_DAILY_LIMIT = "200"
+# "Listen" voices (Google Cloud Text-to-Speech, Chirp 3 HD; needs GOOGLE_TTS_API_KEY).
+# Defaults: bn-IN-Chirp3-HD-Sulafat (female) and bn-IN-Chirp3-HD-Charon (male); override with
+# TTS_VOICE_BN_FEMALE, TTS_VOICE_BN_MALE, TTS_VOICE_EN_FEMALE … here.
 
-# Market pulse uses keyless public feeds; no market-data secret is required.
+# Rashtrix TV (src/youtube.js): needs the YOUTUBE_API_KEY secret (YouTube Data API v3, free quota).
+# Units a day the TV may use refreshing sources (the free quota is 10,000).
+YOUTUBE_DAILY_UNITS = "8000"
+# The control room: rundowns and the as-run log are kept this many days; clips this many days unused.
+ARCHIVE_DAYS = "90"
+CLIP_RETENTION_DAYS = "30"
+# Rashtrix Command Centre (self-hosted NRCS): its address and the app's account there (the
+# password is the NRCS_PASSWORD secret). Empty = the producer's import is off.
+NRCS_URL = ""
+NRCS_USERNAME = ""
 
 [ai]
 binding = "AI"
+
+# Realtime control (src/control.js): one Durable Object per channel and per live-studio room.
+# SQLite-backed, so it runs on the Workers free plan.
+[[durable_objects.bindings]]
+name = "CONTROL"
+class_name = "TvControl"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TvControl"]
+
+# Video clips (src/clips.js) in Cloudflare R2 (free tier: 10 GB). Switched off until the bucket
+# exists (a deploy fails if it names a bucket that does not): enable R2 in the dashboard, run
+# `npx wrangler r2 bucket create rashtrix-clips`, then remove the # from the three lines below.
+# Clips not marked "keep" are deleted after CLIP_RETENTION_DAYS without use.
+# [[r2_buckets]]
+# binding = "CLIPS"
+# bucket_name = "rashtrix-clips"

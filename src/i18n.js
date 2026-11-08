@@ -1,26 +1,29 @@
-// English, Hindi and Bengali. Each language has its own addresses (/hi/…, /bn/…) so search
-// engines index them and shared links open in the reader's language. The interface is
-// translated as it is drawn: every text, label and placeholder the app renders is looked up in
-// the dictionary for the language (src/i18n/hi.js, src/i18n/bn.js). Stories and site pages
-// come translated from the server.
+// Bengali first, then English and Hindi. Bengali lives at the bare addresses (/, /article/…);
+// English at /en/…, Hindi at /hi/…, so search engines index each and shared links open in the
+// reader's language. The interface is written in English in the code and translated as it is
+// drawn: every text, label and placeholder is looked up in the dictionary for the language
+// (src/i18n/bn.js, src/i18n/hi.js). Stories come in their own language from the server.
 
 export const LANGUAGES = {
+  bn: { name: "বাংলা", short: "বাং", locale: "bn-IN" },
   en: { name: "English", short: "EN", locale: "en-IN" },
-  hi: { name: "हिन्दी", short: "हिं", locale: "hi-IN" },
-  bn: { name: "বাংলা", short: "বাং", locale: "bn-IN" }
+  hi: { name: "हिन्दी", short: "हिं", locale: "hi-IN" }
 };
-const PREFIX = /^\/(hi|bn)(?=\/|$)/;
-export const langOf = path => path.match(PREFIX)?.[1] || "en";
-export const lang = langOf(location.pathname);
-export const LOCALE = LANGUAGES[lang].locale;
+export const DEFAULT_LANG = "bn";
+const PREFIX = /^\/(en|hi)(?=\/|$)/;
+export const langOf = path => path.match(PREFIX)?.[1] || DEFAULT_LANG;
+export let lang = langOf(location.pathname);
+export let LOCALE = LANGUAGES[lang].locale;
+// Control-room and guest screens choose their language themselves (remembered per person).
+export function setLang(l) { if (LANGUAGES[l]) { lang = l; LOCALE = LANGUAGES[l].locale; } }
 export const stripLang = path => path.replace(PREFIX, "") || "/";
 const isAppPath = href => href.startsWith("/") && !href.startsWith("//") && !/^\/(api|admin|media|cdn-cgi)(\/|$)|\.(html|xml|txt|json|js|css|webmanifest|jpe?g|png|gif|avif|webp|svg|ico|pdf|ics|mp3)(\?|#|$)/i.test(href);
-// "/edition/x" -> "/hi/edition/x" while reading in Hindi.
+// "/article/x" -> "/en/article/x" while reading in English.
 export function withLang(href, l = lang) {
   if (typeof href !== "string" || !isAppPath(href)) return href;
   const [path, rest = ""] = href.split(/(?=[?#])/);
   const bare = stripLang(path);
-  return l === "en" ? bare + rest : `/${l}${bare === "/" ? "" : bare}${rest}`;
+  return l === DEFAULT_LANG ? bare + rest : `/${l}${bare === "/" ? "" : bare}${rest}`;
 }
 
 let dict = new Map(), patterns = [];
@@ -124,10 +127,12 @@ export async function loadLanguage() {
   document.documentElement.lang = lang === "en" ? "en-IN" : LOCALE;
   document.documentElement.dataset.lang = lang;
   if (lang === "en") return;
-  const fonts = { hi: "Tiro+Devanagari+Hindi:ital@0;1", bn: "Tiro+Bangla:ital@0;1" }[lang];
-  const link = document.createElement("link");
-  link.rel = "stylesheet"; link.href = `https://fonts.googleapis.com/css2?family=${fonts}&display=swap`;
-  document.head.append(link);
+  // Bengali fonts load with the page (index.html); Hindi adds its own.
+  if (lang === "hi") {
+    const link = document.createElement("link");
+    link.rel = "stylesheet"; link.href = "https://fonts.googleapis.com/css2?family=Tiro+Devanagari+Hindi:ital@0;1&family=Hind:wght@400;500;600;700&display=swap";
+    document.head.append(link);
+  }
   const mod = await (lang === "hi" ? import("./i18n/hi.js") : import("./i18n/bn.js"));
   dict = new Map(Object.entries(mod.default).map(([k, v]) => [norm(k), v]));
   patterns = mod.patterns || [];

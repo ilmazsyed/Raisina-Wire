@@ -1,32 +1,88 @@
 {
   "id": "/",
-  "name": "Raisina Wire",
-  "short_name": "Raisina Wire",
-  "description": "An Indian perspective on a changing world: Raisina Wire analysis, a live news wire, markets and community.",
-  "lang": "en-IN",
+  "name": "Rashtrix 24×7 News",
+  "short_name": "Rashtrix",
+  "description": "রাষ্ট্রিক্স ২৪×৭ নিউজ — কলকাতা, পশ্চিমবঙ্গ, ভারত, প্রবাসী বাঙালি আর বিশ্বের খবর। লোক গুনি না, লোকের কথা শুনি।",
+  "lang": "bn-IN",
   "dir": "ltr",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "any",
-  "background_color": "#f8f8fa",
-  "theme_color": "#0f1422",
-  "categories": ["news", "magazines", "politics"],
+  "background_color": "#ffffff",
+  "theme_color": "#AA0404",
+  "categories": [
+    "news"
+  ],
   "prefer_related_applications": false,
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "shortcuts": [
-    { "name": "Live wire", "short_name": "Live", "description": "Latest headlines from the live wire", "url": "/live", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Raisina Wire editions", "short_name": "Editions", "description": "Every Raisina Wire edition", "url": "/editions", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Markets", "short_name": "Markets", "description": "Market board", "url": "/markets", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Saved stories", "short_name": "Saved", "description": "Stories saved for offline reading", "url": "/saved", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
-  ],
-  "screenshots": [
-    { "src": "/screenshots/edition-narrow.webp", "sizes": "412x915", "type": "image/webp", "form_factor": "narrow", "label": "Read every Raisina Wire edition in the app, online or offline" },
-    { "src": "/screenshots/editions-wide.webp", "sizes": "1280x800", "type": "image/webp", "form_factor": "wide", "label": "Every Raisina Wire edition, newest first" }
+    {
+      "name": "সর্বশেষ খবর",
+      "short_name": "সর্বশেষ",
+      "url": "/live",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "কলকাতা",
+      "short_name": "কলকাতা",
+      "url": "/desk/kolkata",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "সংক্ষেপে",
+      "short_name": "সংক্ষেপে",
+      "url": "/briefs",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "সেভ করা খবর",
+      "short_name": "সেভ",
+      "url": "/saved",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ]
 }

@@ -4,11 +4,11 @@ import { createHash } from "node:crypto";
 import { defineConfig } from "vite";
 
 // Fill the service worker's precache list with this build's files, so an installed app
-// opens offline with the reader, all edition text and artwork. Admin pages are left out.
+// opens offline. Admin pages are left out.
 function precacheServiceWorker() {
   let outDir;
   return {
-    name: "raisina-precache",
+    name: "rashtrix-precache",
     apply: "build",
     configResolved(config) { outDir = resolve(config.root, config.build.outDir); },
     closeBundle() {
@@ -17,7 +17,7 @@ function precacheServiceWorker() {
         return statSync(path).isDirectory() ? walk(path) : [path];
       });
       const files = walk(outDir).map(f => "/" + relative(outDir, f).split("\\").join("/"))
-        .filter(f => !/^\/(sw\.js|_headers|og-image\.jpg|admin|screenshots\/|videos\/|anchors\/)/.test(f) && !f.includes("/admin-"))
+        .filter(f => !/^\/(sw\.js|_headers|og-image[\w-]*\.jpg|admin|tv\.html|producer|pcr|studio|prompter|guest|onair)/.test(f) && !/\/(admin|tv|producer|pcr|studio|prompter|guest|onair|studiodesk|rtc|crshell|control|uilang)-/.test(f))
         .map(f => (f === "/index.html" ? "/" : f))
         .sort();
       const hash = createHash("sha256");
@@ -38,7 +38,14 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(import.meta.dirname, "index.html"),
-        admin: resolve(import.meta.dirname, "admin.html")
+        admin: resolve(import.meta.dirname, "admin.html"),
+        tv: resolve(import.meta.dirname, "tv.html"),
+        producer: resolve(import.meta.dirname, "producer.html"),
+        pcr: resolve(import.meta.dirname, "pcr.html"),
+        studio: resolve(import.meta.dirname, "studio.html"),
+        guest: resolve(import.meta.dirname, "guest.html"),
+        onair: resolve(import.meta.dirname, "onair.html"),
+        prompter: resolve(import.meta.dirname, "prompter.html")
       }
     }
   }
