@@ -240,10 +240,12 @@ export class TvControl {
       case "countdown": this.toGuest(b.guestId || "*", { type: "countdown", seconds: Math.max(0, Math.min(600, Number(b.seconds) || 10)), at: now() }); break;
       case "state": g.state = b.state; this.toGuest(b.guestId, { type: "state", state: b.state }); break;
       case "remove": delete room.guests[b.guestId]; this.toGuest(b.guestId, { type: "removed" }); break;
+      // The producer's talkback microphone (a Realtime track); only the guest named in talkback hears it.
+      case "talkback.track": room.talkbackTrack = b.track && b.track.sessionId ? { sessionId: String(b.track.sessionId).slice(0, 80), trackName: String(b.track.trackName || "").slice(0, 80) } : null; this.broadcast({ type: "room", state: room }, ["guest"]); break;
       default: throw new Error("Unknown studio command.");
     }
     await this.ctx.storage.put("state", this.state);
-    this.broadcast({ type: "room", state: room }, ["producer", "output"]);
+    this.broadcast({ type: "room", state: room }, ["producer", "output", "guest"]);
     return { room };
   }
   toGuest(guestId, msg) {
@@ -254,16 +256,16 @@ export class TvControl {
     const room = this.room(), g = (room.guests[guestId] ||= {});
     g.online = online; g.seen = now();
     await this.ctx.storage.put("state", this.state);
-    this.broadcast({ type: "room", state: room }, ["producer", "output"]);
+    this.broadcast({ type: "room", state: room }, ["producer", "output", "guest"]);
   }
   async roomMessage(ws, role, who, m) {
     const room = this.room();
     if (role === "guest") {
       const g = (room.guests[who] ||= {});
-      if (m.type === "hello" || m.type === "checks" || m.type === "tracks") Object.assign(g, { online: true, seen: now() }, m.data || {});
+      if (m.type === "hello") Object.assign(g, { online: true, seen: now() });
       if (m.type === "reply") this.broadcast({ type: "reply", guestId: who, text: String(m.text || "").slice(0, 300) }, ["producer"]);
       await this.ctx.storage.put("state", this.state);
-      this.broadcast({ type: "room", state: room }, ["producer", "output"]);
+      this.broadcast({ type: "room", state: room }, ["producer", "output", "guest"]);
     }
   }
 }

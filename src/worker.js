@@ -24,6 +24,7 @@ import m0022 from "../migrations/0022_tv.sql";
 import m0023 from "../migrations/0023_studio.sql";
 import { handleControlRoom, control as ctlCommand } from "./controlroom.js";
 import { serveClip, clipHousekeeping } from "./clips.js";
+import { handleStudio } from "./studioapi.js";
 import { rundownHousekeeping } from "./rundown.js";
 export { TvControl } from "./control.js";
 import { CHANNELS, tvSettings, saveTvSettings, newOutputKey, setBreaking, tvState, clearTvCache, checkKey, promos as tvPromos, copyImage } from "./tvchannel.js";
@@ -1013,6 +1014,11 @@ async function api(request, env, ctx) {
   if (tvMatch && request.method === "GET") {
     if (tvMatch[2]) return json({ ok: await checkKey(env, tvMatch[1], url.searchParams.get("key")) }, 200, { "cache-control": "no-store" });
     return json(await tvState(env, tvMatch[1]), 200, { "cache-control": "no-cache" });
+  }
+  // ---- The live studio (src/studioapi.js): guests, rooms, the media relay.
+  if (/^\/api\/(rtc|ws\/room|studio\/guest|admin\/studio)(\/|$)/.test(url.pathname)) {
+    const out = await handleStudio(request, env, url, { json, err, currentUser, isStaff, auditFn: (u, ...a) => audit(env, u, ...a) });
+    if (out) return out;
   }
   // ---- The control room (src/controlroom.js): realtime control, PCR commands, Companion, rundowns, clips.
   if (/^\/api\/(ws\/ctl|ctl|companion|admin\/(rundowns|templates|asrun|proof|clips|macros|companion|copy-image|inputs))(\/|$)/.test(url.pathname)) {

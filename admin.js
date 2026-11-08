@@ -309,6 +309,7 @@ async function render(view){
         <label class="field">News Update after every<select name="newsEvery">${[0,1,2,3,4,5,6,8].map(n=>`<option value="${n}" ${n===S.newsEvery?"selected":""}>${n?`${n} video${n>1?"s":""}`:"never"}</option>`).join("")}</select><small class="hint">At the top of the hour it is the Bulletin.</small></label>
         <label class="field">Headline sets<select name="sets">${[1,2,3,4,5].map(n=>`<option ${n===S.sets?"selected":""}>${n}</option>`).join("")}</select></label>
         <label class="field">Seconds per set<select name="setSeconds">${[5,6,7,8,10,12].map(n=>`<option ${n===S.setSeconds?"selected":""}>${n}</option>`).join("")}</select></label>
+        <label class="field full">App live stream (optional): the studio's HLS (.m3u8) or WHEP address from the media server<input name="appStream" value="${esc(S.appStream?.url||"")}" placeholder="https://live.example.com/studio/index.m3u8"><small class="hint">When set, the app plays this for live-studio segments instead of connecting to each guest. See README: “Studio stream for the app”.</small></label>
         <label class="field full">Your ticker lines first (one per line; the latest headlines follow)<textarea name="ticker" rows="3" lang="bn">${esc((S.ticker||[]).join("\n"))}</textarea></label>
         ${adFields(ch,S.ad)}</div>
         <div class="form-actions"><button class="button">Save</button><label class="field check" style="margin:0"><input type="checkbox" name="restart"> Start the running order again from the newest video</label></div></form></div>`};
@@ -331,7 +332,7 @@ async function render(view){
     $$(".tv-break").forEach(f=>f.addEventListener("submit",e=>{e.preventDefault();const v=Object.fromEntries(new FormData(f));if(!confirm("Break in on every screen now?"))return;go(`/api/admin/tv/${f.dataset.ch}/breaking`,J("POST",{text:v.text,music:!!f.elements.music.checked,seconds:v.seconds}),"Breaking news is going out to every screen.")}));
     $$("[data-clearbreak]").forEach(b=>b.addEventListener("click",()=>go(`/api/admin/tv/${b.dataset.clearbreak}/breaking`,J("POST",{clear:true}),"Cleared.")));
     $$(".tv-set").forEach(f=>f.addEventListener("submit",e=>{e.preventDefault();const ch=f.dataset.ch,v=Object.fromEntries(new FormData(f)),el=f.elements;
-      const b={newsEvery:v.newsEvery,sets:v.sets,setSeconds:v.setSeconds,ticker:String(v.ticker||"").split("\n"),ad:{line1:v.ad1,line2:v.ad2,line3:v.ad3,image:v[`adimg_${ch}`]||""},restart:!!el.restart.checked};
+      const b={newsEvery:v.newsEvery,sets:v.sets,setSeconds:v.setSeconds,ticker:String(v.ticker||"").split("\n"),ad:{line1:v.ad1,line2:v.ad2,line3:v.ad3,image:v[`adimg_${ch}`]||""},appStream:v.appStream||"",restart:!!el.restart.checked};
       if(ch==="h"){b.lowerThird=v.lowerThird;b.lband={on:!!el.lbandOn.checked,text:v.lbandText}}else{b.band=v.band;b.promosOn=!!el.promosOn.checked;b.promoEvery=v.promoEvery}
       go(`/api/admin/tv/${ch}`,J("PUT",b),"Saved. Screens update within a few seconds.")}));
     $("#tvRefresh").addEventListener("click",e=>{e.target.disabled=true;e.target.textContent="Refreshing…";go("/api/admin/tv/refresh",J("POST"),r=>r.skipped?`Not refreshed: ${r.skipped}.`:`Refreshed ${r.done} source${r.done===1?"":"s"}${r.failed?`, ${r.failed} failed`:""}.`)});

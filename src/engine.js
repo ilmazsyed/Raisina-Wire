@@ -140,7 +140,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
 
   const st = { tv: null, ctl: null, queue: [], skew: 0, alive: true, muted: muted ?? !output, audio: null, current: null, shownBreaking: "", flash: 0, stalledSince: 0, playing: false, ws: null, dumpUntil: 0, pkgTimer: null };
   const now = () => Date.now() + st.skew;
-  const auth = key ? { ch: channel, key } : guestToken ? { t: guestToken } : {};
+  const auth = key ? { ch: channel, key } : guestToken ? { t: guestToken } : mode === "app" ? { viewer: 1 } : {};
 
   /* sound */
   const soundBtn = host.querySelector(".tvp-sound");
@@ -172,7 +172,16 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (src.kind === "clip") { v.src = src.url; v.addEventListener("loadedmetadata", () => { v.currentTime = (src.in || 0) + offset; v.play().catch(() => {}); }, { once: true }); }
       if (src.kind === "hls") playHls(v, src.url, st.ctl?.delay || 0).then(x => { extra = x; v.play().catch(() => {}); }).catch(() => {});
       if (src.kind === "whep") playWhep(v, src.url).then(x => { extra = x; }).catch(() => {});
-      if (src.kind === "guest") { const g = st.room?.guests?.[src.id] || src; if (g.sessionId) pullGuest(v, g, auth).then(x => { extra = x; }).catch(() => {}); }
+      if (src.kind === "guest") {
+        const known = st.room?.guests?.[src.id]?.sessionId ? st.room.guests[src.id] : src.sessionId ? src : null;
+        // Rundown items know only the guest's id: ask for their tracks (or VDO.Ninja link).
+        const look = known ? Promise.resolve(known) : fetch(`/api/rtc/guest/${encodeURIComponent(src.id)}?${new URLSearchParams(auth)}`).then(r => r.ok ? r.json() : null);
+        look.then(g => {
+          if (!g || !st.alive || !el.isConnected) return;
+          if (g.vdo && !g.sessionId) { el.querySelector("video").outerHTML = `<iframe src="${esc(g.vdo)}" allow="autoplay; fullscreen" title=""></iframe>`; return; }
+          if (g.sessionId) pullGuest(v, g, auth).then(x => { extra = x; }).catch(() => {});
+        }).catch(() => {});
+      }
       if (src.kind === "clip" && src.out) v.addEventListener("timeupdate", () => { if (v.currentTime >= src.out) v.pause(); });
       slot.destroy = () => { try { extra?.destroy?.(); extra?.close?.(); } catch { /* none */ } v.pause(); v.removeAttribute("src"); v.srcObject = null; };
       slot.setMuted = m => { v.muted = m || !isMain; };
@@ -203,7 +212,14 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   }
 
   /* ---------- what is on air now ---------- */
-  function resolve() {
+  // In the app, live-studio segments play the studio's own stream when there is one, so each
+  // viewer does not connect to every guest.
+  function forApp(sc) {
+    if (mode !== "app" || !sc?.sources?.some(s => s.kind === "guest" || s.kind === "vdo") || !st.tv?.appStream) return sc;
+    return { ...sc, layout: "full", sources: [{ kind: st.tv.appStream.kind, url: st.tv.appStream.url }], key: `${sc.key}:app` };
+  }
+  function resolve() { return forApp(resolveRaw()); }
+  function resolveRaw() {
     const c = st.ctl;
     if (mode === "scene") return fixedScene ? { ...fixedScene, key: JSON.stringify(fixedScene) } : null;
     if (st.tv && !st.tv.on && !(c && (c.mode === "manual" || c.rundown))) return { off: true, key: "off" };

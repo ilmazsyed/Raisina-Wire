@@ -41,7 +41,9 @@ export default defineConfig({
         admin: resolve(import.meta.dirname, "admin.html"),
         tv: resolve(import.meta.dirname, "tv.html"),
         producer: resolve(import.meta.dirname, "producer.html"),
-        pcr: resolve(import.meta.dirname, "pcr.html")
+        pcr: resolve(import.meta.dirname, "pcr.html"),
+        studio: resolve(import.meta.dirname, "studio.html"),
+        guest: resolve(import.meta.dirname, "guest.html")
       }
     }
   }

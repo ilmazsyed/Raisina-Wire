@@ -43,7 +43,7 @@ dialog::backdrop { background: #000a; }
 .row { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.stack { display: grid; gap: 10px; }
+.stack { display: grid; gap: 10px; align-content: start; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
 .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--mute); margin: 0 0 8px; }
 
@@ -159,7 +159,9 @@ dialog::backdrop { background: #000a; }
   .pr { grid-template-columns: 1fr; }
   .pcr { grid-template-columns: 1fr; }
 }
+#ret .tvp-sound { display: none; }
 @media (max-width: 700px) {
+  .grid2, .grid3 { grid-template-columns: 1fr; }
   .monitors { grid-template-columns: 1fr; }
   .switcher { grid-template-columns: 1fr; }
 }

@@ -53,6 +53,10 @@ export async function saveTvSettings(env, ch, b) {
   if (b.promoEvery !== undefined) s.promoEvery = int(b.promoEvery, 1, 20, s.promoEvery);
   if (Array.isArray(b.ticker)) s.ticker = b.ticker.map(x => clean(x, 160)).filter(Boolean).slice(0, 20);
   if (b.ad) s.ad = { image: /^(https:\/\/|\/media\/|\/brand\/)/.test(b.ad.image || "") ? clean(b.ad.image, 1500) : "", line1: clean(b.ad.line1, 40), line2: clean(b.ad.line2, 60), line3: clean(b.ad.line3, 80) };
+  // The studio's own stream for the app (OBS → the media server on the Oracle Cloud VM): HLS
+  // (.m3u8) or WebRTC (WHEP). When set, the app plays it for live-studio segments instead of
+  // pulling each guest, so the media relay carries only the studio.
+  if (b.appStream !== undefined) { const u = clean(b.appStream, 500); s.appStream = /^https:\/\//.test(u) ? { url: u, kind: /\.m3u8(\?|$)/.test(u) ? "hls" : "whep" } : null; }
   // A change to what plays restarts the channel clock, so every screen picks up the new order.
   if (b.restart) s.epoch = Date.now();
   await putSettings(env, ch, s);
@@ -120,7 +124,7 @@ export async function tvState(env, ch) {
     live: live || null,
     schedule: s.on ? scheduleAt(buildLoop(s, videos, cards), s.epoch) : [],
     breaking: s.breaking && Date.now() - Date.parse(s.breaking.at) < (s.breaking.seconds + 90) * 1000 ? s.breaking : null,
-    lband: ch === "h" ? s.lband : null, lowerThird: s.lowerThird || "", band: s.band || "",
+    lband: ch === "h" ? s.lband : null, lowerThird: s.lowerThird || "", band: s.band || "", appStream: s.appStream || null,
     ad: s.ad, sets: s.sets, setSeconds: s.setSeconds,
     ticker: [...s.ticker, ...headlines.slice(0, 14).map(h => h.text)],
     headlines

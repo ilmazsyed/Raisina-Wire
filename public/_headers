@@ -13,3 +13,17 @@
   Cache-Control: no-cache
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+# The live studio: guests (and the producer's talkback) need the camera and microphone, here and
+# in VDO.Ninja when a room uses it.
+/guest.html
+  ! Permissions-Policy
+  Permissions-Policy: camera=(self "https://vdo.ninja"), microphone=(self "https://vdo.ninja"), display-capture=(self "https://vdo.ninja"), autoplay=*, fullscreen=*, geolocation=()
+/guest
+  ! Permissions-Policy
+  Permissions-Policy: camera=(self "https://vdo.ninja"), microphone=(self "https://vdo.ninja"), display-capture=(self "https://vdo.ninja"), autoplay=*, fullscreen=*, geolocation=()
+/studio.html
+  ! Permissions-Policy
+  Permissions-Policy: camera=(self "https://vdo.ninja"), microphone=(self "https://vdo.ninja"), autoplay=*, fullscreen=*, geolocation=()
+/studio
+  ! Permissions-Policy
+  Permissions-Policy: camera=(self "https://vdo.ninja"), microphone=(self "https://vdo.ninja"), autoplay=*, fullscreen=*, geolocation=()
