@@ -144,7 +144,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
 
   /* sound */
   const soundBtn = host.querySelector(".tvp-sound");
-  const unmute = () => { st.muted = false; soundBtn?.remove(); try { st.audio ||= new (window.AudioContext || window.webkitAudioContext)(); st.audio.resume(); } catch { /* none */ } st.current?.slots.forEach(sl => sl.setMuted?.(false)); };
+  const unmute = () => { st.muted = false; soundBtn?.remove(); try { st.audio ||= new (window.AudioContext || window.webkitAudioContext)(); st.audio.resume(); } catch { /* none */ } st.current?.slots.forEach(sl => { sl.setMuted?.(false); sl.play?.(); }); };
   soundBtn?.addEventListener("click", unmute);
   if (!st.muted) { try { st.audio = new (window.AudioContext || window.webkitAudioContext)(); } catch { /* none */ } }
 
@@ -161,9 +161,19 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         if (!YT || !st.alive || !el.isConnected) return;
         player = new YT.Player(el.querySelector(".tvs-yt"), { width: "100%", height: "100%", videoId: src.id,
           playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, playsinline: 1, fs: 0, autoplay: 1, mute: mute() ? 1 : 0, start: Math.floor((src.in || 0) + offset), ...(src.out ? { end: Math.floor(src.out) } : {}), origin: location.origin },
-          events: { onStateChange: e => { state = e.data; since = Date.now(); if (e.data === 1) el.querySelector(".tvs-poster")?.remove(); }, onReady: e => { mute() ? e.target.mute() : e.target.unMute(); e.target.playVideo(); } } });
+          events: { onStateChange: e => { state = e.data; since = Date.now(); if (e.data === 1) { el.querySelector(".tvs-poster")?.remove(); played(); } }, onReady: e => { mute() ? e.target.mute() : e.target.unMute(); e.target.playVideo(); } } });
       });
-      slot.destroy = () => { try { player?.destroy(); } catch { /* none */ } };
+      // If the phone blocks autoplay (iPhone Low Power Mode, data saver), the cover that keeps
+      // viewers off YouTube's controls is lifted after a few seconds so YouTube's own play button
+      // can be tapped; it comes back once the video plays.
+      const blocked = setTimeout(() => {
+        if (!st.alive || !el.isConnected || state === 1 || !isMain || output) return;
+        el.classList.add("tap-play");
+        el.insertAdjacentHTML("beforeend", `<span class="tvs-hint">▶ ভিডিও চালাতে ট্যাপ করুন</span>`);
+      }, 5000);
+      const played = () => { el.classList.remove("tap-play"); el.querySelector(".tvs-hint")?.remove(); };
+      slot.destroy = () => { clearTimeout(blocked); try { player?.destroy(); } catch { /* none */ } };
+      slot.play = () => { try { player?.playVideo(); } catch { /* none */ } };
       slot.setMuted = m => { try { m || !isMain ? player?.mute() : player?.unMute(); } catch { /* none */ } };
       slot.stalled = () => state === 3 && Date.now() - since > 10000;
       slot.playing = () => state === 1;
@@ -349,15 +359,18 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const total = p.counts.reduce((a, b) => a + b, 0) || 1;
     return `<div class="${full ? "poll-full" : "poll-bar"}"><div class="poll-q"><span>জনমত</span><b>${esc(p.question)}</b></div><div class="poll-opts">${p.options.map((o, i) => `<span><b>${esc(o)}</b><i style="width:${Math.round(100 * p.counts[i] / total)}%"></i><em>${bnDigits(Math.round(100 * p.counts[i] / total))}%</em></span>`).join("")}</div><small class="poll-note">অ্যাপে ভোট দিন · এটি বৈজ্ঞানিক সমীক্ষা নয় · মোট ${bnDigits(p.counts.reduce((a, b) => a + b, 0))} ভোট</small></div>`;
   }
+  // Writes a layer only when its content changed, so its animations are not restarted.
+  const put = (sel, html) => { const el = $(sel); if (el && el.__html !== html) { el.innerHTML = html; el.__html = html; } };
   function drawJacket() {
+    let gfx = "", ovl = "";
     const c = st.ctl || {}, L = c.layers || { bug: true, live: true, clock: true, lower: true, ticker: true, ad: true, weather: true }, s = st.tv || {};
     const sc = st.current?.scene, fullGfx = stage.classList.contains("full-gfx");
-    if (!sc || sc.off || sc.standby || fullGfx || mode === "scene" && !sc.sources?.length && !sc.graphic) { $(".tvp-gfx").innerHTML = ""; $(".tvp-ovl").innerHTML = ""; return; }
+    if (!sc || sc.off || sc.standby || fullGfx || mode === "scene" && !sc.sources?.length && !sc.graphic) { put(".tvp-gfx", ""); put(".tvp-ovl", ""); return; }
     const isVideo = (sc.sources || []).length && !sc.graphic, lband = sc.layout === "lband";
     const ticker = [...(c.ticker || []), ...(sc.ticker || []), ...(L.weather && s.weather ? [s.weather] : []), ...(s.ticker || [])];
     const strap = c.lower && L.lower ? c.lower : sc.lower && L.lower ? sc.lower : null;
     if (channel === "h") {
-      $(".tvp-gfx").innerHTML = `
+      gfx = `
         ${L.bug ? `<div class="tv-bug"><img src="${LOGO}" alt=""></div>` : ""}
         ${L.live ? `<div class="tv-live"><i></i>LIVE</div>` : ""}${L.clock ? `<div class="tv-clock">${ist()}${s.bangabda ? `<small>${esc(s.bangabda)}</small>` : ""}</div>` : ""}
         ${!lband && L.lower && (strap || isVideo) ? `<div class="tv-l3"><span class="lt-tag">${strap ? esc(strap.title ? "রাষ্ট্রিক্স" : "রাষ্ট্রিক্স") : "রাষ্ট্রিক্স"}</span><span class="lt-text">${strap ? `${esc(strap.name)}${strap.title ? `<small>${esc(strap.title)}</small>` : ""}` : esc(s.lowerThird || sc.label || "")}</span></div>` : ""}
@@ -365,14 +378,16 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         ${L.ticker ? `<div class="tv-ticker"><span class="tk-label">শিরোনাম</span><div class="tk-track">${tickerHTML(ticker)}</div></div>` : ""}`;
     } else {
       const flash = s.band || (s.headlines || [])[st.flash % Math.max(1, (s.headlines || []).length)]?.text || "";
-      $(".tvp-gfx").innerHTML = `
+      gfx = `
         ${isVideo && L.lower ? `<div class="v-flash"><span>${strap ? "রাষ্ট্রিক্স" : s.band ? "রাষ্ট্রিক্স" : "শিরোনাম"}</span><b>${esc(strap ? `${strap.name}${strap.title ? ` · ${strap.title}` : ""}` : flash)}</b></div>` : ""}
         ${isVideo && L.live ? `<div class="tv-live v"><i></i>LIVE</div>` : ""}
         ${L.ticker ? `<div class="tv-ticker v"><span class="tk-label">খবর</span><div class="tk-track">${tickerHTML(ticker)}</div></div>` : ""}`;
     }
     // Overlays: poll bar, results bar, curated comments.
     const o = c.overlay || {};
-    $(".tvp-ovl").innerHTML = `${o.poll ? pollHTML(o.poll, false) : ""}<div class="ovl-right">${o.results ? resultsHTML(o.results, false) : ""}${o.comments?.length ? `<div class="cm-box">${o.comments.slice(0, 3).map(x => `<p><b>${esc(x.author)}</b><span>${esc(x.text)}</span><small>${x.platform === "youtube" ? "ইউটিউব" : x.platform === "facebook" ? "ফেসবুক" : "রাষ্ট্রিক্স অ্যাপ"}</small></p>`).join("")}</div>` : ""}</div>`;
+    ovl = `${o.poll ? pollHTML(o.poll, false) : ""}<div class="ovl-right">${o.results ? resultsHTML(o.results, false) : ""}${o.comments?.length ? `<div class="cm-box">${o.comments.slice(0, 3).map(x => `<p><b>${esc(x.author)}</b><span>${esc(x.text)}</span><small>${x.platform === "youtube" ? "ইউটিউব" : x.platform === "facebook" ? "ফেসবুক" : "রাষ্ট্রিক্স অ্যাপ"}</small></p>`).join("")}</div>` : ""}</div>`;
+
+    put(".tvp-gfx", gfx); put(".tvp-ovl", ovl);
   }
   function showBreaking(b) {
     const el = document.createElement("div"); el.className = "tv-breaking";

@@ -181,3 +181,8 @@ body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 
 /* Video slots: the player is laid out at its on-screen size and scaled back up to fill the slot. */
 .tvs .tvs-ytwrap{position:absolute;left:0;top:0;width:calc(100% * var(--k,1));height:calc(100% * var(--k,1));transform:scale(calc(1 / var(--k,1)));transform-origin:0 0;overflow:hidden}
+
+/* Autoplay blocked by the phone: YouTube's own play button shows and can be tapped. */
+.tvs.tap-play .tvp-shield,.tvs.tap-play .tvs-poster{display:none}
+.tvs-hint{position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:4;pointer-events:none;padding:16px 34px;border-radius:999px;background:rgba(17,17,17,.82);color:#fff;font:700 44px "Hind Siliguri",sans-serif;white-space:nowrap}
+.tvp-h .tvs-hint{font-size:34px;bottom:18%}
