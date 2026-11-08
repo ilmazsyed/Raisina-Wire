@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
+    "build": "node scripts/check-migrations.mjs && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "dev:worker": "wrangler dev",
     "deploy": "npm run build && wrangler deploy"
