@@ -351,7 +351,7 @@ body.nav-stuck .site-nav{max-width:var(--max);background:rgba(255,255,255,.86);b
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
 .ticker-track{flex:1;min-width:0;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 3%,#000 95%,transparent);mask-image:linear-gradient(90deg,transparent,#000 3%,#000 95%,transparent)}
 .ticker-move{display:flex;width:max-content}
-.ticker-move.moving{animation:ticker var(--ticker-duration,80s) linear infinite}
+.ticker-move.moving{animation:ticker var(--ticker-duration,50s) linear infinite}
 .ticker-track:hover .ticker-move,.ticker-track:focus-within .ticker-move{animation-play-state:paused}
 @keyframes ticker{to{transform:translateX(-50%)}}
 .ticker-set{display:flex}
