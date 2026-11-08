@@ -1780,3 +1780,35 @@ html:is([data-lang=bn],[data-lang=hi]) :is(.sf-col h3,.sf-form h3){font-size:15p
   .sf-col{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
   .sf-col h3{grid-column:1/-1}
 }
+
+/* ---------- Home lead: a swipeable carousel of the ten newest stories, glass cards ---------- */
+.lead-carousel{min-width:0;display:flex;flex-direction:column;gap:12px}
+.lc-track{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;overscroll-behavior-x:contain;scrollbar-width:none;padding:4px 2px 14px;outline:none}
+.lc-track::-webkit-scrollbar{display:none}
+.lc-card{flex:0 0 88%;scroll-snap-align:start;display:flex;flex-direction:column;border-radius:26px;overflow:hidden;min-width:0}
+.lc-media{display:block;aspect-ratio:16/10;overflow:hidden;border-radius:26px 26px 0 0;background:#f4eeee}
+.lc-media>img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s}
+.lc-card:hover .lc-media>img{transform:scale(1.03)}
+.lc-media .text-card{min-height:0;height:100%;border-radius:26px 26px 0 0;border-width:0 0 3px}
+.lc-body{display:flex;flex-direction:column;gap:10px;padding:18px 22px 20px;flex:1}
+.lc-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.lc-title{margin:0;font:600 clamp(22px,2.4vw,32px)/1.25 var(--serif);letter-spacing:-.3px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.lc-title a{color:inherit;text-decoration:none}.lc-title a:hover{color:var(--red)}
+.lc-dek{margin:0;font:400 17px/1.55 var(--serif);color:var(--ink-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.lc-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:auto;padding-top:6px}
+.lc-read{padding:10px 18px}
+.lc-nav{display:flex;align-items:center;justify-content:center;gap:14px}
+.lc-dots{display:flex;gap:6px}.lc-dots i{width:7px;height:7px;border-radius:99px;background:rgba(15,20,34,.18);transition:width .25s,background .25s}
+.lc-dots i.on{width:22px;background:var(--red)}
+.lc-count{font:600 13px var(--sans);color:var(--ink-2);min-width:52px;text-align:center}
+:root[data-theme=dark] .lc-dots i{background:rgba(255,255,255,.22)}:root[data-theme=dark] .lc-dots i.on{background:var(--red)}
+@media (max-width:1100px){.lead-carousel{grid-column:1/-1;order:-1}}
+@media (max-width:640px){.lc-card{flex-basis:90%;border-radius:22px}.lc-media{border-radius:22px 22px 0 0}.lc-body{padding:16px 16px 18px}.lc-title{font-size:22px}.lc-dek{font-size:16px}.lc-nav .carousel-btn{display:none}}
+/* Wire stories in the carousel: the panel is a branded block; the headline is shown once, below. */
+.lc-media .text-card{justify-content:center;align-items:center;gap:14px;padding:18px}
+.lc-media .text-card .tc-head{display:none}
+.lc-media .text-card .tc-top{flex-direction:column;gap:12px}
+.lc-media .text-card .tc-top img{width:clamp(64px,22%,104px);height:auto;aspect-ratio:auto;border-radius:12px}
+.lc-media .text-card .tc-desk{font-size:14px;padding:3px 12px}
+.lc-media .text-card .tc-kind{font-size:13px}
+.lc-media .text-card .tc-foot{font-size:12px}

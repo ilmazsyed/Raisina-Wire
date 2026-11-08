@@ -36,7 +36,7 @@ const img = (src, alt = "") => src ? `<img class="img-cover" src="${esc(src)}" a
 // Wire rewrites, briefs and stories without a photo show a branded text card instead: the
 // maroon jacket frame, the logo card and the desk, with the headline set large.
 function textCard(a, { big = false } = {}) {
-  return `<span class="text-card${big ? " big" : ""}" aria-hidden="true"><span class="tc-top"><img src="/brand/logo-xs.webp" alt="" width="24" height="34"><span class="tc-desk">${esc(tr(a.category || ""))}</span>${kindLabel(a) ? `<span class="tc-kind">${esc(tr(kindLabel(a)))}</span>` : ""}</span><span class="tc-head">${esc(a.title)}</span><span class="tc-foot">RASHTRIX <b>24X7 NEWS</b></span></span>`;
+  return `<span class="text-card${big ? " big" : ""}" aria-hidden="true"><span class="tc-top"><img src="/brand/${big ? "logo-sm" : "logo-xs"}.webp" alt="" width="24" height="34"><span class="tc-desk">${esc(tr(a.category || ""))}</span>${kindLabel(a) ? `<span class="tc-kind">${esc(tr(kindLabel(a)))}</span>` : ""}</span><span class="tc-head">${esc(a.title)}</span><span class="tc-foot">RASHTRIX <b>24X7 NEWS</b></span></span>`;
 }
 // A story's picture, or its text card.
 const pic = (a, opts) => a.image ? img(a.image) : textCard(a, opts);
@@ -448,23 +448,29 @@ function viewHome() {
   const photo = all.find(a => a.image), newest = all[0];
   const lead = photo && newest && (Date.parse(newest.publishedAt) - Date.parse(photo.publishedAt)) < 2 * 3600e3 ? photo : newest;
   if (!lead) { $("#view").innerHTML = `<div class="wrap home"><section id="liveBanner" class="band-tight" hidden></section>${articlesSettled ? `<div class="empty" style="margin-top:30px">No stories yet.</div>` : `<div class="skeleton" style="height:420px;margin-top:20px"></div>`}</div>`; renderLiveBanner(); return; }
-  const used = new Set([lead.id]);
+  // The lead: a swipeable carousel of the ten newest stories (the lead first), glass cards with
+  // the photo or text card on top and the words below, so nothing overlaps.
+  const top = [lead, ...all.filter(a => a.id !== lead.id)].slice(0, 10);
+  const used = new Set(top.map(a => a.id));
   const side = all.filter(a => !used.has(a.id)).slice(0, 4); side.forEach(a => used.add(a.id));
   $("#view").innerHTML = `
   <div class="wrap home">
     <section id="liveBanner" class="band-tight" aria-label="Live coverage" hidden></section>
     <section id="shortsRail" class="shorts-rail" aria-label="Shorts" hidden></section>
     <div class="lead-grid">
-      <section class="side-stack" aria-label="More top stories"><div class="kicker">Top stories</div>
+      ${side.length ? `<section class="side-stack" aria-label="More top stories"><div class="kicker">Top stories</div>
         ${side.map(e => `<a class="side-item" href="${edHref(e)}"><div class="thumb">${pic(e)}</div><span class="kicker">${newTag(e)}${esc(e.category)}</span><h3>${esc(e.title)}</h3><span class="meta">${ago(e.publishedAt)}</span></a>`).join("")}
+      </section>` : ""}
+      <section class="lead-carousel" aria-roledescription="carousel" aria-label="Latest stories">
+        <div class="lc-track" id="lcTrack" tabindex="0">${top.map((e, i) => `<article class="lc-card glass" aria-roledescription="slide" aria-label="${digits(i + 1)} / ${digits(top.length)}">
+          <a class="lc-media" href="${edHref(e)}" tabindex="-1" aria-hidden="true">${e.image ? img(e.image, "") : textCard(e, { big: true })}</a>
+          <div class="lc-body">
+            <div class="lc-meta"><span class="tag tag-red">${esc(e.category)}</span>${kindLabel(e) ? `<span class="kicker">${kindLabel(e)}</span>` : ""}${newTag(e)}</div>
+            <h${i ? 2 : 1} class="lc-title"><a href="${edHref(e)}">${esc(e.title)}</a></h${i ? 2 : 1}>${e.dek ? `<p class="lc-dek">${esc(e.dek)}</p>` : ""}
+            <div class="lc-foot"><span class="byline"><img src="${writer(e.writer).photo}" alt="" class="${writer(e.writer).isDesk ? "desk" : ""}"><span><b>${esc(e.author)}</b> <span class="muted">· ${ago(e.publishedAt)}</span></span></span><a class="btn btn-red lc-read" href="${edHref(e)}">Read <span aria-hidden="true">→</span></a></div>
+          </div></article>`).join("")}</div>
+        <div class="lc-nav"><button class="carousel-btn" type="button" data-action="lead-step" data-dir="-1" aria-label="Previous story">‹</button><span class="lc-dots" id="lcDots">${top.map((_, i) => `<i class="${i ? "" : "on"}"></i>`).join("")}</span><span class="lc-count" id="lcCount">${digits(1)} / ${digits(top.length)}</span><button class="carousel-btn" type="button" data-action="lead-step" data-dir="1" aria-label="Next story">›</button></div>
       </section>
-      <article class="hero${lead.image ? "" : " no-photo"}">${lead.image ? img(lead.image, "") : textCard(lead, { big: true })}
-        <div class="hero-card glass">
-          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><span class="tag tag-red">${esc(lead.category)}</span>${kindLabel(lead) ? `<span class="kicker">${kindLabel(lead)}</span>` : ""}</div>
-          <h1><a href="${edHref(lead)}">${esc(lead.title)}</a></h1>${lead.dek ? `<p>${esc(lead.dek)}</p>` : ""}
-          <div class="hero-foot"><span class="byline"><img src="${writer(lead.writer).photo}" alt="" class="${writer(lead.writer).isDesk ? "desk" : ""}"><span><b>${esc(lead.author)}</b> <span class="muted">· ${ago(lead.publishedAt)}</span></span></span><a class="btn btn-red hero-read" href="${edHref(lead)}">Read <span aria-hidden="true">→</span></a></div>
-        </div>
-      </article>
       <aside class="live-rail glass" aria-label="Latest news"><div class="live-title"><b><span class="dot-live"></span>Latest</b><a class="link-gold" href="/live" style="font-size:13px">All →</a></div><div id="rail"></div></aside>
     </div>
 
@@ -476,6 +482,14 @@ function viewHome() {
     ${joinBand()}
   </div>`;
   renderRail(); renderHomeDesks(used); renderBriefBand(); renderCommunity(); renderLiveBanner(); renderHomeMedia();
+  // The dots and the count follow the card in view.
+  const track = document.getElementById("lcTrack");
+  if (track) track.addEventListener("scroll", () => {
+    const cards = track.children; if (!cards.length) return;
+    const i = Math.min(Math.round(track.scrollLeft / (cards[0].offsetWidth + 16)), cards.length - 1);
+    document.querySelectorAll("#lcDots i").forEach((d, k) => d.classList.toggle("on", k === i));
+    const c = document.getElementById("lcCount"); if (c) c.textContent = `${digits(i + 1)} / ${digits(cards.length)}`;
+  }, { passive: true });
 }
 function renderRail() {
   const host = $("#rail"); if (!host) return;
@@ -1147,6 +1161,7 @@ async function onAction(e) {
   if (a === "tv-ch") { store.set("rw-tv-ch", el.dataset.ch); $$("[data-action=tv-ch]").forEach(b => b.setAttribute("aria-selected", String(b === el))); $("#tvWatch")?.classList.toggle("is-v", el.dataset.ch === "v"); mountWatchTV(); }
   if (a === "short") openShorts(Number(el.dataset.index) || 0);
   if (a === "play-video") playInline(el.dataset.id);
+  if (a === "lead-step") { const t = document.getElementById("lcTrack"), c = t?.children[0]; if (t && c) t.scrollBy({ left: Number(el.dataset.dir) * (c.offsetWidth + 16), behavior: "smooth" }); }
   if (a === "carousel") { const c = el.closest("section")?.querySelector(".vcarousel"); c?.scrollBy({ left: Number(el.dataset.dir) * c.clientWidth * .85, behavior: "smooth" }); }
   if (a === "copy-link" || a === "copy-quote") { e.preventDefault(); const text = a === "copy-link" ? el.dataset.url : el.closest(".quote-bubble")?.dataset.quote; try { await navigator.clipboard.writeText(text); toast(a === "copy-link" ? "Link copied." : "Quote copied with a link."); } catch { toast("Couldn’t copy. Select and copy instead."); } }
   if (a === "unsave") unsave(el.dataset.href);
