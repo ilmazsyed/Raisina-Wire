@@ -10,7 +10,7 @@ Rule: everything must run on free tiers. No paid AI API.
 - Vertical jacket reference: two Short frames (owner will add `jacket-midband.jpg`, `jacket-lowband.jpg`).
 - Colours: brand red #AA0404, jacket maroon #A43F44, gold #D4A017 (hints only), ink #111111, white.
 - Fonts: Noto Serif Bengali (headlines on bands), Hind Siliguri (UI/body), Montserrat (English caps).
-- Tagline: লোক গুনি না, লোকের কথা শুনি
+- Tagline: দেশ প্রথম । বলিদান পরম ধর্ম
 - Horizontal on-air look: white + red, frosted glass panels, black text on white, white on red, gold only as thin accents, slow animated background (dot grid drift, rotating thin arcs, light sheen). No pastel blobs.
 - Vertical on-air look: matches the YouTube Shorts jacket (portrait strip, logo card, maroon frame, slanted headline band + "YOUR AD HERE" box).
 

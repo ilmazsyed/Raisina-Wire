@@ -42,7 +42,7 @@ Build brief and phases: `rashtrix/BRIEF.md`. Built so far: **Phase 1** (the Beng
 - **Brand:** the full Rashtrix logo (a trademark: always shown whole, never cropped) in the header,
   icons and text cards, from `rashtrix/brand/logo.png`;
   brand red `#AA0404`, maroon `#A43F44`, gold accents `#D4A017`; Noto Serif Bengali, Hind Siliguri,
-  Montserrat; tagline লোক গুনি না, লোকের কথা শুনি; share card `public/og-image.jpg`.
+  Montserrat; tagline দেশ প্রথম । বলিদান পরম ধর্ম; share card `public/og-image.jpg`.
 - **Legal and compliance** (`src/legal.js`, English with Bengali versions): Terms, **DPDP privacy
   notice** with consent and withdrawal, Disclaimer (explains AI-assisted wire reports), Copyright
   (facts, not words), Corrections policy, Community guidelines, **Grievance redressal under the IT

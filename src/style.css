@@ -1674,3 +1674,37 @@ header.wrap .mast-rule{grid-column:1/-1;grid-row:3;margin-top:12px;height:3px}
 }
 .utility .icon-btn[data-count]:not([data-count=""]):after{top:-5px;right:-5px}
 @media(max-width:760px){.nav-dock{margin-top:6px}header.wrap .mast-rule{margin-top:7px}}
+
+/* The article font everywhere in the app (Noto Serif Bengali; Hindi uses its own serif). */
+html{--sans:var(--serif)!important;--display:var(--serif)!important;--mono:var(--serif)!important}
+body,button,input,select,textarea{font-family:var(--serif)}
+
+/* LIVE TV, always at the top: straight to the channel. */
+.live-tv-btn{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 13px 0 11px;border-radius:999px;background:var(--red);color:#fff!important;font:700 13px/1 var(--serif);letter-spacing:.3px;text-decoration:none;box-shadow:0 6px 16px -8px rgba(170,4,4,.6);white-space:nowrap}
+.live-tv-btn:hover{background:var(--red-deep,#8a0303)}
+.live-tv-btn .live-dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:livepulse 1.4s ease-in-out infinite}
+.live-tv-btn svg{opacity:.95}
+@keyframes livepulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+@media(prefers-reduced-motion:reduce){.live-tv-btn .live-dot{animation:none}}
+@media(max-width:760px){.live-tv-btn{height:32px;padding:0 9px;gap:4px;font-size:12px}.live-tv-btn .live-tv-word{display:none}.live-tv-btn svg{width:14px;height:14px}}
+.tagline .tl-part{display:inline-block;white-space:nowrap}
+@media(max-width:760px){
+  header.wrap .nameplate{flex-wrap:nowrap}
+  header.wrap .nameplate-tag p.tagline{max-width:none}
+  .utility-right [data-action=theme]{display:none}
+}
+
+/* The Shorts tab: one short at a time, swipe up for the next (YouTube Shorts). */
+.shorts-page{max-width:460px;margin:10px auto 0;padding:0 var(--gutter,16px)}
+.shorts-feed{height:calc(100dvh - 190px);min-height:420px;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none;border-radius:20px;background:#000;overscroll-behavior:contain}
+.shorts-feed::-webkit-scrollbar{display:none}
+.sf-item{position:relative;height:100%;scroll-snap-align:start;scroll-snap-stop:always;display:flex;flex-direction:column;justify-content:center;background:#000}
+.sf-frame{position:relative;width:100%;max-height:100%;aspect-ratio:9/16;margin:0 auto;background:#000}
+.sf-frame img,.sf-frame iframe{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border:0}
+.sf-frame .play-badge{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+.sf-info{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:flex-end;justify-content:space-between;gap:10px;padding:40px 14px 14px;background:linear-gradient(transparent,rgba(0,0,0,.75));color:#fff;pointer-events:none}
+.sf-info b{font:600 16px/1.4 var(--serif);text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.sf-tools{pointer-events:auto}
+.sf-tools .update-share{color:#fff;border-color:rgba(255,255,255,.4);background:rgba(0,0,0,.25)}
+.sf-hint{text-align:center;font-size:12.5px;margin:8px 0 0}
+@media(max-width:760px){.shorts-page{padding:0 10px}.shorts-feed{height:calc(100dvh - 150px);border-radius:16px}}
