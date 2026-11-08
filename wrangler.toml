@@ -36,7 +36,7 @@ migrations_dir = "migrations"
 APP_NAME = "Rashtrix 24×7 News"
 # Built-in admin account. Its password is the ADMIN_PASSWORD secret, set in the Cloudflare
 # dashboard (Worker → Settings → Variables and Secrets), never here.
-ADMIN_EMAIL = ""
+ADMIN_EMAIL = "ilmazsyed@gmail.com"
 # The app's public address, used in canonical links, sitemaps, the RSS feed and social cards.
 # Page visits to the workers.dev address are redirected here. Leave empty until the domain is
 # connected (the workers.dev address is used meanwhile).
