@@ -44,9 +44,11 @@ SITE_URL = ""
 # Rashtrix's Wix blog, imported and kept in sync (src/wix.js).
 WIX_SITE = "https://www.rashtrix.live"
 # The wire desk (src/wiredesk.js): needs the GEMINI_API_KEY secret (Google AI Studio, free tier).
-GEMINI_MODEL = "gemini-3.8-flash"
-# Calls a day the desk may make (keep under the free tier's daily limit for the model).
-GEMINI_DAILY_LIMIT = "200"
+# Models in order of choice. The free tier counts each model separately: Flash-Lite about 500
+# requests a day each, Flash 20. When one is used up for the day the desk moves to the next.
+GEMINI_MODELS = "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.8-flash"
+# Calls a day across all the models, spread evenly round the clock.
+GEMINI_DAILY_LIMIT = "1000"
 # "Listen" voices (Google Cloud Text-to-Speech, Chirp 3 HD; needs GOOGLE_TTS_API_KEY).
 # Defaults: bn-IN-Chirp3-HD-Sulafat (female) and bn-IN-Chirp3-HD-Charon (male); override with
 # TTS_VOICE_BN_FEMALE, TTS_VOICE_BN_MALE, TTS_VOICE_EN_FEMALE … here.

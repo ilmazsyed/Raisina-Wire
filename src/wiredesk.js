@@ -21,11 +21,25 @@ const now = () => new Date().toISOString();
 const setting = async (env, key, fallback) => (await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(key).first())?.value ?? fallback;
 
 export const wireReady = env => Boolean(env.GEMINI_API_KEY);
-export const geminiModel = env => env.GEMINI_MODEL || "gemini-3.8-flash";
-// When Google retires a model it answers 404 and names the one to use; the desk switches to it
-// by itself and remembers the choice (settings: gemini_model), so a retirement never stops it.
-async function activeModel(env) { return (await setting(env, "gemini_model", "")) || geminiModel(env); }
-const DAILY_LIMIT = env => Number(env.GEMINI_DAILY_LIMIT || 200);
+// The free tier counts each model's requests separately and allows Flash-Lite models about 500 a
+// day but Flash only 20, so the desk works through a chain of models (GEMINI_MODELS, comma-
+// separated, first choice first): when one model's daily allowance is used up it moves to the
+// next until midnight Pacific time. A model Google retires (404) is skipped for a month, and the
+// one Google names in its answer is tried next.
+const DEFAULT_MODELS = "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.8-flash";
+export const geminiModels = env => String(env.GEMINI_MODELS || env.GEMINI_MODEL_CHAIN || DEFAULT_MODELS).split(",").map(m => m.trim()).filter(Boolean);
+export const geminiModel = env => geminiModels(env)[0];
+async function modelChain(env) {
+  const named = (await setting(env, "gemini_model", "")).trim();   // a replacement Google named
+  const chain = [...new Set([...geminiModels(env), ...(named ? [named] : [])])];
+  const { results } = await env.DB.prepare("SELECT key, value FROM settings WHERE key LIKE 'gemini_off:%'").all().catch(() => ({ results: [] }));
+  const off = new Map(results.filter(r => Date.parse(r.value) > Date.now()).map(r => [r.key.slice(11), r.value]));
+  return { chain, available: chain.filter(m => !off.has(m)), off };
+}
+async function activeModel(env) { const { available, chain } = await modelChain(env); return available[0] || chain[0]; }
+const modelOff = (env, model, until) => env.DB.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(`gemini_off:${model}`, until).run();
+// Calls a day across the chain (about 500 + 500 + 20 on the free tier), spread over the day.
+const DAILY_LIMIT = env => Number(env.GEMINI_DAILY_LIMIT || 1000);
 const WAIT = async env => Number(await setting(env, "wire_wait_minutes", env.WIRE_WAIT_MINUTES || 30));
 const MAX_AGE_H = 24;   // items and queued jobs older than this are not written up
 
@@ -35,7 +49,7 @@ export async function wireSettings(env) {
     autopublish: (await setting(env, "wire_autopublish", "on")) !== "off",
     paused: (await setting(env, "wire_paused", "off")) === "on",
     waitMinutes: await WAIT(env),
-    model: await activeModel(env), dailyLimit: DAILY_LIMIT(env), ready: wireReady(env)
+    model: await activeModel(env), models: (await modelChain(env)).chain, dailyLimit: DAILY_LIMIT(env), ready: wireReady(env)
   };
 }
 export async function saveWireSettings(env, b) {
@@ -214,8 +228,10 @@ Sources (${items.length}):
 ${items.map((it, i) => `--- Source ${i + 1} (${it.lang}) ---\nHeadline: ${it.title}\nPublished: ${it.published_at || "unknown"}\n${it.text || it.summary || ""}`).join("\n\n")}`;
 }
 
-async function callGemini(env, text, retried = false, think = true) {
-  const model = await activeModel(env);
+async function callGemini(env, text, retried = false, think = true, tries = 0) {
+  const { available } = await modelChain(env);
+  if (!available.length) { await blockUntil(env, nextPacificMidnight()); const e = new Error("daily free quota used up on every model; waiting for the reset"); e.retry = true; throw e; }
+  const model = available[0];
   const endpoint = env.GEMINI_ENDPOINT || `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   // A report in three languages is long: the newer models think before writing, which can take
   // well over a minute. Light thinking keeps it quick; the wait allows three minutes.
@@ -236,22 +252,26 @@ async function callGemini(env, text, retried = false, think = true) {
   }
   if (r.status === 400 && thinking.thinkingConfig) {
     const body = await r.clone().text();
-    if (/thinking/i.test(body)) return callGemini(env, text, retried, false);   // a model without that setting
+    if (/thinking/i.test(body)) return callGemini(env, text, retried, false, tries);   // a model without that setting
   }
   await countCall(env);
   if (r.status === 429) {
     const body = await r.text();
-    // Per-day quota: wait for the reset. Per-minute: try again in two minutes.
+    // Per-day quota: this model rests until the reset and the next model in the chain takes over.
+    // Per-minute: try again in two minutes.
     const daily = /per.?day|PerDay|daily/i.test(body);
+    if (daily) { await modelOff(env, model, nextPacificMidnight()); if (tries < 4) return callGemini(env, text, retried, think, tries + 1); }
     await blockUntil(env, daily ? nextPacificMidnight() : new Date(Date.now() + 2 * 60e3).toISOString());
     const e = new Error(daily ? "daily free quota used up; waiting for the reset" : "rate limited; retrying shortly"); e.retry = true; throw e;
   }
   if (!r.ok) {
     const body = await r.text();
-    const next = r.status === 404 && !retried && body.match(/use (?:models\/)?(gemini-[\w.-]+)/i)?.[1];
-    if (next && next !== model) {
-      await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('gemini_model',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(next).run();
-      return callGemini(env, text, true);
+    if (r.status === 404 && tries < 4) {
+      // A retired model: skip it for a month; if Google names the replacement, add it to the chain.
+      const next = body.match(/use (?:models\/)?(gemini-[\w.-]+)/i)?.[1];
+      await modelOff(env, model, new Date(Date.now() + 30 * 86400e3).toISOString());
+      if (next && next !== model) await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('gemini_model',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(next).run();
+      return callGemini(env, text, true, think, tries + 1);
     }
     const e = new Error(`Gemini ${r.status}: ${body.slice(0, 200)}`); e.retry = r.status >= 500; throw e;
   }
@@ -327,8 +347,17 @@ export async function runWireDesk(env, { onAlert, budget = 2 } = {}) {
   const fetched = await fetchSources(env);
   const grouped = await groupItems(env);
   if (!wireReady(env) || s.paused) return { fetched, grouped, written: 0, note: !wireReady(env) ? "GEMINI_API_KEY not set" : "paused" };
-  const q = await quota(env);
+  let q = await quota(env);
+  // A desk-wide wait (set when every model had run out) is lifted while a model still has some of
+  // its day left, e.g. after a new model is added to the chain.
+  if (q.blockedUntil && (await modelChain(env)).available.length) { await env.DB.prepare("UPDATE ai_usage SET blocked_until=NULL WHERE day=?").bind(pacificDay()).run(); q = await quota(env); }
   if (!q.left) return { fetched, grouped, written: 0, note: q.blockedUntil ? `waiting until ${q.blockedUntil}` : "daily limit reached" };
+  // Round the clock: by any minute of the (Pacific) day the desk may have used its share of the
+  // day so far plus one hour's share, so the allowance is never spent by the afternoon.
+  const minutes = (Date.now() - Date.parse(`${pacificDay()}T08:00:00Z`)) / 60e3;
+  const paced = Math.floor(q.limit * Math.min(1, (Math.max(0, minutes) + 60) / 1440)) - q.calls;
+  if (paced <= 0) return { fetched, grouped, written: 0, note: "pacing: the day's allowance is spread round the clock" };
+  budget = Math.min(budget, paced);
   // Stories that failed only because a model was retired go back to the queue once.
   await env.DB.prepare("UPDATE wire_jobs SET status='queued', attempts=0, error='' WHERE status='failed' AND (error LIKE 'Gemini 404:%no longer available%' OR error LIKE '%aborted due to timeout%' OR error LIKE 'Gemini took too long%')").run();
   // Stuck jobs (a Worker that stopped mid-way) go back to the queue after ten minutes.

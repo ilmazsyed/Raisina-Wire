@@ -1,5 +1,5 @@
 import { cached, categorize, DESKS } from "./feeds.js";
-import { runWireDesk, wireDeskReport, saveWireSettings, fetchSources, groupItems, writeJob, quota } from "./wiredesk.js";
+import { runWireDesk, wireDeskReport, saveWireSettings, wireSettings, fetchSources, groupItems, writeJob, quota } from "./wiredesk.js";
 import { syncWixFeed, backfillWix, wixStatus, restartWixBackfill } from "./wix.js";
 import m0001 from "../migrations/0001_init.sql";
 import m0002 from "../migrations/0002_platform_modules.sql";
@@ -417,8 +417,9 @@ async function api(request, env, ctx) {
         env.DB.prepare("SELECT COUNT(*) AS n FROM wire_items WHERE fetched_at>=?").bind(new Date(Date.now() - 3600e3).toISOString()).first().catch(() => null),
         env.DB.prepare("SELECT MAX(published_at) AS at FROM articles WHERE kind IN ('rewrite','brief') AND status='published'").first().catch(() => null),
         quota(env).catch(() => null)]);
+      const wireStatus = await wireSettings(env).catch(() => ({}));
       const clean = e => String(e || "").replace(/"[^"]*"|“[^”]*”|\([^)]*\)/g, "…").replace(/https?:\/\/\S+/g, "").slice(0, 120);
-      out.wire = { jobs24h: Object.fromEntries(jobs.map(j => [j.status, j.n])), errors6h: errs.map(e => ({ error: clean(e.error), n: e.n })), itemsLastHour: items?.n ?? null, lastPublished: last?.at || null, calls: q ? { today: q.calls, limit: q.limit, blockedUntil: q.blockedUntil } : null, model: env.GEMINI_MODEL || null, keySet: Boolean(env.GEMINI_API_KEY) };
+      out.wire = { jobs24h: Object.fromEntries(jobs.map(j => [j.status, j.n])), errors6h: errs.map(e => ({ error: clean(e.error), n: e.n })), itemsLastHour: items?.n ?? null, lastPublished: last?.at || null, calls: q ? { today: q.calls, limit: q.limit, blockedUntil: q.blockedUntil } : null, models: wireStatus.models, model: wireStatus.model, keySet: Boolean(env.GEMINI_API_KEY) };
     }
     return json(out, 200, { "cache-control": "no-store" });
   }
