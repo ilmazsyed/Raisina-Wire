@@ -1630,3 +1630,47 @@ h1,h2,h3{font-family:var(--serif)}
 .tvi-res i{position:absolute;inset:0 auto 0 0;background:rgba(170,4,4,.18)}
 .tvi-res span,.tvi-res em{position:relative;font-style:normal;font-weight:600}
 .tvi-row{display:flex;gap:8px}.tvi-row input{flex:1;min-width:0;padding:8px 10px;border-radius:10px;border:1px solid var(--line,#ddd);background:transparent;color:inherit;font:inherit}
+
+/* ---------- Compact header (Nov 2026): less empty space; the menu carries no logo ---------- */
+.site-nav .nav-brand{display:none!important}
+/* One band: the full logo and tagline on the left; the tools, the date and "updated" on the right. */
+header.wrap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:auto auto;align-items:center;column-gap:18px;padding-top:12px}
+header.wrap .utility,header.wrap .masthead{display:contents}
+header.wrap .utility-right{grid-column:3;grid-row:1;justify-self:end}
+header.wrap .utility-left{grid-column:3;grid-row:2;justify-self:end;font-size:12px;color:var(--muted);gap:10px}
+header.wrap .nameplate{grid-column:1/3;grid-row:1/3;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:18px;padding:0;border:0}
+header.wrap .nameplate-link{font-size:0;flex:0 0 auto}
+header.wrap .mast-logo{height:84px}
+header.wrap .nameplate-tag{display:block;text-align:left;margin:0}
+header.wrap .nameplate-tag p.tagline{font-size:21px}
+header.wrap .mast-rule{grid-column:1/-1;grid-row:3;margin-top:12px;height:3px}
+.nav-dock{margin-top:12px}
+@media(max-width:760px){
+  /* One row: the full logo with the tagline beside it, the tools on the right. */
+  header.wrap{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:10px;padding-top:8px}
+  header.wrap .utility,header.wrap .masthead{display:contents}
+  header.wrap .utility-left{display:none}
+  header.wrap .utility-right{grid-column:3;grid-row:1;gap:4px}
+  header.wrap .nameplate{grid-column:1/3;grid-row:1;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding:0;min-width:0}
+  header.wrap .nameplate-link{font-size:0;flex:0 0 auto}
+  header.wrap .mast-logo{height:50px}
+  header.wrap .nameplate-tag{display:block;min-width:0;text-align:left;margin:0}
+  header.wrap .nameplate-tag p.tagline{font-size:12.5px;line-height:1.35;white-space:normal;max-width:9.5em}
+  header.wrap .nameplate-tag p.tag-sub{display:none}
+  header.wrap .mast-rule{grid-column:1/-1;grid-row:2;margin-top:8px;height:2px}
+  .utility .icon-btn{width:32px;height:32px}
+  .utility .icon-btn.lang-btn{height:32px;padding:0 9px}
+  .utility .icon-btn.lang-btn svg{display:none}
+  .utility-right .text-btn{padding:6px 4px;font-size:13px}
+  #joinBtn{display:none}
+  .avatar{width:32px;height:32px;font-size:12px}
+  .nav-dock{margin-top:8px}
+  .site-nav{padding:4px;border-radius:14px}
+  .site-nav a{padding:7px 12px;font-size:14px}
+  body.nav-stuck .nav-dock:before{height:calc(64px + env(safe-area-inset-top))}
+}
+@media(max-width:380px){
+  header.wrap .nameplate-tag{display:none}
+}
+.utility .icon-btn[data-count]:not([data-count=""]):after{top:-5px;right:-5px}
+@media(max-width:760px){.nav-dock{margin-top:6px}header.wrap .mast-rule{margin-top:7px}}
