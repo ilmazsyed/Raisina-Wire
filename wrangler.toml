@@ -24,12 +24,12 @@ run_worker_first = [
 [triggers]
 crons = ["* * * * *"]
 
-# Create the database once with `npx wrangler d1 create rashtrix-db` and paste its id here.
+# The rashtrix-db database (created with `npx wrangler d1 create rashtrix-db`).
 # Tables are created automatically on first use (migrations/).
 [[d1_databases]]
 binding = "DB"
 database_name = "rashtrix-db"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "bb54e3c7-eb77-46db-8863-5a1f3e27f303"
 migrations_dir = "migrations"
 
 [vars]
