@@ -97,6 +97,17 @@ export async function refreshSource(env, src) {
     vids = vids.filter(v => v.snippet?.channelId === own); dropped = all - vids.length;
   }
   const at = now(), stmts = [];
+  // The vertical channel plays the newest Short first: a Short it has not had before restarts
+  // its running order, so the new one goes on next.
+  let fresh = 0;
+  if (src.kind !== "live" && src.channel === "v" && vids.length) {
+    const have = new Set();
+    for (let i = 0; i < vids.length; i += 50) {
+      const part = vids.slice(i, i + 50).map(v => v.id);
+      (await env.DB.prepare(`SELECT yt_id FROM tv_items WHERE channel='v' AND yt_id IN (${part.map(() => "?").join(",")})`).bind(...part).all()).results.forEach(r => have.add(r.yt_id));
+    }
+    fresh = vids.filter(v => !have.has(v.id) && isoSeconds(v.contentDetails?.duration) <= 180).length;
+  }
   const order = new Map(ids.map((id, i) => [id, i]));
   let liveNow = 0, liveVideo = "";
   for (const v of vids) {
@@ -112,6 +123,10 @@ export async function refreshSource(env, src) {
   const title = src.kind === "playlist" ? src.title : (vids[0]?.snippet?.title || src.title || "");
   stmts.push(env.DB.prepare("UPDATE tv_sources SET last_refresh=?, last_error=?, item_count=?, live_now=?, live_video=?, title=CASE WHEN title='' THEN ? ELSE title END WHERE id=?").bind(at, dropped && !vids.length ? NOT_OWN.slice(0, 200) : "", src.kind === "live" ? 0 : vids.length, liveNow, liveVideo, String(title).slice(0, 200), src.id));
   for (let i = 0; i < stmts.length; i += 80) await env.DB.batch(stmts.slice(i, i + 80));
+  if (fresh) {
+    const row = await env.DB.prepare("SELECT value FROM settings WHERE key='tv:v'").first();
+    if (row) { const tv = JSON.parse(row.value || "{}"); tv.epoch = Date.now(); await env.DB.prepare("UPDATE settings SET value=? WHERE key='tv:v'").bind(JSON.stringify(tv)).run(); }
+  }
   return { videos: vids.length, liveNow };
 }
 

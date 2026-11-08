@@ -1494,6 +1494,7 @@ async function viewShorts() {
   // The short in view plays (muted until the viewer turns the sound on); the others stop.
   shortsObserver?.disconnect();
   const play = el => { const id = el.dataset.yt, f = el.querySelector(".sf-frame"); if (f.querySelector("iframe")) return;
+    { const seen = seenShorts(); seen.add(`yt:${id}`); store.set("rw-seen-shorts", [...seen].slice(-200)); }
     f.insertAdjacentHTML("beforeend", `<iframe src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&loop=1&playlist=${id}&rel=0&modestbranding=1" title="" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`); };
   const stop = el => el.querySelector(".sf-frame iframe")?.remove();
   shortsObserver = new IntersectionObserver(es => es.forEach(e => e.intersectionRatio >= 0.6 ? play(e.target) : stop(e.target)), { threshold: [0, 0.6] });
@@ -1524,9 +1525,13 @@ function videoCard(m) {
 function renderHomeMedia() {
   const rail = $("#shortsRail"), band = $("#videoBand");
   if (rail) {
-    const list = shorts(), yt = (state.ytShorts || []).slice(0, 20);
-    rail.hidden = !list.length && !yt.length;
-    rail.innerHTML = list.length || yt.length ? `<div class="shorts-head"><span class="kicker">Shorts</span><a class="link-gold" href="/shorts">All shorts →</a></div><div class="shorts-row">${shortBubbles(list)}${yt.map((s, i) => `<a class="short-bubble" href="/shorts?v=${encodeURIComponent(s.id)}" aria-label="Play: ${esc(s.title)}"><span class="short-ring"><span class="short-face"><img src="${esc(ytThumb(s))}" alt="" ${i < 5 ? "" : 'loading="lazy"'}></span></span><span class="short-name" data-no-tr>${esc(s.title)}</span></a>`).join("")}</div>` : "";
+    // One row, newest upload first: the Shorts uploaded here and the channel's YouTube Shorts.
+    const list = shorts(), seen = seenShorts(), when = x => Date.parse(x.publishedAt || "") || 0;
+    const items = [...list.map((m, i) => ({ t: when(m), html: j => shortBubbles([m]).replace(/data-index="0"/, `data-index="${i}"`).replace(/loading="lazy"/, j < 5 ? "" : 'loading="lazy"') })),
+      ...(state.ytShorts || []).slice(0, 30).map(s => ({ t: when(s), html: j => `<a class="short-bubble${seen.has(`yt:${s.id}`) ? " seen" : ""}" href="${withLang(`/shorts?v=${encodeURIComponent(s.id)}`)}" aria-label="Play: ${esc(s.title)}"><span class="short-ring"><span class="short-face"><img src="${esc(ytThumb(s))}" alt="" ${j < 5 ? "" : 'loading="lazy"'}></span></span><span class="short-name" data-no-tr>${esc(s.title)}</span></a>` }))]
+      .sort((a, b) => b.t - a.t).slice(0, 30);
+    rail.hidden = !items.length;
+    rail.innerHTML = items.length ? `<div class="shorts-head"><span class="kicker">Shorts</span><a class="link-gold" href="${withLang("/shorts")}">All shorts →</a></div><div class="shorts-row">${items.map((x, j) => x.html(j)).join("")}</div>` : "";
   }
   if (band) {
     const films = (state.media || []).filter(isFilm);
