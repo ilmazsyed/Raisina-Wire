@@ -1621,3 +1621,12 @@ h1,h2,h3{font-family:var(--serif)}
 .tv-watch-head h1{margin:4px 0 0;font:700 34px/1.2 var(--serif)}
 .tv-watch-player{position:relative;border-radius:18px;overflow:hidden;background:#000;box-shadow:0 24px 60px -24px rgba(17,17,17,.45)}
 .tv-watch-player.is-v{max-width:420px;margin:0 auto}
+/* Watch: the channel's poll and the comment box under the player. */
+.tv-interact{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:14px}
+.tv-interact .glass{padding:14px 16px;border-radius:16px;display:grid;gap:8px;align-content:start}
+.tvi-opts{display:grid;gap:6px}
+.tvi-opts .btn{justify-content:flex-start;text-align:left}
+.tvi-res{position:relative;display:flex;justify-content:space-between;padding:7px 10px;border-radius:10px;background:rgba(127,127,127,.12);overflow:hidden}
+.tvi-res i{position:absolute;inset:0 auto 0 0;background:rgba(170,4,4,.18)}
+.tvi-res span,.tvi-res em{position:relative;font-style:normal;font-weight:600}
+.tvi-row{display:flex;gap:8px}.tvi-row input{flex:1;min-width:0;padding:8px 10px;border-radius:10px;border:1px solid var(--line,#ddd);background:transparent;color:inherit;font:inherit}

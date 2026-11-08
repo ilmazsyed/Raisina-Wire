@@ -57,6 +57,10 @@ YOUTUBE_DAILY_UNITS = "8000"
 # The control room: rundowns and the as-run log are kept this many days; clips this many days unused.
 ARCHIVE_DAYS = "90"
 CLIP_RETENTION_DAYS = "30"
+# Rashtrix Command Centre (self-hosted NRCS): its address and the app's account there (the
+# password is the NRCS_PASSWORD secret). Empty = the producer's import is off.
+NRCS_URL = ""
+NRCS_USERNAME = ""
 
 [ai]
 binding = "AI"
@@ -71,8 +75,10 @@ class_name = "TvControl"
 tag = "v1"
 new_sqlite_classes = ["TvControl"]
 
-# Video clips (src/clips.js). Create the bucket once with `npx wrangler r2 bucket create rashtrix-clips`
-# (R2 free tier: 10 GB). Clips not marked "keep" are deleted after CLIP_RETENTION_DAYS without use.
-[[r2_buckets]]
-binding = "CLIPS"
-bucket_name = "rashtrix-clips"
+# Video clips (src/clips.js) in Cloudflare R2 (free tier: 10 GB). Switched off until the bucket
+# exists (a deploy fails if it names a bucket that does not): enable R2 in the dashboard, run
+# `npx wrangler r2 bucket create rashtrix-clips`, then remove the # from the three lines below.
+# Clips not marked "keep" are deleted after CLIP_RETENTION_DAYS without use.
+# [[r2_buckets]]
+# binding = "CLIPS"
+# bucket_name = "rashtrix-clips"

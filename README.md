@@ -91,6 +91,82 @@ To switch on YouTube sourcing: Google Cloud console → APIs & Services → **En
 Data API v3* → Credentials → **Create API key** (restrict it to that API) → `npx wrangler secret put
 YOUTUBE_API_KEY`.
 
+## Phase 3: bulletin producer and PCR
+
+- **Realtime control** (`src/control.js`): each channel has a Durable Object that holds what is on
+  air and sends every change to every screen over WebSockets in about a second: the OBS/vMix outputs,
+  the PCR, the producer, the prompter and the app's players (screens without WebSockets read it every
+  five seconds). One program engine (`src/engine.js`) draws the channel everywhere: nine layouts (full,
+  PiP, 2-up, 1 big + 2, 3 equal, host + 4, 6-grid, L-band, full graphic) from YouTube, app clips, HLS
+  and WHEP streams, live guests and pictures; transitions (cut, mix, red slash wipe, stinger); every
+  graphics layer on or off.
+- **Bulletin producer** (`/producer.html`): each channel's rundowns for each day. Nine item types
+  (YouTube video with in and out points, live segment with layout and sources, app clip, full-screen
+  breaking, headline set, L-band, promo card, ad break, slate). Drag to reorder; each item has its
+  own name strap, ticker lines and script. Lengths, running time from the top, back-timing (when each
+  item must start to end on time) and the total against the slot are worked out as you type.
+  **Templates** make rundowns automatically every chosen day. **On air** hands the rundown to the PCR.
+  **Print** makes a PDF in the browser (so Bengali is shaped correctly).
+- **Midnight (India time):** the day's rundowns are archived with the **as-run log** (what actually
+  went on air, when, for how long, and how: auto, TAKE, breaking, macro…). Archives and logs are kept
+  `ARCHIVE_DAYS` (default 90) and can be copied back to today.
+- **PCR** (`/pcr.html?ch=h|v`): preview and program monitors; a source grid with tally (green in
+  preview, red on air): the running order, live inputs, studio guests, clips, headlines, slate;
+  layouts, transitions, **TAKE** and **AUTO**; graphics layers; name strap; ticker; **Breaking in now**;
+  the rundown with a countdown, previous / next / skip / go to, auto-advance on or off. The PCR can cut
+  in anything at any time, then AUTO resumes the rundown where it paused (or skip on). **Macros**: one
+  button or key runs several steps. **Keyboard**: Space TAKE, Enter AUTO, 1–9 sources, Shift+1–9
+  layouts, N/B/K next/back/skip, X/M/W/G transitions, L strap, Shift+D DUMP, Shift+S standby.
+- **Bitfocus Companion / Stream Deck:** PCR → Companion gives a private address; each button sends a
+  GET to `/api/companion/<h|v>/<action>?token=…` (take, auto, next, prev, skip, dump, standby,
+  transitions, layers, delay, macros).
+- **Clips** (`src/clips.js`): upload (any size, in 20 MB parts) or paste a Google Drive link (copied
+  once). Kept in Cloudflare R2; clips not marked “keep” are deleted after `CLIP_RETENTION_DAYS`
+  (default 30) unused. MP4 (H.264) plays everywhere. Pictures pasted as Drive links (promo cards,
+  slates, ad box) are copied into the app's storage.
+
+## Phase 4: live studio
+
+- **Guests join from a link** (`/guest.html?t=…`, no install): camera preview, name and title (they
+  fill the name strap), the broadcast **consent** box (its wording and time are stored), headphones
+  advice, then the **green room** checks (camera, microphone level, network round trip, headphones).
+  They see the other guests and the on-air **return feed** (muted unless they choose, with
+  headphones), get the producer's **messages** and **countdown** on their phone, and hear the
+  producer's **private talkback**.
+- **Studio desk** (`/studio.html`): rooms per channel, invitations (copy the link or send it on
+  WhatsApp), each guest's picture and checks, mute, talkback, message, countdown, green room / ready /
+  on air, name strap to the channel, and the **guest directory** (filled as guests join, with how often
+  each has been on air).
+- **Video** goes through **Cloudflare Realtime** (SFU + TURN; the Worker relays the calls so the
+  secret never reaches a browser). Without its keys, or when a room is set to it, rooms use
+  **VDO.Ninja** (free, no account). Last resort: put the guest on a Google Meet call and capture the
+  window in OBS/vMix.
+- **Studio stream for the app:** OBS sends the programme to a media server (MediaMTX) on an Oracle
+  Cloud Always Free VM; set its HLS or WHEP address in control room → TV channels → *App live stream*,
+  and the app plays it during live-studio segments instead of connecting each viewer to each guest.
+
+## Phase 5: extras
+
+- **Safety:** broadcast delay 0–10 s on the outputs; **DUMP** throws away what is waiting and puts the
+  standby slate up; the **standby slate** also goes up by itself when an output's source stops for 10
+  seconds, and staff devices get a **push alert** (also when an output goes silent for 30 seconds).
+  The **audit log** (on-air desk → Reports) shows who did what and when, and prints as PDF.
+- **Teleprompter** (`/prompter.html?ch=h|v`): every item's script in rundown order; moves on with the
+  rundown; speed, size, mirror; keys Space, ↑/↓, ←/→, M, +/−, H.
+- **On-air desk** (`/onair.html`): **polls** (viewers vote in the app's Watch page, one vote per device
+  a day, kept only as a one-way hash; the on-air bar always says it is not a scientific survey);
+  **results boards** (official figures only, the source on screen, refused on air until the
+  exit-poll **blackout** time); **comments** (app comments from signed-in readers, YouTube live chat
+  and Facebook live comments when their keys are set; nothing goes on screen until approved and
+  ticked); **sponsors** for the ad box, rotated by weight, each showing logged as **proof of play**
+  (PDF or CSV).
+- **বঙ্গাব্দ date** under the clock (the Bengali calendar as West Bengal keeps it) and **Kolkata
+  weather** in the ticker (Open-Meteo, free, no key; every 30 minutes).
+- **Rashtrix Command Centre** (the self-hosted NRCS): in the producer, *Import from Command Centre*
+  lists its Approved and On Air stories and adds them to the rundown with their scripts and lengths.
+- **Language:** the producer, PCR, studio, on-air desk, prompter and guest screens switch between
+  বাংলা, English and हिन्दी (remembered per person); on-air graphics stay in Bengali.
+
 ## Setting it up (owner)
 
 You need a Cloudflare account. Do these once, in order.
@@ -118,6 +194,37 @@ You need a Cloudflare account. Do these once, in order.
 8. **Grievance Officer:** fill in `GRIEVANCE` at the top of `src/legal.js` (name, email, phone,
    address) before launch; until then the pages say the details are coming.
 
+The control room screens (producer, PCR, studio, on-air desk, prompter) need nothing more: the
+Durable Object for realtime control is created by the deploy, on the free plan. These switch on the
+rest, whenever you are ready:
+
+9. **Clips (Cloudflare R2, 10 GB free):** Cloudflare dashboard → **R2** → enable it (Cloudflare asks
+   for a payment method even for the free tier) → in this folder `npx wrangler r2 bucket create
+   rashtrix-clips` → in `wrangler.toml` remove the `#` from the three `[[r2_buckets]]` lines → deploy.
+10. **Cloudflare Realtime (live studio video):** dashboard → **Realtime** → *Serverless SFU* →
+    **Create application** → copy the App ID and the API token, then
+    `npx wrangler secret put CALLS_APP_ID` and `npx wrangler secret put CALLS_APP_SECRET`. For guests
+    on strict office or mobile networks, also *TURN Server* → **Create TURN key** →
+    `npx wrangler secret put TURN_KEY_ID` and `npx wrangler secret put TURN_KEY_TOKEN`. The free
+    allowance is 1,000 GB a month. Until then rooms use VDO.Ninja.
+11. **Studio stream for the app (Oracle Cloud Always Free):** create an Always Free Ubuntu VM
+    (Ampere A1). In its VCN security list allow TCP 80, 443 and 1935 and UDP 8189 (and open the same
+    in the VM's own firewall). Install **MediaMTX** (github.com/bluenviron/mediamtx, one file) and run
+    it as a service; in `mediamtx.yml` set `hlsVariant: lowLatency` and allow your app's address as
+    the origin for HLS and WebRTC. Put **Caddy** in front (`live.yourdomain` → `localhost:8888` for HLS
+    and `localhost:8889` for WebRTC) for HTTPS. In OBS: Settings → Stream → *WHIP*,
+    `https://live.yourdomain/studio/whip` (or RTMP `rtmp://<vm-ip>/studio`). The app address is then
+    `https://live.yourdomain/studio/index.m3u8` (HLS) or `https://live.yourdomain/studio/whep`
+    (WebRTC): paste it in control room → TV channels → *App live stream*, and add it in the PCR under
+    *Live inputs* to cut to it.
+12. **Facebook live comments (optional):** a Page access token with `pages_read_engagement` →
+    `npx wrangler secret put FB_PAGE_TOKEN`. YouTube live chat uses the `YOUTUBE_API_KEY` from Phase 2.
+13. **Rashtrix Command Centre:** make it a newsroom account (Editorial department) for the app, then
+    set `NRCS_URL` (its address, e.g. `https://nrcs.yourdomain`) and `NRCS_USERNAME` in `wrangler.toml`
+    `[vars]` and `npx wrangler secret put NRCS_PASSWORD`.
+14. **Bitfocus Companion (optional):** PCR → *Companion* → **Make a token**, then follow the steps on
+    that screen.
+
 Machine translation of English live coverage into Bengali and Hindi uses Cloudflare Workers AI
 (free daily allowance) through the `[ai]` binding; no key needed.
 
@@ -143,5 +250,15 @@ like `generateContent`, and `WIX_SITE` at a local copy of the blog.
 - `src/tts.js` — Listen; `src/mt.js` — Workers AI translation; `src/push.js` — alerts
 - `src/legal.js` — About and legal pages; `src/i18n/` — interface text
 - `admin.html`, `admin.js`, `admin.css` — the control room
-- `migrations/` — D1 schema (`0021_rashtrix.sql` adds the Rashtrix tables)
+- `src/control.js` — realtime control (Durable Object); `src/engine.js` — the program engine;
+  `src/scenes.js` — layouts, item types, timings
+- `src/rundown.js`, `src/clips.js`, `src/controlroom.js` — rundowns, clips, control-room API;
+  `producer.html`/`src/producer.js`, `pcr.html`/`src/pcr.js`
+- `src/studioapi.js`, `src/rtc.js` — live studio and WebRTC; `studio.html`/`src/studiodesk.js`,
+  `guest.html`/`src/guest.js`
+- `src/extras.js` — polls, results, comments, sponsors, বঙ্গাব্দ, weather, audit, Command Centre;
+  `onair.html`/`src/onair.js`, `prompter.html`/`src/prompter.js`
+- `src/crshell.js`, `src/control.css`, `src/uilang.js` — shared by the control-room screens
+- `migrations/` — D1 schema (`0021_rashtrix.sql` the Rashtrix tables, `0022_tv.sql` the channels,
+  `0023_studio.sql` the control room and studio)
 - `rashtrix/` — the brief and the owner's brand files

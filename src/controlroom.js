@@ -99,6 +99,13 @@ export async function handleControlRoom(request, env, url, { json, err, currentU
   if (cmd && request.method === "POST") {
     const b = await request.json().catch(() => ({}));
     if (b.cmd === "rundown.load") return err("Put a rundown on air from the producer.");
+    // Results: official figures only, and never during the exit-poll blackout.
+    const boardId = b.cmd === "overlay" ? b.args?.results : b.args?.scene?.graphic?.kind === "results" ? b.args.scene.graphic.id : null;
+    if (boardId) {
+      const bd = await env.DB.prepare("SELECT blackout_until FROM results_boards WHERE id=?").bind(boardId).first();
+      if (!bd) return err("Results board not found.", 404);
+      if (bd.blackout_until && Date.parse(bd.blackout_until) > Date.now()) return err(`Blackout until ${new Date(bd.blackout_until).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST: results cannot go on air yet.`);
+    }
     if (b.cmd === "macro" && b.args?.id) {
       const m = await env.DB.prepare("SELECT * FROM macros WHERE id=?").bind(b.args.id).first();
       if (!m) return err("No such macro.", 404);

@@ -52,7 +52,7 @@ function welcome() {
     <h2 style="margin:0">Welcome to the Rashtrix studio</h2><p class="muted" style="margin:0" data-no-tr>${esc(G.info.room.title)}</p>
     <video id="me" autoplay playsinline muted style="width:100%;background:#000;border-radius:10px;transform:scaleX(-1);aspect-ratio:16/9;object-fit:cover"></video>
     <div class="bar" id="lvl" title="Microphone level"><i></i></div><small class="muted">Say something: the bar should move.</small>
-    <div class="grid2"><label>Camera<select id="camSel"></select></label><label>Microphone<select id="micSel"></select></label></div>
+    <div class="grid2"><label>Camera<select id="camSel" data-no-tr></select></label><label>Microphone<select id="micSel" data-no-tr></select></label></div>
     <div class="panel" style="border-color:var(--amber)"><b>🎧 Please wear headphones or earphones.</b><p class="muted" style="margin:4px 0 0">Without them, the programme sound comes back through your microphone and everyone hears an echo. Sit facing a window or a lamp, and keep the phone steady (lying sideways for TV).</p><label style="display:flex;gap:6px;align-items:center;margin-top:6px;color:var(--ink)"><input type="checkbox" id="hp"> I am wearing headphones</label></div>
     <form id="join" class="stack"><div class="grid2"><label>Your name (as it should appear on screen)<input name="name" required value="${esc(g.name)}" data-no-tr></label><label>Your title (e.g. Professor, Jadavpur University)<input name="title" value="${esc(g.title)}" data-no-tr></label></div>
       <div class="panel"><b>Broadcast consent</b><p style="white-space:pre-line;margin:6px 0" data-no-tr>${esc(consent)}</p><label style="display:flex;gap:6px;align-items:center;color:var(--ink)"><input type="checkbox" name="consent" required> I agree</label></div>
@@ -167,7 +167,7 @@ async function checks() {
   const { rtt } = await netStats(G.pub?.pc).catch(() => ({}));
   const conn = navigator.connection?.effectiveType || "";
   const c = { camera: G.mode === "vdo" || v?.readyState === "live", mic: G.mode === "vdo" || a?.readyState === "live", level: Math.round(G.level), network: conn, rtt: rtt || 0, headphones: G.headphones || $("#hp")?.checked || false, device: navigator.userAgent.match(/\(([^)]+)\)/)?.[1]?.slice(0, 60) || "" };
-  const el = $("#checks"); if (el) el.innerHTML = `${c.camera ? "✅" : "❌"} Camera · ${c.mic ? "✅" : "❌"} Microphone · ${rtt ? (rtt < 150 ? "✅" : rtt < 350 ? "⚠️" : "❌") : "…"} Network${rtt ? ` ${rtt} ms` : ""} · ${c.headphones ? "✅" : "⚠️"} Headphones`;
+  const el = $("#checks"); if (el) el.innerHTML = `<i>${c.camera ? "✅" : "❌"}</i> <span>Camera</span> · <i>${c.mic ? "✅" : "❌"}</i> <span>Microphone</span> · <i>${rtt ? (rtt < 150 ? "✅" : rtt < 350 ? "⚠️" : "❌") : "…"}</i> <span>Network</span>${rtt ? ` <span data-no-tr>${rtt} ms</span>` : ""} · <i>${c.headphones ? "✅" : "⚠️"}</i> <span>Headphones</span>`;
   fetch("/api/studio/guest/checks", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ t, checks: c }) }).catch(() => {});
 }
 

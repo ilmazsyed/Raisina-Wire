@@ -17,7 +17,7 @@ function precacheServiceWorker() {
         return statSync(path).isDirectory() ? walk(path) : [path];
       });
       const files = walk(outDir).map(f => "/" + relative(outDir, f).split("\\").join("/"))
-        .filter(f => !/^\/(sw\.js|_headers|og-image[\w-]*\.jpg|admin|tv\.html|producer|pcr|studio|prompter|guest)/.test(f) && !/\/(admin|tv|producer|pcr|studio|prompter|guest|crshell|control|uilang)-/.test(f))
+        .filter(f => !/^\/(sw\.js|_headers|og-image[\w-]*\.jpg|admin|tv\.html|producer|pcr|studio|prompter|guest|onair)/.test(f) && !/\/(admin|tv|producer|pcr|studio|prompter|guest|onair|studiodesk|rtc|crshell|control|uilang)-/.test(f))
         .map(f => (f === "/index.html" ? "/" : f))
         .sort();
       const hash = createHash("sha256");
@@ -43,7 +43,9 @@ export default defineConfig({
         producer: resolve(import.meta.dirname, "producer.html"),
         pcr: resolve(import.meta.dirname, "pcr.html"),
         studio: resolve(import.meta.dirname, "studio.html"),
-        guest: resolve(import.meta.dirname, "guest.html")
+        guest: resolve(import.meta.dirname, "guest.html"),
+        onair: resolve(import.meta.dirname, "onair.html"),
+        prompter: resolve(import.meta.dirname, "prompter.html")
       }
     }
   }

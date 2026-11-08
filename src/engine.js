@@ -312,7 +312,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   }
   function resultsHTML(id, full) {
     const b = (st.tv?.boards || []).find(x => x.id === id); if (!b) return "";
-    if (b.blackout) return full ? `<div class="res-full"><div class="res-head"><b>${esc(b.title)}</b></div><p class="res-block">ফল প্রকাশের সময় হয়নি। নির্বাচন কমিশনের নির্দেশ অনুযায়ী এখন কোনো ফল বা বুথফেরত সমীক্ষা দেখানো যাবে না।</p></div>` : "";
+    if (b.blackout) return full ? `<div class="res-full"><div class="res-head"><b>${esc(b.title)}</b></div><p class="res-block">ফল প্রকাশের সময় হয়নি। নির্বাচন কমিশনের নির্দেশ অনুযায়ী এখন কোনও ফল বা বুথফেরত সমীক্ষা দেখানো যাবে না।</p></div>` : "";
     const max = Math.max(1, ...b.rows.map(r => (r.won || 0) + (r.leading || 0)));
     const rows = b.rows.map(r => `<li style="--c:${esc(r.colour || "#AA0404")}"><b>${esc(r.party)}</b><span class="res-bar"><i style="width:${100 * ((r.won || 0) + (r.leading || 0)) / max}%"></i></span><em>${bnDigits(r.won || 0)}${b.kind === "seats" ? ` <small>+${bnDigits(r.leading || 0)}</small>` : ""}</em></li>`).join("");
     return `<div class="${full ? "res-full" : "res-bar-ovl"}"><div class="res-head"><b>${esc(b.title)}</b><small>${b.kind === "seats" ? `জয়ী + এগিয়ে · মোট আসন ${bnDigits(b.total)}` : "প্রাপ্ত ভোট"}</small></div><ol>${rows}</ol><p class="res-src">সূত্র: ${esc(b.source || "নির্বাচন কমিশন")} · শুধু সরকারি তথ্য</p></div>`;
@@ -345,7 +345,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     }
     // Overlays: poll bar, results bar, curated comments.
     const o = c.overlay || {};
-    $(".tvp-ovl").innerHTML = `${o.poll ? pollHTML(o.poll, false) : ""}${o.results ? resultsHTML(o.results, false) : ""}${o.comments?.length ? `<div class="cm-box">${o.comments.slice(0, 3).map(x => `<p><b>${esc(x.author)}</b><span>${esc(x.text)}</span><small>${x.platform === "youtube" ? "ইউটিউব" : x.platform === "facebook" ? "ফেসবুক" : "রাষ্ট্রিক্স অ্যাপ"}</small></p>`).join("")}</div>` : ""}`;
+    $(".tvp-ovl").innerHTML = `${o.poll ? pollHTML(o.poll, false) : ""}<div class="ovl-right">${o.results ? resultsHTML(o.results, false) : ""}${o.comments?.length ? `<div class="cm-box">${o.comments.slice(0, 3).map(x => `<p><b>${esc(x.author)}</b><span>${esc(x.text)}</span><small>${x.platform === "youtube" ? "ইউটিউব" : x.platform === "facebook" ? "ফেসবুক" : "রাষ্ট্রিক্স অ্যাপ"}</small></p>`).join("")}</div>` : ""}</div>`;
   }
   function showBreaking(b) {
     const el = document.createElement("div"); el.className = "tv-breaking";

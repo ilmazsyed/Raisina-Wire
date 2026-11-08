@@ -1613,7 +1613,7 @@ function viewWatch() {
   $("#view").innerHTML = `<div class="watch">
     <div class="wrap"><section class="tv-watch"><div class="tv-watch-head"><div><div class="kicker"><span class="dot-live"></span> Rashtrix TV</div><h1>Watch live</h1></div>
       <div class="pill-tabs" role="tablist" aria-label="Channel">${[["h", "Rashtrix TV"], ["v", "Rashtrix Shorts"]].map(([k, l]) => `<button type="button" role="tab" data-action="tv-ch" data-ch="${k}" aria-selected="${k === tvChannel()}">${l}</button>`).join("")}</div></div>
-      <div class="tv-watch-player ${tvChannel() === "v" ? "is-v" : ""}" id="tvWatch" data-no-tr></div></section>
+      <div class="tv-watch-player ${tvChannel() === "v" ? "is-v" : ""}" id="tvWatch" data-no-tr></div><div id="tvInteract" class="tv-interact"></div></section>
       <div class="page-head"><div><div class="kicker">Watch</div><h2>Videos</h2><p>Videos and shorts from Rashtrix.</p></div></div>
       ${all == null ? `<div class="skeleton" style="height:260px;margin-top:30px"></div>` : `
       <div class="w-tools"><div class="chips" role="tablist">${["All", ...cats.map(([c]) => c)].map(c => `<button class="chip" type="button" data-action="w-cat" data-cat="${esc(c)}" aria-pressed="${c === "All"}">${esc(c === "All" ? "All" : CAT_NAMES[c] || c)}</button>`).join("")}</div>
@@ -1648,6 +1648,24 @@ let tvInstance = null;
 function mountWatchTV() {
   const host = $("#tvWatch"); if (!host) return;
   tvInstance?.destroy(); tvInstance = mountTV(host, { channel: tvChannel() });
+  drawTvInteract();
+}
+// Under the player: the channel's open poll (one vote per device a day) and a comment box
+// (signed-in readers; the desk chooses which comments go on screen).
+async function drawTvInteract() {
+  const box = $("#tvInteract"); if (!box) return;
+  const { polls = [] } = await fetch("/api/polls", { cache: "no-store" }).then(r => r.json()).catch(() => ({}));
+  const voted = store.get("rw-voted", {}), p = polls[0];
+  const total = p ? p.counts.reduce((a, b) => a + b, 0) : 0;
+  box.innerHTML = `${p ? `<div class="tvi-poll glass"><span class="kicker">Poll</span><b data-no-tr>${esc(p.question)}</b>
+      <div class="tvi-opts">${p.options.map((o, i) => voted[p.id] != null ? `<div class="tvi-res"><span data-no-tr>${esc(o)}</span><i style="width:${total ? Math.round(100 * p.counts[i] / total) : 0}%"></i><em>${digits(total ? Math.round(100 * p.counts[i] / total) : 0)}%</em></div>` : `<button type="button" class="btn btn-sm" data-vote="${i}" data-no-tr>${esc(o)}</button>`).join("")}</div>
+      <small class="muted">Not a scientific survey. One vote per device a day.</small></div>` : ""}
+    <form class="tvi-comment glass" id="tviC"><span class="kicker">Comment on the channel</span>${state.user ? `<div class="tvi-row"><input name="text" maxlength="300" placeholder="Write a comment for Rashtrix TV" required><button class="btn btn-dark btn-sm">Send</button></div><small class="muted">The newsroom reads every comment; some are shown on screen with your name.</small>` : `<p class="muted">Sign in to send a comment to the channel.</p><button class="btn btn-dark btn-sm" type="button" data-action="join">Sign in</button>`}</form>`;
+  box.querySelectorAll("[data-vote]").forEach(b => b.addEventListener("click", async () => {
+    try { await apiJSON(`/api/polls/${p.id}/vote`, { choice: Number(b.dataset.vote) }); voted[p.id] = Number(b.dataset.vote); store.set("rw-voted", voted); toast("Thank you. Your vote is counted."); drawTvInteract(); } catch (e) { toast(e.message); }
+  }));
+  $("#tviC")?.addEventListener("submit", async e => { e.preventDefault(); const t = e.target.elements.text; if (!t) return;
+    try { await apiJSON("/api/comments", { text: t.value }); t.value = ""; toast("Sent to the newsroom."); } catch (x) { toast(x.message); } });
 }
 function filterWatch(q, cat) {
   const rows = $("#wRows"), res = $("#wResults"); if (!rows) return;

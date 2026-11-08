@@ -1,7 +1,7 @@
 // The language of the control-room and studio screens (producer, PCR, prompter, guest): বাংলা,
 // English or हिन्दी, remembered on the device and, for staff, on their account. On-air graphics
 // stay in Bengali whatever the screen's language.
-import { LANGUAGES, setLang, loadLanguage, startTranslator, lang } from "./i18n.js";
+import { LANGUAGES, setLang, loadLanguage, startTranslator, lang, tr } from "./i18n.js";
 
 const KEY = "rx-ui-lang";
 const read = () => { try { return localStorage.getItem(KEY); } catch { return null; } };
@@ -12,6 +12,9 @@ export async function initUiLang({ account = true } = {}) {
   setLang(l);
   await loadLanguage();
   startTranslator();
+  // Questions the browser asks (confirm, prompt) are in the screen's language too.
+  const c = window.confirm.bind(window), p = window.prompt.bind(window);
+  window.confirm = m => c(tr(m)); window.prompt = (m, d) => p(tr(m), d);
   return l;
 }
 // A small switch (select) for the screen's header.

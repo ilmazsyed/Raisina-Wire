@@ -137,7 +137,7 @@ async function addItem(type) {
   } catch (e) { fail(e); }
 }
 async function putOnAir(index) {
-  if (!confirm(`Put “${S.rd.title}” on air on ${S.ch === "h" ? "Rashtrix TV" : "Rashtrix Shorts"} now${index > 0 ? `, from item ${index + 1}` : ""}?`)) return;
+  if (!confirm(index > 0 ? "Put this rundown on air now, from the selected item?" : "Put this rundown on air now, from the top?")) return;
   try { await api(`/api/admin/rundowns/${S.rd.id}/onair`, { method: "POST", body: { index } }); toast("On air. The PCR has it now."); loadOnAir(); } catch (e) { fail(e); }
 }
 
@@ -149,7 +149,7 @@ function drawItem() {
   const timed = !["video", "clip", "adbreak"].includes(it.type) || !(Number(d.out) > Number(d.in));
   let specific = "";
   if (it.type === "video") specific = `<label>YouTube link or ID<input name="ytId" value="${esc(d.ytId || "")}" placeholder="https://youtu.be/…" ${dis}></label><div class="grid2"><label>In (m:ss)<input name="in" value="${fmt(d.in || 0)}" ${dis}></label><label>Out (m:ss, empty = to the end)<input name="out" value="${d.out ? fmt(d.out) : ""}" ${dis}></label></div>`;
-  if (it.type === "clip") specific = `<label>Clip<select name="clip" ${dis}><option value="">Choose from the clips library…</option>${S.clips.filter(c => c.status === "ready").map(c => `<option value="${c.id}" data-url="${esc(c.url)}" ${d.clipId === c.id ? "selected" : ""}>${esc(c.title)}</option>`).join("")}</select></label><div class="grid2"><label>In (m:ss)<input name="in" value="${fmt(d.in || 0)}" ${dis}></label><label>Out (m:ss)<input name="out" value="${d.out ? fmt(d.out) : ""}" ${dis}></label></div>`;
+  if (it.type === "clip") specific = `<label>Clip<select name="clip" data-no-tr ${dis}><option value="">Choose from the clips library…</option>${S.clips.filter(c => c.status === "ready").map(c => `<option value="${c.id}" data-url="${esc(c.url)}" ${d.clipId === c.id ? "selected" : ""}>${esc(c.title)}</option>`).join("")}</select></label><div class="grid2"><label>In (m:ss)<input name="in" value="${fmt(d.in || 0)}" ${dis}></label><label>Out (m:ss)<input name="out" value="${d.out ? fmt(d.out) : ""}" ${dis}></label></div>`;
   if (it.type === "live") specific = `<label>Layout<select name="layout" ${dis}>${Object.entries(LAYOUTS).filter(([k]) => k !== "graphic").map(([k, l]) => `<option value="${k}" ${d.layout === k ? "selected" : ""}>${l.name}</option>`).join("")}</select></label><div class="stack" id="srcs"></div>`;
   if (it.type === "breaking") specific = `<label>Breaking headline (on screen)<input name="text" value="${esc(d.text || "")}" data-no-tr ${dis}></label><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="music" ${d.music !== false ? "checked" : ""} ${dis}> Breaking music</label>`;
   if (it.type === "headlines") specific = `<label>Title<input name="htitle" value="${esc(d.title || "")}" placeholder="শিরোনাম" ${dis}></label><label>Headlines (one a line, up to 5; empty = the latest from the site)<textarea name="lines" rows="5" ${dis}>${esc(d.lines || "")}</textarea></label>`;
@@ -158,7 +158,7 @@ function drawItem() {
   if (it.type === "adbreak") specific = `<label>Ads (one a line: picture link, seconds)<textarea name="ads" rows="5" ${dis}>${esc((d.items || []).map(x => `${x.image}, ${x.seconds}`).join("\n"))}</textarea></label>`;
   R.innerHTML = `<form class="stack" autocomplete="off"><h3><span class="type ${it.type}">${ITEM_TYPES[it.type]}</span></h3>
     <label>Title (for the rundown)<input name="title" value="${esc(it.title)}" data-no-tr ${dis}></label>
-    ${timed ? `<label>Length (m:ss)<input name="duration" value="${fmt(it.duration)}" ${dis}></label>` : `<p class="muted">Length comes from the in and out points: ${digits(fmt(it.duration))}</p>`}
+    ${timed ? `<label>Length (m:ss)<input name="duration" value="${fmt(it.duration)}" ${dis}></label>` : `<p class="muted"><span>Length comes from the in and out points:</span> <span data-no-tr>${digits(fmt(it.duration))}</span></p>`}
     ${specific}
     <details ${d.lowerThird || d.ticker ? "open" : ""}><summary>On-screen text</summary><div class="stack" style="margin-top:8px">
       <div class="grid2"><label>Lower third: name<input name="lowerThird" value="${esc(d.lowerThird || "")}" ${dis}></label><label>Lower third: title<input name="lowerTitle" value="${esc(d.lowerTitle || "")}" ${dis}></label></div>
@@ -219,7 +219,7 @@ async function clipsDialog() {
   await loadClips();
   const d = dialog(`<h3>Clips library</h3><p class="muted">MP4 (H.264) plays everywhere. Clips are kept in Cloudflare R2 (10 GB free) and deleted after 30 days unused unless marked “keep”.</p>
     ${S.clipsInfo ? `<p class="tag amber">${esc(S.clipsInfo)}</p>` : `<div class="grid2"><label>Upload a video<input type="file" id="cf" accept="video/mp4,video/quicktime,video/webm"></label><label>Or paste a Google Drive link<span class="row"><input id="cd" placeholder="https://drive.google.com/file/d/…" style="flex:1"><button class="btn" id="cdGo">Copy</button></span></label></div><div class="bar" hidden><i></i></div><div class="clips-list"></div>`}`);
-  const draw = () => { const L = $(".clips-list", d); if (!L) return; L.innerHTML = S.clips.map(c => `<div class="clip"><div><b data-no-tr>${esc(c.title)}</b><br><small>${(c.bytes / 1048576).toFixed(1)} MB · ${c.status === "ready" ? "ready" : c.status}${c.keep ? " · keep" : ""}</small></div><div class="row"><a class="btn sm" href="${esc(c.url)}" target="_blank">Play</a><button class="btn sm" data-keep="${c.id}">${c.keep ? "Unkeep" : "Keep"}</button><button class="btn sm" data-del="${c.id}">Delete</button></div></div>`).join("") || `<p class="muted">No clips yet.</p>`;
+  const draw = () => { const L = $(".clips-list", d); if (!L) return; L.innerHTML = S.clips.map(c => `<div class="clip"><div><b data-no-tr>${esc(c.title)}</b><br><small>${digits((c.bytes / 1048576).toFixed(1))} MB${c.status === "ready" ? "" : ` · ${c.status}`}${c.keep ? " · Keep" : ""}</small></div><div class="row"><a class="btn sm" href="${esc(c.url)}" target="_blank">Play</a><button class="btn sm" data-keep="${c.id}">${c.keep ? "Unkeep" : "Keep"}</button><button class="btn sm" data-del="${c.id}">Delete</button></div></div>`).join("") || `<p class="muted">No clips yet.</p>`;
     $$("[data-keep]", L).forEach(b => b.onclick = async () => { const c = S.clips.find(x => x.id === b.dataset.keep); await api(`/api/admin/clips/${c.id}`, { method: "PUT", body: { keep: !c.keep } }).catch(fail); await loadClips(); draw(); });
     $$("[data-del]", L).forEach(b => b.onclick = async () => { if (!confirm("Delete this clip from storage?")) return; await api(`/api/admin/clips/${b.dataset.del}`, { method: "DELETE" }).catch(fail); await loadClips(); draw(); }); };
   draw();
@@ -254,7 +254,7 @@ async function templatesDialog() {
 async function asrunDialog() {
   const d = dialog(`<h3>As-run log</h3><div class="row"><label>Day<input type="date" id="ad" value="${S.day}"></label><button class="btn" id="aPrint">Print (PDF)</button></div><div class="clips-list" id="al"></div>`);
   let rows = [];
-  const load = async () => { rows = (await api(`/api/admin/asrun?day=${$("#ad", d).value}&channel=${S.ch}`)).asrun; $("#al", d).innerHTML = rows.map(r => `<div class="clip"><div><b data-no-tr>${esc(r.title || r.type)}</b><br><small>${digits(istClock(Date.parse(r.at)))} · ${esc(r.type)} · ${esc(r.how)}</small></div><small>${digits(fmt(r.actual || r.planned))}</small></div>`).join("") || `<p class="muted">Nothing logged.</p>`; };
+  const load = async () => { rows = (await api(`/api/admin/asrun?day=${$("#ad", d).value}&channel=${S.ch}`)).asrun; $("#al", d).innerHTML = rows.map(r => `<div class="clip" data-no-tr><div><b data-no-tr>${esc(r.title || r.type)}</b><br><small>${digits(istClock(Date.parse(r.at)))} · ${esc(r.type)} · ${esc(r.how)}</small></div><small>${digits(fmt(r.actual || r.planned))}</small></div>`).join("") || `<p class="muted">Nothing logged.</p>`; };
   $("#ad", d).onchange = () => load().catch(fail); await load().catch(fail);
   $("#aPrint", d).onclick = () => printDoc(`As-run log · ${S.ch === "h" ? "Rashtrix TV" : "Rashtrix Shorts"} · ${$("#ad", d).value}`, `<table><thead><tr><th>Time (IST)</th><th>What</th><th>Type</th><th>How</th><th>Planned</th><th>Actual</th></tr></thead><tbody>${rows.map(r => `<tr><td>${istClock(Date.parse(r.at))}</td><td>${esc(r.title)}</td><td>${esc(r.type)}</td><td>${esc(r.how)}</td><td>${fmt(r.planned)}</td><td>${fmt(r.actual)}</td></tr>`).join("")}</tbody></table>`);
 }
@@ -262,7 +262,7 @@ async function nrcsDialog() {
   const d = dialog(`<h3>Import from Rashtrix Command Centre</h3><div id="nl" class="clips-list"><p class="muted">Loading stories…</p></div>`);
   try {
     const { stories, configured } = await api("/api/admin/nrcs/stories");
-    if (!configured) { $("#nl", d).innerHTML = `<p class="muted">The Command Centre is not connected yet. Set its address (NRCS_URL) and key (NRCS_TOKEN secret) — see the README.</p>`; return; }
+    if (!configured) { $("#nl", d).innerHTML = `<p class="muted">The Command Centre is not connected yet. Set its address (NRCS_URL), user name (NRCS_USERNAME) and password (NRCS_PASSWORD secret): see the README.</p>`; return; }
     $("#nl", d).innerHTML = stories.map(s => `<div class="clip"><div><b data-no-tr>${esc(s.title)}</b><br><small>${esc(s.slug || "")} ${s.duration ? `· ${digits(fmt(s.duration))}` : ""}</small></div><button class="btn sm" data-imp="${esc(s.id)}">Add</button></div>`).join("") || `<p class="muted">No ready stories.</p>`;
     $$("[data-imp]", d).forEach(b => b.onclick = async () => { const s = stories.find(x => String(x.id) === b.dataset.imp);
       try { await api(`/api/admin/rundowns/${S.rd.id}/items`, { method: "POST", body: { type: s.video ? "video" : "slate", title: s.title, duration: s.duration || 60, script: s.script || "", data: { ytId: s.video || "", lowerThird: s.lowerThird || "", lowerTitle: s.lowerTitle || "", text: s.title } } }); b.disabled = true; b.textContent = "Added"; openRundown(S.rd.id); } catch (e) { fail(e); } });

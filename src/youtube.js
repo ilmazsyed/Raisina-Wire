@@ -40,13 +40,14 @@ export async function ytUsage(env) {
   return { day: pacificDay(), units: r?.units || 0, limit: YT_DAILY_UNITS(env) };
 }
 
-async function call(env, path, params) {
+export async function ytCall(env, path, params, units = 1) { return call(env, path, params, units); }
+async function call(env, path, params, units = 1) {
   const base = env.YOUTUBE_ENDPOINT || "https://www.googleapis.com/youtube/v3";
   const url = new URL(`${base.replace(/\/$/, "")}/${path}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   url.searchParams.set("key", env.YOUTUBE_API_KEY);
   const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
-  await spend(env, 1);
+  await spend(env, units);
   if (!r.ok) { const t = await r.text(); throw new Error(`YouTube ${r.status}: ${(t.match(/"message":\s*"([^"]+)/)?.[1] || t).slice(0, 160)}`); }
   return r.json();
 }

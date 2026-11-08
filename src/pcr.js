@@ -33,12 +33,12 @@ const same = (a, b) => a && b && a.kind === b.kind && (a.id || a.url || "") === 
 
 /* ---------- sources for the grid ---------- */
 function buildSources() {
-  const list = [{ key: "cont", name: "Running order", kind: "continuity", src: { kind: "continuity" } }];
+  const list = [{ key: "cont", name: "Running order", kind: "continuity", own: true, src: { kind: "continuity" } }];
   S.inputs.forEach(x => list.push({ key: `in:${x.id}`, name: x.name || x.kind.toUpperCase(), kind: x.kind, src: x.kind === "yt" ? { kind: "yt", id: x.url } : { kind: x.kind, url: x.url, name: x.name } }));
   S.guests.forEach(g => list.push({ key: `g:${g.id}`, name: g.name || "Guest", kind: "guest", src: { kind: g.vdo ? "vdo" : "guest", id: g.id, url: g.vdo || "", name: g.name, title: g.title, sessionId: g.sessionId, tracks: g.tracks }, lower: { name: g.name, title: g.title }, live: g.online }));
   S.clips.filter(c => c.status === "ready").slice(0, 30).forEach(c => list.push({ key: `c:${c.id}`, name: c.title, kind: "clip", src: { kind: "clip", url: c.url } }));
-  list.push({ key: "gfx:headlines", name: "Headlines", kind: "graphic", scene: { layout: "graphic", sources: [], graphic: { kind: "headlines" }, label: "Headlines" } });
-  list.push({ key: "gfx:slate", name: "Slate", kind: "graphic", scene: { layout: "graphic", sources: [], graphic: { kind: "slate", text: "" }, label: "Slate" } });
+  list.push({ key: "gfx:headlines", name: "Headlines", kind: "graphic", own: true, scene: { layout: "graphic", sources: [], graphic: { kind: "headlines" }, label: "Headlines" } });
+  list.push({ key: "gfx:slate", name: "Slate", kind: "graphic", own: true, scene: { layout: "graphic", sources: [], graphic: { kind: "slate", text: "" }, label: "Slate" } });
   S.sources = list;
 }
 function drawSources() {
@@ -46,7 +46,7 @@ function drawSources() {
   $(".sources").innerHTML = S.sources.map((s, i) => {
     const inPv = s.scene ? S.pv.graphic?.kind === s.scene.graphic.kind && !S.pv.sources?.length : S.pv.sources?.some(x => same(x, s.src));
     const inPg = pg && (s.scene ? pg.graphic?.kind === s.scene.graphic.kind : pg.sources?.some(x => same(x, s.src)));
-    return `<button class="srcbtn ${inPg ? "pg" : ""} ${inPv ? "pv" : ""}" data-i="${i}" title="${esc(s.name)}">${s.kind === "yt" ? `<img src="https://i.ytimg.com/vi/${esc(s.src.id)}/default.jpg" alt="">` : ""}<span class="k">${i < 9 ? digits(i + 1) : ""}</span><b data-no-tr>${esc(s.name)}</b><small>${s.kind === "continuity" ? "Channel" : s.kind}${s.live === false ? " · offline" : ""}</small></button>`;
+    return `<button class="srcbtn ${inPg ? "pg" : ""} ${inPv ? "pv" : ""}" data-i="${i}" title="${esc(s.name)}">${s.kind === "yt" ? `<img src="https://i.ytimg.com/vi/${esc(s.src.id)}/default.jpg" alt="">` : ""}<span class="k">${i < 9 ? digits(i + 1) : ""}</span><b ${s.own ? "" : "data-no-tr"}>${esc(s.name)}</b><small>${s.kind === "continuity" ? "Channel" : s.kind}${s.live === false ? " · offline" : ""}</small></button>`;
   }).join("");
   $$(".srcbtn").forEach(b => b.onclick = () => pickSource(Number(b.dataset.i)));
 }
@@ -220,7 +220,7 @@ async function dump() { await cmd("dump"); toast("DUMP: the outputs threw away t
     <div class="panel"><h2>Breaking in now</h2><div class="stack"><input id="brText" placeholder="Breaking headline (Bengali)" data-no-tr><div class="row"><label>Seconds<input id="brSec" type="number" value="20" min="5" max="60" style="width:70px"></label><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="brMusic" checked> Music</label><button class="btn red" id="brGo">Breaking in now</button><button class="btn" id="brClear">Clear</button></div><div id="breakNow"></div></div></div>
     <div class="panel"><h2>Rundown</h2><div id="rdTitle"></div><div class="countdown">—</div><p class="muted" id="rdLeft" style="text-align:center;margin:0 0 6px"></p>
       <div class="row" style="margin-bottom:6px"><button class="btn sm" id="rdPrev">◀ Prev (B)</button><button class="btn sm" id="rdNext">Next ▶ (N)</button><button class="btn sm" id="rdSkip">Skip (K)</button><button class="btn sm" id="rdAuto">Auto advance</button><button class="btn sm" id="rdStop">Stop</button><a class="btn sm" href="/producer.html">Producer</a></div><div class="rdlist"></div></div>
-    <div class="panel"><h2>Delay and safety</h2><div class="row"><label>Broadcast delay<select id="delay">${Array.from({ length: 11 }, (_, i) => `<option value="${i}">${digits(i)} s</option>`).join("")}</select></label><button class="btn red dump" id="dump" title="Shift+D">DUMP</button><button class="btn amber" id="standby" title="Shift+S">Standby slate</button></div>
+    <div class="panel"><h2>Delay and safety</h2><div class="row"><label>Broadcast delay<select id="delay">${Array.from({ length: 11 }, (_, i) => `<option value="${i}" data-no-tr>${digits(i)} s</option>`).join("")}</select></label><button class="btn red dump" id="dump" title="Shift+D">DUMP</button><button class="btn amber" id="standby" title="Shift+S">Standby slate</button></div>
       <p class="muted" style="font-size:12px">With a delay, the outputs run behind the PCR. DUMP throws away what is waiting and puts the standby slate up. If an output's source stops for 10 seconds, the standby slate goes up by itself and the newsroom gets an alert.</p></div>
     <div class="panel"><h2>Outputs</h2><div class="health"></div></div>
     <div class="panel"><h2>Keys</h2><div class="keys"><div><kbd>Space</kbd> TAKE</div><div><kbd>Enter</kbd> AUTO</div><div><kbd>1–9</kbd> source</div><div><kbd>Shift+1–9</kbd> layout</div><div><kbd>N</kbd> next</div><div><kbd>B</kbd> previous</div><div><kbd>K</kbd> skip</div><div><kbd>X M W G</kbd> transitions</div><div><kbd>L</kbd> name strap</div><div><kbd>Shift+L</kbd> strap off</div><div><kbd>Shift+D</kbd> DUMP</div><div><kbd>Shift+S</kbd> standby</div><div><kbd>Esc</kbd> clear preview</div></div></div>
