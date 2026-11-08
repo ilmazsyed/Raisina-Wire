@@ -122,7 +122,7 @@ export async function tvState(env, ch) {
   const s = await tvSettings(env, ch);
   const [videos, cards, live, stories] = await Promise.all([
     playable(env, ch), ch === "v" ? promos(env) : [],
-    env.DB.prepare("SELECT CASE WHEN live_video<>'' THEN live_video ELSE yt_id END AS ytId, title FROM tv_sources WHERE channel=? AND kind='live' AND active=1 AND on_air=1 AND (yt_id NOT LIKE 'UC%' OR live_video<>'') LIMIT 1").bind(ch).first(),
+    env.DB.prepare("SELECT CASE WHEN live_video<>'' THEN live_video ELSE yt_id END AS ytId, title FROM tv_sources WHERE channel=? AND kind='live' AND active=1 AND on_air=1 AND live_now=1 LIMIT 1").bind(ch).first(),
     listPublished(env, { limit: 30 }).then(l => localiseArticles(env, "bn", l))
   ]);
   const headlines = stories.filter(a => a.lang === "bn").map(a => ({ text: a.title, desk: a.category, kind: a.kind }));

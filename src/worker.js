@@ -1071,7 +1071,8 @@ async function api(request, env, ctx) {
           const ch = CHANNELS.includes(b.channel) ? b.channel : null, ref = parseYouTubeRef(b.ref);
           if (!ch) return err("Choose the horizontal or the vertical channel.");
           if (!ref) return err("Paste a YouTube channel, playlist, video, Short or live address.");
-          let kind = b.kind === "live" || ref.kind === "live" ? "live" : ref.kind, id = randomId();
+          // A playlist is never a live, even with Live ticked.
+          let kind = ref.kind === "playlist" ? "playlist" : b.kind === "live" || ref.kind === "live" ? "live" : ref.kind, id = randomId();
           if (ref.kind === "channel") {
             // A whole channel: its Shorts (vertical), its long videos (horizontal), or its live.
             if (!ytReady(env)) return err("Add the YouTube key first: a channel address needs it.");
