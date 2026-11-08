@@ -1171,4 +1171,9 @@ export default {
   "No shorts yet.": "अभी कोई शॉर्ट्स नहीं।",
   "Swipe up for the next one": "अगला देखने के लिए ऊपर स्वाइप करें",
   "Founder and Editor-in-Chief": "संस्थापक और प्रधान संपादक",
+  "YouTube channel, playlist, video, Short or live address": "यूट्यूब चैनल, प्लेलिस्ट, वीडियो, शॉर्ट या लाइव का पता",
+  "Paste a YouTube channel, playlist, video, Short or live address.": "यूट्यूब चैनल, प्लेलिस्ट, वीडियो, शॉर्ट या लाइव का पता डालें।",
+  "Add the YouTube key first: a channel address needs it.": "पहले यूट्यूब की जोड़ें। चैनल के पते के लिए यह ज़रूरी है।",
+  "That YouTube channel was not found.": "वह यूट्यूब चैनल नहीं मिला।",
+  "That source is already on this channel.": "यह स्रोत इस चैनल पर पहले से है।",
 };

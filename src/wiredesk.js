@@ -184,18 +184,30 @@ Sources (${items.length}):
 ${items.map((it, i) => `--- Source ${i + 1} (${it.lang}) ---\nHeadline: ${it.title}\nPublished: ${it.published_at || "unknown"}\n${it.text || it.summary || ""}`).join("\n\n")}`;
 }
 
-async function callGemini(env, text, retried = false) {
+async function callGemini(env, text, retried = false, think = true) {
   const model = await activeModel(env);
   const endpoint = env.GEMINI_ENDPOINT || `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-  const r = await fetch(endpoint, {
-    method: "POST", signal: AbortSignal.timeout(60000),
-    headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: RULES }] },
-      contents: [{ role: "user", parts: [{ text }] }],
-      generationConfig: { temperature: 0.4, responseMimeType: "application/json", responseSchema: SCHEMA, maxOutputTokens: 8192 }
-    })
-  });
+  // A report in three languages is long: the newer models think before writing, which can take
+  // well over a minute. Light thinking keeps it quick; the wait allows three minutes.
+  const thinking = think && /^gemini-3/.test(model) ? { thinkingConfig: { thinkingLevel: "low" } } : {};
+  let r;
+  try {
+    r = await fetch(endpoint, {
+      method: "POST", signal: AbortSignal.timeout(180000),
+      headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: RULES }] },
+        contents: [{ role: "user", parts: [{ text }] }],
+        generationConfig: { temperature: 0.4, responseMimeType: "application/json", responseSchema: SCHEMA, maxOutputTokens: 16384, ...thinking }
+      })
+    });
+  } catch (e) {
+    const err = new Error(e?.name === "TimeoutError" ? "Gemini took too long; trying again shortly" : `Gemini: ${e?.message || e}`); err.retry = true; throw err;
+  }
+  if (r.status === 400 && thinking.thinkingConfig) {
+    const body = await r.clone().text();
+    if (/thinking/i.test(body)) return callGemini(env, text, retried, false);   // a model without that setting
+  }
   await countCall(env);
   if (r.status === 429) {
     const body = await r.text();
@@ -288,7 +300,7 @@ export async function runWireDesk(env, { onAlert, budget = 2 } = {}) {
   const q = await quota(env);
   if (!q.left) return { fetched, grouped, written: 0, note: q.blockedUntil ? `waiting until ${q.blockedUntil}` : "daily limit reached" };
   // Stories that failed only because a model was retired go back to the queue once.
-  await env.DB.prepare("UPDATE wire_jobs SET status='queued', attempts=0, error='' WHERE status='failed' AND error LIKE 'Gemini 404:%no longer available%'").run();
+  await env.DB.prepare("UPDATE wire_jobs SET status='queued', attempts=0, error='' WHERE status='failed' AND (error LIKE 'Gemini 404:%no longer available%' OR error LIKE '%aborted due to timeout%' OR error LIKE 'Gemini took too long%')").run();
   // Stuck jobs (a Worker that stopped mid-way) go back to the queue after ten minutes.
   await env.DB.prepare("UPDATE wire_jobs SET status='queued' WHERE status='working' AND updated_at<?").bind(new Date(Date.now() - 10 * 60e3).toISOString()).run();
   // Two-source stories first, then the oldest.

@@ -30,7 +30,7 @@ import { rundownHousekeeping } from "./rundown.js";
 export { TvControl } from "./control.js";
 import { shortsList } from "./tvchannel.js";
 import { CHANNELS, tvSettings, saveTvSettings, newOutputKey, setBreaking, tvState, clearTvCache, checkKey, promos as tvPromos, copyImage } from "./tvchannel.js";
-import { parseYouTubeRef, refreshSources, refreshSource, playlistTitle, ytUsage, ytReady } from "./youtube.js";
+import { parseYouTubeRef, refreshSources, refreshSource, playlistTitle, ytUsage, ytReady, addChannelSource } from "./youtube.js";
 import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { handleTts } from "./tts.js";
@@ -1070,10 +1070,15 @@ async function api(request, env, ctx) {
         if (request.method === "POST") {
           const ch = CHANNELS.includes(b.channel) ? b.channel : null, ref = parseYouTubeRef(b.ref);
           if (!ch) return err("Choose the horizontal or the vertical channel.");
-          if (!ref) return err("Paste a YouTube playlist, video, Short or live address.");
-          const kind = b.kind === "live" || ref.kind === "live" ? "live" : ref.kind;
-          const id = randomId();
-          await env.DB.prepare("INSERT INTO tv_sources (id,channel,kind,yt_id,title) VALUES (?,?,?,?,?)").bind(id, ch, kind, ref.id, clean(b.title, 200) || (kind === "playlist" && ytReady(env) ? await playlistTitle(env, ref.id) : "")).run()
+          if (!ref) return err("Paste a YouTube channel, playlist, video, Short or live address.");
+          // A playlist is never a live, even with Live ticked.
+          let kind = ref.kind === "playlist" ? "playlist" : b.kind === "live" || ref.kind === "live" ? "live" : ref.kind, id = randomId();
+          if (ref.kind === "channel") {
+            // A whole channel: its Shorts (vertical), its long videos (horizontal), or its live.
+            if (!ytReady(env)) return err("Add the YouTube key first: a channel address needs it.");
+            const added = await addChannelSource(env, ch, ref, { title: clean(b.title, 200), live: kind === "live" || ref.tab === "live" || ref.tab === "streams" });
+            id = added.id; kind = added.kind;
+          } else await env.DB.prepare("INSERT INTO tv_sources (id,channel,kind,yt_id,title) VALUES (?,?,?,?,?)").bind(id, ch, kind, ref.id, clean(b.title, 200) || (kind === "playlist" && ytReady(env) ? await playlistTitle(env, ref.id) : "")).run()
             .catch(e => { throw new Error(/UNIQUE/.test(e.message) ? "That source is already on this channel." : e.message); });
           await audit(env, user, "tv.source.add", "tv_source", id, { ch, kind, yt: ref.id });
           if (ytReady(env)) { const src = await env.DB.prepare("SELECT * FROM tv_sources WHERE id=?").bind(id).first(); await refreshSource(env, src).catch(e => env.DB.prepare("UPDATE tv_sources SET last_error=? WHERE id=?").bind(String(e.message).slice(0, 200), id).run()); }

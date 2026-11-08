@@ -1223,4 +1223,9 @@ export default {
   "No shorts yet.": "এখনও কোনও শর্টস নেই।",
   "Swipe up for the next one": "পরেরটি দেখতে উপরে সোয়াইপ করুন",
   "Founder and Editor-in-Chief": "প্রতিষ্ঠাতা ও প্রধান সম্পাদক",
+  "YouTube channel, playlist, video, Short or live address": "ইউটিউব চ্যানেল, প্লেলিস্ট, ভিডিও, শর্ট বা লাইভের ঠিকানা",
+  "Paste a YouTube channel, playlist, video, Short or live address.": "ইউটিউব চ্যানেল, প্লেলিস্ট, ভিডিও, শর্ট বা লাইভের ঠিকানা দিন।",
+  "Add the YouTube key first: a channel address needs it.": "আগে ইউটিউব কী যোগ করুন। চ্যানেলের ঠিকানার জন্য সেটি লাগবে।",
+  "That YouTube channel was not found.": "ওই ইউটিউব চ্যানেলটি পাওয়া যায়নি।",
+  "That source is already on this channel.": "এই উৎসটি এই চ্যানেলে আগেই আছে।",
 };
