@@ -442,11 +442,14 @@ function wireEmpty() {
 // Rashtrix's own stories (with photos) lead; the wire desk's rewrites and briefs run in the
 // latest-news stream as text. Then a section per desk.
 function viewHome() {
-  const all = stories(), own = all.filter(a => !isWire(a)), photo = own.filter(a => a.image);
-  const lead = photo[0] || own[0] || all[0];
+  // Newest first, wire briefs and reports included: the lead is the newest story, unless a
+  // story with a photo is less than two hours older, which then leads.
+  const all = stories().sort((x, y) => (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0));
+  const photo = all.find(a => a.image), newest = all[0];
+  const lead = photo && newest && (Date.parse(newest.publishedAt) - Date.parse(photo.publishedAt)) < 2 * 3600e3 ? photo : newest;
   if (!lead) { $("#view").innerHTML = `<div class="wrap home"><section id="liveBanner" class="band-tight" hidden></section>${articlesSettled ? `<div class="empty" style="margin-top:30px">No stories yet.</div>` : `<div class="skeleton" style="height:420px;margin-top:20px"></div>`}</div>`; renderLiveBanner(); return; }
   const used = new Set([lead.id]);
-  const side = own.filter(a => !used.has(a.id)).slice(0, 4); side.forEach(a => used.add(a.id));
+  const side = all.filter(a => !used.has(a.id)).slice(0, 4); side.forEach(a => used.add(a.id));
   $("#view").innerHTML = `
   <div class="wrap home">
     <section id="liveBanner" class="band-tight" aria-label="Live coverage" hidden></section>
@@ -483,8 +486,8 @@ function renderHomeDesks(used = new Set()) {
   for (const d of DESKS) {
     const host = $(`#desk-${DESK_SLUG[d]}`); if (!host) continue;
     const list = stories().filter(a => a.category === d && !used.has(a.id));
-    // Own stories with photos first, then the rest, four per desk.
-    const pickd = [...list.filter(a => !isWire(a)), ...list.filter(isWire)].slice(0, 4).sort((x, y) => Date.parse(y.publishedAt) - Date.parse(x.publishedAt));
+    // The four newest on each desk, wire briefs and reports included.
+    const pickd = list.sort((x, y) => (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0)).slice(0, 4);
     host.closest(".desk-band").hidden = !pickd.length;
     host.innerHTML = pickd.map(e => edCard(e)).join("");
   }
@@ -1177,7 +1180,7 @@ function renderTicker() {
   if (!items.length) { host.innerHTML = `<span class="ticker-item muted">${articlesSettled ? "Rashtrix 24×7 News" : "Loading the latest news…"}</span>`; host.classList.remove("moving"); return; }
   // Two copies make the loop seamless; the second is hidden from assistive tech.
   host.innerHTML = `<div class="ticker-set">${items.join("")}</div><div class="ticker-set" aria-hidden="true">${items.join("").replaceAll("<a ", '<a tabindex="-1" ')}</div>`;
-  host.style.setProperty("--ticker-duration", `${Math.max(40, items.length * 7)}s`);
+  host.style.setProperty("--ticker-duration", `${Math.max(24, items.length * 4.5)}s`);
   host.classList.add("moving");
 }
 async function loadCoverage() {

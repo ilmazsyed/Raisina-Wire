@@ -147,7 +147,30 @@ const countCall = env => env.DB.prepare("INSERT INTO ai_usage (day,calls) VALUES
 const blockUntil = (env, until) => env.DB.prepare("INSERT INTO ai_usage (day,calls,blocked_until) VALUES (?,0,?) ON CONFLICT(day) DO UPDATE SET blocked_until=excluded.blocked_until").bind(pacificDay(), until).run();
 
 const LANG_SCHEMA = { type: "OBJECT", properties: { title: { type: "STRING" }, dek: { type: "STRING" }, body: { type: "STRING" } }, required: ["title", "body"] };
-const SCHEMA = { type: "OBJECT", properties: { desk: { type: "STRING", enum: DESKS }, tags: { type: "ARRAY", items: { type: "STRING" } }, bn: LANG_SCHEMA, en: LANG_SCHEMA, hi: LANG_SCHEMA, unusable: { type: "BOOLEAN" }, reason: { type: "STRING" } }, required: ["desk", "bn", "en", "hi"] };
+// Where the story happened and how far it reaches come first, so the desk is chosen from them.
+const PLACE_SCHEMA = { type: "OBJECT", properties: { city: { type: "STRING" }, district: { type: "STRING" }, state: { type: "STRING" }, country: { type: "STRING" } }, required: ["country"] };
+const SCHEMA = { type: "OBJECT", properties: { place: PLACE_SCHEMA, scope: { type: "STRING", enum: ["city", "state", "national", "international", "diaspora"] }, desk: { type: "STRING", enum: DESKS }, tags: { type: "ARRAY", items: { type: "STRING" } }, bn: LANG_SCHEMA, en: LANG_SCHEMA, hi: LANG_SCHEMA, unusable: { type: "BOOLEAN" }, reason: { type: "STRING" } },
+  required: ["place", "scope", "desk", "bn", "en", "hi"], propertyOrdering: ["place", "scope", "desk", "tags", "bn", "en", "hi", "unusable", "reason"] };
+
+// The desk, from where the story happened and how far it reaches. The model's own choice is
+// used only when it gives no place.
+const KOLKATA_AREA = /kolkata|calcutta|howrah|salt ?lake|bidhannagar|new ?town|rajarhat|dum ?dum|baranagar|behala|jadavpur|tollygunge|garia|kasba|barasat|sonarpur|কলকাতা|হাওড়া|সল্টলেক|বিধাননগর|নিউ ?টাউন|রাজারহাট|দমদম|বরানগর|বেহালা|যাদবপুর|টালিগঞ্জ|গড়িয়া|কসবা/i;
+const IN_BENGAL = /west ?bengal|পশ্চিমবঙ্গ|^bengal$/i;
+const IN_INDIA = /^(india|bharat|ভারত|भारत)$/i;
+export function deskFor(out) {
+  const p = out?.place || {}, scope = out?.scope;
+  const known = [p.country, p.state, p.city].some(x => String(x || "").trim());
+  if (!known) return DESKS.includes(out?.desk) ? out.desk : null;
+  if (scope === "diaspora") return "Probashi Bangali";
+  const country = String(p.country || "").trim(), state = String(p.state || "").trim();
+  const local = `${p.city || ""} ${p.district || ""}`;
+  if (country && !IN_INDIA.test(country)) return "World";
+  if (scope === "international" && !IN_BENGAL.test(state)) return "World";
+  if (state && !IN_BENGAL.test(state) && !KOLKATA_AREA.test(local)) return "India";
+  if (scope === "national" && !state) return "India";
+  if (IN_BENGAL.test(state) || KOLKATA_AREA.test(local)) return scope === "city" && KOLKATA_AREA.test(local) ? "Kolkata" : "West Bengal";
+  return DESKS.includes(out?.desk) ? out.desk : "India";
+}
 
 // The Bengali house style: Anandabazar Patrika's standard চলিত বাংলা, with the brisk,
 // conversational pace of The Wall. Used for every Bengali rewrite and brief.
@@ -169,7 +192,14 @@ Rules, in order of importance:
 5. Neutral, factual tone. No opinion, no adjectives of judgement, no clickbait, no exclamation marks. Respect the presumption of innocence: say "accused" or "arrested", never call anyone guilty unless convicted. Do not name victims of sexual offences or minors.
 6. Bengali in the house style of Anandabazar Patrika and The Wall (thewall.in): see BENGALI_STYLE below. English in plain Indian English. Hindi in plain standard Hindi.
 7. If the sources are not news (an advertisement, an opinion column, a horoscope, a quiz, a list of offers) or too thin to report safely, set "unusable": true and explain in "reason".
-Also choose the desk: Kolkata (the city and its suburbs), West Bengal (the rest of the state), India (other states and national news), Probashi Bangali (Bengalis living outside Bengal or abroad), World. Give up to five short topic tags in English.
+Also file the story correctly. First give "place": where the main event happened (city or town, district, state, country, in English; leave a part empty if the sources do not say). Then "scope":
+- "city": a local story in Kolkata and its suburbs (Howrah, Salt Lake, New Town, Dum Dum, Behala, Jadavpur and so on): a fire, an accident, crime, civic works, the municipality, a local event.
+- "state": anywhere else in West Bengal, or about West Bengal as a whole: the state government, Nabanna, the chief minister, the state assembly, state-wide politics and parties, the Calcutta High Court, a district — even if the announcement was made in Kolkata.
+- "national": India outside West Bengal, or India as a whole: the central government, Parliament, the Supreme Court, other states, national politics, the economy, national sport.
+- "international": events outside India, including Bangladesh and the rest of South Asia, and foreign affairs where the event happened abroad.
+- "diaspora": Bengalis living outside West Bengal, in other states or abroad, as the subject of the story (their associations, festivals, troubles, migrant workers from Bengal elsewhere).
+Then "desk", which must match: city → Kolkata, state → West Bengal, national → India, international → World, diaspora → Probashi Bangali.
+Give up to five short topic tags in English.
 
 ${BENGALI_STYLE}`;
 
@@ -271,7 +301,7 @@ export async function writeJob(env, job, { onAlert } = {}) {
   }
   const bn = out.bn || {}, en = out.en || {}, hi = out.hi || {};
   if (!bn.title || wordCount(bn.body) < (job.kind === "brief" ? 50 : 80)) throw new Error("the Bengali text came back too short");
-  const desk = DESKS.includes(out.desk) ? out.desk : categorize(`${en.title} ${bn.title}`);
+  const desk = deskFor(out) || categorize(`${en.title} ${bn.title}`);
   const tags = splitTags((out.tags || []).join(",")).join(",");
   const auto = (await setting(env, "wire_autopublish", "on")) !== "off";
   const aid = id(), slug = await uniqueSlug(env, latinSlug(en.title) || `news-${aid.slice(0, 8)}`), at = now();
