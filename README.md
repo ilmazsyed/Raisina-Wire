@@ -5,8 +5,8 @@ code base: a Cloudflare Worker with a D1 database and an installable web app (PW
 **own Worker (`rashtrix`) and its own D1 database (`rashtrix-db`)**, never Raisina Wire's.
 Everything runs on free tiers; there is no paid AI API.
 
-Build brief and phases: `rashtrix/BRIEF.md`. This is **Phase 1** (the Bengali-first app). TV
-channels, the producer and PCR, the live studio and the extras are Phases 2–5.
+Build brief and phases: `rashtrix/BRIEF.md`. Built so far: **Phase 1** (the Bengali-first app) and
+**Phase 2** (the two TV channels). The producer and PCR, the live studio and the extras are Phases 3–5.
 
 ## What is in Phase 1
 
@@ -52,6 +52,44 @@ channels, the producer and PCR, the live studio and the extras are Phases 2–5.
   Google News sitemap, RSS), offline PWA.
 - **Removed:** the AI anchors, lip-sync, voice cloning and all anchor workflows and assets; Raisina
   TV (the two Rashtrix TV channels come in Phase 2); Calibrex ads; Markets; Raisina Wire's editions.
+
+## Phase 2: Rashtrix TV (two channels)
+
+- **Horizontal** (1920×1080, "Rashtrix TV") and **vertical** (1080×1920, "Rashtrix Shorts") are separate
+  channels, each switched on or off on its own, each with its own **secret output address** for OBS or
+  vMix: `/tv.html?ch=h&key=…` and `/tv.html?ch=v&key=…` (control room → **TV channels**: copy, open, or
+  make a new address, which stops the old one). In OBS: Sources → + → Browser, paste the address, set
+  the size, tick "Control audio via OBS".
+- **Sourcing** from the YouTube Data API (`src/youtube.js`): add playlists, single videos and lives per
+  channel (Shorts playlists → vertical, long videos → horizontal; the vertical channel only plays videos
+  up to three minutes, the horizontal one only those over a minute). Sources refresh every 10 minutes
+  and with **Refresh now**. Only `playlistItems.list`, `videos.list` and `playlists.list` are used (1 unit
+  each), never `search.list`; lives are added by their address and checked with `videos.list`, and go on
+  screen only when an editor switches them **on air**. A daily cap (`YOUTUBE_DAILY_UNITS`, default 8,000
+  of the free 10,000) stops refreshes before the quota runs out. Any video can be left out of a channel.
+- **One running order for everyone** (`src/tvchannel.js`): every screen (OBS outputs and the app)
+  computes the same position from the channel's clock, so they show the same thing at the same moment.
+  Control changes reach every screen within about five seconds.
+- **YouTube's controls are hidden** (`controls=0`, no keyboard, no related videos) under a layer that
+  takes every click.
+- **Horizontal jacket:** the full Rashtrix logo as the bug, LIVE, India time, a lower third (the
+  video's title or your own line), the ad box (three lines or a picture), and the ticker (your lines,
+  then the latest Rashtrix headlines). **L-band**: the picture moves up and right and headlines fill
+  the L. **Break in now**: full-screen BREAKING NEWS with an original music sting made in the browser
+  (nothing licensed). **News Update** every N videos (headline sets by desk), which becomes the
+  **Bulletin** at the top of the hour.
+- **Vertical:** Shorts carry their own jacket, so our graphics sit in its safe zones: a headline flash
+  over the left of the portrait strip, LIVE in the video's corner, the ticker at the bottom. Items the
+  app makes (News Update, breaking) get an **app-drawn jacket** in the same positions as the Shorts
+  jacket (portrait strip, logo card, maroon frame, slanted band with the ad box). **Promo cards**:
+  full-screen 9:16 pictures (uploaded, or a Google Drive link copied into the app's storage), each on
+  or skipped, shown after every N Shorts.
+- **In the app**, Watch shows the channels in the app's own player (not the YouTube page), muted until
+  the viewer taps for sound. On-air graphics stay in Bengali in every language.
+
+To switch on YouTube sourcing: Google Cloud console → APIs & Services → **Enable APIs** → *YouTube
+Data API v3* → Credentials → **Create API key** (restrict it to that API) → `npx wrangler secret put
+YOUTUBE_API_KEY`.
 
 ## Setting it up (owner)
 

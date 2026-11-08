@@ -729,4 +729,9 @@ export default {
   "Rashtrix · Excerpt": "রাষ্ট্রিক্স",
   "Contact": "যোগাযোগ",
   "Live": "লাইভ",
+  "Rashtrix TV": "রাষ্ট্রিক্স টিভি",
+  "Rashtrix Shorts": "রাষ্ট্রিক্স শর্টস",
+  "Watch live": "লাইভ দেখুন",
+  "Videos and shorts from Rashtrix.": "রাষ্ট্রিক্সের ভিডিও আর শর্টস।",
+  "Channel": "চ্যানেল",
 };

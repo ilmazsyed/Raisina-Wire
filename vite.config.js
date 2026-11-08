@@ -17,7 +17,7 @@ function precacheServiceWorker() {
         return statSync(path).isDirectory() ? walk(path) : [path];
       });
       const files = walk(outDir).map(f => "/" + relative(outDir, f).split("\\").join("/"))
-        .filter(f => !/^\/(sw\.js|_headers|og-image[\w-]*\.jpg|admin)/.test(f) && !f.includes("/admin-"))
+        .filter(f => !/^\/(sw\.js|_headers|og-image[\w-]*\.jpg|admin|tv\.html)/.test(f) && !f.includes("/admin-") && !f.includes("/tv-"))
         .map(f => (f === "/index.html" ? "/" : f))
         .sort();
       const hash = createHash("sha256");
@@ -38,7 +38,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(import.meta.dirname, "index.html"),
-        admin: resolve(import.meta.dirname, "admin.html")
+        admin: resolve(import.meta.dirname, "admin.html"),
+        tv: resolve(import.meta.dirname, "tv.html")
       }
     }
   }

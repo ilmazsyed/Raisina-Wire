@@ -1614,3 +1614,10 @@ h1,h2,h3{font-family:var(--serif)}
 .aside-link .thumb .text-card .tc-top img{width:auto;height:30px}
 :root[data-theme=dark] .mast-logo,:root[data-theme=dark] .brand-mark img,:root[data-theme=dark] .tc-top img{background:#fff;border-radius:4px}
 @media(max-width:760px){.mast-logo{height:84px}}
+
+/* Rashtrix TV on the Watch page */
+.tv-watch{margin-top:22px}
+.tv-watch-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px}
+.tv-watch-head h1{margin:4px 0 0;font:700 34px/1.2 var(--serif)}
+.tv-watch-player{position:relative;border-radius:18px;overflow:hidden;background:#000;box-shadow:0 24px 60px -24px rgba(17,17,17,.45)}
+.tv-watch-player.is-v{max-width:420px;margin:0 auto}

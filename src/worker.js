@@ -20,6 +20,9 @@ import m0016 from "../migrations/0016_media_full.sql";
 import m0017 from "../migrations/0017_article_video.sql";
 import m0020 from "../migrations/0020_oauth.sql";
 import m0021 from "../migrations/0021_rashtrix.sql";
+import m0022 from "../migrations/0022_tv.sql";
+import { CHANNELS, tvSettings, saveTvSettings, newOutputKey, setBreaking, tvState, clearTvCache, checkKey, promos as tvPromos, copyImage } from "./tvchannel.js";
+import { parseYouTubeRef, refreshSources, refreshSource, playlistTitle, ytUsage, ytReady } from "./youtube.js";
 import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { handleTts } from "./tts.js";
@@ -71,7 +74,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -205,6 +208,7 @@ const httpsUrl = (v, max = 1500) => { const s = String(v || "").trim().slice(0, 
 const videoRef = v => { const s = String(v || "").trim().slice(0, 1500); return /^https:\/\/\S+\.(mp4|webm)(\?\S*)?$/.test(s) ? s : ""; };
 const imageRef = v => { const s = String(v || "").trim().slice(0, 1500); return /^\/(media|brand)\/[\w.-]+$/.test(s) ? s : httpsUrl(s); };
 const STORY_KINDS = ["article", "rewrite", "brief"];
+const clean = (v, n) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
 const kindValue = v => STORY_KINDS.includes(v) ? v : "article";
 const langValue = v => LANGS.includes(v) ? v : "bn";
 const writerKey = v => WRITERS.some(w => w.key === v) ? v : DEFAULT_WRITER;
@@ -987,6 +991,82 @@ async function api(request, env, ctx) {
     return json({ images: results.map(r => ({ ...r, url: `/media/${r.id}.${r.mime.split("/")[1].replace("jpeg", "jpg")}` })) }, 200, { "cache-control": "no-store" });
   }
 
+  // ---- Rashtrix TV (src/tvchannel.js, src/youtube.js): two channels, sources, promos, controls.
+  const tvMatch = url.pathname.match(/^\/api\/tv\/(h|v)(\/key)?$/);
+  if (tvMatch && request.method === "GET") {
+    if (tvMatch[2]) return json({ ok: await checkKey(env, tvMatch[1], url.searchParams.get("key")) }, 200, { "cache-control": "no-store" });
+    return json(await tvState(env, tvMatch[1]), 200, { "cache-control": "no-cache" });
+  }
+  if (url.pathname.startsWith("/api/admin/tv")) {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const parts = url.pathname.split("/").slice(4).map(decodeURIComponent);   // after /api/admin/tv
+    const b = ["GET", "DELETE"].includes(request.method) ? {} : await request.json().catch(() => ({}));
+    const done = async (out = { ok: true }) => { clearTvCache(); return json(out, 200, { "cache-control": "no-store" }); };
+    try {
+      if (!parts.length && request.method === "GET") {
+        const [h, v, sources, counts, cards, usage] = await Promise.all([tvSettings(env, "h"), tvSettings(env, "v"),
+          env.DB.prepare("SELECT * FROM tv_sources ORDER BY channel, kind, created_at").all().then(r => r.results),
+          env.DB.prepare("SELECT channel, COUNT(*) AS n, SUM(excluded) AS off FROM tv_items GROUP BY channel").all().then(r => r.results),
+          tvPromos(env, true), ytUsage(env)]);
+        return json({ channels: { h, v }, sources, counts, promos: cards, usage, ready: ytReady(env) }, 200, { "cache-control": "no-store" });
+      }
+      const [first, second, third] = parts;
+      if (CHANNELS.includes(first)) {
+        if (!second && request.method === "PUT") { await saveTvSettings(env, first, b); await audit(env, user, "tv.settings", "tv", first, { keys: Object.keys(b) }); return done(); }
+        if (second === "key" && request.method === "POST") { const key = await newOutputKey(env, first); await audit(env, user, "tv.key", "tv", first, {}); return done({ ok: true, key }); }
+        if (second === "breaking" && request.method === "POST") { const br = await setBreaking(env, first, b); await audit(env, user, br ? "tv.breaking" : "tv.breaking.clear", "tv", first, br || {}); return done({ ok: true, breaking: br }); }
+        if (second === "items" && request.method === "GET") {
+          const { results } = await env.DB.prepare("SELECT i.yt_id AS ytId,i.title,i.duration,i.thumb,i.published_at AS publishedAt,i.excluded,i.playable,s.title AS source FROM tv_items i LEFT JOIN tv_sources s ON s.id=i.source_id WHERE i.channel=? ORDER BY i.published_at DESC LIMIT 400").bind(first).all();
+          return json({ items: results }, 200, { "cache-control": "no-store" });
+        }
+        if (second === "items" && third && request.method === "PUT") { await env.DB.prepare("UPDATE tv_items SET excluded=? WHERE channel=? AND yt_id=?").bind(b.excluded ? 1 : 0, first, third).run(); return done(); }
+      }
+      if (first === "refresh" && request.method === "POST") return done({ ok: true, ...(await refreshSources(env, { force: true, channel: CHANNELS.includes(b.channel) ? b.channel : null })) });
+      if (first === "sources") {
+        if (request.method === "POST") {
+          const ch = CHANNELS.includes(b.channel) ? b.channel : null, ref = parseYouTubeRef(b.ref);
+          if (!ch) return err("Choose the horizontal or the vertical channel.");
+          if (!ref) return err("Paste a YouTube playlist, video, Short or live address.");
+          const kind = b.kind === "live" || ref.kind === "live" ? "live" : ref.kind;
+          const id = randomId();
+          await env.DB.prepare("INSERT INTO tv_sources (id,channel,kind,yt_id,title) VALUES (?,?,?,?,?)").bind(id, ch, kind, ref.id, clean(b.title, 200) || (kind === "playlist" && ytReady(env) ? await playlistTitle(env, ref.id) : "")).run()
+            .catch(e => { throw new Error(/UNIQUE/.test(e.message) ? "That source is already on this channel." : e.message); });
+          await audit(env, user, "tv.source.add", "tv_source", id, { ch, kind, yt: ref.id });
+          if (ytReady(env)) { const src = await env.DB.prepare("SELECT * FROM tv_sources WHERE id=?").bind(id).first(); await refreshSource(env, src).catch(e => env.DB.prepare("UPDATE tv_sources SET last_error=? WHERE id=?").bind(String(e.message).slice(0, 200), id).run()); }
+          return done({ ok: true, id });
+        }
+        if (second && request.method === "DELETE") { await env.DB.batch([env.DB.prepare("DELETE FROM tv_items WHERE source_id=?").bind(second), env.DB.prepare("DELETE FROM tv_sources WHERE id=?").bind(second)]); await audit(env, user, "tv.source.delete", "tv_source", second, {}); return done(); }
+        if (second && request.method === "PUT") {
+          const src = await env.DB.prepare("SELECT * FROM tv_sources WHERE id=?").bind(second).first();
+          if (!src) return err("Not found.", 404);
+          // One live on air per channel.
+          if (b.onAir) await env.DB.prepare("UPDATE tv_sources SET on_air=0 WHERE channel=?").bind(src.channel).run();
+          await env.DB.prepare("UPDATE tv_sources SET active=?, on_air=?, title=? WHERE id=?").bind(b.active === undefined ? src.active : b.active ? 1 : 0, b.onAir === undefined ? src.on_air : b.onAir ? 1 : 0, b.title !== undefined ? clean(b.title, 200) : src.title, second).run();
+          await audit(env, user, b.onAir !== undefined ? (b.onAir ? "tv.live.on" : "tv.live.off") : "tv.source.edit", "tv_source", second, b);
+          return done();
+        }
+      }
+      if (first === "promos") {
+        if (request.method === "POST") {
+          let image = String(b.image || "").trim();
+          if (!/^\/media\/[\w.-]+$/.test(image)) image = await copyImage(env, image, user.id);
+          const { n } = await env.DB.prepare("SELECT COALESCE(MAX(sort),0)+1 AS n FROM tv_promos").first();
+          await env.DB.prepare("INSERT INTO tv_promos (id,title,image_url,seconds,sort) VALUES (?,?,?,?,?)").bind(randomId(), clean(b.title, 120), image, Math.max(3, Math.min(30, parseInt(b.seconds, 10) || 8)), n).run();
+          return done();
+        }
+        if (second && request.method === "DELETE") { await env.DB.prepare("DELETE FROM tv_promos WHERE id=?").bind(second).run(); return done(); }
+        if (second && request.method === "PUT") {
+          const p = await env.DB.prepare("SELECT * FROM tv_promos WHERE id=?").bind(second).first();
+          if (!p) return err("Not found.", 404);
+          await env.DB.prepare("UPDATE tv_promos SET active=?, seconds=?, sort=? WHERE id=?").bind(b.active === undefined ? p.active : b.active ? 1 : 0, b.seconds ? Math.max(3, Math.min(30, parseInt(b.seconds, 10) || p.seconds)) : p.seconds, b.sort ?? p.sort, second).run();
+          return done();
+        }
+      }
+      return err("Not found.", 404);
+    } catch (e) { return err(e.message); }
+  }
+
   // ---- Audience events from readers' browsers (src/audience.js); daily totals only
   if (url.pathname === "/api/m" && request.method === "POST") {
     if (!BOT_UA.test(request.headers.get("user-agent") || "")) {
@@ -1355,6 +1435,8 @@ async function scheduled(env) {
   await step("wire desk", () => runWireDesk(env, { onAlert: a => storyAlert(env, null, null, { ...a, status: "published", kind: "rewrite", published_at: new Date().toISOString() }) }));
   await step("wix feed", () => syncWixFeed(env));
   await step("wix backfill", () => backfillWix(env));
+  // Rashtrix TV: refresh YouTube sources (each at most every ten minutes).
+  await step("tv sources", () => refreshSources(env));
 }
 // 9 am and 9 pm India time, every day (unless switched off in the control room).
 // The settings row makes each one send exactly once, even if two cron runs overlap.

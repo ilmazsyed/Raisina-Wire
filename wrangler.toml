@@ -51,5 +51,9 @@ GEMINI_DAILY_LIMIT = "200"
 # Defaults: bn-IN-Chirp3-HD-Sulafat (female) and bn-IN-Chirp3-HD-Charon (male); override with
 # TTS_VOICE_BN_FEMALE, TTS_VOICE_BN_MALE, TTS_VOICE_EN_FEMALE … here.
 
+# Rashtrix TV (src/youtube.js): needs the YOUTUBE_API_KEY secret (YouTube Data API v3, free quota).
+# Units a day the TV may use refreshing sources (the free quota is 10,000).
+YOUTUBE_DAILY_UNITS = "8000"
+
 [ai]
 binding = "AI"

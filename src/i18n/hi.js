@@ -635,4 +635,8 @@ export default {
   "Live": "लाइव",
   "Advertising & contact": "विज्ञापन और संपर्क",
   "New to Rashtrix?": "राष्ट्रिक्स पर नए हैं?",
+  "Rashtrix TV": "राष्ट्रिक्स टीवी",
+  "Rashtrix Shorts": "राष्ट्रिक्स शॉर्ट्स",
+  "Watch live": "लाइव देखें",
+  "Channel": "चैनल",
 };

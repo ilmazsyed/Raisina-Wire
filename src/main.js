@@ -1,4 +1,6 @@
 import "./style.css";
+import "./tv.css";
+import { mountTV } from "./tvplayer.js";
 import { brandMark, fullLogo, BRAND } from "./brand.js";
 import { WRITERS, writer, setGuestWriters } from "./writers.js";
 import { ABOUT, LEGAL, LEGAL_ORDER, LEGAL_UPDATED } from "./legal.js";
@@ -365,6 +367,7 @@ async function route({ restoreY = null } = {}) {
   const view = views[r.page] || viewNotFound;
   // Lists that mix in control-room articles wait briefly for them, so the lead story doesn't flash.
   stopListening();
+  if (!["watch", "tv"].includes(r.page) && tvInstance) { tvInstance.destroy(); tvInstance = null; }
   if (["home", "editions", "search", "author", "edition", "article", "tag", "my", "desk", "briefs", "live"].includes(r.page)) {
     await Promise.race([Promise.all([articlesReady, writersReady]), new Promise(res => setTimeout(res, 1200))]);
     if (!articlesSettled && ["home", "desk", "briefs", "live", "author"].includes(r.page)) state.drewWithoutArticles = true;
@@ -1118,6 +1121,7 @@ async function onAction(e) {
   if (a === "signout") { toggleAccountMenu(false); signOut(); }
   if (a === "listen") toggleListening();
   if (a === "voice") toggleVoice();
+  if (a === "tv-ch") { store.set("rw-tv-ch", el.dataset.ch); $$("[data-action=tv-ch]").forEach(b => b.setAttribute("aria-selected", String(b === el))); $("#tvWatch")?.classList.toggle("is-v", el.dataset.ch === "v"); mountWatchTV(); }
   if (a === "short") openShorts(Number(el.dataset.index) || 0);
   if (a === "play-video") playInline(el.dataset.id);
   if (a === "carousel") { const c = el.closest("section")?.querySelector(".vcarousel"); c?.scrollBy({ left: Number(el.dataset.dir) * c.clientWidth * .85, behavior: "smooth" }); }
@@ -1607,7 +1611,10 @@ function viewWatch() {
   const more = Object.entries(byCat).filter(([, l]) => l.length < 2).flatMap(([, l]) => l);
   const popular = films.filter(m => m.plays > 0).sort((a, b) => b.plays - a.plays).slice(0, 12);
   $("#view").innerHTML = `<div class="watch">
-    <div class="wrap"><div class="page-head"><div><div class="kicker">Watch</div><h1>Videos</h1><p>Videos and shorts from Rashtrix. Live TV is coming soon.</p></div></div>
+    <div class="wrap"><section class="tv-watch"><div class="tv-watch-head"><div><div class="kicker"><span class="dot-live"></span> Rashtrix TV</div><h1>Watch live</h1></div>
+      <div class="pill-tabs" role="tablist" aria-label="Channel">${[["h", "Rashtrix TV"], ["v", "Rashtrix Shorts"]].map(([k, l]) => `<button type="button" role="tab" data-action="tv-ch" data-ch="${k}" aria-selected="${k === tvChannel()}">${l}</button>`).join("")}</div></div>
+      <div class="tv-watch-player ${tvChannel() === "v" ? "is-v" : ""}" id="tvWatch" data-no-tr></div></section>
+      <div class="page-head"><div><div class="kicker">Watch</div><h2>Videos</h2><p>Videos and shorts from Rashtrix.</p></div></div>
       ${all == null ? `<div class="skeleton" style="height:260px;margin-top:30px"></div>` : `
       <div class="w-tools"><div class="chips" role="tablist">${["All", ...cats.map(([c]) => c)].map(c => `<button class="chip" type="button" data-action="w-cat" data-cat="${esc(c)}" aria-pressed="${c === "All"}">${esc(c === "All" ? "All" : CAT_NAMES[c] || c)}</button>`).join("")}</div>
         <label class="w-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input type="search" id="wSearch" placeholder="Search videos" aria-label="Search videos"></label></div>
@@ -1633,6 +1640,14 @@ function viewWatch() {
     if (k >= 0) openShorts(k);
     else if (films.some(m => m.id === want)) openCinema(want, "latest");
   }
+  mountWatchTV();
+}
+// Rashtrix TV in the app: the channel's own player (not the YouTube page of the stream).
+const tvChannel = () => store.get("rw-tv-ch", "h") === "v" ? "v" : "h";
+let tvInstance = null;
+function mountWatchTV() {
+  const host = $("#tvWatch"); if (!host) return;
+  tvInstance?.destroy(); tvInstance = mountTV(host, { channel: tvChannel() });
 }
 function filterWatch(q, cat) {
   const rows = $("#wRows"), res = $("#wResults"); if (!rows) return;
