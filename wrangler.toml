@@ -44,7 +44,7 @@ SITE_URL = ""
 # Rashtrix's Wix blog, imported and kept in sync (src/wix.js).
 WIX_SITE = "https://www.rashtrix.live"
 # The wire desk (src/wiredesk.js): needs the GEMINI_API_KEY secret (Google AI Studio, free tier).
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.8-flash"
 # Calls a day the desk may make (keep under the free tier's daily limit for the model).
 GEMINI_DAILY_LIMIT = "200"
 # "Listen" voices (Google Cloud Text-to-Speech, Chirp 3 HD; needs GOOGLE_TTS_API_KEY).

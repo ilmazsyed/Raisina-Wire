@@ -21,7 +21,10 @@ const now = () => new Date().toISOString();
 const setting = async (env, key, fallback) => (await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(key).first())?.value ?? fallback;
 
 export const wireReady = env => Boolean(env.GEMINI_API_KEY);
-export const geminiModel = env => env.GEMINI_MODEL || "gemini-2.5-flash";
+export const geminiModel = env => env.GEMINI_MODEL || "gemini-3.8-flash";
+// When Google retires a model it answers 404 and names the one to use; the desk switches to it
+// by itself and remembers the choice (settings: gemini_model), so a retirement never stops it.
+async function activeModel(env) { return (await setting(env, "gemini_model", "")) || geminiModel(env); }
 const DAILY_LIMIT = env => Number(env.GEMINI_DAILY_LIMIT || 200);
 const WAIT = async env => Number(await setting(env, "wire_wait_minutes", env.WIRE_WAIT_MINUTES || 30));
 const MAX_AGE_H = 24;   // items and queued jobs older than this are not written up
@@ -32,7 +35,7 @@ export async function wireSettings(env) {
     autopublish: (await setting(env, "wire_autopublish", "on")) !== "off",
     paused: (await setting(env, "wire_paused", "off")) === "on",
     waitMinutes: await WAIT(env),
-    model: geminiModel(env), dailyLimit: DAILY_LIMIT(env), ready: wireReady(env)
+    model: await activeModel(env), dailyLimit: DAILY_LIMIT(env), ready: wireReady(env)
   };
 }
 export async function saveWireSettings(env, b) {
@@ -181,8 +184,9 @@ Sources (${items.length}):
 ${items.map((it, i) => `--- Source ${i + 1} (${it.lang}) ---\nHeadline: ${it.title}\nPublished: ${it.published_at || "unknown"}\n${it.text || it.summary || ""}`).join("\n\n")}`;
 }
 
-async function callGemini(env, text) {
-  const endpoint = env.GEMINI_ENDPOINT || `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel(env))}:generateContent`;
+async function callGemini(env, text, retried = false) {
+  const model = await activeModel(env);
+  const endpoint = env.GEMINI_ENDPOINT || `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const r = await fetch(endpoint, {
     method: "POST", signal: AbortSignal.timeout(60000),
     headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
@@ -200,7 +204,15 @@ async function callGemini(env, text) {
     await blockUntil(env, daily ? nextPacificMidnight() : new Date(Date.now() + 2 * 60e3).toISOString());
     const e = new Error(daily ? "daily free quota used up; waiting for the reset" : "rate limited; retrying shortly"); e.retry = true; throw e;
   }
-  if (!r.ok) { const e = new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 200)}`); e.retry = r.status >= 500; throw e; }
+  if (!r.ok) {
+    const body = await r.text();
+    const next = r.status === 404 && !retried && body.match(/use (?:models\/)?(gemini-[\w.-]+)/i)?.[1];
+    if (next && next !== model) {
+      await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('gemini_model',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(next).run();
+      return callGemini(env, text, true);
+    }
+    const e = new Error(`Gemini ${r.status}: ${body.slice(0, 200)}`); e.retry = r.status >= 500; throw e;
+  }
   const d = await r.json();
   const out = d.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "";
   if (!out) { const e = new Error(`Gemini returned nothing (${d.candidates?.[0]?.finishReason || d.promptFeedback?.blockReason || "no reason"})`); throw e; }
@@ -275,6 +287,8 @@ export async function runWireDesk(env, { onAlert, budget = 2 } = {}) {
   if (!wireReady(env) || s.paused) return { fetched, grouped, written: 0, note: !wireReady(env) ? "GEMINI_API_KEY not set" : "paused" };
   const q = await quota(env);
   if (!q.left) return { fetched, grouped, written: 0, note: q.blockedUntil ? `waiting until ${q.blockedUntil}` : "daily limit reached" };
+  // Stories that failed only because a model was retired go back to the queue once.
+  await env.DB.prepare("UPDATE wire_jobs SET status='queued', attempts=0, error='' WHERE status='failed' AND error LIKE 'Gemini 404:%no longer available%'").run();
   // Stuck jobs (a Worker that stopped mid-way) go back to the queue after ten minutes.
   await env.DB.prepare("UPDATE wire_jobs SET status='queued' WHERE status='working' AND updated_at<?").bind(new Date(Date.now() - 10 * 60e3).toISOString()).run();
   // Two-source stories first, then the oldest.
