@@ -1862,3 +1862,12 @@ html:is([data-lang=bn],[data-lang=hi]) :is(.sf-col h3,.sf-form h3){font-size:15p
 .related-row .kicker{font-size:12px}
 .related-row b{font:600 17px/1.4 var(--serif);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .related-row .meta{font-size:12px;color:var(--muted)}
+
+/* LIVE TV stays in English, with "TV" shown on phones too. */
+@media(max-width:760px){.live-tv-btn .live-tv-word{display:inline}.live-tv-btn svg{display:none}}
+/* Watch: the channel's Shorts row */
+.w-short-face{display:block;aspect-ratio:9/16;border-radius:14px;overflow:hidden;background:#111}
+.w-short-face img{width:100%;height:100%;object-fit:cover;display:block}
+a.w-short{color:inherit;text-decoration:none}
+a.w-short b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:6px;font-size:13px;line-height:1.35}
+a.w-short{aspect-ratio:auto;overflow:visible;background:none;border-radius:0}

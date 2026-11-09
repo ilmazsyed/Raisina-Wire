@@ -1035,6 +1035,15 @@ async function api(request, env, ctx) {
     return json({ images: results.map(r => ({ ...r, url: `/media/${r.id}.${r.mime.split("/")[1].replace("jpeg", "jpg")}` })) }, 200, { "cache-control": "no-store" });
   }
 
+  // ---- The Watch page's videos: the channels' YouTube videos, each filed under a desk from its
+  // title (long videos from the horizontal channel, Shorts from the vertical one).
+  if (url.pathname === "/api/tv/videos" && request.method === "GET") {
+    const { results } = await env.DB.prepare(`SELECT i.channel, i.yt_id AS id, i.title, i.thumb, i.duration, i.published_at AS publishedAt FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
+      WHERE i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0 ORDER BY i.published_at DESC LIMIT 240`).all();
+    const seen = new Set(), videos = [];
+    for (const v of results) { if (seen.has(v.id)) continue; seen.add(v.id); videos.push({ ...v, short: v.channel === "v" && v.duration <= 180, category: categorize(v.title) }); }
+    return json({ videos }, 200, { "cache-control": "public, max-age=120" });
+  }
   // ---- The Shorts tab: YouTube Shorts from the vertical channel's sources.
   if (url.pathname === "/api/shorts" && request.method === "GET") return json({ shorts: await shortsList(env) }, 200, { "cache-control": "public, max-age=60" });
   // ---- Likes for the video on air (the app player's like button). One per device, kept on the

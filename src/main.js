@@ -161,7 +161,7 @@ function renderShell() {
     <div class="utility">
       <div class="utility-left"><span id="today"></span><button class="fresh-btn" id="freshBtn" type="button" data-action="refresh-all" aria-label="Refresh the news">${ICON_REFRESH}<span id="freshText">Updated just now</span></button></div>
       <div class="utility-right">
-        <a class="live-tv-btn" href="/watch" aria-label="Live TV"><span class="live-dot" aria-hidden="true"></span><span class="live-word">LIVE</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2.5" y="6" width="19" height="13" rx="2"/><path d="M8 2.5l4 3.5 4-3.5"/></svg><span class="live-tv-word">TV</span></a>
+        <a class="live-tv-btn" href="/watch" aria-label="LIVE TV" data-no-tr><span class="live-dot" aria-hidden="true"></span><span class="live-word">LIVE</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2.5" y="6" width="19" height="13" rx="2"/><path d="M8 2.5l4 3.5 4-3.5"/></svg><span class="live-tv-word">TV</span></a>
         <details class="lang-menu" id="langMenu"><summary class="icon-btn lang-btn" aria-label="Language" title="Language">${ICON_GLOBE}<span lang="${lang}">${LANGUAGES[lang].short}</span></summary>
           <div class="lang-pop glass" id="langPop" data-no-tr role="menu">${languageLinks()}</div></details>
         <button class="icon-btn" type="button" data-action="theme" aria-label="Switch between light and dark" title="Light or dark"><svg class="i-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg><svg class="i-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
@@ -187,7 +187,7 @@ function renderShell() {
       <div class="sf-brand-text">
         <p class="sf-tagline" lang="bn" data-no-tr>${BRAND.tagline.split("।").map((x, i, all) => `<span>${x.trim()}${i < all.length - 1 ? " ।" : ""}</span>`).join("")}</p>
         <p class="sf-sub"><span>Kolkata</span><i aria-hidden="true">·</i><span>West Bengal</span><i aria-hidden="true">·</i><span>India</span><i aria-hidden="true">·</i><span>World</span></p>
-        <div class="sf-cta"><a class="live-tv-btn" href="/watch"><span class="live-dot" aria-hidden="true"></span><span class="live-word">LIVE</span><span class="live-tv-word">TV</span></a><a class="sf-install install-link" href="#" data-action="install">Install the app</a></div>
+        <div class="sf-cta"><a class="live-tv-btn" href="/watch" data-no-tr><span class="live-dot" aria-hidden="true"></span><span class="live-word">LIVE</span><span class="live-tv-word">TV</span></a><a class="sf-install install-link" href="#" data-action="install">Install the app</a></div>
       </div>
     </div>
     <div class="sf-grid">
@@ -1532,7 +1532,15 @@ async function viewShorts() {
   if (want) document.getElementById(`s-${want}`)?.scrollIntoView({ block: "start" });
 }
 async function loadMedia() {
-  try { const r = await fetch("/api/media"); state.media = r.ok ? (await r.json()).items || [] : []; } catch { state.media = []; }
+  const [media, tv] = await Promise.all([
+    fetch("/api/media").then(r => r.ok ? r.json() : null).then(d => d?.items || []).catch(() => []),
+    fetch("/api/tv/videos").then(r => r.ok ? r.json() : null).then(d => d?.videos || []).catch(() => [])
+  ]);
+  // The channel's long YouTube videos sit with the desk's own videos, filed by desk.
+  const yt = tv.filter(v => !v.short).map(v => ({ id: `yt-${v.id}`, title: v.title, mediaType: "video", mediaUrl: `https://www.youtube.com/watch?v=${v.id}`,
+    thumbnailUrl: v.thumb || `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`, category: v.category, publishedAt: v.publishedAt, duration: v.duration, plays: 0, fromChannel: true }));
+  state.media = [...media, ...yt.filter(v => !media.some(m => String(m.mediaUrl || "").includes(v.id.slice(3))))];
+  state.tvShorts = tv.filter(v => v.short);
   if (["tv", "watch"].includes(parseRoute().page)) viewWatch();
   renderHomeMedia();
 }
@@ -1693,8 +1701,9 @@ function viewWatch() {
   const because = last ? films.filter(m => m.id !== last.id && m.category === last.category && !(prog[m.id]?.t / prog[m.id]?.d > 0.94)) : [];
   const byCat = {};
   films.forEach(m => (byCat[m.category || "More"] ||= []).push(m));
-  const cats = Object.entries(byCat).filter(([, l]) => l.length >= 2).sort((a, b) => b[1].length - a[1].length);
-  const more = Object.entries(byCat).filter(([, l]) => l.length < 2).flatMap(([, l]) => l);
+  // A row per desk, in the site's desk order; anything without a desk goes under More videos.
+  const cats = [...DESKS.filter(d => byCat[d]?.length).map(d => [d, byCat[d]]), ...Object.entries(byCat).filter(([c, l]) => !DESKS.includes(c) && c !== "More" && l.length >= 2)];
+  const more = Object.entries(byCat).filter(([c, l]) => !cats.some(([k]) => k === c)).flatMap(([, l]) => l);
   const popular = films.filter(m => m.plays > 0).sort((a, b) => b.plays - a.plays).slice(0, 12);
   $("#view").innerHTML = `<div class="watch">
     <div class="wrap"><section class="tv-watch"><div class="tv-watch-head"><div><div class="kicker"><span class="dot-live"></span> Rashtrix TV</div><h1>Watch live</h1></div>
@@ -1706,6 +1715,7 @@ function viewWatch() {
         <label class="w-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input type="search" id="wSearch" placeholder="Search videos" aria-label="Search videos"></label></div>
       <div id="wRows">
         ${sh.length ? `<section class="w-row w-shorts" id="shorts"><div class="w-row-head"><h2>Shorts</h2><span class="meta">${sh.length}</span></div><div class="w-rail">${sh.map((m, i) => `<button class="w-short" type="button" data-action="short" data-index="${i}" aria-label="Play: ${esc(m.title)}">${thumbImg(m.thumbnailUrl, i < 5)}<span class="play-badge" aria-hidden="true"></span><b>${esc(m.title)}</b></button>`).join("")}</div></section>` : ""}
+        ${(state.tvShorts || []).length ? `<section class="w-row w-shorts" data-row="ytshorts"><div class="w-row-head"><h2>Rashtrix Shorts</h2><a class="link-gold" href="${withLang("/shorts")}">All shorts →</a></div><div class="w-rail">${state.tvShorts.slice(0, 30).map(v => `<a class="w-short" href="${withLang(`/shorts?v=${encodeURIComponent(v.id)}`)}"><span class="w-short-face"><img src="${esc(v.thumb || `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`)}" alt="" loading="lazy"></span><b data-no-tr>${esc(v.title)}</b></a>`).join("")}</div></section>` : ""}
         ${wRow("continue", "Continue watching", cont)}
         ${wRow("latest", "Latest videos", films.slice(0, 14))}
         ${last && because.length ? wRow("because", `Because you watched ${last.title.length > 40 ? last.title.slice(0, 38) + "…" : last.title}`, because) : ""}
