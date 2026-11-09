@@ -107,39 +107,35 @@ export function buildLoop(s, videos, cards = []) {
   }
   if (!videos.length && cards.length && s.promosOn) cards.forEach(p => loop.push({ type: "promo", id: p.id, image: p.image, title: p.title, dur: p.seconds }));
   if (!loop.length) loop.push({ type: "flash", dur: FLASH_SECONDS, n: 0 });
-  loop.forEach((x, i) => { x.sting = hash(`${x.ytId || x.type}:${i}`) % 3 === 0; });
+  // A stinger after every video (on the flash that follows it); promos get one now and then.
+  loop.forEach((x, i) => { x.sting = x.type === "flash" ? true : x.type === "promo" ? hash(`${x.id}:${i}`) % 3 === 0 : false; });
   return loop;
 }
-// Bulletin time in [0, x): three minutes at the start of every half hour.
-const bulletinMs = x => Math.floor(x / HALF_HOUR) * BULLETIN_MS + Math.min(x % HALF_HOUR, BULLETIN_MS);
-// Where the channel is now, and what follows for the next `ahead` seconds. Loop time runs only
-// outside bulletins, so after a bulletin the loop resumes where it stopped (a video cut by the
-// bulletin carries on from the same second).
-export function scheduleAt(loop, epoch, t = Date.now(), ahead = 5400) {
+// Every video plays whole, from its first second to its last. The schedule is walked from the
+// channel's start (or a saved point on the way): items follow one another, and once a half hour
+// has passed the bulletin goes on at the next break, never in the middle of a video. What was on
+// air when the loop restarted for a new video ("hold") plays out first.
+const nextHalf = x => Math.floor(x / HALF_HOUR) * HALF_HOUR + HALF_HOUR;
+export function scheduleAt(loop, epoch, t = Date.now(), ahead = 5400, opts = {}) {
+  const out = [], end = t + ahead * 1000;
+  for (const h of opts.hold || []) if (h.start + h.dur * 1000 > t && h.start < end) out.push(h);
   const total = loop.reduce((n, x) => n + x.dur, 0) * 1000;
-  if (!total) return [];
-  const out = [], end = t + ahead * 1000, bulletin = start => ({ type: "bulletin", start, dur: BULLETIN_MS / 1000, sting: true });
-  let at = t;
-  const ws = Math.floor(at / HALF_HOUR) * HALF_HOUR;
-  if (at - ws < BULLETIN_MS) { out.push(bulletin(ws)); at = ws + BULLETIN_MS; }
-  // Position in the loop (loop time leaves the bulletins out).
-  let lt = ((at - epoch - (bulletinMs(at) - bulletinMs(epoch))) % total + total) % total, i = 0;
-  while (lt >= loop[i].dur * 1000) { lt -= loop[i].dur * 1000; i = (i + 1) % loop.length; }
-  let into = lt;
-  // Each piece keeps a fixed start: an item cut by a bulletin resumes as a new piece that starts
-  // when the bulletin ends, from the second it stopped at ("in").
-  const lastEnd = Math.floor(at / HALF_HOUR) * HALF_HOUR + BULLETIN_MS;
-  let runStart = at - into < lastEnd ? lastEnd : at - into, inMs = at - into < lastEnd ? into - (at - lastEnd) : 0;
-  for (let n = 0; at < end && n < 500; n++) {
-    const x = loop[i], left = x.dur * 1000 - into, next = Math.floor(at / HALF_HOUR) * HALF_HOUR + HALF_HOUR;
-    if (at + left <= next) {
-      out.push({ ...x, start: runStart, in: inMs / 1000, dur: (at + left - runStart) / 1000 });
-      at += left; into = 0; i = (i + 1) % loop.length; runStart = at; inMs = 0;
-    } else {
-      out.push({ ...x, start: runStart, in: inMs / 1000, dur: (next - runStart) / 1000, cut: true });
-      into += next - at; out.push(bulletin(next)); at = next + BULLETIN_MS; runStart = at; inMs = into;
+  if (!total) return out;
+  const a = opts.anchor && opts.anchor.epoch === epoch && opts.anchor.len === loop.length && opts.anchor.at <= t ? opts.anchor : null;
+  let at = a ? a.at : epoch, i = a ? a.i % loop.length : 0, due = a ? a.due : nextHalf(epoch), steps = 0, mark = null;
+  while (at < end && steps < 400000) {
+    steps++;
+    if (at >= due) {
+      if (at + BULLETIN_MS > t) out.push({ type: "bulletin", start: at, dur: BULLETIN_MS / 1000, sting: true });
+      due = nextHalf(at); at += BULLETIN_MS; continue;
     }
+    const x = loop[i], next = at + x.dur * 1000;
+    if (next > t) out.push({ ...x, start: at, in: 0 });
+    else if (steps % 500 === 0) mark = { epoch, len: loop.length, at: next, i: (i + 1) % loop.length, due };
+    at = next; i = (i + 1) % loop.length;
   }
+  // A saved point near now, so the next walk is short.
+  out.anchor = mark && steps > 1500 ? mark : null;
   return out;
 }
 
@@ -172,10 +168,14 @@ export async function tvState(env, ch) {
   ]);
   const headlines = stories.map(a => ({ text: a.title, desk: a.category, kind: a.kind }));
   const bulletin = stories.slice(0, 6).map(r => ({ title: r.title, desk: r.category, kind: r.kind, text: firstWords(r.body) }));
+  const schedule = s.on ? scheduleAt(buildLoop(s, videos, cards), s.epoch, Date.now(), 5400, { hold: s.hold, anchor: s.anchor }) : [];
+  // Keep a point near now (and drop a hold that has played out), so the walk stays short.
+  const holdOver = (s.hold || []).length && (s.hold || []).every(h => h.start + h.dur * 1000 < Date.now());
+  if (schedule.anchor || holdOver) { const fresh = await tvSettings(env, ch); if (schedule.anchor && fresh.epoch === s.epoch) fresh.anchor = schedule.anchor; if (holdOver) delete fresh.hold; await putSettings(env, ch, fresh); }
   const value = {
     channel: ch, on: s.on, serverTime: Date.now(),
     live: live || null,
-    schedule: s.on ? scheduleAt(buildLoop(s, videos, cards), s.epoch) : [],
+    schedule: s.on ? schedule : [],
     breaking: s.breaking && Date.now() - Date.parse(s.breaking.at) < (s.breaking.seconds + 90) * 1000 ? s.breaking : null,
     lband: ch === "h" ? s.lband : null, lowerThird: s.lowerThird || "", band: s.band || "", appStream: s.appStream || null,
     ad: s.ad, sets: s.sets, setSeconds: s.setSeconds,

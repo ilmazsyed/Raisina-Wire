@@ -1824,3 +1824,13 @@ html:is([data-lang=bn],[data-lang=hi]) :is(.sf-col h3,.sf-form h3){font-size:15p
 /* Home: the Shorts row sits directly above the Latest cards. */
 .latest-col{display:flex;flex-direction:column;gap:16px;min-width:0}
 .latest-col .shorts-rail{margin:0}
+
+/* The latest-updates column: compact cards, live coverage first. */
+.timeline.compact{margin-top:10px;gap:10px;padding-left:14px}
+.timeline.compact a:before{left:-20px;top:4px;width:8px;height:8px}
+.timeline.compact .when{font-size:11px}
+.timeline.compact b{margin-top:2px;font-size:14px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.timeline.compact .tl-live b{color:var(--red)}
+.timeline.compact .tl-live .when{color:var(--red);font-weight:700}
+.timeline.compact .tl-live .dot-live{display:inline-block;width:7px;height:7px;margin-right:5px;vertical-align:1px}
+.live-rail{padding-bottom:14px}

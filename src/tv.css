@@ -213,3 +213,16 @@ body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 .tv-liveclock .tv-live{position:static}
 .tv-liveclock .tv-clock{position:static;padding:6px 14px;border-radius:8px;background:rgba(255,255,255,.94);font:700 30px Montserrat,"Hind Siliguri",sans-serif;color:#111;box-shadow:0 4px 14px rgba(0,0,0,.18)}
 .tvp-v .tv-liveclock{top:60px;right:60px}
+
+/* The sound note sits at the foot of the picture; like and share sit in a bar under it. */
+.tvp-sound{left:50%;bottom:58px;top:auto;transform:translateX(-50%);padding:6px 12px;font-size:12.5px}
+.tvp-sound[hidden]{display:none}
+.tvp-actions{display:none}
+.tvp-bar{display:flex;justify-content:flex-end;gap:10px;padding:10px 12px;background:#111}
+.tvp-bar button{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:8px 14px;background:#1d1d1d;color:#fff;font:700 13.5px "Hind Siliguri",sans-serif;cursor:pointer}
+.tvp-bar svg{width:17px;height:17px;fill:currentColor}
+.tvp-bar .tvp-like span{min-width:1ch;opacity:.85;font-weight:600}
+.tvp-bar .tvp-like.on{background:#AA0404;border-color:#AA0404}
+.tvp-bar .tvp-like[hidden]{display:none}
+/* While a tap is needed, the poster is lifted so YouTube's own play button shows. */
+.tvp.yt-tap .tvs-poster{display:none}

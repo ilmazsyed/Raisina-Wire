@@ -491,10 +491,19 @@ function viewHome() {
     const c = document.getElementById("lcCount"); if (c) c.textContent = `${digits(i + 1)} / ${digits(cards.length)}`;
   }, { passive: true });
 }
+// The latest-updates column: running live coverage first, each headed by its newest update, then
+// the wire's own reports and briefs, newest first; seven cards in all, no photos.
+const firstLine = t => { const x = String(t || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(); return (x.split(/(?<=[।.!?])\s/)[0] || x).slice(0, 160); };
 function renderRail() {
   const host = $("#rail"); if (!host) return;
-  const items = stories().slice(0, 9);
-  host.innerHTML = items.length ? `<div class="timeline">${items.map(i => `<a href="${edHref(i)}"><span class="when">${clock(i.publishedAt)} · ${esc(i.category)}</span><b>${esc(i.title)}</b></a>`).join("")}</div>` : wireEmpty();
+  const live = (state.coverageAll || []).filter(d => d?.item).map(d => {
+    const u = d.updates?.[0], text = u ? (u.title || firstLine(u.body)) : d.item.title;
+    return `<a class="tl-live" href="${withLang(`/coverage/${encodeURIComponent(d.item.slug)}`)}"><span class="when"><i class="dot-live"></i>Live · <span data-no-tr>${esc(d.item.title)}</span></span><b>${esc(text)}</b></a>`;
+  }).slice(0, 7);
+  const wire = stories().filter(isWire).sort((x, y) => (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0)).slice(0, 7 - live.length)
+    .map(i => `<a href="${edHref(i)}"><span class="when">${clock(i.publishedAt)} · ${esc(i.category)}</span><b>${esc(i.title)}</b></a>`);
+  const items = [...live, ...wire];
+  host.innerHTML = items.length ? `<div class="timeline compact">${items.join("")}</div>` : wireEmpty();
 }
 function renderHomeDesks(used = new Set()) {
   for (const d of DESKS) {
@@ -1215,7 +1224,7 @@ async function loadCoverage() {
     state.coverageAll = all.filter(d => d?.item && d.item.status === "live");
     state.coverageLead = state.coverageAll[0] || null;
   } catch { state.coverage ||= []; } // keep what is shown when a refresh fails
-  renderTicker(); renderLiveBanner(); renderLiveNow(); renderNav(parseRoute());
+  renderTicker(); renderLiveBanner(); renderLiveNow(); renderRail(); renderNav(parseRoute());
 }
 let bannerTimer;
 // One live coverage as a broadcast tile: the coverage photo with a blinking LIVE tab, the headline,

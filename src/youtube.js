@@ -4,6 +4,7 @@
 // state is read with videos.list. Every source is refreshed at most every 10 minutes (or at once
 // with "Refresh now"), which keeps a dozen playlists well under 3,000 units a day.
 
+import { tvState } from "./tvchannel.js";
 const now = () => new Date().toISOString();
 const pacificDay = (t = Date.now()) => new Date(t - 8 * 3600e3).toISOString().slice(0, 10);
 export const ytReady = env => Boolean(env.YOUTUBE_API_KEY);
@@ -99,7 +100,7 @@ export async function refreshSource(env, src) {
   const at = now(), stmts = [];
   // Both channels play the newest video first: a video a channel has not had before restarts its
   // running order, so the new one goes on next.
-  let fresh = 0;
+  let fresh = 0, onAir = null;
   if (src.kind !== "live" && vids.length) {
     const have = new Set();
     for (let i = 0; i < vids.length; i += 50) {
@@ -108,6 +109,7 @@ export async function refreshSource(env, src) {
     }
     const fits = sec => src.channel === "v" ? sec > 0 && sec <= 180 : sec >= 61;
     fresh = vids.filter(v => !have.has(v.id) && fits(isoSeconds(v.contentDetails?.duration)) && v.snippet?.liveBroadcastContent === "none").length;
+    if (fresh) onAir = await tvState(env, src.channel).catch(() => null);
   }
   const order = new Map(ids.map((id, i) => [id, i]));
   let liveNow = 0, liveVideo = "";
@@ -125,8 +127,18 @@ export async function refreshSource(env, src) {
   stmts.push(env.DB.prepare("UPDATE tv_sources SET last_refresh=?, last_error=?, item_count=?, live_now=?, live_video=?, title=CASE WHEN title='' THEN ? ELSE title END WHERE id=?").bind(at, dropped && !vids.length ? NOT_OWN.slice(0, 200) : "", src.kind === "live" ? 0 : vids.length, liveNow, liveVideo, String(title).slice(0, 200), src.id));
   for (let i = 0; i < stmts.length; i += 80) await env.DB.batch(stmts.slice(i, i + 80));
   if (fresh) {
+    // The loop restarts at the new video once the item on air now has played to its end (a
+    // video is followed by its flash first), so nothing is cut.
     const key = `tv:${src.channel}`, row = await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(key).first();
-    if (row) { const tv = JSON.parse(row.value || "{}"); tv.epoch = Date.now(); await env.DB.prepare("UPDATE settings SET value=? WHERE key=?").bind(JSON.stringify(tv), key).run(); }
+    if (row) {
+      const tv = JSON.parse(row.value || "{}"), t = Date.now();
+      const sched = (onAir?.schedule || []).filter(x => x.start + x.dur * 1000 > t);
+      const hold = [], cur = sched[0];
+      if (cur) { hold.push(cur); if (cur.type === "video" && sched[1]?.type === "flash") hold.push(sched[1]); }
+      tv.epoch = hold.length ? hold[hold.length - 1].start + hold[hold.length - 1].dur * 1000 : t;
+      tv.hold = hold; delete tv.anchor;
+      await env.DB.prepare("UPDATE settings SET value=? WHERE key=?").bind(JSON.stringify(tv), key).run();
+    }
   }
   return { videos: vids.length, liveNow };
 }
