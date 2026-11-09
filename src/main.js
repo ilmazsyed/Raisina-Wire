@@ -700,7 +700,7 @@ function relatedBlock(a, list) {
   const scored = list.filter(x => x.slug !== a.slug).map((x, i) => ({ x, score: (x.tags || []).filter(t => tags.has(t.toLowerCase())).length * 3 + (x.category === a.category ? 1 : 0) - i * 0.001 }))
     .filter(r => r.score > 0).sort((p, q) => q.score - p.score).slice(0, 3).map(r => r.x);
   if (!scored.length) return "";
-  return `<section class="related"><div class="kicker">Related stories</div><div class="related-grid">${scored.map(x => `<a class="related-card glass" href="${edHref(x)}"><span class="thumb">${pic(x)}</span><span class="body"><span class="kicker">${esc(x.category)}</span><b>${esc(x.title)}</b><span class="meta">${ago(x.publishedAt)}</span></span></a>`).join("")}</div></section>`;
+  return `<section class="related"><div class="kicker">Related stories</div><div class="related-list">${scored.map(x => `<a class="related-row" href="${edHref(x)}"><span class="kicker">${esc(x.category)}${kindLabel(x) ? ` · ${kindLabel(x)}` : ""}</span><b>${esc(x.title)}</b><span class="meta">${ago(x.publishedAt)}</span></a>`).join("")}</div></section>`;
 }
 
 /* ---------- Sharing ---------- */
