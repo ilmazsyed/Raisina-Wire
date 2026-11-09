@@ -1834,3 +1834,17 @@ html:is([data-lang=bn],[data-lang=hi]) :is(.sf-col h3,.sf-form h3){font-size:15p
 .timeline.compact .tl-live .when{color:var(--red);font-weight:700}
 .timeline.compact .tl-live .dot-live{display:inline-block;width:7px;height:7px;margin-right:5px;vertical-align:1px}
 .live-rail{padding-bottom:14px}
+
+/* The swipe cards: compact text cards (live coverage and the wire), no photos, little air. */
+.lc-card.lc-mini{border-top:4px solid var(--red);border-radius:20px}
+.lc-mini .lc-link{display:flex;flex-direction:column;gap:8px;padding:14px 18px 16px;color:inherit;text-decoration:none}
+.lc-mini .lc-meta{gap:8px}
+.lc-mini .lc-meta .tag{font-size:12px;padding:3px 9px}
+.lc-mini .lc-ago{margin-left:auto;font:500 12px var(--sans);color:var(--muted)}
+.lc-mini .lc-title{font-size:clamp(19px,2vw,24px);line-height:1.35;-webkit-line-clamp:3}
+.lc-mini .lc-dek{font-size:15px;line-height:1.5;-webkit-line-clamp:2}
+.lc-mini.lc-live{border-top-color:#e00}
+.lc-mini.lc-live .lc-title{color:var(--red)}
+.lc-mini .tag-live .dot-live{display:inline-block;width:7px;height:7px;margin-right:5px;vertical-align:1px}
+.lead-carousel:has(.lc-mini) .lc-track{align-items:stretch;padding-bottom:8px}
+@media (max-width:640px){.lc-mini .lc-title{font-size:19px}.lc-mini .lc-link{padding:12px 14px 14px}}
