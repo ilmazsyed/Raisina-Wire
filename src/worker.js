@@ -1584,7 +1584,7 @@ export default {
     const url = new URL(request.url);
     // The share cards (src/ogcard.js); the cron needs the site's own address to photograph them.
     if (url.pathname.startsWith("/og/")) {
-      try { await ensureSchema(env); const r = await ogRoute(url, env); if (r) return r; } catch (e) { console.error("og", e?.stack || e); return Response.redirect(`${url.origin}/og-image.jpg`, 302); }
+      try { await ensureSchema(env); const r = await ogRoute(url, env, ctx); if (r) return r; } catch (e) { console.error("og", e?.stack || e); return Response.redirect(`${url.origin}/og-image.jpg`, 302); }
     }
     if (!env.SITE_URL && !originSaved && env.DB && /^https:/.test(url.origin) && !/localhost|127\.0\.0\.1/.test(url.host)) { originSaved = true; ctx.waitUntil(env.DB.prepare("INSERT INTO settings (key,value) VALUES ('site_origin',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(url.origin).run().catch(() => {})); }
     if (url.pathname.startsWith("/oauth/") || url.pathname.startsWith("/.well-known/oauth-")) { try { await ensureSchema(env); const response=await oauthHandle(request,env); if(response)return response; } catch(e) { return err("OAuth service temporarily unavailable.",503); } }
