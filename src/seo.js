@@ -99,12 +99,13 @@ async function pageFor(path, url, env, o, lang) {
     [a] = await localiseArticles(env, lang, [a]);
     // No version in this language: the page points search engines at the original.
     if (a.lang !== lang) return { canonicalPath: prefixed(a.lang, a.href), alternates: [], title: `${a.title} · ${site}`, description: clip(a.dek || a.title, 160), contentLang: LOCALES[a.lang], body: `<article><h1>${esc(a.title)}</h1>${a.dek ? `<p class="ssr-dek">${esc(a.dek)}</p>` : ""}${blocksHTML(textBlocks(a.body))}</article>` };
-    const w = writer(a.writer), image = a.image ? abs(o, a.heroUrl || a.image) : `${o}${OG_IMAGE}`;
+    // The share card: the story's own 1200×630 picture (src/ogcard.js).
+    const w = writer(a.writer), image = `${o}/og/${encodeURIComponent(a.slug)}.jpg`;
     const blocks = textBlocks(a.body), words = blocks.reduce((n, b) => n + b.x.split(/\s+/).length, 0);
     const description = clip(a.dek || blocks.find(b => b.t === "p")?.x || a.title, 160);
     const here = prefixed(lang, a.href), desk = DESK_NAMES[lang][a.category] || a.category;
     return {
-      alternates: versions, title: `${a.title} · ${site}`, ogTitle: a.title, description, image: a.image ? image : "", type: "article",
+      alternates: versions, title: `${a.title} · ${site}`, ogTitle: a.title, description, image, imageCard: true, type: "article",
       article: { published: a.publishedAt, modified: a.updatedAt || a.publishedAt, section: desk, author: w.name, tags: a.tags },
       ld: [{ "@context": "https://schema.org", "@graph": [
         { "@type": a.kind === "article" ? "NewsArticle" : "ReportageNewsArticle", "@id": `${o}${here}#article`, mainEntityOfPage: `${o}${here}`, url: `${o}${here}`,
@@ -210,7 +211,7 @@ export async function renderPage(request, env, ensureSchema) {
   const alternates = page.alternates || [];
   const canonical = o + (page.canonicalPath || (full === "/" ? "/" : full));
   const hreflang = alternates.length > 1 ? [...alternates.map(l => `<link rel="alternate" hreflang="${LOCALES[l]}" href="${esc(o + prefixed(l, path))}">`), `<link rel="alternate" hreflang="x-default" href="${esc(o + path)}">`] : [];
-  const image = page.image || `${o}${OG_IMAGE}`, card = !page.image;
+  const image = page.image || `${o}${OG_IMAGE}`, card = !page.image || page.imageCard;
   const head = [
     `<link rel="canonical" href="${esc(canonical)}">`, `<link rel="alternate" type="application/rss+xml" title="${esc(SITE[lang])}" href="${o}/feed.xml">`, ...hreflang,
     `<meta property="og:locale" content="${LOCALES[lang].replace("-", "_")}">`, `<meta property="og:url" content="${esc(canonical)}">`,
