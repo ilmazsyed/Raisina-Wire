@@ -42,10 +42,14 @@ export const DESKS = [...PLACE_DESKS, ...SUBJECT_DESKS];
 const SPORTS = /\b(cricket|cricketer|football|footballer|ipl|isl|i-league|test match|odi|t20|world cup|olympics?|tennis|hockey|badminton|chess|wrestling|athletics|mohun bagan|east bengal (fc|club)|mohammedan sporting|fifa|bcci|virat kohli|rohit sharma|sourav ganguly|messi|ronaldo|grand prix|formula ?1|wicket|century|hat-?trick|durand cup|santosh trophy|ranji)\b|ক্রিকেট|ফুটবল|আইপিএল|আইএসএল|বিশ্বকাপ|অলিম্পিক|টেনিস|হকি|ব্যাডমিন্টন|দাবাড়ু|মোহনবাগান|ইস্টবেঙ্গল|মহমেডান স্পোর্টিং|টেস্ট ম্যাচ|উইকেট|সেঞ্চুরি|হ্যাটট্রিক|ডুরান্ড কাপ|সন্তোষ ট্রফি|রঞ্জি|সৌরভ গঙ্গোপাধ্যায়|বিরাট কোহলি|রোহিত শর্মা|মেসি|রোনাল্ডো|খেলোয়াড়|ক্রীড়া|क्रिकेट|फुटबॉल|खिलाड़ी|ओलंपिक/i;
 const ENTERTAINMENT = /\b(bollywood|tollywood|box office|trailer|web series|ott release|netflix|amazon prime video|hotstar|film festival|kiff|movie|cinema|actor|actress|singer|concert|music video|album|oscars?|grammy|filmfare|national film award|shah rukh|salman khan|prosenjit|bigg boss|reality show)\b|সিনেমা|চলচ্চিত্র|ছবির শুটিং|ছবি মুক্তি|অভিনেতা|অভিনেত্রী|অভিনয়|টলিউড|বলিউড|ওয়েব সিরিজ|ধারাবাহিক|গায়ক|গায়িকা|সঙ্গীতশিল্পী|কনসার্ট|চিত্রপরিচালক|বক্স অফিস|ট্রেলার|প্রসেনজিৎ|শাহরুখ|চলচ্চিত্র উৎসব|রিয়্যালিটি শো|बॉलीवुड|फिल्म|अभिनेता|अभिनेत्री/i;
 const LIFESTYLE = /\b(lifestyle|health tips|fitness|diet|recipes?|fashion|beauty tips|skincare|travel (guide|tips|destination)|tourist spots?|yoga|wellness|weight loss|parenting|horoscope|astrology)\b|জীবনধারা|লাইফস্টাইল|রেসিপি|রান্না|ফ্যাশন|ত্বকের যত্ন|চুলের যত্ন|রূপচর্চা|ভ্রমণ|বেড়াতে যান|ঘুরে আসুন|যোগাসন|শরীরচর্চা|ডায়েট|ওজন কমা|স্বাস্থ্য টিপস|প্যারেন্টিং|রাশিফল|হেঁশেল|ফ্যাটি লিভার|কোলেস্টেরল|ঘুমের সমস্যা|जीवनशैली|रेसिपी|फैशन|राशिफल/i;
+// Politics, government, crime and science stay news on their place desk even when a film star
+// or a holiday is in them ("BJP fields an actress", "threat to a singer", "IAS officers' travel").
+const HARD_NEWS = /\b(bjp|tmc|trinamool|congress|cpi\(?m\)?|candidate|by-?election|assembly|lok sabha|rajya sabha|minister|ias|ips|police|arrest(ed)?|murder|threat|extortion|court|scientist|physicist|nobel)\b|বিজেপি|তৃণমূল|কংগ্রেস|সিপিএম|প্রার্থী|উপনির্বাচন|বিধানসভা|লোকসভা|রাজ্যসভা|মন্ত্রী|আইএএস|আইপিএস|পুলিশ|গ্রেফতার|খুন|হুমকি|তোলাবাজি|আদালত|রাজনৈতিক|বিজ্ঞানী|নোবেল/i;
 // The subject desk a story belongs to, if any.
 export function subjectDesk(text = "") {
   const t = String(text);
   if (SPORTS.test(t)) return "Sports";
+  if (HARD_NEWS.test(t)) return null;
   if (ENTERTAINMENT.test(t)) return "Entertainment";
   if (LIFESTYLE.test(t)) return "Lifestyle";
   return null;
@@ -53,10 +57,14 @@ export function subjectDesk(text = "") {
 const KOLKATA = /\b(kolkata|calcutta|howrah|salt ?lake|bidhannagar|new ?town|rajarhat|lalbazar|nabanna|dum ?dum|behala|jadavpur|tollygunge|esplanade|sealdah|park street|kmc)\b|কলকাতা|কলিকাতা|হাওড়া|সল্টলেক|বিধাননগর|নিউটাউন|নিউ টাউন|রাজারহাট|লালবাজার|নবান্ন|দমদম|বেহালা|যাদবপুর|টালিগঞ্জ|ধর্মতলা|শিয়ালদহ|পার্ক স্ট্রিট|পুরসভা|कोलकाता|हावड़ा/i;
 const BENGAL = /\b(west bengal|bengal|siliguri|darjeeling|durgapur|asansol|kharagpur|midnapore|medinipur|bardhaman|burdwan|nadia|murshidabad|malda|jalpaiguri|cooch ?behar|hooghly|birbhum|bankura|purulia|sundarbans?|digha|mamata|abhishek banerjee|suvendu|trinamool|tmc|calcutta high court)\b|পশ্চিমবঙ্গ|বঙ্গ|রাজ্য|শিলিগুড়ি|দার্জিলিং|দুর্গাপুর|আসানসোল|খড়্গপুর|মেদিনীপুর|বর্ধমান|নদিয়া|মুর্শিদাবাদ|মালদহ|জলপাইগুড়ি|কোচবিহার|হুগলি|বীরভূম|বাঁকুড়া|পুরুলিয়া|সুন্দরবন|দিঘা|মমতা|অভিষেক|শুভেন্দু|তৃণমূল|পুরভোট|पश्चिम बंगाल|बंगाल|ममता/i;
 const PROBASHI = /\b(bengali diaspora|non-resident bengali|bengalis? (in|abroad|living)|probashi|bengali association|durga puja (in|at) (london|new york|delhi|mumbai|bengaluru|toronto|sydney|dubai))\b|প্রবাসী|প্রবাসে|বিদেশে বাঙালি|বাঙালি সংগঠন|ভিনরাজ্যে|পরিযায়ী শ্রমিক|প্রবাসী বাঙালি|प्रवासी बंगाली/i;
-const INDIA = /\b(india|indian|delhi|new delhi|mumbai|chennai|bengaluru|hyderabad|modi|lok sabha|rajya sabha|parliament|supreme court|centre|union government|bjp|congress|uttar pradesh|uttarakhand|himachal|punjab|haryana|rajasthan|madhya pradesh|chhattisgarh|telangana|andhra|goa|sikkim|manipur|meghalaya|mizoram|nagaland|arunachal|jammu|kashmir|ladakh|bihar|assam|odisha|jharkhand|tripura|maharashtra|gujarat|kerala|karnataka|tamil nadu|rbi|isro|sriharikota)\b|ভারত|দিল্লি|মোদী|সংসদ|সুপ্রিম কোর্ট|কেন্দ্র|বিজেপি|কংগ্রেস|বিহার|অসম|ওড়িশা|ঝাড়খণ্ড|ত্রিপুরা|মুম্বই|উত্তরপ্রদেশ|উত্তরাখণ্ড|হিমাচল|পঞ্জাব|রাজস্থান|মণিপুর|কাশ্মীর|ইসরো|भारत|दिल्ली|मोदी|संसद|सुप्रीम कोर्ट|केंद्र|उत्तराखंड|उत्तर प्रदेश|बिहार|कश्मीर/i;
+const INDIA = /\b(india|indian|delhi|new delhi|mumbai|chennai|bengaluru|hyderabad|modi|amit shah|rahul gandhi|lok sabha|rajya sabha|parliament|supreme court|centre|union government|bjp|congress|uttar pradesh|uttarakhand|himachal|punjab|haryana|rajasthan|madhya pradesh|chhattisgarh|telangana|andhra|goa|sikkim|manipur|meghalaya|mizoram|nagaland|arunachal|jammu|kashmir|ladakh|bihar|assam|odisha|jharkhand|tripura|maharashtra|gujarat|kerala|karnataka|tamil nadu|rbi|isro|sriharikota)\b|ভারত|দিল্লি|মোদী|অমিত শাহ|রাহুল গান্ধী|সংসদ|সুপ্রিম কোর্ট|কেন্দ্র|বিজেপি|কংগ্রেস|বিহার|অসম|ওড়িশা|ঝাড়খণ্ড|ত্রিপুরা|মুম্বই|উত্তরপ্রদেশ|উত্তরাখণ্ড|হিমাচল|পঞ্জাব|রাজস্থান|মণিপুর|কাশ্মীর|ইসরো|भारत|दिल्ली|मोदी|संसद|सुप्रीम कोर्ट|केंद्र|उत्तराखंड|उत्तर प्रदेश|बिहार|कश्मीर/i;
 export function categorize(text = "") {
   const t = String(text);
-  const subject = subjectDesk(t); if (subject) return subject;
+  return subjectDesk(t) || placeDesk(t);
+}
+// The place desk alone.
+export function placeDesk(text = "") {
+  const t = String(text);
   if (PROBASHI.test(t)) return "Probashi Bangali";
   if (KOLKATA.test(t)) return "Kolkata";
   if (BENGAL.test(t)) return "West Bengal";
