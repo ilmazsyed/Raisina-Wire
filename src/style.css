@@ -1848,3 +1848,9 @@ html:is([data-lang=bn],[data-lang=hi]) :is(.sf-col h3,.sf-form h3){font-size:15p
 .lc-mini .tag-live .dot-live{display:inline-block;width:7px;height:7px;margin-right:5px;vertical-align:1px}
 .lead-carousel:has(.lc-mini) .lc-track{align-items:stretch;padding-bottom:8px}
 @media (max-width:640px){.lc-mini .lc-title{font-size:19px}.lc-mini .lc-link{padding:12px 14px 14px}}
+
+/* Swipe cards: a defined edge and a clearer glass. */
+.lc-card.lc-mini{border:1px solid rgba(170,4,4,.16);border-top:4px solid var(--red);background:linear-gradient(160deg,rgba(255,255,255,.95) 0%,rgba(255,247,247,.78) 100%);backdrop-filter:blur(18px) saturate(170%);-webkit-backdrop-filter:blur(18px) saturate(170%);box-shadow:inset 0 1px 0 rgba(255,255,255,.95),0 12px 30px -14px rgba(17,17,17,.32),0 2px 8px rgba(17,17,17,.06)}
+:root[data-theme=dark] .lc-card.lc-mini{border-color:rgba(255,255,255,.12);border-top-color:var(--red);background:linear-gradient(160deg,rgba(28,30,40,.92),rgba(20,22,30,.78));box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 12px 30px -14px rgba(0,0,0,.6)}
+/* Stories without a photo open straight into the text. */
+.reader-hero.text-hero{display:none}
