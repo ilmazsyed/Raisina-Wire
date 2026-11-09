@@ -226,3 +226,15 @@ body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 .tvp-bar .tvp-like[hidden]{display:none}
 /* While a tap is needed, the poster is lifted so YouTube's own play button shows. */
 .tvp.yt-tap .tvs-poster{display:none}
+
+/* The Rashtrix stinger: a red panel wipes up over the picture with the logo, then off the top. */
+.tvp-stinger{background:linear-gradient(165deg,#d10a0a 0%,#AA0404 55%,#6e0000 100%);animation:tvsting2 1.4s cubic-bezier(.7,0,.3,1) both}
+.tvp-stinger:before{content:"";position:absolute;left:0;right:0;top:50%;height:6px;background:#D4A017;transform:scaleX(0);animation:tvstingline .9s .25s cubic-bezier(.2,.8,.2,1) both}
+.tvp-stinger img{position:relative}
+@keyframes tvsting2{0%{clip-path:inset(100% 0 0 0)}35%,62%{clip-path:inset(0 0 0 0)}100%{clip-path:inset(0 0 100% 0)}}
+@keyframes tvstingline{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+/* Shorts headline band: a red wipe upwards between headlines. */
+.v-flash{overflow:hidden}
+.v-flash .vf-wipe{position:absolute;inset:0;z-index:2;background:var(--red);pointer-events:none;animation:vfwipe .8s cubic-bezier(.7,0,.3,1) both}
+@keyframes vfwipe{0%{clip-path:inset(100% 0 0 0)}45%{clip-path:inset(0 0 0 0)}100%{clip-path:inset(0 0 100% 0)}}
+.v-flash span,.v-flash b{animation:tvin .35s .4s both}

@@ -107,8 +107,8 @@ export function buildLoop(s, videos, cards = []) {
   }
   if (!videos.length && cards.length && s.promosOn) cards.forEach(p => loop.push({ type: "promo", id: p.id, image: p.image, title: p.title, dur: p.seconds }));
   if (!loop.length) loop.push({ type: "flash", dur: FLASH_SECONDS, n: 0 });
-  // A stinger after every video (on the flash that follows it); promos get one now and then.
-  loop.forEach((x, i) => { x.sting = x.type === "flash" ? true : x.type === "promo" ? hash(`${x.id}:${i}`) % 3 === 0 : false; });
+  // The Rashtrix stinger between every video: going into the flash after it and into the next.
+  loop.forEach((x, i) => { x.sting = x.type === "flash" || x.type === "video" ? true : x.type === "promo" ? hash(`${x.id}:${i}`) % 3 === 0 : false; });
   return loop;
 }
 // Every video plays whole, from its first second to its last. The schedule is walked from the
