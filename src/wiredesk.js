@@ -13,7 +13,7 @@ import { bnLine, tidyLine } from "./bnline.js";
 //     (wire_items, linked by job) for the control room;
 //   - each item is rewritten once; when the daily free quota is spent the queue simply waits
 //     (the free tier resets at midnight Pacific time, 13:30 India time) and carries on.
-import { parseFeed, sourceText, categorize, DESKS, PLACE_DESKS, SUBJECT_DESKS, subjectDesk, scriptLang } from "./feeds.js";
+import { parseFeed, sourceText, categorize, DESKS, PLACE_DESKS, SUBJECT_DESKS, subjectDesk, placeDesk, scriptLang } from "./feeds.js";
 import { textHash, splitTags } from "./store.js";
 
 const UA = "Mozilla/5.0 (compatible; RashtrixWire/1.0; +https://www.rashtrix.live)";
@@ -429,15 +429,23 @@ export async function videoHeadlines(env, n = 15) {
 }
 
 
-/* ---------- Moving earlier stories to the new subject desks (once) ---------- */
+/* ---------- Moving earlier stories to the subject desks (once per rule change) ---------- */
 // Entertainment, sport and lifestyle stories filed under a place desk before those desks
-// existed are moved to them, by their headline and tags. It runs once, on the newest 2,000.
+// existed are moved to them, by their headline, standfirst and tags; a story the first pass
+// moved that the stricter rule (politics, crime, government, science stay news) no longer
+// counts goes back to its place desk. It runs once per version, on the newest 2,000.
+const REFILE_KEY = "desks_subjects_v2";
 export async function refileSubjects(env) {
-  const done = await env.DB.prepare("SELECT value FROM settings WHERE key='desks_subjects_v1'").first().catch(() => null);
+  const done = await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(REFILE_KEY).first().catch(() => null);
   if (done) return { done: 0 };
-  const { results } = await env.DB.prepare(`SELECT id, title, dek, tags, category FROM articles WHERE category IN (${PLACE_DESKS.map(() => "?").join(",")}) ORDER BY published_at DESC LIMIT 2000`).bind(...PLACE_DESKS).all();
-  const moves = results.map(r => [r.id, subjectDesk(`${r.title} ${r.dek || ""} ${r.tags || ""}`)]).filter(([, d]) => d);
+  const { results } = await env.DB.prepare(`SELECT id, title, dek, tags, category FROM articles WHERE category IN (${DESKS.map(() => "?").join(",")}) ORDER BY published_at DESC LIMIT 2000`).bind(...DESKS).all();
+  const moves = [];
+  for (const r of results) {
+    const text = `${r.title} ${r.dek || ""} ${r.tags || ""}`, subject = subjectDesk(text);
+    if (PLACE_DESKS.includes(r.category) && subject) moves.push([r.id, subject]);
+    else if (SUBJECT_DESKS.includes(r.category) && subject !== r.category) moves.push([r.id, subject || placeDesk(text)]);
+  }
   for (let i = 0; i < moves.length; i += 50) await env.DB.batch(moves.slice(i, i + 50).map(([id, d]) => env.DB.prepare("UPDATE articles SET category=? WHERE id=?").bind(d, id)));
-  await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('desks_subjects_v1',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(String(moves.length)).run();
+  await env.DB.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(REFILE_KEY, String(moves.length)).run();
   return { done: moves.length };
 }
