@@ -11,11 +11,11 @@ import { DESKS } from "./feeds.js";
 const DEFAULT = "bn";
 const LOCALES = { bn: "bn-IN", en: "en-IN", hi: "hi-IN" };
 export const prefixed = (lang, path) => lang === DEFAULT ? path : `/${lang}${path === "/" ? "" : path}`;
-export const DESK_SLUGS = { Kolkata: "kolkata", "West Bengal": "west-bengal", India: "india", "Probashi Bangali": "probashi-bangali", World: "world" };
+export const DESK_SLUGS = { Kolkata: "kolkata", "West Bengal": "west-bengal", India: "india", "Probashi Bangali": "probashi-bangali", World: "world", Entertainment: "entertainment", Sports: "sports", Lifestyle: "lifestyle" };
 const DESK_NAMES = {
-  bn: { Kolkata: "কলকাতা", "West Bengal": "পশ্চিমবঙ্গ", India: "ভারত", "Probashi Bangali": "প্রবাসী বাঙালি", World: "বিশ্ব" },
-  en: { Kolkata: "Kolkata", "West Bengal": "West Bengal", India: "India", "Probashi Bangali": "Probashi Bangali", World: "World" },
-  hi: { Kolkata: "कोलकाता", "West Bengal": "पश्चिम बंगाल", India: "भारत", "Probashi Bangali": "प्रवासी बंगाली", World: "दुनिया" }
+  bn: { Kolkata: "কলকাতা", "West Bengal": "পশ্চিমবঙ্গ", India: "ভারত", "Probashi Bangali": "প্রবাসী বাঙালি", World: "বিশ্ব", Entertainment: "বিনোদন", Sports: "খেলা", Lifestyle: "জীবনধারা" },
+  en: { Kolkata: "Kolkata", "West Bengal": "West Bengal", India: "India", "Probashi Bangali": "Probashi Bangali", World: "World", Entertainment: "Entertainment", Sports: "Sports", Lifestyle: "Lifestyle" },
+  hi: { Kolkata: "कोलकाता", "West Bengal": "पश्चिम बंगाल", India: "भारत", "Probashi Bangali": "प्रवासी बंगाली", World: "दुनिया", Entertainment: "मनोरंजन", Sports: "खेल", Lifestyle: "जीवनशैली" }
 };
 const SITE = { bn: "রাষ্ট্রিক্স ২৪×৭ নিউজ", en: "Rashtrix 24×7 News", hi: "राष्ट्रिक्स 24×7 न्यूज़" };
 const HOME = {
@@ -126,7 +126,7 @@ async function pageFor(path, url, env, o, lang) {
     if (!desk) return { status: 404, title: `404 · ${site}`, description: "", noindex: true, body: "<h1>404</h1>" };
     const stories = (await localiseArticles(env, lang, await listPublished(env, { limit: 300 }))).filter(s => s.category === desk).slice(0, 60);
     const name = DESK_NAMES[lang][desk];
-    const BN_OF = { Kolkata: "কলকাতার", "West Bengal": "পশ্চিমবঙ্গের", India: "ভারতের", "Probashi Bangali": "প্রবাসী বাঙালির", World: "বিশ্বের" };
+    const BN_OF = { Kolkata: "কলকাতার", "West Bengal": "পশ্চিমবঙ্গের", India: "ভারতের", "Probashi Bangali": "প্রবাসী বাঙালির", World: "বিশ্বের", Entertainment: "বিনোদনের", Sports: "খেলার", Lifestyle: "জীবনধারার" };
     const title = { bn: `${BN_OF[desk]} খবর · ${site}`, en: `${name} news · ${site}`, hi: `${name} समाचार · ${site}` }[lang];
     return { title, alternates: LANGS, description: clip(`${title}: ${stories.slice(0, 3).map(s => s.title).join("; ")}`, 160),
       ld: [{ "@context": "https://schema.org", "@graph": [{ "@type": "CollectionPage", url: o + prefixed(lang, `/desk/${arg}`), name: title, isPartOf: { "@id": `${o}/#website` },

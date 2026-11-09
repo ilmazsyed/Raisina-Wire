@@ -13,7 +13,7 @@ import { bnLine, tidyLine } from "./bnline.js";
 //     (wire_items, linked by job) for the control room;
 //   - each item is rewritten once; when the daily free quota is spent the queue simply waits
 //     (the free tier resets at midnight Pacific time, 13:30 India time) and carries on.
-import { parseFeed, sourceText, categorize, DESKS, scriptLang } from "./feeds.js";
+import { parseFeed, sourceText, categorize, DESKS, PLACE_DESKS, SUBJECT_DESKS, subjectDesk, scriptLang } from "./feeds.js";
 import { textHash, splitTags } from "./store.js";
 
 const UA = "Mozilla/5.0 (compatible; RashtrixWire/1.0; +https://www.rashtrix.live)";
@@ -164,18 +164,22 @@ const blockUntil = (env, until) => env.DB.prepare("INSERT INTO ai_usage (day,cal
 const LANG_SCHEMA = { type: "OBJECT", properties: { title: { type: "STRING" }, dek: { type: "STRING" }, body: { type: "STRING" } }, required: ["title", "body"] };
 // Where the story happened and how far it reaches come first, so the desk is chosen from them.
 const PLACE_SCHEMA = { type: "OBJECT", properties: { city: { type: "STRING" }, district: { type: "STRING" }, state: { type: "STRING" }, country: { type: "STRING" } }, required: ["country"] };
-const SCHEMA = { type: "OBJECT", properties: { place: PLACE_SCHEMA, scope: { type: "STRING", enum: ["city", "state", "national", "international", "diaspora"] }, desk: { type: "STRING", enum: DESKS }, tags: { type: "ARRAY", items: { type: "STRING" } }, bn: LANG_SCHEMA, en: LANG_SCHEMA, hi: LANG_SCHEMA, unusable: { type: "BOOLEAN" }, reason: { type: "STRING" } },
-  required: ["place", "scope", "desk", "bn", "en", "hi"], propertyOrdering: ["place", "scope", "desk", "tags", "bn", "en", "hi", "unusable", "reason"] };
+const SCHEMA = { type: "OBJECT", properties: { place: PLACE_SCHEMA, scope: { type: "STRING", enum: ["city", "state", "national", "international", "diaspora"] }, beat: { type: "STRING", enum: ["news", "entertainment", "sports", "lifestyle"] }, desk: { type: "STRING", enum: DESKS }, tags: { type: "ARRAY", items: { type: "STRING" } }, bn: LANG_SCHEMA, en: LANG_SCHEMA, hi: LANG_SCHEMA, unusable: { type: "BOOLEAN" }, reason: { type: "STRING" } },
+  required: ["place", "scope", "beat", "desk", "bn", "en", "hi"], propertyOrdering: ["place", "scope", "beat", "desk", "tags", "bn", "en", "hi", "unusable", "reason"] };
 
 // The desk, from where the story happened and how far it reaches. The model's own choice is
 // used only when it gives no place.
 const KOLKATA_AREA = /kolkata|calcutta|howrah|salt ?lake|bidhannagar|new ?town|rajarhat|dum ?dum|baranagar|behala|jadavpur|tollygunge|garia|kasba|barasat|sonarpur|কলকাতা|হাওড়া|সল্টলেক|বিধাননগর|নিউ ?টাউন|রাজারহাট|দমদম|বরানগর|বেহালা|যাদবপুর|টালিগঞ্জ|গড়িয়া|কসবা/i;
 const IN_BENGAL = /west ?bengal|পশ্চিমবঙ্গ|^bengal$/i;
 const IN_INDIA = /^(india|bharat|ভারত|भारत)$/i;
+const BEAT_DESK = { entertainment: "Entertainment", sports: "Sports", lifestyle: "Lifestyle" };
 export function deskFor(out) {
+  // Entertainment, sport and lifestyle have their own desks, wherever the story happened.
+  if (BEAT_DESK[out?.beat]) return BEAT_DESK[out.beat];
+  if (SUBJECT_DESKS.includes(out?.desk)) return out.desk;
   const p = out?.place || {}, scope = out?.scope;
   const known = [p.country, p.state, p.city].some(x => String(x || "").trim());
-  if (!known) return DESKS.includes(out?.desk) ? out.desk : null;
+  if (!known) return PLACE_DESKS.includes(out?.desk) ? out.desk : null;
   if (scope === "diaspora") return "Probashi Bangali";
   const country = String(p.country || "").trim(), state = String(p.state || "").trim();
   const local = `${p.city || ""} ${p.district || ""}`;
@@ -184,7 +188,7 @@ export function deskFor(out) {
   if (state && !IN_BENGAL.test(state) && !KOLKATA_AREA.test(local)) return "India";
   if (scope === "national" && !state) return "India";
   if (IN_BENGAL.test(state) || KOLKATA_AREA.test(local)) return scope === "city" && KOLKATA_AREA.test(local) ? "Kolkata" : "West Bengal";
-  return DESKS.includes(out?.desk) ? out.desk : "India";
+  return PLACE_DESKS.includes(out?.desk) ? out.desk : "India";
 }
 
 // The Bengali house style: Anandabazar Patrika's standard চলিত বাংলা, with the brisk,
@@ -213,7 +217,12 @@ Also file the story correctly. First give "place": where the main event happened
 - "national": India outside West Bengal, or India as a whole: the central government, Parliament, the Supreme Court, other states, national politics, the economy, national sport.
 - "international": events outside India, including Bangladesh and the rest of South Asia, and foreign affairs where the event happened abroad.
 - "diaspora": Bengalis living outside West Bengal, in other states or abroad, as the subject of the story (their associations, festivals, troubles, migrant workers from Bengal elsewhere).
-Then "desk", which must match: city → Kolkata, state → West Bengal, national → India, international → World, diaspora → Probashi Bangali.
+Then "beat", the kind of story:
+- "entertainment": films, television and web series, music, theatre, celebrities and their work, film festivals, box office.
+- "sports": every sport and sportsperson: cricket, football (Mohun Bagan, East Bengal, Mohammedan Sporting), the Olympics, tennis, chess and the rest, at any level.
+- "lifestyle": health and fitness advice, food and recipes, fashion and beauty, travel features, relationships and parenting, astrology, festival customs as features.
+- "news": everything else — politics, government, crime, courts, accidents, civic life, the economy, science. A crime, court case, accident or political story about a film star or a sportsperson is "news".
+Then "desk", which must match: for the beats entertainment → Entertainment, sports → Sports, lifestyle → Lifestyle; for news, by scope: city → Kolkata, state → West Bengal, national → India, international → World, diaspora → Probashi Bangali.
 Give up to five short topic tags in English.
 
 ${BENGALI_STYLE}`;
@@ -417,4 +426,18 @@ export async function videoHeadlines(env, n = 15) {
   const stmts = results.map(r => env.DB.prepare("UPDATE tv_items SET headline=? WHERE yt_id=?").bind(lines[r.id] || bnLine(r.title, r.description) || " ", r.id));
   await env.DB.batch(stmts);
   return { done: stmts.length, written: Object.keys(lines).length };
+}
+
+
+/* ---------- Moving earlier stories to the new subject desks (once) ---------- */
+// Entertainment, sport and lifestyle stories filed under a place desk before those desks
+// existed are moved to them, by their headline and tags. It runs once, on the newest 2,000.
+export async function refileSubjects(env) {
+  const done = await env.DB.prepare("SELECT value FROM settings WHERE key='desks_subjects_v1'").first().catch(() => null);
+  if (done) return { done: 0 };
+  const { results } = await env.DB.prepare(`SELECT id, title, dek, tags, category FROM articles WHERE category IN (${PLACE_DESKS.map(() => "?").join(",")}) ORDER BY published_at DESC LIMIT 2000`).bind(...PLACE_DESKS).all();
+  const moves = results.map(r => [r.id, subjectDesk(`${r.title} ${r.dek || ""} ${r.tags || ""}`)]).filter(([, d]) => d);
+  for (let i = 0; i < moves.length; i += 50) await env.DB.batch(moves.slice(i, i + 50).map(([id, d]) => env.DB.prepare("UPDATE articles SET category=? WHERE id=?").bind(d, id)));
+  await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('desks_subjects_v1',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(String(moves.length)).run();
+  return { done: moves.length };
 }

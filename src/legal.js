@@ -33,7 +33,7 @@ export const ABOUT = {
   <li><b>Rashtrix reports</b>: stories by our own reporters and desk, with their photographs.</li>
   <li><b>Wire reports and briefs</b>: short reports written by the Rashtrix wire desk from several published sources, checked against each other and written in our own words. They carry no photographs.</li>
   <li><b>Live coverage</b> of developing events, and alerts when news breaks.</li>
-  <li>Five desks: <b>Kolkata</b>, <b>West Bengal</b>, <b>India</b>, <b>Probashi Bangali</b> (Bengalis outside Bengal and abroad) and the <b>World</b>, in Bengali, English and Hindi.</li>
+  <li>Eight desks: <b>Kolkata</b>, <b>West Bengal</b>, <b>India</b>, <b>Probashi Bangali</b> (Bengalis outside Bengal and abroad), the <b>World</b>, <b>Entertainment</b>, <b>Sports</b> and <b>Lifestyle</b>, in Bengali, English and Hindi.</li>
 </ul>
 <h2>How we work</h2>
 <p>We report facts we can stand behind and correct mistakes openly. Wire reports are drafted with the help of an AI language model from facts in at least two published reports wherever possible, and an editor can pull or correct any of them at once; every correction is recorded. See our <a href="/disclaimer">editorial disclaimer</a>, <a href="/copyright">how we use other publishers’ work</a> and our <a href="/corrections">corrections policy</a>.</p>
@@ -49,7 +49,7 @@ export const ABOUT = {
   <li><b>রাষ্ট্রিক্সের খবর</b>: আমাদের নিজস্ব সাংবাদিক ও ডেস্কের লেখা, তাঁদের তোলা ছবি সহ।</li>
   <li><b>ওয়্যার খবর ও সংক্ষিপ্ত খবর</b>: একাধিক প্রকাশিত খবর মিলিয়ে, যাচাই করে, আমাদের নিজের ভাষায় লেখা রাষ্ট্রিক্স ওয়্যার ডেস্কের ছোট প্রতিবেদন। এগুলিতে কোনো ছবি থাকে না।</li>
   <li>ঘটনার <b>লাইভ কভারেজ</b>, আর বড় খবরে সঙ্গে সঙ্গে অ্যালার্ট।</li>
-  <li>পাঁচটি ডেস্ক: <b>কলকাতা</b>, <b>পশ্চিমবঙ্গ</b>, <b>ভারত</b>, <b>প্রবাসী বাঙালি</b> আর <b>বিশ্ব</b> — বাংলা, ইংরেজি ও হিন্দিতে।</li>
+  <li>আটটি ডেস্ক: <b>কলকাতা</b>, <b>পশ্চিমবঙ্গ</b>, <b>ভারত</b>, <b>প্রবাসী বাঙালি</b>, <b>বিশ্ব</b>, <b>বিনোদন</b>, <b>খেলা</b> আর <b>জীবনধারা</b> — বাংলা, ইংরেজি ও হিন্দিতে।</li>
 </ul>
 <h2>আমরা কীভাবে কাজ করি</h2>
 <p>যে তথ্যের দায় নিতে পারি, শুধু সেটুকুই প্রকাশ করি, আর ভুল হলে খোলাখুলি সংশোধন করি। ওয়্যার খবর একটি এআই ভাষা-মডেলের সাহায্যে লেখা হয়, যতটা সম্ভব অন্তত দু’টি প্রকাশিত খবরের তথ্য মিলিয়ে; সম্পাদক যে কোনো খবর সঙ্গে সঙ্গে সরিয়ে নিতে বা সংশোধন করতে পারেন, আর প্রতিটি সংশোধনের হিসেব রাখা হয়। পড়ুন আমাদের <a href="/disclaimer">সম্পাদকীয় ঘোষণা</a>, <a href="/copyright">অন্য প্রকাশকের লেখা আমরা কীভাবে ব্যবহার করি</a> আর <a href="/corrections">সংশোধন নীতি</a>।</p>

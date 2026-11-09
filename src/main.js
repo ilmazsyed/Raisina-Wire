@@ -12,9 +12,9 @@ const esc = (s = "") => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<":
 const IST = { timeZone: "Asia/Kolkata" };
 
 const state = { articles: [], media: null, coverage: [], coverageAll: [], coverageLead: null, user: null, community: null, events: null, installPrompt: null, topics: [] };
-// The five desks. Stories carry the English name as their category; the interface translates it.
-const DESKS = ["Kolkata", "West Bengal", "India", "Probashi Bangali", "World"];
-const DESK_SLUG = { Kolkata: "kolkata", "West Bengal": "west-bengal", India: "india", "Probashi Bangali": "probashi-bangali", World: "world" };
+// The desks (five by place, three by subject). Stories carry the English name as their category; the interface translates it.
+const DESKS = ["Kolkata", "West Bengal", "India", "Probashi Bangali", "World", "Entertainment", "Sports", "Lifestyle"];
+const DESK_SLUG = { Kolkata: "kolkata", "West Bengal": "west-bengal", India: "india", "Probashi Bangali": "probashi-bangali", World: "world", Entertainment: "entertainment", Sports: "sports", Lifestyle: "lifestyle" };
 const deskOf = slug => DESKS.find(d => DESK_SLUG[d] === slug);
 const deskHref = d => `/desk/${DESK_SLUG[d] || "world"}`;
 const isWire = a => a?.kind === "rewrite" || a?.kind === "brief";
@@ -1401,7 +1401,7 @@ function openDiscussionDialog(title = "") {
 const AVATAR_COLOURS = ["#AA0404", "#0f5c8c", "#137a55", "#7a530f", "#6b3fa0", "#b4570e", "#1f6f78", "#8c2155"];
 const avatarColour = name => AVATAR_COLOURS[[...String(name)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % AVATAR_COLOURS.length];
 const avatar = (name, cls = "") => `<span class="av ${cls}" style="--av:${avatarColour(name)}" aria-hidden="true">${esc(initials(name))}</span>`;
-const TOPIC_COLOURS = { Kolkata: "#AA0404", "West Bengal": "#A43F44", India: "#b4570e", "Probashi Bangali": "#6b3fa0", World: "#0f5c8c", General: "#596173" };
+const TOPIC_COLOURS = { Kolkata: "#AA0404", "West Bengal": "#A43F44", India: "#b4570e", "Probashi Bangali": "#6b3fa0", World: "#0f5c8c", Entertainment: "#a3166f", Sports: "#1d7a3a", Lifestyle: "#b8740a", General: "#596173" };
 const topicChip = t => `<span class="topic-chip" style="--tc:${TOPIC_COLOURS[t] || "#596173"}">${esc(t)}</span>`;
 // Discussions are held in English, Hindi or Bengali; the language shows on each one.
 const langChip = l => l && l !== "en" && LANGUAGES[l] ? `<span class="lang-chip" lang="${l}">${LANGUAGES[l].name}</span>` : "";
