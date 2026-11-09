@@ -1,3 +1,4 @@
+import { bnLine, tidyLine } from "./bnline.js";
 // The Rashtrix wire desk. It reads the outlets the owner has approved (control room → Wire
 // sources), groups items about the same story, and writes a new report in our own words with
 // Gemini (Google AI Studio, free tier): a Bengali rewrite when the sources are Bengali, a
@@ -228,7 +229,7 @@ Sources (${items.length}):
 ${items.map((it, i) => `--- Source ${i + 1} (${it.lang}) ---\nHeadline: ${it.title}\nPublished: ${it.published_at || "unknown"}\n${it.text || it.summary || ""}`).join("\n\n")}`;
 }
 
-async function callGemini(env, text, retried = false, think = true, tries = 0) {
+async function callGemini(env, text, retried = false, think = true, tries = 0, opt = {}) {
   const { available } = await modelChain(env);
   if (!available.length) { await blockUntil(env, nextPacificMidnight()); const e = new Error("daily free quota used up on every model; waiting for the reset"); e.retry = true; throw e; }
   const model = available[0];
@@ -242,9 +243,9 @@ async function callGemini(env, text, retried = false, think = true, tries = 0) {
       method: "POST", signal: AbortSignal.timeout(180000),
       headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: RULES }] },
+        systemInstruction: { parts: [{ text: opt.system || RULES }] },
         contents: [{ role: "user", parts: [{ text }] }],
-        generationConfig: { temperature: 0.4, responseMimeType: "application/json", responseSchema: SCHEMA, maxOutputTokens: 16384, ...thinking }
+        generationConfig: { temperature: 0.4, responseMimeType: "application/json", responseSchema: opt.schema || SCHEMA, maxOutputTokens: opt.schema ? 4096 : 16384, ...thinking }
       })
     });
   } catch (e) {
@@ -252,7 +253,7 @@ async function callGemini(env, text, retried = false, think = true, tries = 0) {
   }
   if (r.status === 400 && thinking.thinkingConfig) {
     const body = await r.clone().text();
-    if (/thinking/i.test(body)) return callGemini(env, text, retried, false, tries);   // a model without that setting
+    if (/thinking/i.test(body)) return callGemini(env, text, retried, false, tries, opt);   // a model without that setting
   }
   await countCall(env);
   if (r.status === 429) {
@@ -260,7 +261,7 @@ async function callGemini(env, text, retried = false, think = true, tries = 0) {
     // Per-day quota: this model rests until the reset and the next model in the chain takes over.
     // Per-minute: try again in two minutes.
     const daily = /per.?day|PerDay|daily/i.test(body);
-    if (daily) { await modelOff(env, model, nextPacificMidnight()); if (tries < 4) return callGemini(env, text, retried, think, tries + 1); }
+    if (daily) { await modelOff(env, model, nextPacificMidnight()); if (tries < 4) return callGemini(env, text, retried, think, tries + 1, opt); }
     await blockUntil(env, daily ? nextPacificMidnight() : new Date(Date.now() + 2 * 60e3).toISOString());
     const e = new Error(daily ? "daily free quota used up; waiting for the reset" : "rate limited; retrying shortly"); e.retry = true; throw e;
   }
@@ -271,7 +272,7 @@ async function callGemini(env, text, retried = false, think = true, tries = 0) {
       const next = body.match(/use (?:models\/)?(gemini-[\w.-]+)/i)?.[1];
       await modelOff(env, model, new Date(Date.now() + 30 * 86400e3).toISOString());
       if (next && next !== model) await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('gemini_model',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(next).run();
-      return callGemini(env, text, true, think, tries + 1);
+      return callGemini(env, text, true, think, tries + 1, opt);
     }
     const e = new Error(`Gemini ${r.status}: ${body.slice(0, 200)}`); e.retry = r.status >= 500; throw e;
   }
@@ -397,3 +398,23 @@ export async function wireDeskReport(env) {
   };
 }
 export { scriptLang };
+
+/* ---------- One-line Bengali titles for the TV's videos ---------- */
+// The "up next" card on Rashtrix TV names the coming video in one Bengali line. The desk writes
+// it from the video's YouTube title and description, fifteen videos to a call, only while the
+// day's free quota has room to spare; until then (or if it fails) the line is taken from the
+// title itself (src/bnline.js).
+const LINE_SCHEMA = { type: "OBJECT", properties: { items: { type: "ARRAY", items: { type: "OBJECT", properties: { id: { type: "STRING" }, line: { type: "STRING" } }, required: ["id", "line"] } } }, required: ["items"] };
+export async function videoHeadlines(env, n = 15) {
+  const { results } = await env.DB.prepare("SELECT yt_id AS id, MAX(title) AS title, MAX(description) AS description FROM tv_items WHERE headline='' AND playable=1 AND excluded=0 GROUP BY yt_id ORDER BY MAX(published_at) DESC LIMIT ?").bind(n).all();
+  if (!results.length) return { done: 0 };
+  let lines = {};
+  const q = wireReady(env) ? await quota(env) : null;
+  if (q && !q.blockedUntil && q.left > 150) {
+    const text = `For each YouTube video below, write ONE short Bengali headline (at most ten words) that says what the video is about, using its title and description. Bengali words only: leave out the channel's name, "Shorts", "Breaking", "Live", hashtags, emoji, English words, links, dates and every prefix or suffix. No quotation marks and no দাঁড়ি at the end.\n\n${results.map(r => `id: ${r.id}\ntitle: ${r.title}\ndescription: ${String(r.description || "").slice(0, 600)}`).join("\n\n")}`;
+    try { const out = await callGemini(env, text, false, false, 0, { system: BENGALI_STYLE, schema: LINE_SCHEMA }); for (const x of out.items || []) lines[x.id] = tidyLine(x.line); } catch (e) { if (!e.retry) console.error("video headlines:", e?.message || e); else return { done: 0, waiting: true }; }
+  }
+  const stmts = results.map(r => env.DB.prepare("UPDATE tv_items SET headline=? WHERE yt_id=?").bind(lines[r.id] || bnLine(r.title, r.description) || " ", r.id));
+  await env.DB.batch(stmts);
+  return { done: stmts.length, written: Object.keys(lines).length };
+}

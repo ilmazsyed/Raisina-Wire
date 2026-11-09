@@ -117,9 +117,9 @@ export async function refreshSource(env, src) {
     const live = v.snippet?.liveBroadcastContent;   // none | upcoming | live
     if (src.kind === "live") { if (live === "live" && !liveNow) { liveNow = 1; liveVideo = v.id; } continue; }
     const playable = v.status?.embeddable !== false && v.status?.privacyStatus !== "private" && live === "none" ? 1 : 0;
-    stmts.push(env.DB.prepare(`INSERT INTO tv_items (channel,yt_id,source_id,title,duration,thumb,published_at,position,playable,seen_at) VALUES (?,?,?,?,?,?,?,?,?,?)
-      ON CONFLICT(channel,yt_id) DO UPDATE SET source_id=excluded.source_id,title=excluded.title,duration=excluded.duration,thumb=excluded.thumb,published_at=excluded.published_at,position=excluded.position,playable=excluded.playable,seen_at=excluded.seen_at`)
-      .bind(src.channel, v.id, src.id, String(v.snippet?.title || "").slice(0, 300), isoSeconds(v.contentDetails?.duration), thumbOf(v.snippet), v.snippet?.publishedAt || null, order.get(v.id) ?? 0, playable, at));
+    stmts.push(env.DB.prepare(`INSERT INTO tv_items (channel,yt_id,source_id,title,duration,thumb,published_at,position,playable,seen_at,description) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(channel,yt_id) DO UPDATE SET headline=CASE WHEN tv_items.title=excluded.title THEN tv_items.headline ELSE '' END,description=excluded.description,source_id=excluded.source_id,title=excluded.title,duration=excluded.duration,thumb=excluded.thumb,published_at=excluded.published_at,position=excluded.position,playable=excluded.playable,seen_at=excluded.seen_at`)
+      .bind(src.channel, v.id, src.id, String(v.snippet?.title || "").slice(0, 300), isoSeconds(v.contentDetails?.duration), thumbOf(v.snippet), v.snippet?.publishedAt || null, order.get(v.id) ?? 0, playable, at, String(v.snippet?.description || "").slice(0, 1500)));
   }
   // Videos that left the playlist leave the channel.
   if (src.kind === "playlist") stmts.push(env.DB.prepare("DELETE FROM tv_items WHERE source_id=? AND seen_at<>?").bind(src.id, at));
