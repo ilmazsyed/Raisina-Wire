@@ -324,7 +324,37 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   }
 
   /* ---------- the channel's own running order (no rundown on air) ---------- */
-  function continuitySeg() { const t = now(); return st.tv?.schedule?.find(x => x.start <= t && t < x.start + x.dur * 1000) || null; }
+  function continuitySeg() { if (mode === "app") return localSeg(); const t = now(); return st.tv?.schedule?.find(x => x.start <= t && t < x.start + x.dur * 1000) || null; }
+  // In the app each viewer has their own running order: it starts at the newest video when the
+  // viewer opens the channel and goes down the list; a video moves on only when it has played
+  // to its end, a headline flash (with the stinger) comes between videos, the bulletin goes on
+  // at the first break after :00 and :30, and a newly uploaded video is played next. Only what
+  // the control room puts on air (live, manual takes, rundowns, standby, breaking) is the same
+  // for every viewer at the same moment.
+  const nextHalfT = t => Math.floor(t / 1800e3) * 1800e3 + 1800e3;
+  function localSeg() {
+    const loop = st.tv?.loop || []; if (!loop.length) return null;
+    const t = now(), q = st.seq ||= { i: 0, item: null, seg: null, start: 0, due: nextHalfT(t), n: 0, head: loop[0]?.ytId || "" };
+    if (q.item) {
+      const it = q.item, age = t - q.start;
+      const done = it.type === "video"
+        ? (st.yt?.ended && st.nowYt?.id === it.ytId) || age > (it.dur + 45) * 1000 || (!st.yt && age > it.dur * 1000)
+        : age >= it.dur * 1000;
+      if (!done) return q.seg;
+    }
+    let next;
+    if (q.item && t >= q.due && q.item.type !== "bulletin") { next = { type: "bulletin", dur: 120, sting: true }; q.due = nextHalfT(t); }
+    else {
+      if (q.item) q.i = (q.i + 1) % loop.length;
+      if (q.restart && q.item?.type !== "video") { q.i = 0; q.restart = false; }
+      const x = loop[q.i % loop.length];
+      if (q.item?.type === "video" && x.type === "video") { next = { type: "flash", dur: 10, sting: true, n: q.n }; q.i = (q.i - 1 + loop.length) % loop.length; }
+      else next = x;
+    }
+    q.n++; q.item = next; q.start = t;
+    q.seg = { ...next, start: t, in: 0, n: next.n ?? q.n };
+    return q.seg;
+  }
   function continuityScene() {
     const s = st.tv; if (!s) return null;
     if (s.live) return { layout: "full", sources: [{ kind: "yt", id: s.live.ytId }], label: s.live.title, key: `live:${s.live.ytId}` };
@@ -548,7 +578,6 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     // Outputs apply realtime changes after the broadcast delay.
     while (st.queue.length && st.queue[0].at <= Date.now()) { st.ctl = st.queue.shift().state; onState?.(st.ctl); }
     let sc = resolve();
-    if (mode === "app") sc = wholeVideos(sc);
     if (sc?.key !== st.current?.key) drawScene(sc);
     const b = st.ctl?.breaking || st.tv?.breaking;
     if (mode !== "scene" && b && st.shownBreaking !== b.at && now() - Date.parse(b.at) < 90e3) { st.shownBreaking = b.at; showBreaking(b); }
@@ -560,7 +589,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   /* ---------- data ---------- */
   async function loadTv() {
     if (mode === "scene" && !fixedScene?.needsTv) { /* the PCR preview still wants headlines for graphics */ }
-    try { const r = await fetch(`/api/tv/${channel}`, { cache: "no-store" }); if (r.ok) { const s = await r.json(); st.skew = s.serverTime - Date.now(); st.tv = s; } } catch { /* keep */ }
+    try { const r = await fetch(`/api/tv/${channel}`, { cache: "no-store" }); if (r.ok) { const s = await r.json(); st.skew = s.serverTime - Date.now(); st.tv = s; const head = s.loop?.find(x => x.type === "video")?.ytId; if (st.seq && head && head !== st.seq.head) { st.seq.head = head; st.seq.restart = true; } } } catch { /* keep */ }
   }
   function applyCtl(state, serverTime) {
     if (serverTime) st.skew = serverTime - Date.now();

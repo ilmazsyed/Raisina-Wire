@@ -168,7 +168,8 @@ export async function tvState(env, ch) {
   ]);
   const headlines = stories.map(a => ({ text: a.title, desk: a.category, kind: a.kind }));
   const bulletin = stories.slice(0, 6).map(r => ({ title: r.title, desk: r.category, kind: r.kind, text: firstWords(r.body) }));
-  const schedule = s.on ? scheduleAt(buildLoop(s, videos, cards), s.epoch, Date.now(), 5400, { hold: s.hold, anchor: s.anchor }) : [];
+  const loop = buildLoop(s, videos, cards);
+  const schedule = s.on ? scheduleAt(loop, s.epoch, Date.now(), 5400, { hold: s.hold, anchor: s.anchor }) : [];
   // Keep a point near now (and drop a hold that has played out), so the walk stays short.
   const holdOver = (s.hold || []).length && (s.hold || []).every(h => h.start + h.dur * 1000 < Date.now());
   if (schedule.anchor || holdOver) { const fresh = await tvSettings(env, ch); if (schedule.anchor && fresh.epoch === s.epoch) fresh.anchor = schedule.anchor; if (holdOver) delete fresh.hold; await putSettings(env, ch, fresh); }
@@ -180,7 +181,9 @@ export async function tvState(env, ch) {
     lband: ch === "h" ? s.lband : null, lowerThird: s.lowerThird || "", band: s.band || "", appStream: s.appStream || null,
     ad: s.ad, sets: s.sets, setSeconds: s.setSeconds,
     ticker: [...s.ticker, ...headlines.slice(0, 14).map(h => h.text)],
-    headlines, bulletin
+    headlines, bulletin,
+    // The app plays its own copy of the order for each viewer, newest video first (src/engine.js).
+    loop: s.on ? loop : []
   };
   memo.set(ch, { at: Date.now(), value });
   return value;
