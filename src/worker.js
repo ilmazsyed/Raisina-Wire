@@ -25,6 +25,8 @@ import m0023 from "../migrations/0023_studio.sql";
 import m0024 from "../migrations/0024_tv_channels.sql";
 import m0025 from "../migrations/0025_tv_likes.sql";
 import m0026 from "../migrations/0026_tv_headline.sql";
+import m0027 from "../migrations/0027_og_cards.sql";
+import { ogRoute, renderCards } from "./ogcard.js";
 import { handleControlRoom, control as ctlCommand } from "./controlroom.js";
 import { serveClip, clipHousekeeping } from "./clips.js";
 import { handleStudio } from "./studioapi.js";
@@ -85,7 +87,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -1546,6 +1548,11 @@ async function scheduled(env) {
   // The control room: midnight archive and the day's rundowns from templates; old clips go.
   await step("rundowns", () => rundownHousekeeping(env));
   await step("clips", () => clipHousekeeping(env));
+  // Share cards for the newest stories (last: it opens a headless browser).
+  await step("share cards", async () => {
+    const origin = env.SITE_URL || (await env.DB.prepare("SELECT value FROM settings WHERE key='site_origin'").first())?.value;
+    return renderCards(env, String(origin || "").replace(/\/$/, ""));
+  });
 }
 // 9 am and 9 pm India time, every day (unless switched off in the control room).
 // The settings row makes each one send exactly once, even if two cron runs overlap.
@@ -1570,10 +1577,16 @@ async function sendDaily(env, slot) {
   return slot;
 }
 
+let originSaved = false;
 export default {
   async scheduled(event, env, ctx) { ctx.waitUntil(scheduled(env)); },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    // The share cards (src/ogcard.js); the cron needs the site's own address to photograph them.
+    if (url.pathname.startsWith("/og/")) {
+      try { await ensureSchema(env); const r = await ogRoute(url, env); if (r) return r; } catch (e) { console.error("og", e?.stack || e); return Response.redirect(`${url.origin}/og-image.jpg`, 302); }
+    }
+    if (!env.SITE_URL && !originSaved && env.DB && /^https:/.test(url.origin) && !/localhost|127\.0\.0\.1/.test(url.host)) { originSaved = true; ctx.waitUntil(env.DB.prepare("INSERT INTO settings (key,value) VALUES ('site_origin',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(url.origin).run().catch(() => {})); }
     if (url.pathname.startsWith("/oauth/") || url.pathname.startsWith("/.well-known/oauth-")) { try { await ensureSchema(env); const response=await oauthHandle(request,env); if(response)return response; } catch(e) { return err("OAuth service temporarily unavailable.",503); } }
     if (url.pathname === "/mcp") {
       try { return await api(request,env,ctx); }
