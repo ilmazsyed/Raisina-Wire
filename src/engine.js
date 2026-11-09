@@ -73,36 +73,68 @@ export function breakingSting(ctx, seconds = 6) {
   [220, 261.6, 329.6, 440].forEach(f => tone(f, t0 + 1.0, seconds - 1.2, "sawtooth", 0.18));
   for (let b = 1.0; b < seconds - 0.3; b += 0.5) tone(55, t0 + b, 0.3, "triangle", 0.7);
 }
-// A news bed under the headline flash and the bulletin: a soft pad, a pulsing bass and light
-// ticks at 112 bpm, faded in and out. Returns a function that fades it out at once.
-export function newsBed(ctx, seconds = 10) {
+// The news bed under the headline flash, the "up next" card and the bulletin: a driving
+// newsroom track (kick, snare, ticking hats, a pumping bass, brass-like stabs and a running
+// arpeggio) through a compressor, so it sits loud and even. Notes are scheduled a second ahead
+// as it plays, so a two-minute bed costs no more than a short one. Returns a function that fades
+// it out at once.
+let noiseBuf = null;
+const noise = ctx => { if (!noiseBuf || noiseBuf.sampleRate !== ctx.sampleRate) { noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } return noiseBuf; };
+export function newsBed(ctx, seconds = 10, { bpm = 128, level = 0.9 } = {}) {
   if (!ctx) return () => {};
-  const t0 = ctx.currentTime + 0.05, end = t0 + Math.min(seconds, 185), beat = 60 / 112;
-  const out = ctx.createGain(); out.gain.setValueAtTime(0, t0); out.gain.linearRampToValueAtTime(0.16, t0 + 0.8);
-  out.gain.setValueAtTime(0.16, Math.max(t0 + 0.9, end - 1.2)); out.gain.linearRampToValueAtTime(0, end); out.connect(ctx.destination);
-  const nodes = [];
-  const tone = (f, at, len, type, vol) => {
+  const t0 = ctx.currentTime + 0.05, end = t0 + Math.min(seconds, 185), s16 = 60 / bpm / 4;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -20; comp.knee.value = 8; comp.ratio.value = 8; comp.attack.value = 0.002; comp.release.value = 0.12;
+  const out = ctx.createGain(), make = ctx.createGain(); make.gain.value = 1.6;
+  out.gain.setValueAtTime(0, t0); out.gain.linearRampToValueAtTime(level, t0 + 0.06);
+  out.gain.setValueAtTime(level, Math.max(t0 + 0.1, end - 0.7)); out.gain.linearRampToValueAtTime(0, end);
+  out.connect(comp).connect(make).connect(ctx.destination);
+  const osc = (type, f, at, len, vol, cut = 3000, glide = 0) => {
     const o = ctx.createOscillator(), g = ctx.createGain(), lp = ctx.createBiquadFilter();
-    o.type = type; o.frequency.value = f; lp.type = "lowpass"; lp.frequency.value = 1800;
-    g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(vol, at + 0.03); g.gain.exponentialRampToValueAtTime(0.001, at + len);
-    o.connect(lp).connect(g).connect(out); o.start(at); o.stop(at + len + 0.05); nodes.push(o);
+    o.type = type; o.frequency.setValueAtTime(f, at); if (glide) o.frequency.exponentialRampToValueAtTime(glide, at + len * 0.6);
+    lp.type = "lowpass"; lp.frequency.value = cut;
+    g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(vol, at + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+    o.connect(lp).connect(g).connect(out); o.start(at); o.stop(at + len + 0.02);
   };
-  const tick = at => {
-    const len = 0.04, buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * len), ctx.sampleRate), d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
-    const src = ctx.createBufferSource(), hp = ctx.createBiquadFilter(), g = ctx.createGain();
-    src.buffer = buf; hp.type = "highpass"; hp.frequency.value = 6000; g.gain.value = 0.18;
-    src.connect(hp).connect(g).connect(out); src.start(at); nodes.push(src);
+  const hiss = (at, len, vol, type, f, q = 0.8) => {
+    const src = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+    src.buffer = noise(ctx); fl.type = type; fl.frequency.value = f; fl.Q.value = q;
+    g.gain.setValueAtTime(vol, at); g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+    src.connect(fl).connect(g).connect(out); src.start(at, Math.random() * 0.5, len + 0.02);
   };
-  // A minor, F, C, G: two bars each.
-  const chords = [[110, 130.8, 164.8], [87.3, 110, 130.8], [130.8, 164.8, 196], [98, 123.5, 146.8]];
-  for (let bar = 0, at = t0; at < end; bar++, at += beat * 4) {
-    const ch = chords[Math.floor(bar / 2) % chords.length];
-    ch.forEach(f => tone(f * 2, at, beat * 4, "triangle", 0.09));
-    for (let b = 0; b < 4; b++) { tone(ch[0] / 2, at + b * beat, beat * 0.5, "sine", 0.55); tick(at + b * beat + beat / 2); }
-    if (bar % 2 === 0) tone(ch[2] * 4, at, beat * 0.6, "sine", 0.05);
-  }
-  return () => { try { const t = ctx.currentTime; out.gain.cancelScheduledValues(t); out.gain.setValueAtTime(out.gain.value, t); out.gain.linearRampToValueAtTime(0, t + 0.4); setTimeout(() => { nodes.forEach(n => { try { n.stop(); } catch { /* done */ } }); out.disconnect(); }, 600); } catch { /* none */ } };
+  const kick = at => osc("sine", 160, at, 0.32, 1, 800, 42);
+  const snare = at => { hiss(at, 0.2, 0.55, "bandpass", 1900, 0.7); osc("triangle", 200, at, 0.1, 0.35, 2000); };
+  const hat = (at, accent) => hiss(at, accent ? 0.07 : 0.035, accent ? 0.22 : 0.12, "highpass", 8000);
+  const crash = at => hiss(at, 1.4, 0.35, "highpass", 5000, 0.5);
+  // A minor, F, C, G: a bar each.
+  const roots = [55, 43.65, 65.41, 49], chords = [[220, 261.6, 329.6], [174.6, 220, 261.6], [261.6, 329.6, 392], [196, 246.9, 293.7]];
+  let step = 0, next = t0;
+  const plan = () => {
+    while (next < ctx.currentTime + 0.8 && next < end - 0.05) {
+      const at = next, k = step % 16, bar = Math.floor(step / 16), c = bar % 4, ch = chords[c];
+      if (k === 0 && bar % 4 === 0) { crash(at); ch.forEach(f => osc("sawtooth", f, at, 0.9, 0.11, 2600)); }
+      if ([0, 6, 8, 11].includes(k)) kick(at);
+      if (k === 4 || k === 12) snare(at);
+      hat(at, k % 4 === 2);
+      if (k % 2 === 0) osc("sawtooth", roots[c] * (k % 4 === 2 ? 2 : 1), at, s16 * 1.6, 0.42, 520);
+      if (k === 0 || k === 10) ch.forEach(f => osc("sawtooth", f, at, 0.22, 0.08, 2400));
+      osc("square", ch[(step >> 1) % 3] * 2, at, s16 * 0.8, 0.045, 3200);
+      next += s16; step++;
+    }
+  };
+  plan(); const timer = setInterval(plan, 200);
+  setTimeout(() => clearInterval(timer), (end - ctx.currentTime + 1) * 1000);
+  return () => { clearInterval(timer); try { const t = ctx.currentTime; out.gain.cancelScheduledValues(t); out.gain.setValueAtTime(out.gain.value, t); out.gain.linearRampToValueAtTime(0, t + 0.3); setTimeout(() => { try { out.disconnect(); } catch { /* done */ } }, 1500); } catch { /* none */ } };
+}
+// A rising swoosh and a hit, for the "up next" card.
+function riser(ctx) {
+  if (!ctx) return;
+  const t = ctx.currentTime + 0.02, src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+  src.buffer = noise(ctx); bp.type = "bandpass"; bp.Q.value = 1.4; bp.frequency.setValueAtTime(300, t); bp.frequency.exponentialRampToValueAtTime(6000, t + 0.7);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.6, t + 0.65); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+  src.connect(bp).connect(g).connect(ctx.destination); src.start(t, 0, 0.95);
+  const o = ctx.createOscillator(), og = ctx.createGain(); o.type = "sine"; o.frequency.setValueAtTime(140, t + 0.7); o.frequency.exponentialRampToValueAtTime(40, t + 1.1);
+  og.gain.setValueAtTime(0.9, t + 0.7); og.gain.exponentialRampToValueAtTime(0.0001, t + 1.2); o.connect(og).connect(ctx.destination); o.start(t + 0.7); o.stop(t + 1.25);
 }
 function whoosh(ctx) {
   if (!ctx) return;
@@ -180,15 +212,27 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // viewer visits often, at once). The app starts with sound where it may; otherwise it plays
   // muted and turns sound on at the first tap or key press anywhere on the page.
   const soundBtn = host.querySelector(".tvp-sound"), tapHint = host.querySelector(".tvp-taphint");
+  // On iPhone, page sound otherwise counts as a game sound and is silenced by the ringer switch.
+  try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch { /* older Safari */ }
   try { st.audio = new (window.AudioContext || window.webkitAudioContext)(); } catch { /* none */ }
+  const wake = () => { try { if (st.audio && st.audio.state !== "running") st.audio.resume(); } catch { /* none */ } };
   const unmute = () => {
     if (!st.alive) return;
     st.muted = false; if (soundBtn) soundBtn.hidden = true;
-    try { st.audio?.resume(); } catch { /* none */ }
+    wake();
     st.current?.slots.forEach(sl => { sl.setMuted?.(false); sl.play?.(); });
+    startBed(st.current?.scene);
   };
-  const firstTouch = () => { if (st.muted) unmute(); };
-  if (mode === "app") { ["pointerdown", "keydown", "touchend"].forEach(ev => document.addEventListener(ev, firstTouch, { passive: true })); }
+  const firstTouch = () => { wake(); if (st.muted) unmute(); };
+  if (mode === "app") { ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.addEventListener(ev, firstTouch, { passive: true })); }
+  // Music under the headline flash, the "up next" card and the bulletin (faster for the bulletin).
+  const BEDS = { flash: { bpm: 128 }, upnext: { bpm: 132 }, bulletin: { bpm: 140 } };
+  function startBed(sc) {
+    const kind = sc?.graphic?.kind;
+    if (!BEDS[kind] || st.muted || !st.audio || mode !== "app" || st.bed) return;
+    wake();
+    st.bed = newsBed(st.audio, Math.max(2, (sc.dur || 10) - (now() - (sc.startAt || now())) / 1000), BEDS[kind]);
+  }
   soundBtn?.addEventListener("click", unmute);
   const soundOff = () => { st.muted = true; if (soundBtn) soundBtn.hidden = false; };
   // Some phones (iPhone in Low Power Mode) start a YouTube video only from a tap inside it: the
@@ -226,11 +270,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const layer = $(".tvp-ytlayer"), token = {}, start = Math.floor(src.in || 0);
     el.classList.add("tvs-shared");
     el.innerHTML = `<img class="tvs-poster" src="https://i.ytimg.com/vi/${esc(src.id)}/hqdefault.jpg" alt="" onerror="this.hidden=true">`;
-    st.ytOwner = token; st.ytPoster = el; st.nowYt = { id: src.id, title: src.title || "" }; layer.hidden = false; showLike();
+    st.ytOwner = token; st.ytPoster = el; st.nowYt = { id: src.id, title: src.title || "" }; layer.hidden = false; layer.classList.remove("pre"); showLike();
     const load = () => {
       const y = st.yt;
       if (!y?.ready || st.ytOwner !== token) return;
-      try { y.ended = false; y.player.loadVideoById({ videoId: src.id, startSeconds: start }); st.muted ? y.player.mute() : y.player.unMute(); } catch { /* none */ }
+      try {
+        y.ended = false;
+        if (y.pre === src.id) { y.pre = null; y.preloading = false; y.player.seekTo(start, true); st.muted ? y.player.mute() : y.player.unMute(); y.player.playVideo(); }
+        else { y.pre = null; y.player.loadVideoById({ videoId: src.id, startSeconds: start }); st.muted ? y.player.mute() : y.player.unMute(); }
+      } catch { /* none */ }
       checkStart();
     };
     // Not playing after a moment: try again muted (allowed nearly everywhere), then ask for a tap.
@@ -246,7 +294,12 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, playsinline: 1, fs: 0, autoplay: 1, mute: st.muted ? 1 : 0, start, origin: location.origin },
         events: {
           onReady: e => { st.yt.ready = true; st.muted ? e.target.mute() : e.target.unMute(); if (st.ytOwner === token) { e.target.playVideo(); checkStart(); } else st.ytLoad?.(); },
-          onStateChange: e => { st.yt.state = e.data; st.yt.since = Date.now(); if (e.data === 0) st.yt.ended = true; if (e.data === 1) { st.ytPoster?.querySelector(".tvs-poster")?.remove(); needTap(false); } },
+          onStateChange: e => {
+            st.yt.state = e.data; st.yt.since = Date.now();
+            // A video loaded in advance waits, paused and buffering, until its turn.
+            if (st.yt.preloading && !st.ytOwner) { if (e.data === 1) { e.target.pauseVideo(); st.yt.preloading = false; } return; }
+            if (e.data === 0) st.yt.ended = true; if (e.data === 1) { st.ytPoster?.querySelector(".tvs-poster")?.remove(); needTap(false); }
+          },
           onError: () => { st.yt.state = 0; st.yt.ended = true; }
         } });
     });
@@ -260,6 +313,16 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       playing: () => st.yt?.state === 1, shared: true
     };
   }
+  // The next video is loaded into the one player while the flash or the "up next" card is on
+  // (the player is invisible then), so it plays the moment its turn comes, without a wait.
+  function preloadYT(want) {
+    const y = st.yt;
+    if (!want || !y?.ready || st.ytOwner || y.pre === want.id) return;
+    y.pre = want.id; y.preloading = true;
+    $(".tvp-ytlayer")?.classList.add("pre");
+    try { y.player.mute(); y.player.loadVideoById({ videoId: want.id, startSeconds: Math.floor(want.at || 0) }); } catch { y.pre = null; y.preloading = false; }
+  }
+  const ytPos = id => { try { return st.nowYt?.id === id ? st.yt?.player?.getCurrentTime?.() || 0 : 0; } catch { return 0; } };
   function makeSource(el, src, offset, isMain, solo) {
     const slot = { el, src, destroy() {}, setMuted() {}, stalled: () => false };
     const mute = () => st.muted || !isMain;
@@ -327,32 +390,57 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   function continuitySeg() { if (mode === "app") return localSeg(); const t = now(); return st.tv?.schedule?.find(x => x.start <= t && t < x.start + x.dur * 1000) || null; }
   // In the app each viewer has their own running order: it starts at the newest video when the
   // viewer opens the channel and goes down the list; a video moves on only when it has played
-  // to its end, a headline flash (with the stinger) comes between videos, the bulletin goes on
-  // at the first break after :00 and :30, and a newly uploaded video is played next. Only what
-  // the control room puts on air (live, manual takes, rundowns, standby, breaking) is the same
-  // for every viewer at the same moment.
-  const nextHalfT = t => Math.floor(t / 1800e3) * 1800e3 + 1800e3;
+  // to its end; a headline flash (with the stinger) comes after every video, and an animated
+  // "up next" card before the next one. The bulletin is on the clock, the same for everyone: two
+  // minutes from every :00 and :30 (a viewer who opens the channel at 4:01 joins it a minute in).
+  // It cuts into whatever is playing, and that video is picked up again after it, where it was
+  // left. What the control room puts on air (live, manual takes, rundowns, standby, breaking) is
+  // also the same for every viewer at the same moment.
+  const BULLETIN_MS = 120e3, UPNEXT = 6;
+  const upnext = v => ({ type: "upnext", video: v, dur: UPNEXT, sting: false });
   function localSeg() {
     const loop = st.tv?.loop || []; if (!loop.length) return null;
-    const t = now(), q = st.seq ||= { i: 0, item: null, seg: null, start: 0, due: nextHalfT(t), n: 0, head: loop[0]?.ytId || "" };
+    const t = now(), q = st.seq ||= { i: 0, item: null, seg: null, start: 0, n: 0, head: loop[0]?.ytId || "" };
+    const slot = Math.floor(t / 1800e3) * 1800e3;
+    if (t - slot < BULLETIN_MS && (st.tv?.bulletin || []).length) {
+      if (q.item?.type !== "bulletin" || q.start !== slot) {
+        // Whatever was on stops for the bulletin; a video is picked up again afterwards.
+        if (q.item?.type === "video") { const at = (q.item.in || 0) + ytPos(q.item.ytId); q.resume = at < q.item.dur - 8 ? { ...q.item, at, resumed: true } : null; }
+        else if (q.item?.type === "upnext") q.resume = q.item.video;
+        q.item = { type: "bulletin", dur: BULLETIN_MS / 1000, sting: true }; q.start = slot; q.n++;
+        q.seg = { ...q.item, start: slot, in: 0 };
+      }
+      st.preWant = null;
+      return q.seg;
+    }
     if (q.item) {
       const it = q.item, age = t - q.start;
       const done = it.type === "video"
-        ? (st.yt?.ended && st.nowYt?.id === it.ytId) || age > (it.dur + 45) * 1000 || (!st.yt && age > it.dur * 1000)
+        ? (st.yt?.ended && st.nowYt?.id === it.ytId) || age > (it.dur - (it.in || 0) + 45) * 1000 || (!st.yt && age > (it.dur - (it.in || 0)) * 1000)
         : age >= it.dur * 1000;
       if (!done) return q.seg;
     }
+    if (q.restart && !["video", "upnext"].includes(q.item?.type)) { q.i = 0; q.restart = false; }
+    const take = () => { const x = loop[q.i % loop.length]; q.i = (q.i + 1) % loop.length; return x; };
     let next;
-    if (q.item && t >= q.due && q.item.type !== "bulletin") { next = { type: "bulletin", dur: 120, sting: true }; q.due = nextHalfT(t); }
+    if (q.item?.type === "upnext") {
+      const v = q.item.video;
+      next = { type: "video", ytId: v.ytId, title: v.title, line: v.line, dur: v.dur, in: v.at || 0 };
+      if (!v.resumed) take();
+    } else if (q.resume) { next = upnext(q.resume); q.resume = null; }
     else {
-      if (q.item) q.i = (q.i + 1) % loop.length;
-      if (q.restart && q.item?.type !== "video") { q.i = 0; q.restart = false; }
-      const x = loop[q.i % loop.length];
-      if (q.item?.type === "video" && x.type === "video") { next = { type: "flash", dur: 10, sting: true, n: q.n }; q.i = (q.i - 1 + loop.length) % loop.length; }
-      else next = x;
+      let x = loop[q.i % loop.length];
+      // No flash straight after the bulletin.
+      if (x.type === "flash" && q.item?.type === "bulletin" && loop.length > 1) { take(); x = loop[q.i % loop.length]; }
+      if (x.type === "video" && q.item?.type === "video") next = { type: "flash", dur: 10, sting: true, n: q.n };
+      else if (x.type === "video" && q.item) next = upnext({ ...x, at: 0 });
+      else next = take();
     }
     q.n++; q.item = next; q.start = t;
-    q.seg = { ...next, start: t, in: 0, n: next.n ?? q.n };
+    q.seg = { ...next, start: t, in: next.in || 0, n: next.n ?? q.n };
+    // While a flash or the "up next" card is on, the video after it is loaded in advance.
+    const after = next.type === "upnext" ? next.video : next.type !== "video" ? loop.slice(q.i).concat(loop.slice(0, q.i)).find(x => x.type === "video") : null;
+    st.preWant = after ? { id: after.ytId, at: after.at || 0 } : null;
     return q.seg;
   }
   function continuityScene() {
@@ -360,8 +448,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (s.live) return { layout: "full", sources: [{ kind: "yt", id: s.live.ytId }], label: s.live.title, key: `live:${s.live.ytId}` };
     const seg = continuitySeg(); if (!seg) return { layout: "graphic", graphic: { kind: "headlines" }, key: "c:none" };
     const transition = seg.sting ? { type: "stinger", ms: 1200 } : { type: "mix", ms: 500 };
-    if (seg.type === "video") return { layout: "full", sources: [{ kind: "yt", id: seg.ytId, in: seg.in || 0 }], label: seg.title, startAt: seg.start, key: `c:${seg.ytId}:${seg.start}`, transition };
+    if (seg.type === "video") return { layout: "full", sources: [{ kind: "yt", id: seg.ytId, in: seg.in || 0, title: seg.line || seg.title }], label: seg.line || seg.title, startAt: seg.start, key: `c:${seg.ytId}:${seg.start}`, transition };
     if (seg.type === "flash") return { layout: "graphic", graphic: { kind: "flash", n: seg.n || 0 }, startAt: seg.start, dur: seg.dur, key: `c:flash:${seg.start}`, transition };
+    if (seg.type === "upnext") return { layout: "graphic", graphic: { kind: "upnext", video: seg.video }, startAt: seg.start, dur: seg.dur, key: `c:upnext:${seg.start}`, transition: { type: "mix", ms: 250 }, full: true };
     if (seg.type === "bulletin") return { layout: "graphic", graphic: { kind: "bulletin" }, startAt: seg.start, dur: seg.dur, key: `c:bulletin:${seg.start}`, transition, full: true };
     if (seg.type === "news") return { layout: "graphic", graphic: { kind: "news" }, startAt: seg.start, dur: seg.dur, key: `c:news:${seg.start}`, transition };
     if (seg.type === "promo") return { layout: "graphic", graphic: { kind: "promo", image: seg.image }, key: `c:promo:${seg.start}`, full: true };
@@ -413,6 +502,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       });
       if (sc.graphic) box.append(graphic(sc));
     }
+    startBed(sc);
     stage.querySelector(".tvp-stage").append(box);
     const leftVideo = old?.scene?.sources?.some(x => x.kind === "yt") && !old?.scene?.graphic;
     const t = !old ? { type: "cut", ms: 0 } : leftVideo ? { type: "stinger", ms: 1200 } : (sc?.transition || st.ctl?.transition || { type: "mix", ms: 600 });
@@ -433,6 +523,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   }
 
   /* ---------- graphics ---------- */
+  const istParts = d => { const [h, m] = d.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).split(":").map(Number); return { h, m }; };
+  function slotWords(d) {
+    const { h, m } = istParts(d), h12 = h % 12 || 12;
+    const part = h < 4 ? "রাত" : h < 6 ? "ভোর" : h < 12 ? "সকাল" : h < 15 ? "দুপুর" : h < 18 ? "বিকেল" : h < 20 ? "সন্ধ্যা" : "রাত";
+    const tail = n => `${bnDigits(n)}${n === 2 ? "টো" : n === 3 || n === 4 ? "টে" : "টা"}`;
+    if (m < 30) return `${part} ${tail(h12)}`;
+    return `${part} ${h12 === 1 ? "দেড়টা" : h12 === 2 ? "আড়াইটে" : `সাড়ে ${tail(h12)}`}`;
+  }
+  const bnDate = d => { try { return bnDigits(d.toLocaleDateString("bn-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long", year: "numeric" })); } catch { return ""; } };
   const ist = () => bnDigits(new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }));
   const tickerHTML = list => { const items = list.map(t => `<span>${esc(t)}</span>`).join("<i>◆</i>"); return `<div class="tk-move" style="--dur:${Math.max(40, list.length * 9)}s"><div>${items}<i>◆</i></div><div aria-hidden="true">${items}<i>◆</i></div></div>`; };
   const adBox = ad => ad?.image ? `<div class="tv-ad img"><img src="${esc(ad.image)}" alt=""></div>` : `<div class="tv-ad"><b>${esc(ad?.line1 || "")}</b><hr><small>${esc(ad?.line2 || "")}</small><hr><small>${esc(ad?.line3 || "")}</small></div>`;
@@ -454,7 +553,6 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = Math.floor((e - 5) / step), x = sets[Math.min(sets.length - 1, k)]; el.innerHTML = e < 5 || !x ? card() : wrapV(setHTML(name, x.label, x.items, step), x.label); };
       draw(); const t = setInterval(() => el.isConnected ? draw() : clearInterval(t), 1000);
     } else if (g.kind === "flash") {   // 10 seconds between videos: the breaking story, or the headlines
-      if (!st.muted && st.audio && mode === "app") st.bed = newsBed(st.audio, Math.max(2, (sc.dur || 10) - (now() - (sc.startAt || now())) / 1000));
       const br = st.ctl?.breaking || st.tv?.breaking;
       if (br?.text) el.innerHTML = channel === "h" ? `<div class="tv-breaking static"><div class="br-slash"></div><div class="br-in"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(br.text)}</b><img src="${LOGO}" alt=""></div><div class="br-bar"></div></div>` : vJacket(`<div class="br-v"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(br.text)}</b></div>`, "এইমাত্র পাওয়া খবর");
       else {
@@ -462,20 +560,39 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         const items = [...Hs.slice(from), ...Hs.slice(0, from)].slice(0, per).map(h => h.text);
         el.innerHTML = wrapV(setHTML("শিরোনাম", "সর্বশেষ", items, sc.dur || 10), "শিরোনাম");
       }
-    } else if (g.kind === "bulletin") {   // three minutes at :00 and :30, the latest stories in detail
-      if (!st.muted && st.audio && mode === "app") st.bed = newsBed(st.audio, Math.max(2, (sc.dur || 120) - (now() - (sc.startAt || now())) / 1000));
-      const total = sc.dur || 120, list = (st.tv?.bulletin || []).slice(0, 6), intro = 6, per = list.length ? (total - intro) / list.length : total;
-      const title = () => `<div class="nu-title${channel === "v" ? " v" : ""}"><img src="${LOGO}" alt=""><b>বুলেটিন</b><small>${ist()}</small></div>`;
-      const story = (x, k) => `<div class="bl-story${channel === "v" ? " v" : ""}"><div class="bl-head"><span>বুলেটিন</span><em>${bnDigits(k + 1)}/${bnDigits(list.length)}</em><b>${esc(x.desk || "")}</b><i style="--d:${per}s"></i></div><h2>${esc(x.title)}</h2><p>${esc(x.text)}</p></div>`;
+    } else if (g.kind === "upnext") {   // the coming video, in one Bengali line
+      const v = g.video || {}, dur = sc.dur || 6, line = String(v.line || v.title || "").trim();
+      const thumb = `https://i.ytimg.com/vi/${esc(v.ytId)}/hqdefault.jpg`;
+      el.innerHTML = `<div class="un${channel === "v" ? " v" : ""}"><div class="un-bg" style="background-image:url('${thumb}')"></div><i class="un-shade"></i>
+        <i class="un-slab s1"></i><i class="un-slab s2"></i><i class="un-slab s3"></i>
+        <div class="un-kick"><span data-no-tr>UP NEXT</span><b>এরপর</b></div>
+        <div class="un-card"><img src="${thumb}" alt=""><i class="un-play"></i><i class="un-shine"></i></div>
+        <h2 class="un-line">${line.split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</h2>
+        <div class="un-count"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44"/><circle class="p" cx="50" cy="50" r="44" style="--d:${dur}s"/></svg><b></b></div>
+        <i class="un-bar" style="--d:${dur}s"></i></div>`;
+      if (!st.muted && mode === "app") riser(st.audio);
+      const count = () => { if (!el.isConnected && st.current) return; const left = Math.max(1, Math.ceil(dur - (now() - (sc.startAt || now())) / 1000)); const b = el.querySelector(".un-count b"); if (b && b.textContent !== bnDigits(left)) b.textContent = bnDigits(left); };
+      count(); const t = setInterval(() => el.isConnected ? count() : clearInterval(t), 250);
+    } else if (g.kind === "bulletin") {   // two minutes from :00 and :30, the same for everyone
+      const total = sc.dur || 120, list = (st.tv?.bulletin || []).slice(0, 8), intro = 7, per = list.length ? (total - intro) / list.length : total;
+      const at = new Date(sc.startAt || now()), when = slotWords(at), day = bnDate(at);
+      const opening = () => `<div class="nb${channel === "v" ? " v" : ""}"><i class="nb-ray"></i><i class="nb-ray r2"></i><i class="nb-ring"></i><i class="nb-ring b"></i>
+        <div class="nb-logo"><img src="${LOGO}" alt="রাষ্ট্রিক্স"></div>
+        <div class="nb-word" data-no-tr><b class="w1">NEWS</b><b class="w2">BULLETIN</b></div><i class="nb-line"></i>
+        <div class="nb-bn">সংবাদ বুলেটিন · ${esc(when)}</div><div class="nb-when"><span>${esc(day)}</span></div></div>`;
+      const story = (x, k) => `<div class="bs${channel === "v" ? " v" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>
+        <div class="bs-side"><em>${bnDigits(k + 1)}</em><small>/ ${bnDigits(list.length)}</small><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span></div>
+        <div class="bs-main"><h2>${String(x.title || "").split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</h2><p>${esc(x.text || "")}</p></div>
+        <div class="bs-strap"><b data-no-tr>NEWS BULLETIN</b><span>${esc(when)}</span><div class="bs-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${per}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div></div>`;
       let shown = -2;
       const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = e < intro || !list.length ? -1 : Math.min(list.length - 1, Math.floor((e - intro) / per)); if (k === shown) return; const first = shown === -2; shown = k;
-        const paint = () => { el.innerHTML = k < 0 ? title() : story(list[k], k); };
-        // A stinger at every change within the bulletin.
+        const paint = () => { el.innerHTML = k < 0 ? opening() : story(list[k], k); };
         if (first || !el.isConnected) return paint();
-        const w = document.createElement("div"); w.className = "tvp-stinger"; w.innerHTML = `<img src="${LOGO}" alt="">`;
+        // A quick red slash between stories.
+        const w = document.createElement("div"); w.className = "bs-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
         stage.append(w); if (!st.muted) whoosh(st.audio);
-        setTimeout(paint, 650); setTimeout(() => w.remove(), 1400); };
-      draw(); const t = setInterval(() => el.isConnected ? draw() : clearInterval(t), 1000);
+        setTimeout(paint, 330); setTimeout(() => w.remove(), 900); };
+      draw(); const t = setInterval(() => el.isConnected ? draw() : clearInterval(t), 250);
     } else if (g.kind === "headlines") {
       const items = g.lines?.length ? g.lines : (st.tv?.headlines || []).slice(0, 5).map(h => h.text);
       el.innerHTML = wrapV(setHTML("শিরোনাম", g.title || "সর্বশেষ", items, sc.dur || 10), g.title || "শিরোনাম");
@@ -579,6 +696,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     while (st.queue.length && st.queue[0].at <= Date.now()) { st.ctl = st.queue.shift().state; onState?.(st.ctl); }
     let sc = resolve();
     if (sc?.key !== st.current?.key) drawScene(sc);
+    if (mode === "app") preloadYT(st.preWant);
     const b = st.ctl?.breaking || st.tv?.breaking;
     if (mode !== "scene" && b && st.shownBreaking !== b.at && now() - Date.parse(b.at) < 90e3) { st.shownBreaking = b.at; showBreaking(b); }
     drawJacket();
@@ -613,7 +731,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   loadTv().then(tick); connect(); poll();
   const timers = [setInterval(loadTv, 15000), setInterval(tick, 500), setInterval(() => { st.flash++; }, 8000), setInterval(poll, 5000), setInterval(heartbeat, 5000)];
   return {
-    destroy() { st.alive = false; ["pointerdown", "keydown", "touchend"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
+    destroy() { st.alive = false; ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
     unmute, setScene(sc) { fixedScene = sc; tick(); }, get state() { return st.ctl; }
   };
 }

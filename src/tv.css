@@ -138,7 +138,7 @@ body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 .tvp-v .lbv-bottom{position:absolute;left:0;right:0;top:68%;bottom:64px;padding:30px 40px;background:linear-gradient(160deg,var(--red),var(--maroon));color:#fff;display:flex;flex-direction:column;gap:14px}
 .lbv-bottom b{font:700 50px/1.25 "Noto Serif Bengali",serif}.lbv-bottom p{margin:0;font:600 30px/1.3 "Hind Siliguri",sans-serif;border-top:1px solid rgba(255,255,255,.3);padding-top:10px}
 .tv-breaking.static{position:absolute;animation:none}
-.full-gfx .tvp-gfx,.full-gfx .tvp-ovl{display:none}
+.full-gfx .tvp-ovl{display:none}
 /* overlays: poll bar, results, comments */
 .tvp-ovl{position:absolute;inset:0;z-index:7;pointer-events:none}
 .poll-bar{position:absolute;left:56px;right:440px;bottom:96px;padding:16px 22px;border-radius:14px;background:rgba(255,255,255,.96);box-shadow:0 14px 30px rgba(0,0,0,.3);border-top:5px solid var(--red)}
@@ -238,3 +238,111 @@ body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 .v-flash .vf-wipe{position:absolute;inset:0;z-index:2;background:var(--red);pointer-events:none;animation:vfwipe .8s cubic-bezier(.7,0,.3,1) both}
 @keyframes vfwipe{0%{clip-path:inset(100% 0 0 0)}45%{clip-path:inset(0 0 0 0)}100%{clip-path:inset(0 0 100% 0)}}
 .v-flash span,.v-flash b{animation:tvin .35s .4s both}
+
+/* ---------- The video loaded in advance stays invisible until its turn ---------- */
+.tvp-ytlayer.pre{display:block!important;opacity:0;pointer-events:none}
+
+/* ---------- "Up next": the coming video, in one Bengali line ---------- */
+.un{position:absolute;inset:0;overflow:hidden;background:#0c0507;color:#fff}
+.un>*{position:absolute;z-index:3}
+.un-bg{z-index:0;inset:-6%;background-size:cover;background-position:center;opacity:.38;animation:unbg 6.5s linear both}
+.un-shade{z-index:1;inset:0;background:linear-gradient(100deg,rgba(18,0,0,.96) 0%,rgba(40,0,0,.78) 46%,rgba(0,0,0,.25) 100%)}
+@keyframes unbg{from{transform:scale(1.18) translateX(-2%)}to{transform:scale(1.02) translateX(2%)}}
+.un-slab{z-index:2;top:-25%;height:150%;background:var(--red);transform:skewX(-16deg);animation:unslab .85s cubic-bezier(.75,0,.2,1) both}
+.un-slab.s1{left:-14%;width:30%;opacity:.92}
+.un-slab.s2{left:15%;width:4%;background:#e01010;animation-delay:.08s}
+.un-slab.s3{left:20.5%;width:.9%;background:var(--gold);animation-delay:.16s}
+@keyframes unslab{from{transform:skewX(-16deg) translateX(-260%)}}
+.un-kick{left:110px;top:130px;display:flex;flex-direction:column;gap:2px}
+.un-kick span{font:800 34px Montserrat,sans-serif;letter-spacing:.42em;color:var(--gold);animation:unslide .6s .2s cubic-bezier(.2,.9,.2,1) both}
+.un-kick b{font:900 176px/1.08 "Noto Serif Bengali",serif;text-shadow:0 14px 40px rgba(0,0,0,.45);animation:unpop .75s .3s cubic-bezier(.2,1.5,.4,1) both;transform-origin:0 70%}
+@keyframes unslide{from{transform:translateX(-120px);opacity:0}}
+@keyframes unpop{0%{transform:scale(.3) rotate(-6deg);opacity:0}100%{transform:none;opacity:1}}
+.un-card{right:120px;top:130px;width:900px;aspect-ratio:16/9;border-radius:28px;overflow:hidden;background:#000;box-shadow:0 0 0 6px #fff,0 40px 90px rgba(0,0,0,.65);transform:perspective(1800px) rotateY(-10deg);animation:uncard .95s .3s cubic-bezier(.2,.9,.2,1) both,unfloat 2.6s 1.3s ease-in-out infinite alternate}
+.un-card img{width:100%;height:100%;object-fit:cover;display:block;animation:unbg 6.5s linear both}
+@keyframes uncard{from{transform:perspective(1800px) rotateY(-55deg) translateX(520px) scale(.6);opacity:0}}
+@keyframes unfloat{to{transform:perspective(1800px) rotateY(-4deg) translateY(-16px)}}
+.un-play{position:absolute;left:50%;top:50%;width:130px;height:130px;margin:-65px;border-radius:50%;background:var(--red);box-shadow:0 0 0 0 rgba(224,16,16,.7);animation:unpulse 1.2s 1.1s infinite}
+.un-play:after{content:"";position:absolute;left:52px;top:38px;border-left:44px solid #fff;border-top:27px solid transparent;border-bottom:27px solid transparent}
+@keyframes unpulse{70%{box-shadow:0 0 0 46px rgba(224,16,16,0)}100%{box-shadow:0 0 0 0 rgba(224,16,16,0)}}
+.un-shine{position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.45) 50%,transparent 65%);transform:translateX(-120%);animation:unshine 1.1s 1.2s ease both}
+@keyframes unshine{to{transform:translateX(120%)}}
+.un-line{left:110px;right:120px;bottom:120px;margin:0;font:800 78px/1.32 "Noto Serif Bengali",serif;text-shadow:0 8px 30px rgba(0,0,0,.5);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.un-line span{display:inline-block;animation:unword .6s calc(.75s + var(--i)*.09s) cubic-bezier(.2,1.4,.3,1) both}
+@keyframes unword{from{transform:translateY(70px) scale(.7);opacity:0}}
+.un-count{left:110px;top:470px;width:150px;height:150px;animation:unpop .6s .6s cubic-bezier(.2,1.5,.4,1) both}
+.un-count svg{width:100%;height:100%;transform:rotate(-90deg)}
+.un-count circle{fill:rgba(0,0,0,.35);stroke:rgba(255,255,255,.2);stroke-width:7}
+.un-count circle.p{fill:none;stroke:var(--gold);stroke-linecap:round;stroke-dasharray:277;animation:uncount var(--d) linear both}
+@keyframes uncount{to{stroke-dashoffset:277}}
+.un-count b{position:absolute;inset:0;display:grid;place-items:center;font:800 70px "Hind Siliguri",sans-serif}
+.un-bar{left:0;bottom:0;height:14px;width:0;background:linear-gradient(90deg,var(--red),#ff3030,var(--gold));animation:tvprog var(--d) linear both}
+.un.v .un-kick{left:70px;top:190px}
+.un.v .un-kick b{font-size:150px}
+.un.v .un-card{left:calc(50% - 270px);right:auto;top:520px;width:540px;aspect-ratio:9/16;transform:none;animation:uncardv .9s .3s cubic-bezier(.2,.9,.2,1) both,unfloatv 2.6s 1.3s ease-in-out infinite alternate}
+@keyframes uncardv{from{transform:translateY(600px) rotate(8deg) scale(.6);opacity:0}}
+@keyframes unfloatv{to{transform:translateY(-14px) rotate(-1deg)}}
+.un.v .un-line{left:60px;right:60px;top:1500px;bottom:auto;font-size:64px;-webkit-line-clamp:3;text-align:center}
+.un.v .un-count{left:auto;right:70px;top:250px;width:140px;height:140px}
+.un.v .un-slab.s1{left:-30%;width:60%}.un.v .un-slab.s2{left:28%;width:7%}.un.v .un-slab.s3{left:37%;width:1.6%}
+
+/* ---------- The bulletin: the NEWS BULLETIN opening ---------- */
+.nb{position:absolute;inset:0;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;background:radial-gradient(ellipse at 50% 42%,#4a0606 0%,#1a0101 52%,#050303 100%);color:#fff}
+.nb>*{position:relative;z-index:2}
+.nb-ray{position:absolute!important;z-index:0!important;left:50%;top:42%;width:2400px;height:2400px;margin:-1200px;border-radius:50%;background:repeating-conic-gradient(from 0deg,rgba(255,255,255,.06) 0 5deg,transparent 5deg 15deg);animation:tvspin 30s linear infinite}
+.nb-ray.r2{background:repeating-conic-gradient(from 7deg,rgba(224,16,16,.12) 0 3deg,transparent 3deg 20deg);animation-direction:reverse;animation-duration:22s}
+.nb-ring{position:absolute!important;z-index:1!important;left:50%;top:42%;width:220px;height:220px;margin:-110px;border:5px solid rgba(212,160,23,.75);border-radius:50%;animation:nbring 2.2s ease-out infinite}
+.nb-ring.b{animation-delay:1.1s;border-color:rgba(255,255,255,.4)}
+@keyframes nbring{from{transform:scale(.3);opacity:1}to{transform:scale(7);opacity:0}}
+.nb-logo{padding:18px 30px;border-radius:22px;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.5);animation:nblogo .8s .1s cubic-bezier(.2,1.5,.4,1) both}
+.nb-logo img{height:120px;display:block}
+@keyframes nblogo{from{transform:scale(0) rotate(-14deg);opacity:0}}
+.nb-word{display:flex;gap:34px;font:900 150px/1 Montserrat,sans-serif;letter-spacing:.04em}
+.nb-word .w1{animation:nbl .7s .45s cubic-bezier(.2,.9,.2,1) both}
+.nb-word .w2{padding:6px 26px 10px;background:var(--red);border-radius:8px;animation:nbr .7s .55s cubic-bezier(.2,.9,.2,1) both}
+@keyframes nbl{from{transform:translateX(-700px);opacity:0}}
+@keyframes nbr{from{transform:translateX(700px);opacity:0}}
+.nb-line{display:block;width:1300px;height:6px;background:linear-gradient(90deg,transparent,var(--gold),transparent);transform:scaleX(0);animation:nbline .9s .9s ease both}
+@keyframes nbline{to{transform:scaleX(1)}}
+.nb-bn{font:800 66px "Noto Serif Bengali",serif;animation:nbup .6s 1.1s cubic-bezier(.2,.9,.2,1) both}
+.nb-when span{display:inline-block;padding:10px 28px;border-radius:12px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);font:700 40px "Hind Siliguri",sans-serif;animation:nbup .6s 1.3s cubic-bezier(.2,.9,.2,1) both}
+@keyframes nbup{from{transform:translateY(50px);opacity:0}}
+.nb.v .nb-word{flex-direction:column;align-items:center;gap:18px;font-size:140px}
+.nb.v .nb-line{width:860px}.nb.v .nb-bn{font-size:60px;text-align:center}
+
+/* ---------- The bulletin: each story ---------- */
+.bs{position:absolute;inset:0;overflow:hidden;color:#fff;background:linear-gradient(135deg,#0d0b12 0%,#1b0607 55%,#2a0405 100%)}
+.bs-bg{position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.035) 0 2px,transparent 2px 40px);animation:bsdrift 8s linear infinite}
+@keyframes bsdrift{to{background-position:220px 0}}
+.bs-glow{position:absolute;right:-300px;top:-300px;width:1100px;height:1100px;border-radius:50%;background:radial-gradient(circle,rgba(224,16,16,.35),transparent 65%);animation:bsglow 4s ease-in-out infinite alternate}
+@keyframes bsglow{to{transform:translate(-120px,80px) scale(1.15)}}
+.bs-side{position:absolute;left:100px;top:110px;width:250px;display:flex;flex-direction:column;align-items:flex-start;gap:10px;animation:unslide .5s cubic-bezier(.2,.9,.2,1) both}
+.bs-side em{font:900 150px/1 Montserrat,"Hind Siliguri",sans-serif;font-style:normal;color:#fff;padding:10px 26px;background:var(--red);border-radius:16px;box-shadow:0 18px 40px rgba(170,4,4,.45)}
+.bs-side small{font:700 36px "Hind Siliguri",sans-serif;color:rgba(255,255,255,.65)}
+.bs-side span{margin-top:14px;padding:8px 20px;border-left:6px solid var(--gold);font:800 38px "Hind Siliguri",sans-serif;background:rgba(255,255,255,.08)}
+.bs-main{position:absolute;left:420px;right:110px;top:100px;bottom:170px;display:flex;flex-direction:column;gap:30px}
+.bs-main h2{margin:0;font:800 66px/1.3 "Noto Serif Bengali",serif;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.bs-main h2 span{display:inline-block;animation:unword .5s calc(.15s + var(--i)*.05s) cubic-bezier(.2,1.3,.3,1) both}
+.bs-main p{margin:0;padding-left:26px;border-left:4px solid rgba(212,160,23,.8);font:500 38px/1.62 "Noto Serif Bengali",serif;color:rgba(255,255,255,.88);display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden;animation:nbup .7s .7s cubic-bezier(.2,.9,.2,1) both}
+.bs-strap{position:absolute;left:0;right:0;bottom:0;height:110px;display:flex;align-items:center;gap:26px;padding:0 40px 0 0;background:rgba(0,0,0,.55);border-top:3px solid var(--red)}
+.bs-strap b{align-self:stretch;display:grid;place-items:center;padding:0 34px;background:var(--red);font:900 36px Montserrat,sans-serif;letter-spacing:.12em}
+.bs-strap span{font:700 36px "Hind Siliguri",sans-serif;white-space:nowrap}
+.bs-steps{flex:1;display:flex;gap:10px}
+.bs-steps i{flex:1;height:10px;border-radius:5px;background:rgba(255,255,255,.18);overflow:hidden;position:relative}
+.bs-steps i.done{background:var(--gold)}
+.bs-steps i.on:after{content:"";position:absolute;left:0;top:0;bottom:0;width:0;background:var(--gold);animation:tvprog var(--d) linear forwards}
+.bs-strap img{height:64px;padding:6px 12px;background:#fff;border-radius:10px}
+.bs.v .bs-side{left:60px;top:170px;width:auto;flex-direction:row;align-items:center;gap:18px}
+.bs.v .bs-side em{font-size:110px}.bs.v .bs-side span{margin:0 0 0 auto}
+.bs.v .bs-main{left:60px;right:60px;top:420px;bottom:240px}
+.bs.v .bs-main h2{font-size:66px;-webkit-line-clamp:4}
+.bs.v .bs-main p{font-size:42px;-webkit-line-clamp:13}
+.bs.v .bs-strap{height:auto;flex-wrap:wrap;padding:20px 30px;gap:16px 22px}
+.bs.v .bs-strap b{padding:10px 24px}.bs.v .bs-steps{flex-basis:100%;order:3}
+/* A quick red slash between stories */
+.bs-wipe{position:absolute;inset:0;z-index:12;pointer-events:none;overflow:hidden}
+.bs-wipe i{position:absolute;top:-20%;height:140%;width:180%;left:-40%;transform:skewX(-18deg) translateX(-120%);animation:bswipe .8s cubic-bezier(.7,0,.3,1) both}
+.bs-wipe i:nth-child(1){background:var(--gold)}
+.bs-wipe i:nth-child(2){background:var(--red);animation-delay:.04s}
+.bs-wipe i:nth-child(3){background:#120203;animation-delay:.08s}
+@keyframes bswipe{0%{transform:skewX(-18deg) translateX(-120%)}42%,52%{transform:skewX(-18deg) translateX(0)}100%{transform:skewX(-18deg) translateX(120%)}}

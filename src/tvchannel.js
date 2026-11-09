@@ -1,3 +1,4 @@
+import { bnLine } from "./bnline.js";
 // Rashtrix TV, Phase 2: two channels, each on or off, each with its own secret output address
 // for OBS / vMix.
 //   h  horizontal 1920×1080: long videos, with the full designable jacket (bug, LIVE, clock,
@@ -78,7 +79,7 @@ export async function shortsList(env, limit = 60) {
 
 /* ---------- The running order ---------- */
 async function playable(env, ch) {
-  const { results } = await env.DB.prepare(`SELECT i.yt_id AS ytId, i.title, i.duration, i.thumb FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
+  const { results } = await env.DB.prepare(`SELECT i.yt_id AS ytId, i.title, i.duration, i.thumb, i.headline, i.description FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
     WHERE i.channel=? AND i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0 ${ch === "v" ? `AND i.duration<=${SHORT_MAX}` : `AND i.duration>=${LONG_MIN}`}
     ORDER BY i.published_at DESC LIMIT 300`).bind(ch).all();
   return results;
@@ -100,7 +101,7 @@ const hash = str => { let h = 2166136261; for (const c of String(str)) h = Math.
 export function buildLoop(s, videos, cards = []) {
   const loop = []; let k = 0, slot = 0;
   for (const v of videos) {
-    loop.push({ type: "video", ytId: v.ytId, title: v.title, dur: v.duration, thumb: v.thumb });
+    loop.push({ type: "video", ytId: v.ytId, title: v.title, line: (v.headline || "").trim() || bnLine(v.title, v.description), dur: v.duration, thumb: v.thumb });
     loop.push({ type: "flash", dur: FLASH_SECONDS, n: k });
     k++;
     if (s.promosOn && cards.length && s.promoEvery && k % s.promoEvery === 0) { const p = cards[slot++ % cards.length]; loop.push({ type: "promo", id: p.id, image: p.image, title: p.title, dur: p.seconds }); }
@@ -140,7 +141,7 @@ export function scheduleAt(loop, epoch, t = Date.now(), ahead = 5400, opts = {})
 }
 
 /* ---------- What every screen reads ---------- */
-// The bulletin: the six newest Bengali stories (wire briefs and reports, and the desk's own),
+// The bulletin: the eight newest Bengali stories (wire briefs and reports, and the desk's own),
 // each with about a hundred words of its text.
 // What the channel's headlines, flashes and bulletins show: the wire's stories (reports and
 // briefs) from the last twelve hours, newest first. Older stories never go on air.
@@ -167,7 +168,7 @@ export async function tvState(env, ch) {
     wireStories(env)
   ]);
   const headlines = stories.map(a => ({ text: a.title, desk: a.category, kind: a.kind }));
-  const bulletin = stories.slice(0, 6).map(r => ({ title: r.title, desk: r.category, kind: r.kind, text: firstWords(r.body) }));
+  const bulletin = stories.slice(0, 8).map(r => ({ title: r.title, desk: r.category, kind: r.kind, text: firstWords(r.body) }));
   const loop = buildLoop(s, videos, cards);
   const schedule = s.on ? scheduleAt(loop, s.epoch, Date.now(), 5400, { hold: s.hold, anchor: s.anchor }) : [];
   // Keep a point near now (and drop a hold that has played out), so the walk stays short.
