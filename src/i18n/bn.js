@@ -1231,4 +1231,5 @@ export default {
   "Only Shorts and videos from the Rashtrix YouTube channel can be added. Lives can come from any channel: tick Live.": "শুধু রাষ্ট্রিক্সের ইউটিউব চ্যানেলের শর্টস আর ভিডিও যোগ করা যায়। লাইভ যে কোনও চ্যানেলের হতে পারে। তার জন্য ‘লাইভ’ বেছে নিন।",
   "Add the YouTube key first: it is needed to check the channel.": "আগে ইউটিউব কী যোগ করুন। চ্যানেল যাচাই করতে সেটি লাগবে।",
   "That YouTube address was not found.": "ওই ইউটিউব ঠিকানাটি পাওয়া যায়নি।",
+  "Shorts live": "শর্টস লাইভ",
 };

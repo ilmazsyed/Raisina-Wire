@@ -427,7 +427,9 @@ function watchScroll() {
 const edHref = e => e.href || `/article/${e.slug}`;
 const metaLine = e => `${esc(e.author)} · ${ago(e.publishedAt || e.date)}${e.readMinutes && !isWire(e) ? ` · ${e.readMinutes} min` : ""}`;
 function edCard(e, { dek = false } = {}) {
-  return `<a class="ed-card glass${e.image ? "" : " no-photo"}" href="${edHref(e)}"><div class="thumb">${pic(e)}</div><span class="body"><span class="kicker">${newTag(e)}${esc(e.category)}${kindLabel(e) ? ` · ${kindLabel(e)}` : ""}</span><h3>${esc(e.title)}</h3>${dek && e.dek ? `<p>${esc(e.dek)}</p>` : ""}<span class="meta">${metaLine(e)}</span></span></a>`;
+  // A story without a photo is a text card (headline and standfirst); the logo panel is not repeated.
+  if (!e.image) dek = true;
+  return `<a class="ed-card glass${e.image ? "" : " no-photo text-only"}" href="${edHref(e)}">${e.image ? `<div class="thumb">${pic(e)}</div>` : ""}<span class="body"><span class="kicker">${newTag(e)}${esc(e.category)}${kindLabel(e) ? ` · ${kindLabel(e)}` : ""}</span><h3>${esc(e.title)}</h3>${dek && e.dek ? `<p>${esc(e.dek)}</p>` : ""}<span class="meta">${metaLine(e)}</span></span></a>`;
 }
 // A line in the latest-news stream: time, desk, headline (no picture).
 function streamItem(e) {
@@ -1560,6 +1562,8 @@ function videoCard(m) {
   return `<article class="vcard"><div class="vcard-media" data-video="${esc(m.id)}"><button class="vcard-play" type="button" data-action="play-video" data-id="${esc(m.id)}" aria-label="Play: ${esc(m.title)}">${thumbImg(m.thumbnailUrl)}<span class="play-badge" aria-hidden="true"></span></button></div>
     <div class="vcard-body"><span class="kicker">${esc(m.category || "Video")}</span><h3>${esc(m.title)}</h3>${m.description ? `<p>${esc(m.description)}</p>` : ""}${shareBtn(m.title, mediaUrl(m))}</div></article>`;
 }
+// The first bubble in the Shorts row opens the live Shorts channel (Rashtrix Shorts on the Watch page).
+const liveBubble = () => `<a class="short-bubble live-bubble" href="${withLang("/watch?ch=v")}" aria-label="Rashtrix Shorts live"><span class="short-ring"><span class="short-face"><img src="/brand/logo-sm.webp" alt=""></span></span><span class="live-pill" data-no-tr><i></i>LIVE</span><span class="short-name">Shorts live</span></a>`;
 function renderHomeMedia() {
   const rail = $("#shortsRail"), band = $("#videoBand");
   if (rail) {
@@ -1569,7 +1573,7 @@ function renderHomeMedia() {
       ...(state.ytShorts || []).slice(0, 30).map(s => ({ t: when(s), html: j => `<a class="short-bubble${seen.has(`yt:${s.id}`) ? " seen" : ""}" href="${withLang(`/shorts?v=${encodeURIComponent(s.id)}`)}" aria-label="Play: ${esc(s.title)}"><span class="short-ring"><span class="short-face"><img src="${esc(ytThumb(s))}" alt="" ${j < 5 ? "" : 'loading="lazy"'}></span></span><span class="short-name" data-no-tr>${esc(s.title)}</span></a>` }))]
       .sort((a, b) => b.t - a.t).slice(0, 30);
     rail.hidden = !items.length;
-    rail.innerHTML = items.length ? `<div class="shorts-head"><span class="kicker">Shorts</span><a class="link-gold" href="${withLang("/shorts")}">All shorts →</a></div><div class="shorts-row">${items.map((x, j) => x.html(j)).join("")}</div>` : "";
+    rail.innerHTML = items.length ? `<div class="shorts-head"><span class="kicker">Shorts</span><a class="link-gold" href="${withLang("/shorts")}">All shorts →</a></div><div class="shorts-row">${liveBubble()}${items.map((x, j) => x.html(j)).join("")}</div>` : "";
   }
   if (band) {
     const films = (state.media || []).filter(isFilm);
@@ -1691,6 +1695,7 @@ function wRow(key, title, items, extra = "") {
     <div class="w-rail">${items.map((m, i) => wCard(m, key, i)).join("")}</div></section>`;
 }
 function viewWatch() {
+  { const want = parseRoute().params.get("ch"); if (want === "v" || want === "h") store.set("rw-tv-ch", want); }
   if (parseRoute().page === "tv") history.replaceState(history.state, "", withLang("/watch") + location.search + location.hash);
   document.title = `${tr("Watch")} · ${tr("Rashtrix 24×7 News")}`;
   const all = state.media, sh = all ? shorts() : [], films = all ? all.filter(isFilm) : [], others = all ? all.filter(m => !isShort(m) && !isFilm(m)) : [];
