@@ -164,31 +164,36 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       <div class="tvp-gfx"></div><div class="tvp-ovl"></div>
       <div class="tvp-standby" hidden><img src="${LOGO}" alt=""><b>অনুষ্ঠান একটু পরেই</b><small>আমাদের সঙ্গে থাকুন</small></div>
       <div class="tvp-off" hidden><img src="${LOGO}" alt=""><b>শিগগির ফিরছি</b></div>
-    </div></div>${mode === "app" ? `<button class="tvp-sound" type="button">▶ চালু করুন · শব্দসহ</button><span class="tvp-taphint" hidden>▶ ভিডিওতে একবার ট্যাপ করুন</span>
-      <div class="tvp-actions"><button type="button" class="tvp-like" aria-label="Like" hidden>♥ <span>0</span></button><button type="button" class="tvp-share" aria-label="Share">↗ শেয়ার</button></div>` : ""}`;
+    </div></div>${mode === "app" ? `<button class="tvp-sound" type="button" hidden>🔇 শব্দ চালু করতে ট্যাপ করুন</button><span class="tvp-taphint" hidden>▶ ভিডিওতে একবার ট্যাপ করুন</span>
+      <div class="tvp-bar"><button type="button" class="tvp-like" aria-label="Like" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.3 1.1 4.1 2.3h1C12.3 6.1 13.6 5 15.6 5 19 5 21.1 8.4 19.6 11.8 17.5 16.4 12 21 12 21z"/></svg><b>ভালো লাগা</b><span>০</span></button><button type="button" class="tvp-share" aria-label="Share"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 16a3 3 0 0 0-2.4 1.2l-6.8-3.4a3 3 0 0 0 0-1.6l6.8-3.4A3 3 0 1 0 15 7l-6.8 3.4a3 3 0 1 0 0 3.2L15 17a3 3 0 1 0 3-1z"/></svg><b>শেয়ার করুন</b></button></div>` : ""}`;
   const fit = host.querySelector(".tvp-fit"), stage = host.querySelector(".tvp");
   const $ = s => stage.querySelector(s);
   const scale = () => { const k = Math.min(fit.clientWidth / W, (output ? fit.clientHeight : fit.clientWidth * H / W) / H); stage.style.transform = `scale(${k})`; stage.style.setProperty("--k", String(k || 1)); if (!output) fit.style.height = `${H * (fit.clientWidth / W)}px`; };
   const ro = new ResizeObserver(scale); ro.observe(fit); scale();
 
-  const st = { tv: null, ctl: null, queue: [], skew: 0, alive: true, muted: muted ?? !output, audio: null, current: null, shownBreaking: "", flash: 0, stalledSince: 0, playing: false, ws: null, dumpUntil: 0, pkgTimer: null };
+  const st = { tv: null, ctl: null, queue: [], skew: 0, alive: true, muted: muted ?? (mode === "app" ? false : !output), audio: null, current: null, shownBreaking: "", flash: 0, stalledSince: 0, playing: false, ws: null, dumpUntil: 0, pkgTimer: null };
   const now = () => Date.now() + st.skew;
   const auth = key ? { ch: channel, key } : guestToken ? { t: guestToken } : mode === "app" ? { viewer: 1 } : {};
 
   /* sound */
+  // Browsers let a page start sound only after the viewer has touched it (some, for sites the
+  // viewer visits often, at once). The app starts with sound where it may; otherwise it plays
+  // muted and turns sound on at the first tap or key press anywhere on the page.
   const soundBtn = host.querySelector(".tvp-sound"), tapHint = host.querySelector(".tvp-taphint");
+  try { st.audio = new (window.AudioContext || window.webkitAudioContext)(); } catch { /* none */ }
   const unmute = () => {
-    st.muted = false; soundBtn?.remove();
-    try { st.audio ||= new (window.AudioContext || window.webkitAudioContext)(); st.audio.resume(); } catch { /* none */ }
+    if (!st.alive) return;
+    st.muted = false; if (soundBtn) soundBtn.hidden = true;
+    try { st.audio?.resume(); } catch { /* none */ }
     st.current?.slots.forEach(sl => { sl.setMuted?.(false); sl.play?.(); });
-    // Some phones (iPhone in Low Power Mode) start a YouTube video only from a tap inside it:
-    // if it has not started, the cover is lifted once so that one tap reaches it. The same
-    // player then plays every following video, so this is needed only once.
-    setTimeout(() => { if (st.alive && st.yt && st.yt.state !== 1 && st.ytOwner) needTap(true); }, 2500);
   };
+  const firstTouch = () => { if (st.muted) unmute(); };
+  if (mode === "app") { ["pointerdown", "keydown", "touchend"].forEach(ev => document.addEventListener(ev, firstTouch, { passive: true })); }
   soundBtn?.addEventListener("click", unmute);
+  const soundOff = () => { st.muted = true; if (soundBtn) soundBtn.hidden = false; };
+  // Some phones (iPhone in Low Power Mode) start a YouTube video only from a tap inside it: the
+  // cover over it is lifted, with a hint, until it plays. The one player then plays every video.
   const needTap = on => { host.querySelector(".tvp-ytlayer")?.classList.toggle("tap", on); host.querySelector(".tvp")?.classList.toggle("yt-tap", on); if (tapHint) tapHint.hidden = !on; };
-  if (!st.muted) { try { st.audio = new (window.AudioContext || window.webkitAudioContext)(); } catch { /* none */ } }
 
   /* like and share (app) */
   const likeBtn = host.querySelector(".tvp-like"), shareBtn = host.querySelector(".tvp-share");
@@ -209,7 +214,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   });
   shareBtn?.addEventListener("click", async () => {
     const url = `${location.origin}/watch`, title = st.nowYt?.title ? `${st.nowYt.title} · রাষ্ট্রিক্স টিভি` : "রাষ্ট্রিক্স টিভি · লাইভ";
-    try { if (navigator.share) await navigator.share({ title, url }); else { await navigator.clipboard.writeText(url); shareBtn.textContent = "✓ লিংক কপি হয়েছে"; setTimeout(() => { shareBtn.textContent = "↗ শেয়ার"; }, 2000); } } catch { /* cancelled */ }
+    try { if (navigator.share) await navigator.share({ title, url }); else { await navigator.clipboard.writeText(url); const lb = shareBtn.querySelector("b"); lb.textContent = "লিংক কপি হয়েছে"; setTimeout(() => { lb.textContent = "শেয়ার করুন"; }, 2000); } } catch { /* cancelled */ }
   });
 
   /* ---------- sources ---------- */
@@ -217,14 +222,21 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // a phone that needs a tap to start video then needs it only once, and there is only ever
   // one video player on the page.
   function sharedYT(el, src, offset) {
-    const layer = $(".tvp-ytlayer"), token = {}, start = Math.floor((src.in || 0) + offset);
+    // Each video starts from its first second (a viewer who joins mid-video sees it whole).
+    const layer = $(".tvp-ytlayer"), token = {}, start = Math.floor(src.in || 0);
     el.classList.add("tvs-shared");
     el.innerHTML = `<img class="tvs-poster" src="https://i.ytimg.com/vi/${esc(src.id)}/hqdefault.jpg" alt="" onerror="this.hidden=true">`;
     st.ytOwner = token; st.ytPoster = el; st.nowYt = { id: src.id, title: src.title || "" }; layer.hidden = false; showLike();
     const load = () => {
       const y = st.yt;
       if (!y?.ready || st.ytOwner !== token) return;
-      try { y.player.loadVideoById({ videoId: src.id, startSeconds: start }); st.muted ? y.player.mute() : y.player.unMute(); } catch { /* none */ }
+      try { y.ended = false; y.player.loadVideoById({ videoId: src.id, startSeconds: start }); st.muted ? y.player.mute() : y.player.unMute(); } catch { /* none */ }
+      checkStart();
+    };
+    // Not playing after a moment: try again muted (allowed nearly everywhere), then ask for a tap.
+    const checkStart = () => {
+      setTimeout(() => { const y = st.yt; if (!st.alive || st.ytOwner !== token || !y?.ready || [1, 3].includes(y.state)) return; if (!st.muted) { soundOff(); try { y.player.mute(); y.player.playVideo(); } catch { /* none */ } } }, 1800);
+      setTimeout(() => { const y = st.yt; if (st.alive && st.ytOwner === token && y && ![1, 3].includes(y.state)) needTap(true); }, 4500);
     };
     loadYT().then(YT => {
       if (!YT || !st.alive || st.ytOwner !== token) return;
@@ -233,8 +245,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       st.yt.player = new YT.Player(layer.querySelector(".tvs-yt"), { width: "100%", height: "100%", videoId: src.id,
         playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, playsinline: 1, fs: 0, autoplay: 1, mute: st.muted ? 1 : 0, start, origin: location.origin },
         events: {
-          onReady: e => { st.yt.ready = true; st.muted ? e.target.mute() : e.target.unMute(); if (st.ytOwner === token) e.target.playVideo(); else st.ytLoad?.(); },
-          onStateChange: e => { st.yt.state = e.data; st.yt.since = Date.now(); if (e.data === 1) { st.ytPoster?.querySelector(".tvs-poster")?.remove(); needTap(false); } }
+          onReady: e => { st.yt.ready = true; st.muted ? e.target.mute() : e.target.unMute(); if (st.ytOwner === token) { e.target.playVideo(); checkStart(); } else st.ytLoad?.(); },
+          onStateChange: e => { st.yt.state = e.data; st.yt.since = Date.now(); if (e.data === 0) st.yt.ended = true; if (e.data === 1) { st.ytPoster?.querySelector(".tvs-poster")?.remove(); needTap(false); } },
+          onError: () => { st.yt.state = 0; st.yt.ended = true; }
         } });
     });
     st.ytLoad = load;
@@ -371,7 +384,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (sc.graphic) box.append(graphic(sc));
     }
     stage.querySelector(".tvp-stage").append(box);
-    const t = old ? (sc?.transition || st.ctl?.transition || { type: "mix", ms: 600 }) : { type: "cut", ms: 0 };
+    const leftVideo = old?.scene?.sources?.some(x => x.kind === "yt") && !old?.scene?.graphic;
+    const t = !old ? { type: "cut", ms: 0 } : leftVideo ? { type: "stinger", ms: 1200 } : (sc?.transition || st.ctl?.transition || { type: "mix", ms: 600 });
     const finish = () => { old?.box.remove(); old?.slots.forEach(s => { if (!s.shared) s.destroy(); }); };
     if (!old || t.type === "cut" || mode === "scene") finish();
     else if (t.type === "mix") { box.style.animation = `tvmix ${t.ms}ms ease both`; setTimeout(finish, t.ms); }
@@ -383,7 +397,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       setTimeout(() => { box.style.visibility = ""; finish(); }, t.type === "wipe" ? 450 : 700);
       setTimeout(() => w.remove(), t.type === "wipe" ? 1000 : 1400);
     }
-    st.current = { key: sc?.key, scene: sc, box, slots };
+    st.current = { key: sc?.key, scene: sc, box, slots, drawnAt: Date.now() };
     stage.classList.toggle("lband", sc?.layout === "lband");
     stage.classList.toggle("full-gfx", !!sc?.full || sc?.graphic?.kind === "promo" || sc?.graphic?.kind === "ads");
   }
@@ -512,11 +526,29 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   }
 
   /* ---------- the clock ---------- */
+  function wholeVideos(sc) {
+    const cur = st.current, onOrder = k => String(k || "").startsWith("c:") || String(k || "").startsWith("local:");
+    if (st.localScene && now() < st.localUntil && onOrder(sc?.key)) return st.localScene;
+    st.localScene = null;
+    const curVideo = cur?.slots?.some(x => x.shared);
+    if (!curVideo || sc?.key === cur.key || !onOrder(sc?.key) || !onOrder(cur.key)) return sc;
+    const y = st.yt, startedAt = cur.drawnAt || 0;
+    // Still playing (or loading in its first minute): keep it on.
+    if (y && !y.ended && ([1, 3].includes(y.state) || ([-1, 5].includes(y.state) && Date.now() - startedAt < 60e3 && !host.querySelector(".tvp.yt-tap")))) return cur.scene;
+    // Finished: if the order now says another video, the headline flash comes first.
+    if (sc?.sources?.some(x => x.kind === "yt") && !sc.graphic) {
+      st.localScene = { layout: "graphic", graphic: { kind: "flash", n: Math.floor(Date.now() / 10e3) }, startAt: now(), dur: 10, key: `local:flash:${Date.now()}`, transition: { type: "stinger", ms: 1200 } };
+      st.localUntil = now() + 10e3;
+      return st.localScene;
+    }
+    return sc;
+  }
   function tick() {
     if (!st.alive) return;
     // Outputs apply realtime changes after the broadcast delay.
     while (st.queue.length && st.queue[0].at <= Date.now()) { st.ctl = st.queue.shift().state; onState?.(st.ctl); }
-    const sc = resolve();
+    let sc = resolve();
+    if (mode === "app") sc = wholeVideos(sc);
     if (sc?.key !== st.current?.key) drawScene(sc);
     const b = st.ctl?.breaking || st.tv?.breaking;
     if (mode !== "scene" && b && st.shownBreaking !== b.at && now() - Date.parse(b.at) < 90e3) { st.shownBreaking = b.at; showBreaking(b); }
@@ -552,7 +584,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   loadTv().then(tick); connect(); poll();
   const timers = [setInterval(loadTv, 15000), setInterval(tick, 500), setInterval(() => { st.flash++; }, 8000), setInterval(poll, 5000), setInterval(heartbeat, 5000)];
   return {
-    destroy() { st.alive = false; timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
+    destroy() { st.alive = false; ["pointerdown", "keydown", "touchend"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
     unmute, setScene(sc) { fixedScene = sc; tick(); }, get state() { return st.ctl; }
   };
 }
