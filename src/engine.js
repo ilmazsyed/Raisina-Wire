@@ -519,6 +519,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     }
     st.current = { key: sc?.key, scene: sc, box, slots, drawnAt: Date.now() };
     stage.classList.toggle("lband", sc?.layout === "lband");
+    stage.classList.toggle("vid", !sc?.graphic && sc?.layout === "full" && (sc?.sources || []).length === 1);
     stage.classList.toggle("full-gfx", !!sc?.full || sc?.graphic?.kind === "promo" || sc?.graphic?.kind === "ads");
   }
 
