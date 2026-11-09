@@ -62,15 +62,25 @@ async function renderSlugs(env, origin, rows) {
   return out;
 }
 
-// The minute cron: cards for the newest stories that have none (or whose headline changed),
-// working back through the last month, a few at a time inside the free browser allowance.
-export async function renderCards(env, origin, n = 4) {
+// The minute cron: cards for stories published in the last two hours that have none (or whose
+// headline changed). The window is kept short on purpose: every row the query passes counts
+// against D1's free daily allowance of rows read, and a month-long scan every minute used it up
+// and took the site down. Older stories get their card on demand, the first time it is asked
+// for (ogRoute). A run that cannot open the browser (daily allowance used) rests for an hour.
+export async function renderCards(env, origin, n = 3) {
   if (!env.BROWSER || !origin) return { done: 0, skipped: !env.BROWSER ? "no browser binding" : "no site address" };
-  const now = new Date(), since = new Date(Date.now() - 30 * 864e5).toISOString();
+  const rest = await env.DB.prepare("SELECT value FROM settings WHERE key='og_rest_until'").first().catch(() => null);
+  if (rest && Date.parse(rest.value) > Date.now()) return { done: 0, resting: rest.value };
+  const now = new Date(), since = new Date(Date.now() - 2 * 3600e3).toISOString();
   const { results } = await env.DB.prepare(`SELECT a.slug, a.title FROM articles a LEFT JOIN og_cards c ON c.slug=a.slug
     WHERE a.status='published' AND a.published_at<=? AND a.published_at>=? AND (c.slug IS NULL OR c.title<>a.title)
     ORDER BY a.published_at DESC LIMIT ?`).bind(now.toISOString(), since, n).all();
   if (!results.length) return { done: 0 };
-  const made = await renderSlugs(env, origin, results);
+  let made;
+  try { made = await renderSlugs(env, origin, results); }
+  catch (e) {
+    await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('og_rest_until',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(new Date(Date.now() + 3600e3).toISOString()).run().catch(() => {});
+    throw e;
+  }
   return { done: made.filter(Boolean).length };
 }
