@@ -442,17 +442,12 @@ function wireEmpty() {
 // Rashtrix's own stories (with photos) lead; the wire desk's rewrites and briefs run in the
 // latest-news stream as text. Then a section per desk.
 function viewHome() {
-  // Newest first, wire briefs and reports included: the lead is the newest story, unless a
-  // story with a photo is less than two hours older, which then leads.
   const all = stories().sort((x, y) => (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0));
-  const photo = all.find(a => a.image), newest = all[0];
-  const lead = photo && newest && (Date.parse(newest.publishedAt) - Date.parse(photo.publishedAt)) < 2 * 3600e3 ? photo : newest;
-  if (!lead) { $("#view").innerHTML = `<div class="wrap home"><section id="liveBanner" class="band-tight" hidden></section>${articlesSettled ? `<div class="empty" style="margin-top:30px">No stories yet.</div>` : `<div class="skeleton" style="height:420px;margin-top:20px"></div>`}</div>`; renderLiveBanner(); return; }
-  // The lead: a swipeable carousel of the ten newest stories (the lead first), glass cards with
-  // the photo or text card on top and the words below, so nothing overlaps.
-  const top = [lead, ...all.filter(a => a.id !== lead.id)].slice(0, 10);
-  const used = new Set(top.map(a => a.id));
-  const side = all.filter(a => !used.has(a.id)).slice(0, 4); side.forEach(a => used.add(a.id));
+  if (!all.length && !(state.coverageAll || []).length) { $("#view").innerHTML = `<div class="wrap home"><section id="liveBanner" class="band-tight" hidden></section>${articlesSettled ? `<div class="empty" style="margin-top:30px">No stories yet.</div>` : `<div class="skeleton" style="height:420px;margin-top:20px"></div>`}</div>`; renderLiveBanner(); return; }
+  // The top-stories column keeps the desk's own stories (with photos); the carousel beside it
+  // carries only live coverage and the wire (renderLeadCarousel).
+  const used = new Set(all.filter(isWire).slice(0, 7).map(a => a.id));
+  const side = all.filter(a => !isWire(a)).slice(0, 4); side.forEach(a => used.add(a.id));
   $("#view").innerHTML = `
   <div class="wrap home">
     <section id="liveBanner" class="band-tight" aria-label="Live coverage" hidden></section>
@@ -460,16 +455,7 @@ function viewHome() {
       ${side.length ? `<section class="side-stack" aria-label="More top stories"><div class="kicker">Top stories</div>
         ${side.map(e => `<a class="side-item" href="${edHref(e)}"><div class="thumb">${pic(e)}</div><span class="kicker">${newTag(e)}${esc(e.category)}</span><h3>${esc(e.title)}</h3><span class="meta">${ago(e.publishedAt)}</span></a>`).join("")}
       </section>` : ""}
-      <section class="lead-carousel" aria-roledescription="carousel" aria-label="Latest stories">
-        <div class="lc-track" id="lcTrack" tabindex="0">${top.map((e, i) => `<article class="lc-card glass${e.image ? "" : " lc-text"}" aria-roledescription="slide" aria-label="${digits(i + 1)} / ${digits(top.length)}">
-          ${e.image ? `<a class="lc-media" href="${edHref(e)}" tabindex="-1" aria-hidden="true">${img(e.image, "")}</a>` : ""}
-          <div class="lc-body">
-            <div class="lc-meta"><span class="tag tag-red">${esc(e.category)}</span>${kindLabel(e) ? `<span class="kicker">${kindLabel(e)}</span>` : ""}${newTag(e)}</div>
-            <h${i ? 2 : 1} class="lc-title"><a href="${edHref(e)}">${esc(e.title)}</a></h${i ? 2 : 1}>${e.dek ? `<p class="lc-dek">${esc(e.dek)}</p>` : ""}
-            <div class="lc-foot"><span class="byline"><img src="${writer(e.writer).photo}" alt="" class="${writer(e.writer).isDesk ? "desk" : ""}"><span><b>${esc(e.author)}</b> <span class="muted">· ${ago(e.publishedAt)}</span></span></span><a class="btn btn-red lc-read" href="${edHref(e)}">Read <span aria-hidden="true">→</span></a></div>
-          </div></article>`).join("")}</div>
-        <div class="lc-nav"><button class="carousel-btn" type="button" data-action="lead-step" data-dir="-1" aria-label="Previous story">‹</button><span class="lc-dots" id="lcDots">${top.map((_, i) => `<i class="${i ? "" : "on"}"></i>`).join("")}</span><span class="lc-count" id="lcCount">${digits(1)} / ${digits(top.length)}</span><button class="carousel-btn" type="button" data-action="lead-step" data-dir="1" aria-label="Next story">›</button></div>
-      </section>
+      <section class="lead-carousel" id="leadCarousel" aria-roledescription="carousel" aria-label="Latest stories"></section>
       <div class="latest-col"><section id="shortsRail" class="shorts-rail" aria-label="Shorts" hidden></section>
       <aside class="live-rail glass" aria-label="Latest news"><div class="live-title"><b><span class="dot-live"></span>Latest</b><a class="link-gold" href="/live" style="font-size:13px">All →</a></div><div id="rail"></div></aside></div>
     </div>
@@ -481,14 +467,31 @@ function viewHome() {
     <section id="videoBand" class="band band-explainers" aria-labelledby="videoBandTitle" hidden></section>
     ${joinBand()}
   </div>`;
-  renderRail(); renderHomeDesks(used); renderBriefBand(); renderCommunity(); renderLiveBanner(); renderHomeMedia();
+  renderLeadCarousel(); renderRail(); renderHomeDesks(used); renderBriefBand(); renderCommunity(); renderLiveBanner(); renderHomeMedia();
+}
+// The swipe cards at the top: seven compact text cards, no photos. Running live coverage comes
+// first, headed by its newest update; then the wire's own reports and briefs, newest first.
+function renderLeadCarousel() {
+  const host = $("#leadCarousel"); if (!host) return;
+  const live = (state.coverageAll || []).filter(d => d?.item).map(d => {
+    const u = d.updates?.[0];
+    return { live: true, href: withLang(`/coverage/${encodeURIComponent(d.item.slug)}`), title: u ? (u.title || firstLine(u.body)) : d.item.title, cov: d.item.title, at: u?.createdAt || d.item.startedAt };
+  });
+  const wire = stories().filter(isWire).sort((x, y) => (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0))
+    .map(e => ({ href: edHref(e), title: e.title, dek: e.dek, desk: e.category, kind: kindLabel(e), at: e.publishedAt }));
+  const cards = [...live, ...wire].slice(0, 7);
+  host.hidden = !cards.length;
+  host.innerHTML = cards.length ? `<div class="lc-track" id="lcTrack" tabindex="0">${cards.map((c, i) => `<article class="lc-card lc-mini glass${c.live ? " lc-live" : ""}" aria-roledescription="slide" aria-label="${digits(i + 1)} / ${digits(cards.length)}"><a class="lc-link" href="${c.href}">
+      <div class="lc-meta">${c.live ? `<span class="tag tag-live"><i class="dot-live"></i>Live</span><span class="kicker" data-no-tr>${esc(c.cov)}</span>` : `<span class="tag tag-red">${esc(c.desk)}</span>${c.kind ? `<span class="kicker">${c.kind}</span>` : ""}`}<span class="lc-ago">${c.at ? ago(c.at) : ""}</span></div>
+      <h${i ? 2 : 1} class="lc-title" ${c.live ? "data-no-tr" : ""}>${esc(c.title)}</h${i ? 2 : 1}>${c.dek ? `<p class="lc-dek">${esc(c.dek)}</p>` : ""}</a></article>`).join("")}</div>
+    <div class="lc-nav"><button class="carousel-btn" type="button" data-action="lead-step" data-dir="-1" aria-label="Previous story">‹</button><span class="lc-dots" id="lcDots">${cards.map((_, i) => `<i class="${i ? "" : "on"}"></i>`).join("")}</span><span class="lc-count" id="lcCount">${digits(1)} / ${digits(cards.length)}</span><button class="carousel-btn" type="button" data-action="lead-step" data-dir="1" aria-label="Next story">›</button></div>` : "";
   // The dots and the count follow the card in view.
   const track = document.getElementById("lcTrack");
   if (track) track.addEventListener("scroll", () => {
-    const cards = track.children; if (!cards.length) return;
-    const i = Math.min(Math.round(track.scrollLeft / (cards[0].offsetWidth + 16)), cards.length - 1);
+    const list = track.children; if (!list.length) return;
+    const i = Math.min(Math.round(track.scrollLeft / (list[0].offsetWidth + 16)), list.length - 1);
     document.querySelectorAll("#lcDots i").forEach((d, k) => d.classList.toggle("on", k === i));
-    const c = document.getElementById("lcCount"); if (c) c.textContent = `${digits(i + 1)} / ${digits(cards.length)}`;
+    const c = document.getElementById("lcCount"); if (c) c.textContent = `${digits(i + 1)} / ${digits(list.length)}`;
   }, { passive: true });
 }
 // The latest-updates column: running live coverage first, each headed by its newest update, then
@@ -1224,7 +1227,7 @@ async function loadCoverage() {
     state.coverageAll = all.filter(d => d?.item && d.item.status === "live");
     state.coverageLead = state.coverageAll[0] || null;
   } catch { state.coverage ||= []; } // keep what is shown when a refresh fails
-  renderTicker(); renderLiveBanner(); renderLiveNow(); renderRail(); renderNav(parseRoute());
+  renderTicker(); renderLiveBanner(); renderLiveNow(); renderRail(); renderLeadCarousel(); renderNav(parseRoute());
 }
 let bannerTimer;
 // One live coverage as a broadcast tile: the coverage photo with a blinking LIVE tab, the headline,
