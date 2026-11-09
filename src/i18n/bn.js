@@ -199,6 +199,8 @@ export default {
   "Share on Telegram": "টেলিগ্রামে শেয়ার করুন",
   "Share on Email": "ইমেলে পাঠান",
   "Copy link": "লিঙ্ক কপি করুন",
+  "Share with picture": "ছবিসহ শেয়ার করুন",
+  "Save picture": "ছবি সেভ করুন",
   "Share this quote": "এই অংশটি শেয়ার করুন",
   "Share quote": "অংশ শেয়ার করুন",
   "Copy quote": "অংশ কপি করুন",

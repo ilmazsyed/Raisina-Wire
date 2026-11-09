@@ -737,12 +737,34 @@ function openSharePop(title, url) {
     document.addEventListener("keydown", e => { if (e.key === "Escape" && !pop.hidden) { e.stopPropagation(); closeSharePop(); } }, true);
     document.addEventListener("pointerdown", e => { if (!pop.hidden && !pop.contains(e.target) && !e.target.closest("[data-action=share-native],[data-sv=share]")) closeSharePop(); });
   }
-  pop.innerHTML = `<div class="share-pop-head"><b>${esc(title)}</b><button class="modal-close" type="button" data-pop-close aria-label="Close">×</button></div>${shareBlock(title, "", url).replace(/<button class="share-btn share-native"[^]*?<\/button>/, "")}`;
+  // A story's share card (src/ogcard.js) is shown at the top, ready to share as a picture.
+  const card = cardFor(url);
+  pop.classList.toggle("has-card", !!card); pop._file = null;
+  pop.innerHTML = `${card ? `<figure class="share-card"><img src="${esc(card)}" alt="" width="1200" height="630"></figure>` : ""}<div class="share-pop-head"><b>${esc(title)}</b><button class="modal-close" type="button" data-pop-close aria-label="Close">×</button></div>
+    ${card ? `<div class="share-card-actions"><button class="btn btn-red" type="button" data-share-card>${SHARE_ICONS.share}<span>${esc(tr("Share with picture"))}</span></button><a class="btn" href="${esc(card)}" download="rashtrix-news.jpg">${esc(tr("Save picture"))}</a></div>` : ""}
+    ${shareBlock(title, "", url).replace(/<button class="share-btn share-native"[^]*?<\/button>/, "")}`;
+  if (card) {
+    fetch(card).then(r => r.ok ? r.blob() : null).then(b => { if (b && b.type.startsWith("image/")) pop._file = new File([b], "rashtrix-news.jpg", { type: "image/jpeg" }); }).catch(() => {});
+    pop.querySelector("[data-share-card]").onclick = async () => {
+      const f = pop._file, link = tagged(url, "share");
+      try {
+        if (f && navigator.canShare?.({ files: [f] })) await navigator.share({ files: [f], title, text: `${title}\n${link}` });
+        else if (navigator.share) await navigator.share({ title, text: title, url: link });
+        else { await navigator.clipboard.writeText(link); toast("Link copied."); }
+      } catch { /* cancelled */ }
+    };
+  }
   pop.hidden = false;
   pop.querySelector("a.share-btn")?.focus({ preventScroll: true });
 }
 function closeSharePop() { const p = $("#sharePop"); if (p) p.hidden = true; }
+// The share card of a story link (/article/<slug>, in any language), if it is one.
+function cardFor(url) {
+  try { const m = new URL(url, location.origin).pathname.match(/\/article\/([^/?#]+)/); return m ? `/og/${m[1]}.jpg` : ""; } catch { return ""; }
+}
 async function shareOut(title, url) {
+  // A story opens the share panel with its picture card; other pages go straight to the share sheet.
+  if (cardFor(url)) return openSharePop(title, url);
   if (navigator.share) { try { await navigator.share({ title, text: title, url: tagged(url, "share") }); } catch { /* cancelled */ } return; }
   openSharePop(title, url);
 }
@@ -1155,6 +1177,8 @@ async function onAction(e) {
     await shareOut(el.dataset.title, el.dataset.url);
   }
   if (a === "share") {
+    // A story opens the share panel with its picture card.
+    if (cardFor(location.href)) { openSharePop(el.dataset.title || document.title, location.origin + location.pathname); return; }
     const data = { title: el.dataset.title, url: tagged(location.href, "share") };
     try { if (navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(tagged(location.href, "link")); toast("Link copied."); } } catch { /* cancelled */ }
   }
