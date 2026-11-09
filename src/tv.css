@@ -349,3 +349,7 @@ body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 /* Nothing animates where it cannot be seen: the channel's moving background stops under a
    full-screen video or a full-screen graphic (iPhone runs out of graphics memory otherwise). */
 .tvp.vid .tvp-bg,.tvp.full-gfx .tvp-bg{display:none}
+
+/* In the app the channel's background stays still: on a phone its endless motion (dots, sheen,
+   arcs) costs graphics memory behind everything else. Outputs for OBS keep it moving. */
+.tvp-app .tvp-bg *{animation:none!important}
