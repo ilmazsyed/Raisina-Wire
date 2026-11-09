@@ -189,7 +189,7 @@ async function playHls(video, url, delay = 0) {
 export function mountTV(host, { channel = "h", output = false, mode, key = "", scene: fixedScene = null, guestToken = "", onState, muted } = {}) {
   mode ||= output ? "program" : "app";
   const [W, H] = SIZE[channel];
-  host.innerHTML = `<div class="tvp-fit"><div class="tvp tvp-${channel}" style="width:${W}px;height:${H}px">
+  host.innerHTML = `<div class="tvp-fit"><div class="tvp tvp-${channel}${mode === "app" ? " tvp-app" : ""}" style="width:${W}px;height:${H}px">
       <div class="tvp-bg"><i class="dots"></i><i class="arc a1"></i><i class="arc a2"></i><i class="sheen"></i></div>
       ${mode === "app" ? `<div class="tvp-ytlayer" hidden><div class="tvs-ytwrap"><div class="tvs-yt"></div></div><div class="tvp-shield"></div></div>` : ""}
       <div class="tvp-stage"></div>
@@ -534,7 +534,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   }
   const bnDate = d => { try { return bnDigits(d.toLocaleDateString("bn-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long", year: "numeric" })); } catch { return ""; } };
   const ist = () => bnDigits(new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }));
-  const tickerHTML = list => { const items = list.map(t => `<span>${esc(t)}</span>`).join("<i>◆</i>"); return `<div class="tk-move" style="--dur:${Math.max(40, list.length * 9)}s"><div>${items}<i>◆</i></div><div aria-hidden="true">${items}<i>◆</i></div></div>`; };
+  const tickerHTML = all => { const list = mode === "app" ? all.slice(0, 12) : all, items = list.map(t => `<span>${esc(t)}</span>`).join("<i>◆</i>"); return `<div class="tk-move" style="--dur:${Math.max(40, list.length * 9)}s"><div>${items}<i>◆</i></div><div aria-hidden="true">${items}<i>◆</i></div></div>`; };
   const adBox = ad => ad?.image ? `<div class="tv-ad img"><img src="${esc(ad.image)}" alt=""></div>` : `<div class="tv-ad"><b>${esc(ad?.line1 || "")}</b><hr><small>${esc(ad?.line2 || "")}</small><hr><small>${esc(ad?.line3 || "")}</small></div>`;
   const vJacket = (inner, band) => `<div class="vj"><img class="vj-strip" src="/brand/jacket-strip.webp" alt=""><div class="vj-logo"><img src="${LOGO}" alt=""></div><div class="vj-frame">${inner}</div><div class="vj-band"><b>${esc(band)}</b>${adBox(sponsorAd())}</div></div>`;
   const sponsorAd = () => st.ctl?.sponsor ? { image: st.ctl.sponsor.image, line1: st.ctl.sponsor.line1, line2: st.ctl.sponsor.line2, line3: st.ctl.sponsor.line3 } : st.tv?.ad;
