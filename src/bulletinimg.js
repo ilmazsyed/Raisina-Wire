@@ -36,6 +36,16 @@ async function commons(query) {
 }
 
 
+// A publication's name for the credit, from the wire feed's internal label ("ABP ANANDA DIST" →
+// "ABP Ananda"): section words dropped, capitals eased (short acronyms kept).
+const SECTION = /\b(DIST(RICT)?S?|KOLKATA|STATE|BENGAL|NATIONAL|INDIA|WORLD|SPORTS?|ENTERTAINMENT|BUSINESS|LIFESTYLE|POLITICS|LATEST|TOP|FEED|RSS|NEWS FEED|HOME)\b/gi;
+export function pubName(label) {
+  let n = String(label || "").replace(SECTION, " ").replace(/[-–|·:]+\s*$/, "").replace(/\s+/g, " ").trim() || String(label || "").trim();
+  if (n === n.toUpperCase() && /[A-Z]/.test(n)) n = n.split(" ").map(w => w.length <= 3 ? w : w[0] + w.slice(1).toLowerCase()).join(" ");
+  return n;
+}
+export const cleanCredit = c => String(c || "").replace(/^(ছবি: সৌজন্যে )(.+)$/, (_, a, b) => a + pubName(b));
+
 // The lead photo of a web page: og:image, else twitter:image.
 const BROWSER_UA = "Mozilla/5.0 (compatible; RashtrixTV/1.0; +https://rashtrix.ilmazsyed.workers.dev)";
 async function pagePhoto(url) {
@@ -54,7 +64,7 @@ async function sourcePhoto(env, articleId) {
   const { results } = await env.DB.prepare(`SELECT i.url, i.source_name FROM wire_jobs j JOIN wire_items i ON i.job_id=j.id WHERE j.article_id=? ORDER BY i.published_at DESC LIMIT 4`).bind(articleId).all().catch(() => ({ results: [] }));
   for (const it of results) {
     const url = await pagePhoto(it.url).catch(() => "");
-    if (url) return { url, page: it.url, credit: `ছবি: সৌজন্যে ${it.source_name}` };
+    if (url) return { url, page: it.url, credit: `ছবি: সৌজন্যে ${pubName(it.source_name)}` };
   }
   return null;
 }
