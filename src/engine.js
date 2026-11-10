@@ -357,8 +357,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (!BEDS[kind] || st.muted || !st.audio || (mode !== "app" && !output) || st.bed) return;
     wake();
     const gone = (now() - (sc.startAt || now())) / 1000, left = Math.max(2, (sc.dur || 10) - gone);
-    // With the newsreader reading the stories, the bulletin's music sits low under the voice.
-    const duck = kind === "bulletin" && (st.tv?.bulletin || []).some(b => b.voice) ? 0.35 : 1;
+    // With the newsreader reading the stories, the bulletin's music stays on as the bed under
+    // the voice, a little softer so the words stay clear.
+    const duck = kind === "bulletin" && (st.tv?.bulletin || []).some(b => b.voice) ? 0.62 : 1;
     if (kind === "bulletin" && gone < 4.5) { identSig(st.audio); st.bed = newsBed(st.audio, left - (4.5 - gone), { ...BEDS[kind], delay: 4.5 - gone, duck }); return; }
     st.bed = newsBed(st.audio, left, BEDS[kind]);
   }
@@ -771,7 +772,11 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const speak = x => {
         st.voice?.pause(); st.voice = null;
         if (!x?.voice || st.muted || (mode !== "app" && !output)) return;
-        const a = new Audio(x.voice); a.volume = 1; st.voice = a; a.play().catch(() => {});
+        const a = new Audio(x.voice); a.volume = 1; st.voice = a;
+        // Through the same sound output as the music, so the phone plays both together (a
+        // separate player can make an iPhone stop the music).
+        if (st.audio) { try { const src = st.audio.createMediaElementSource(a), g = st.audio.createGain(); g.gain.value = 1.25; src.connect(g).connect(st.audio.destination); } catch { /* plays on its own */ } }
+        a.play().catch(() => {});
       };
       const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = e < 5 ? -2 : e < intro || !list.length ? -1 : Math.min(list.length - 1, Math.floor((e - intro) / per)); if (k === shown) return; const first = shown === -9; shown = k;
         const paint = () => { el.innerHTML = k === -2 ? identHTML() : k < 0 ? opening() : story(list[k], k); speak(k >= 0 ? list[k] : null); };
