@@ -249,12 +249,20 @@ async function playHls(video, url, delay = 0) {
   return hls;
 }
 
-// YouTube shows the video's title, its channel's logo and a pause sign for the first seconds of
-// playback: the video's picture stays covered by its still for those seconds, then fades away.
+// YouTube shows the video's title and its channel's logo along the top of the picture for the
+// first seconds of a video. The still that covers the player while a video loads goes the moment
+// the video moves (holding it longer looks like a frozen picture); only the strip along the top,
+// where YouTube writes its title, stays covered by a soft dark band for those seconds.
 const liftPoster = el => {
-  const p = el?.querySelector(".tvs-poster"); if (!p || p.dataset.lift) return;
-  p.dataset.lift = "1";
-  setTimeout(() => { p.style.transition = "opacity .5s"; p.style.opacity = "0"; setTimeout(() => p.remove(), 600); }, 4000);
+  const p = el?.querySelector(".tvs-poster");
+  if (p && !p.dataset.lift) { p.dataset.lift = "1"; p.style.transition = "opacity .25s"; p.style.opacity = "0"; setTimeout(() => p.remove(), 300); }
+};
+const ytMask = box => {
+  if (!box) return;
+  let m = box.querySelector(":scope > .tvp-ytmask");
+  if (!m) { m = document.createElement("div"); m.className = "tvp-ytmask"; box.appendChild(m); }
+  clearTimeout(m._t); m.classList.add("on");
+  m._t = setTimeout(() => m.classList.remove("on"), 5000);
 };
 // YouTube's own captions never show on air (a viewer's YouTube setting can turn them on).
 const noCaptions = p => { try { p.unloadModule?.("captions"); p.unloadModule?.("cc"); } catch { /* none */ } };
@@ -409,7 +417,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
             st.yt.state = e.data; st.yt.since = Date.now();
             // A video loaded in advance waits, paused and buffering, until its turn.
             if (st.yt.preloading && !st.ytOwner) { if (e.data === 1) { e.target.pauseVideo(); st.yt.preloading = false; } return; }
-            if (e.data === 0) st.yt.ended = true; if (e.data === 1) { liftPoster(st.ytPoster); needTap(false); noCaptions(e.target); }
+            if (e.data === 0) st.yt.ended = true; if (e.data === 1) { if (st.ytPoster?.querySelector(".tvs-poster")) ytMask(layer); liftPoster(st.ytPoster); needTap(false); noCaptions(e.target); }
           },
           onError: () => { st.yt.state = 0; st.yt.ended = true; }
         } });
@@ -447,7 +455,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         if (!YT || !st.alive || !el.isConnected) return;
         player = new YT.Player(el.querySelector(".tvs-yt"), { width: "100%", height: "100%", videoId: src.id,
           playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, cc_load_policy: 0, playsinline: 1, fs: 0, autoplay: 1, mute: mute() ? 1 : 0, start: Math.floor((src.in || 0) + offset), ...(src.out ? { end: Math.floor(src.out) } : {}), origin: location.origin },
-          events: { onStateChange: e => { state = e.data; since = Date.now(); if (e.data === 1) { liftPoster(el); played(); noCaptions(e.target); } }, onReady: e => { mute() ? e.target.mute() : e.target.unMute(); e.target.playVideo(); } } });
+          events: { onStateChange: e => { state = e.data; since = Date.now(); if (e.data === 1) { if (el.querySelector(".tvs-poster")) ytMask(el); liftPoster(el); played(); noCaptions(e.target); } }, onReady: e => { mute() ? e.target.mute() : e.target.unMute(); e.target.playVideo(); } } });
       });
       // If the phone blocks autoplay (iPhone Low Power Mode, data saver), the cover that keeps
       // viewers off YouTube's controls is lifted after a few seconds so YouTube's own play button
