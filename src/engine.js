@@ -792,7 +792,12 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // The horizontal channel's time and date: one slim bar at the top left with LIVE, the time, and
   // the date in English and in the Bengali calendar, side by side.
   const enDate = () => new Date().toLocaleDateString("en-GB", { timeZone: "Asia/Kolkata", weekday: "short", day: "numeric", month: "short", year: "numeric" }).replace(",", "").toUpperCase();
-  const dtBar = (L, s) => (L.live || L.clock) ? `<div class="tv-dt">${L.live ? `<span class="dt-live"><i></i>LIVE</span>` : ""}${L.clock ? `<b class="dt-time">${ist()}</b><span class="dt-date">${esc(enDate())}</span>${s.bangabda ? `<span class="dt-bn">${esc(s.bangabda)}</span>` : ""}` : ""}</div>` : "";
+  // English and Bengali take turns in the time and date: a flip every five seconds. The bar is
+  // redrawn when the minute changes, which starts the ten-second cycle afresh on the minute.
+  const enTime = () => new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const bnDayDate = () => new Date().toLocaleDateString("bn-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long" });
+  const flip = (a, b, cls) => `<span class="dt-flip ${cls}"><span class="ff a">${a}</span><span class="ff b">${b}</span></span>`;
+  const dtBar = (L, s) => (L.live || L.clock) ? `<div class="tv-dt">${L.live ? `<span class="dt-live"><i></i>LIVE</span>` : ""}${L.clock ? `<b class="dt-time">${flip(`${enTime()}<small>IST</small>`, `${ist()}`, "t")}</b><span class="dt-date">${flip(esc(enDate()), esc(bnDayDate()), "d")}</span>${s.bangabda ? `<span class="dt-bn">${esc(s.bangabda)}</span>` : ""}` : ""}</div>` : "";
   function drawJacket() {
     let gfx = "", ovl = "";
     const c = st.ctl || {}, L = c.layers || { bug: true, live: true, clock: true, lower: true, ticker: true, ad: true, weather: true }, s = st.tv || {};
@@ -808,7 +813,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       gfx = `
         ${L.bug ? `<div class="tv-bug"><img src="${LOGO}" alt=""></div>` : ""}
         ${dtBar(L, s)}
-        ${!lband && L.lower && (strap || isVideo) ? `<div class="tv-l3"><span class="lt-tag">NEWS UPDATE</span><span class="lt-text">${strap ? `${esc(strap.name)}${strap.title ? `<small>${esc(strap.title)}</small>` : ""}` : esc(s.lowerThird || sc.label || "")}</span></div>` : ""}
+        ${!lband && L.lower && (strap || isVideo) ? `<div class="tv-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>এই মুহূর্তে</small></span><span class="lt-text">${strap ? `${esc(strap.name)}${strap.title ? `<small>${esc(strap.title)}</small>` : ""}` : esc(s.lowerThird || sc.label || "")}</span></div>` : ""}
         ${!lband && L.ad && isVideo ? adBox(sponsorAd()) : ""}
         ${L.ticker ? `<div class="tv-ticker"><span class="tk-label">শিরোনাম</span><div class="tk-track">${tickerHTML(ticker)}</div></div>` : ""}`;
     } else {
