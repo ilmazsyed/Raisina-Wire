@@ -453,3 +453,9 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tv-watch-player .tvp-bar .tvp-like span{opacity:.75;font-weight:600}
 .tv-watch-player .tvp-bar .tvp-like.on{background:#AA0404;border-color:#AA0404;color:#fff}
 @media (max-width:480px){.tv-watch-player .tvp-bar .tvp-like b{display:none}.tv-watch-player .tvp-bar button{height:34px;padding:0 12px;font-size:12.5px}}
+
+/* The band over YouTube's title strip for the first seconds of each video (see ytMask). */
+.tvp-ytmask{position:absolute;left:0;right:0;top:0;height:19%;z-index:2;pointer-events:none;opacity:0;transition:opacity .6s ease;
+  background:linear-gradient(180deg,rgba(6,9,22,.97) 0%,rgba(6,9,22,.9) 55%,rgba(6,9,22,0) 100%);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  -webkit-mask-image:linear-gradient(180deg,#000 60%,transparent);mask-image:linear-gradient(180deg,#000 60%,transparent)}
+.tvp-ytmask.on{opacity:1;transition:opacity .15s ease}
