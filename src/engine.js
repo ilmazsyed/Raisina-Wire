@@ -183,6 +183,9 @@ async function playHls(video, url, delay = 0) {
   return hls;
 }
 
+// YouTube's own captions never show on air (a viewer's YouTube setting can turn them on).
+const noCaptions = p => { try { p.unloadModule?.("captions"); p.unloadModule?.("cc"); } catch { /* none */ } };
+
 /* ---------- The engine ---------- */
 // mode: "program" (follow the channel), "scene" (draw a given scene: PCR preview), "app" (program
 // in the app, muted until tapped). key: an output key (outputs) – sends heartbeats.
@@ -291,14 +294,14 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (st.yt) return load();
       st.yt = { state: -1, since: Date.now(), ready: false };
       st.yt.player = new YT.Player(layer.querySelector(".tvs-yt"), { width: "100%", height: "100%", videoId: src.id,
-        playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, playsinline: 1, fs: 0, autoplay: 1, mute: st.muted ? 1 : 0, start, origin: location.origin },
+        playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, cc_load_policy: 0, playsinline: 1, fs: 0, autoplay: 1, mute: st.muted ? 1 : 0, start, origin: location.origin },
         events: {
           onReady: e => { st.yt.ready = true; st.muted ? e.target.mute() : e.target.unMute(); if (st.ytOwner === token) { e.target.playVideo(); checkStart(); } else st.ytLoad?.(); },
           onStateChange: e => {
             st.yt.state = e.data; st.yt.since = Date.now();
             // A video loaded in advance waits, paused and buffering, until its turn.
             if (st.yt.preloading && !st.ytOwner) { if (e.data === 1) { e.target.pauseVideo(); st.yt.preloading = false; } return; }
-            if (e.data === 0) st.yt.ended = true; if (e.data === 1) { st.ytPoster?.querySelector(".tvs-poster")?.remove(); needTap(false); }
+            if (e.data === 0) st.yt.ended = true; if (e.data === 1) { st.ytPoster?.querySelector(".tvs-poster")?.remove(); needTap(false); noCaptions(e.target); }
           },
           onError: () => { st.yt.state = 0; st.yt.ended = true; }
         } });
@@ -335,8 +338,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       loadYT().then(YT => {
         if (!YT || !st.alive || !el.isConnected) return;
         player = new YT.Player(el.querySelector(".tvs-yt"), { width: "100%", height: "100%", videoId: src.id,
-          playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, playsinline: 1, fs: 0, autoplay: 1, mute: mute() ? 1 : 0, start: Math.floor((src.in || 0) + offset), ...(src.out ? { end: Math.floor(src.out) } : {}), origin: location.origin },
-          events: { onStateChange: e => { state = e.data; since = Date.now(); if (e.data === 1) { el.querySelector(".tvs-poster")?.remove(); played(); } }, onReady: e => { mute() ? e.target.mute() : e.target.unMute(); e.target.playVideo(); } } });
+          playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, cc_load_policy: 0, playsinline: 1, fs: 0, autoplay: 1, mute: mute() ? 1 : 0, start: Math.floor((src.in || 0) + offset), ...(src.out ? { end: Math.floor(src.out) } : {}), origin: location.origin },
+          events: { onStateChange: e => { state = e.data; since = Date.now(); if (e.data === 1) { el.querySelector(".tvs-poster")?.remove(); played(); noCaptions(e.target); } }, onReady: e => { mute() ? e.target.mute() : e.target.unMute(); e.target.playVideo(); } } });
       });
       // If the phone blocks autoplay (iPhone Low Power Mode, data saver), the cover that keeps
       // viewers off YouTube's controls is lifted after a few seconds so YouTube's own play button
@@ -632,12 +635,17 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   }
   // Writes a layer only when its content changed, so its animations are not restarted.
   const put = (sel, html) => { const el = $(sel); if (el && el.__html !== html) { el.innerHTML = html; el.__html = html; } };
+  // The horizontal channel's time and date: one slim bar at the top left with LIVE, the time, and
+  // the date in English and in the Bengali calendar, side by side.
+  const enDate = () => new Date().toLocaleDateString("en-GB", { timeZone: "Asia/Kolkata", weekday: "short", day: "numeric", month: "short", year: "numeric" }).replace(",", "").toUpperCase();
+  const dtBar = (L, s) => (L.live || L.clock) ? `<div class="tv-dt">${L.live ? `<span class="dt-live"><i></i>LIVE</span>` : ""}${L.clock ? `<b class="dt-time">${ist()}</b><span class="dt-date">${esc(enDate())}</span>${s.bangabda ? `<span class="dt-bn">${esc(s.bangabda)}</span>` : ""}` : ""}</div>` : "";
   function drawJacket() {
     let gfx = "", ovl = "";
     const c = st.ctl || {}, L = c.layers || { bug: true, live: true, clock: true, lower: true, ticker: true, ad: true, weather: true }, s = st.tv || {};
     const sc = st.current?.scene, fullGfx = stage.classList.contains("full-gfx");
     if (!sc || sc.off || sc.standby || mode === "scene" && !sc.sources?.length && !sc.graphic) { put(".tvp-gfx", ""); put(".tvp-ovl", ""); return; }
     // Full-screen graphics (the bulletin, promos): LIVE and the clock stay on screen.
+    if (fullGfx && channel === "h") { put(".tvp-gfx", dtBar(L, s)); put(".tvp-ovl", ""); return; }
     if (fullGfx) { put(".tvp-gfx", `<div class="tv-liveclock">${L.live ? `<span class="tv-live"><i></i>LIVE</span>` : ""}${L.clock ? `<span class="tv-clock">${ist()}</span>` : ""}</div>`); put(".tvp-ovl", ""); return; }
     const isVideo = (sc.sources || []).length && !sc.graphic, lband = sc.layout === "lband";
     const ticker = [...(c.ticker || []), ...(sc.ticker || []), ...(L.weather && s.weather ? [s.weather] : []), ...(s.ticker || [])];
@@ -645,8 +653,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (channel === "h") {
       gfx = `
         ${L.bug ? `<div class="tv-bug"><img src="${LOGO}" alt=""></div>` : ""}
-        ${L.live ? `<div class="tv-live"><i></i>LIVE</div>` : ""}${L.clock ? `<div class="tv-clock">${ist()}${s.bangabda ? `<small>${esc(s.bangabda)}</small>` : ""}</div>` : ""}
-        ${!lband && L.lower && (strap || isVideo) ? `<div class="tv-l3"><span class="lt-tag">${strap ? esc(strap.title ? "রাষ্ট্রিক্স" : "রাষ্ট্রিক্স") : "রাষ্ট্রিক্স"}</span><span class="lt-text">${strap ? `${esc(strap.name)}${strap.title ? `<small>${esc(strap.title)}</small>` : ""}` : esc(s.lowerThird || sc.label || "")}</span></div>` : ""}
+        ${dtBar(L, s)}
+        ${!lband && L.lower && (strap || isVideo) ? `<div class="tv-l3"><span class="lt-tag">NEWS UPDATE</span><span class="lt-text">${strap ? `${esc(strap.name)}${strap.title ? `<small>${esc(strap.title)}</small>` : ""}` : esc(s.lowerThird || sc.label || "")}</span></div>` : ""}
         ${!lband && L.ad && isVideo ? adBox(sponsorAd()) : ""}
         ${L.ticker ? `<div class="tv-ticker"><span class="tk-label">শিরোনাম</span><div class="tk-track">${tickerHTML(ticker)}</div></div>` : ""}`;
     } else {
