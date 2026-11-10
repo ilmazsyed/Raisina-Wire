@@ -840,7 +840,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const enTime = () => new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
   const bnDayDate = () => new Date().toLocaleDateString("bn-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long" });
   const flip = (a, b, cls) => `<span class="dt-flip ${cls}"><span class="ff a">${a}</span><span class="ff b">${b}</span></span>`;
-  const dtBar = (L, s) => (L.live || L.clock) ? `<div class="tv-dt">${L.live ? `<span class="dt-live"><i></i>LIVE</span>` : ""}${L.clock ? `<b class="dt-time">${flip(`${enTime()}<small>IST</small>`, `${ist()}`, "t")}</b><span class="dt-date">${flip(esc(enDate()), esc(bnDayDate()), "d")}</span>${s.bangabda ? `<span class="dt-bn">${esc(s.bangabda)}</span>` : ""}` : ""}</div>` : "";
+  // One block at the top left: LIVE and the time on top; under it, a slim row of the date
+  // (flipping between English and Bengali) and the Bengali calendar date, the same width.
+  const dtBar = (L, s) => (L.live || L.clock) ? `<div class="tv-dt"><div class="dt-top">${L.live ? `<span class="dt-live"><i></i>LIVE</span>` : ""}${L.clock ? `<b class="dt-time">${flip(`${enTime()}<small>IST</small>`, `${ist()}`, "t")}</b>` : ""}</div>${L.clock ? `<div class="dt-sub"><span class="dt-date">${flip(esc(enDate()), esc(bnDayDate()), "d")}</span>${s.bangabda ? `<span class="dt-bn">${esc(s.bangabda)}</span>` : ""}</div>` : ""}</div>` : "";
   // Every ad box on screen (corner, L-band, headlines, vertical band) is filled here on its own,
   // so its turns (partners every 50 s) never redraw the other graphics; a new face turns in.
   function fillAds() {
