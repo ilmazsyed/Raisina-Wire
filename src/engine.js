@@ -73,27 +73,31 @@ export function breakingSting(ctx, seconds = 6) {
   [220, 261.6, 329.6, 440].forEach(f => tone(f, t0 + 1.0, seconds - 1.2, "sawtooth", 0.18));
   for (let b = 1.0; b < seconds - 0.3; b += 0.5) tone(55, t0 + b, 0.3, "triangle", 0.7);
 }
-// The news bed under the headline flash, the "up next" card and the bulletin: a driving
-// newsroom track (kick, snare, ticking hats, a pumping bass, brass-like stabs and a running
-// arpeggio) through a compressor, so it sits loud and even. Notes are scheduled a second ahead
-// as it plays, so a two-minute bed costs no more than a short one. Returns a function that fades
-// it out at once.
+// One second of white noise, shared by the drums and swooshes.
 let noiseBuf = null;
 const noise = ctx => { if (!noiseBuf || noiseBuf.sampleRate !== ctx.sampleRate) { noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } return noiseBuf; };
-export function newsBed(ctx, seconds = 10, { bpm = 128, level = 0.9 } = {}) {
-  if (!ctx) return () => {};
-  const t0 = ctx.currentTime + 0.05, end = t0 + Math.min(seconds, 185), s16 = 60 / bpm / 4;
-  const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -20; comp.knee.value = 8; comp.ratio.value = 8; comp.attack.value = 0.002; comp.release.value = 0.12;
-  const out = ctx.createGain(), make = ctx.createGain(); make.gain.value = 1.6;
-  out.gain.setValueAtTime(0, t0); out.gain.linearRampToValueAtTime(level, t0 + 0.06);
-  out.gain.setValueAtTime(level, Math.max(t0 + 0.1, end - 0.7)); out.gain.linearRampToValueAtTime(0, end);
-  out.connect(comp).connect(make).connect(ctx.destination);
-  const osc = (type, f, at, len, vol, cut = 3000, glide = 0) => {
+// ---------- Music: five original pieces made in the browser (nothing licensed) ----------
+// Every piece plays through one shared bus (a gentle compressor), so two pieces overlapping
+// during a change never clip; each fades in and the outgoing one fades out over the same
+// moment, so a change of music is a smooth cross-fade, never a cut.
+//   headlines – driving newsroom groove (A minor, 126 bpm)
+//   upnext    – bright, rising, expectant (C major, 116 bpm, the filter opens as it runs)
+//   bulletin  – urgent timpani and strings ostinato with brass stabs (D minor, 140 bpm)
+//   ident     – the channel's signature: a boom, a brass swell and a four-note bell motif
+//   stinger   – a rising swoosh into a deep hit and a metallic ring
+const busOf = ctx => {
+  if (ctx.__bus) return ctx.__bus;
+  const comp = ctx.createDynamicsCompressor(), gain = ctx.createGain();
+  comp.threshold.value = -16; comp.knee.value = 10; comp.ratio.value = 5; comp.attack.value = 0.004; comp.release.value = 0.2;
+  gain.gain.value = 1.15; comp.connect(gain).connect(ctx.destination);
+  return (ctx.__bus = comp);
+};
+function voice(ctx, out) {
+  const osc = (type, f, at, len, vol, cut = 3000, glide = 0, attack = 0.005) => {
     const o = ctx.createOscillator(), g = ctx.createGain(), lp = ctx.createBiquadFilter();
     o.type = type; o.frequency.setValueAtTime(f, at); if (glide) o.frequency.exponentialRampToValueAtTime(glide, at + len * 0.6);
     lp.type = "lowpass"; lp.frequency.value = cut;
-    g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(vol, at + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+    g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(vol, at + attack); g.gain.exponentialRampToValueAtTime(0.0001, at + len);
     o.connect(lp).connect(g).connect(out); o.start(at); o.stop(at + len + 0.02);
   };
   const hiss = (at, len, vol, type, f, q = 0.8) => {
@@ -102,39 +106,101 @@ export function newsBed(ctx, seconds = 10, { bpm = 128, level = 0.9 } = {}) {
     g.gain.setValueAtTime(vol, at); g.gain.exponentialRampToValueAtTime(0.0001, at + len);
     src.connect(fl).connect(g).connect(out); src.start(at, Math.random() * 0.5, len + 0.02);
   };
-  const kick = at => osc("sine", 160, at, 0.32, 1, 800, 42);
-  const snare = at => { hiss(at, 0.2, 0.55, "bandpass", 1900, 0.7); osc("triangle", 200, at, 0.1, 0.35, 2000); };
-  const hat = (at, accent) => hiss(at, accent ? 0.07 : 0.035, accent ? 0.22 : 0.12, "highpass", 8000);
-  const crash = at => hiss(at, 1.4, 0.35, "highpass", 5000, 0.5);
-  // A minor, F, C, G: a bar each.
-  const roots = [55, 43.65, 65.41, 49], chords = [[220, 261.6, 329.6], [174.6, 220, 261.6], [261.6, 329.6, 392], [196, 246.9, 293.7]];
+  return { osc, hiss };
+}
+const STYLES = {
+  headlines: { bpm: 126, roots: [55, 43.65, 65.41, 49], chords: [[220, 261.6, 329.6], [174.6, 220, 261.6], [261.6, 329.6, 392], [196, 246.9, 293.7]],
+    step(v, at, k, bar, ch, root, s16) {
+      if (k === 0 && bar % 4 === 0) { v.hiss(at, 1.4, 0.32, "highpass", 5000, 0.5); ch.forEach(f => v.osc("sawtooth", f, at, 0.9, 0.1, 2600)); }
+      if ([0, 6, 8, 11].includes(k)) v.osc("sine", 160, at, 0.32, 1, 800, 42);
+      if (k === 4 || k === 12) { v.hiss(at, 0.2, 0.5, "bandpass", 1900, 0.7); v.osc("triangle", 200, at, 0.1, 0.3, 2000); }
+      v.hiss(at, k % 4 === 2 ? 0.07 : 0.035, k % 4 === 2 ? 0.2 : 0.11, "highpass", 8000);
+      if (k % 2 === 0) v.osc("sawtooth", root * (k % 4 === 2 ? 2 : 1), at, s16 * 1.6, 0.4, 520);
+      if (k === 0 || k === 10) ch.forEach(f => v.osc("sawtooth", f, at, 0.22, 0.075, 2400));
+      v.osc("square", ch[(k >> 1) % 3] * 2, at, s16 * 0.8, 0.04, 3200);
+    } },
+  upnext: { bpm: 116, sweep: true, level: 1.15, roots: [65.41, 55, 43.65, 49], chords: [[261.6, 329.6, 392], [220, 261.6, 329.6], [174.6, 220, 261.6], [196, 246.9, 293.7]],
+    step(v, at, k, bar, ch, root, s16) {
+      if (k === 0) { ch.forEach(f => v.osc("triangle", f, at, s16 * 16, 0.06, 2200, 0, 0.25)); v.osc("sine", root, at, s16 * 8, 0.5, 400); }
+      if (k === 0 || k === 8) v.osc("sine", 130, at, 0.28, 0.8, 600, 50);
+      if (k === 12) v.hiss(at, 0.09, 0.28, "bandpass", 2600, 1.2);
+      if (k % 2 === 1) v.hiss(at, 0.04, 0.09, "highpass", 9000);
+      const bell = [0, 1, 2, 1, 0, 2, 1, 2][k % 8];
+      v.osc("sine", ch[bell] * 4, at, 0.35, 0.07, 6000); v.osc("triangle", ch[bell] * 8, at, 0.12, 0.02, 8000);
+    } },
+  bulletin: { bpm: 140, roots: [73.42, 58.27, 65.41, 55], chords: [[293.7, 349.2, 440], [233.1, 293.7, 349.2], [261.6, 329.6, 392], [220, 277.2, 329.6]],
+    step(v, at, k, bar, ch, root, s16) {
+      if (k === 0 && bar % 4 === 0) { v.hiss(at, 1.6, 0.36, "highpass", 4500, 0.5); v.osc("sine", 90, at, 1.2, 0.9, 500, 38); }
+      if (k % 4 === 0) v.osc("sine", k === 0 ? 98 : 82, at, 0.45, k === 0 ? 0.95 : 0.7, 700, 55);   // timpani
+      if (k === 4 || k === 12) { v.hiss(at, 0.24, 0.6, "bandpass", 1700, 0.6); v.osc("triangle", 180, at, 0.12, 0.35, 1800); }
+      if (k % 2 === 0) v.hiss(at, 0.04, 0.13, "highpass", 7500);
+      v.osc("sawtooth", (k % 2 ? ch[2] : ch[0]) * 2, at, s16 * 0.9, 0.06, 1800);                  // strings ostinato
+      if (k % 4 === 0) v.osc("sawtooth", root, at, s16 * 3, 0.36, 450);
+      if (k === 0 || k === 6) ch.forEach(f => v.osc("sawtooth", f, at, 0.32, 0.085, 2600, 0, 0.02)); // brass stabs
+    } }
+};
+export function newsBed(ctx, seconds = 10, { style = "headlines", level = 0.85, delay = 0 } = {}) {
+  if (!ctx) return () => {};
+  const S = STYLES[style] || STYLES.headlines; level = S.level || level;
+  // Notes are scheduled a second ahead as it plays, so a two-minute piece costs no more than a short one.
+  const t0 = ctx.currentTime + 0.03 + delay, end = t0 + Math.min(seconds, 185), s16 = 60 / S.bpm / 4;
+  const out = ctx.createGain(), tone = ctx.createBiquadFilter();
+  tone.type = "lowpass"; tone.frequency.setValueAtTime(S.sweep ? 900 : 18000, t0);
+  if (S.sweep) tone.frequency.exponentialRampToValueAtTime(12000, end);
+  out.gain.value = 0.0001;
+  // Fade in over 0.7 s and out over the last 0.9 s.
+  out.gain.setValueAtTime(0.0001, t0); out.gain.linearRampToValueAtTime(level, t0 + 0.7);
+  out.gain.setValueAtTime(level, Math.max(t0 + 0.8, end - 0.9)); out.gain.linearRampToValueAtTime(0.0001, end);
+  out.connect(tone).connect(busOf(ctx));
+  const v = voice(ctx, out);
   let step = 0, next = t0;
   const plan = () => {
     while (next < ctx.currentTime + 0.8 && next < end - 0.05) {
-      const at = next, k = step % 16, bar = Math.floor(step / 16), c = bar % 4, ch = chords[c];
-      if (k === 0 && bar % 4 === 0) { crash(at); ch.forEach(f => osc("sawtooth", f, at, 0.9, 0.11, 2600)); }
-      if ([0, 6, 8, 11].includes(k)) kick(at);
-      if (k === 4 || k === 12) snare(at);
-      hat(at, k % 4 === 2);
-      if (k % 2 === 0) osc("sawtooth", roots[c] * (k % 4 === 2 ? 2 : 1), at, s16 * 1.6, 0.42, 520);
-      if (k === 0 || k === 10) ch.forEach(f => osc("sawtooth", f, at, 0.22, 0.08, 2400));
-      osc("square", ch[(step >> 1) % 3] * 2, at, s16 * 0.8, 0.045, 3200);
+      const k = step % 16, bar = Math.floor(step / 16), c = bar % 4;
+      S.step(v, next, k, bar, S.chords[c], S.roots[c], s16);
       next += s16; step++;
     }
   };
   plan(); const timer = setInterval(plan, 200);
   setTimeout(() => clearInterval(timer), (end - ctx.currentTime + 1) * 1000);
-  return () => { clearInterval(timer); try { const t = ctx.currentTime; out.gain.cancelScheduledValues(t); out.gain.setValueAtTime(out.gain.value, t); out.gain.linearRampToValueAtTime(0, t + 0.3); setTimeout(() => { try { out.disconnect(); } catch { /* done */ } }, 1500); } catch { /* none */ } };
+  // Stop: a 0.9-second fade (a cross-fade with whatever starts now), never a cut.
+  return (fade = 0.9) => {
+    clearInterval(timer);
+    try { const t = ctx.currentTime; out.gain.cancelScheduledValues(t); out.gain.setValueAtTime(Math.max(0.0001, out.gain.value), t); out.gain.linearRampToValueAtTime(0.0001, t + fade); setTimeout(() => { try { out.disconnect(); } catch { /* done */ } }, (fade + 1.2) * 1000); } catch { /* none */ }
+  };
+}
+// The channel ID's signature (about five seconds): a boom, a brass swell and a bell motif.
+function identSig(ctx) {
+  if (!ctx) return;
+  const out = ctx.createGain(); out.gain.value = 0.9; out.connect(busOf(ctx));
+  const v = voice(ctx, out), t = ctx.currentTime + 0.03;
+  v.osc("sine", 70, t, 1.8, 1, 400, 28); v.hiss(t, 2.2, 0.4, "highpass", 4200, 0.5);
+  [146.8, 185, 220, 293.7].forEach(f => v.osc("sawtooth", f, t + 0.1, 3.8, 0.075, 2200, 0, 0.5));
+  [587.3, 880, 740, 1174.7].forEach((f, i) => { const at = t + 0.5 + i * 0.38; v.osc("sine", f, at, 1.6, 0.16, 8000); v.osc("triangle", f * 2, at, 0.8, 0.04, 9000); v.osc("sine", f, at + 0.3, 1.2, 0.05, 6000); });
+  v.osc("sine", 55, t + 2.1, 2.4, 0.7, 300); v.hiss(t + 2.1, 2.6, 0.18, "highpass", 6000, 0.5);
+  setTimeout(() => { try { out.disconnect(); } catch { /* done */ } }, 7000);
+}
+// The stinger: a rising swoosh, then a deep hit with a metallic ring.
+function stingerSound(ctx) {
+  if (!ctx) return;
+  const t = ctx.currentTime + 0.02, out = ctx.createGain(); out.gain.value = 0.85; out.connect(busOf(ctx));
+  const v = voice(ctx, out), src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+  src.buffer = noise(ctx); bp.type = "bandpass"; bp.Q.value = 1.2; bp.frequency.setValueAtTime(350, t); bp.frequency.exponentialRampToValueAtTime(5200, t + 0.5);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.55, t + 0.45); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.62);
+  src.connect(bp).connect(g).connect(out); src.start(t, 0, 0.7);
+  v.osc("sine", 120, t + 0.5, 0.7, 0.95, 500, 36); v.hiss(t + 0.5, 0.5, 0.3, "bandpass", 3000, 0.9);
+  v.osc("triangle", 880, t + 0.52, 0.6, 0.08, 7000); v.osc("triangle", 1318.5, t + 0.52, 0.5, 0.05, 8000);
+  setTimeout(() => { try { out.disconnect(); } catch { /* done */ } }, 2500);
 }
 // A rising swoosh and a hit, for the "up next" card.
 function riser(ctx) {
   if (!ctx) return;
-  const t = ctx.currentTime + 0.02, src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+  const t = ctx.currentTime + 0.02, out = ctx.createGain(); out.gain.value = 0.8; out.connect(busOf(ctx));
+  const src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
   src.buffer = noise(ctx); bp.type = "bandpass"; bp.Q.value = 1.4; bp.frequency.setValueAtTime(300, t); bp.frequency.exponentialRampToValueAtTime(6000, t + 0.7);
-  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.6, t + 0.65); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
-  src.connect(bp).connect(g).connect(ctx.destination); src.start(t, 0, 0.95);
-  const o = ctx.createOscillator(), og = ctx.createGain(); o.type = "sine"; o.frequency.setValueAtTime(140, t + 0.7); o.frequency.exponentialRampToValueAtTime(40, t + 1.1);
-  og.gain.setValueAtTime(0.9, t + 0.7); og.gain.exponentialRampToValueAtTime(0.0001, t + 1.2); o.connect(og).connect(ctx.destination); o.start(t + 0.7); o.stop(t + 1.25);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.65); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+  src.connect(bp).connect(g).connect(out); src.start(t, 0, 0.95);
+  setTimeout(() => { try { out.disconnect(); } catch { /* done */ } }, 2000);
 }
 function whoosh(ctx) {
   if (!ctx) return;
@@ -265,12 +331,16 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const firstTouch = () => { wake(); if (st.muted) unmute(); };
   if (mode === "app") { ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.addEventListener(ev, firstTouch, { passive: true })); }
   // Music under the headline flash, the "up next" card and the bulletin (faster for the bulletin).
-  const BEDS = { flash: { bpm: 128 }, upnext: { bpm: 132 }, bulletin: { bpm: 140 }, ident: { bpm: 120 } };
+  // Each kind of graphic has its own music; the channel ID plays its signature, and the bulletin
+  // opens with the signature under its channel ID, then its own music.
+  const BEDS = { flash: { style: "headlines" }, upnext: { style: "upnext" }, bulletin: { style: "bulletin" } };
   function startBed(sc) {
     const kind = sc?.graphic?.kind;
     if (!BEDS[kind] || st.muted || !st.audio || (mode !== "app" && !output) || st.bed) return;
     wake();
-    st.bed = newsBed(st.audio, Math.max(2, (sc.dur || 10) - (now() - (sc.startAt || now())) / 1000), BEDS[kind]);
+    const gone = (now() - (sc.startAt || now())) / 1000, left = Math.max(2, (sc.dur || 10) - gone);
+    if (kind === "bulletin" && gone < 4.5) { identSig(st.audio); st.bed = newsBed(st.audio, left - (4.5 - gone), { ...BEDS[kind], delay: 4.5 - gone }); return; }
+    st.bed = newsBed(st.audio, left, BEDS[kind]);
   }
   soundBtn?.addEventListener("click", unmute);
   const soundOff = () => { st.muted = true; if (soundBtn) soundBtn.hidden = false; };
@@ -571,7 +641,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const w = document.createElement("div"); w.className = t.type === "wipe" ? "tvp-wipe" : "tvp-stinger";
       if (t.type === "stinger") w.innerHTML = `<img src="${LOGO}" alt="">`;
       stage.append(w); box.style.visibility = "hidden";
-      if (!st.muted) whoosh(st.audio);
+      if (!st.muted) (t.type === "stinger" ? stingerSound : whoosh)(st.audio);
       setTimeout(() => { box.style.visibility = ""; finish(); }, t.type === "wipe" ? 450 : 700);
       setTimeout(() => w.remove(), t.type === "wipe" ? 1000 : 1400);
     }
@@ -628,7 +698,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       }
     } else if (g.kind === "ident") {   // the channel ID: the Rashtrix logo, five seconds
       el.innerHTML = identHTML();
-      if (!st.muted && (mode === "app" || output)) { riser(st.audio); breakingSting(st.audio, 3); }
+      if (!st.muted && (mode === "app" || output)) identSig(st.audio);
     } else if (g.kind === "upnext") {   // the coming video, in one Bengali line
       const v = g.video || {}, dur = sc.dur || 6, line = String(v.line || v.title || "").trim();
       const thumb = `https://i.ytimg.com/vi/${esc(v.ytId)}/hqdefault.jpg`;
