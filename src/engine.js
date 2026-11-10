@@ -262,7 +262,7 @@ const noCaptions = p => { try { p.unloadModule?.("captions"); p.unloadModule?.("
 /* ---------- The engine ---------- */
 // mode: "program" (follow the channel), "scene" (draw a given scene: PCR preview), "app" (program
 // in the app, muted until tapped). key: an output key (outputs) – sends heartbeats.
-export function mountTV(host, { channel = "h", output = false, mode, key = "", scene: fixedScene = null, guestToken = "", onState, muted } = {}) {
+export function mountTV(host, { channel = "h", output = false, mode, key = "", scene: fixedScene = null, guestToken = "", onState, muted, tapUnmute = true } = {}) {
   mode ||= output ? "program" : "app";
   const [W, H] = SIZE[channel];
   host.innerHTML = `<div class="tvp-fit"><div class="tvp tvp-${channel}${mode === "app" ? " tvp-app" : ""}" style="width:${W}px;height:${H}px">
@@ -329,7 +329,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     startBed(st.current?.scene);
   };
   const firstTouch = () => { wake(); if (st.muted) unmute(); };
-  if (mode === "app") { ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.addEventListener(ev, firstTouch, { passive: true })); }
+  // A player that starts muted on purpose (the home page's) waits for its own sound button.
+  if (mode === "app" && tapUnmute) { ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.addEventListener(ev, firstTouch, { passive: true })); }
+  if (mode === "app" && st.muted && soundBtn) soundBtn.hidden = false;
   // Music under the headline flash, the "up next" card and the bulletin (faster for the bulletin).
   // Each kind of graphic has its own music; the channel ID plays its signature, and the bulletin
   // opens with the signature under its channel ID, then its own music.

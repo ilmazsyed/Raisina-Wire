@@ -194,6 +194,7 @@ export default {
   "Share on Telegram": "टेलीग्राम पर साझा करें",
   "Share on Email": "ईमेल से भेजें",
   "Copy link": "लिंक कॉपी करें",
+  "Watch full screen →": "बड़े पर्दे पर देखें →",
   "Share with picture": "तस्वीर के साथ शेयर करें",
   "Save picture": "तस्वीर सेव करें",
   "Share this quote": "यह अंश साझा करें",
