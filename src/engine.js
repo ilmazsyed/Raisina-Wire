@@ -269,8 +269,8 @@ const ytMask = (box, ms = 6000) => {
 // A YouTube player state change: 1 playing, 2 paused, 3 buffering, 0 ended, 5 cued, -1 unstarted.
 const ytMaskState = (box, state, fresh) => {
   const m = box?.querySelector(":scope > .tvp-ytmask"), held = m?.classList.contains("on") && !m._t;
-  if (state === 1) { if (fresh) ytMask(box, 6000); else if (held) ytMask(box, 4000); }
-  else if ([0, 2, 3, 5].includes(state)) ytMask(box, 0);
+  if (state === 1) { if (fresh) ytMask(box, 3500); else if (held) ytMask(box, 2500); }
+  else if (state === 0 || state === 2) ytMask(box, 0);
 };
 // YouTube's own captions never show on air (a viewer's YouTube setting can turn them on).
 const noCaptions = p => { try { p.unloadModule?.("captions"); p.unloadModule?.("cc"); } catch { /* none */ } };
@@ -653,7 +653,17 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const leftVideo = old?.scene?.sources?.some(x => x.kind === "yt") && !old?.scene?.graphic;
     const t = !old ? { type: "cut", ms: 0 } : leftVideo ? { type: "stinger", ms: 1200 } : (sc?.transition || st.ctl?.transition || { type: "mix", ms: 600 });
     const finish = () => { old?.box.remove(); old?.slots.forEach(s => { if (!s.shared) s.destroy(); }); };
-    if (!old || t.type === "cut" || mode === "scene") finish();
+    // Into a video from a card (up next, headlines): the card stays on screen, on top, until the
+    // video is really playing, then fades into it, so no one watches a still while it loads.
+    const intoVideo = old && !leftVideo && mode !== "scene" && !sc?.graphic && (sc?.sources || []).some(x => x.kind === "yt") && slots[0]?.playing;
+    if (intoVideo) {
+      old.box.parentNode?.appendChild(old.box);
+      const t0 = Date.now(), iv = setInterval(() => {
+        if (!(slots[0].playing() || Date.now() - t0 > 4000 || !st.alive || st.current?.box !== box)) return;
+        clearInterval(iv); old.box.style.animation = "tvmixout .45s ease both"; setTimeout(finish, 450);
+      }, 80);
+    }
+    else if (!old || t.type === "cut" || mode === "scene") finish();
     else if (t.type === "mix") { box.style.animation = `tvmix ${t.ms}ms ease both`; setTimeout(finish, t.ms); }
     else if (t.type === "wipe" || t.type === "stinger") {
       const w = document.createElement("div"); w.className = t.type === "wipe" ? "tvp-wipe" : "tvp-stinger";
@@ -681,8 +691,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const bnDate = d => { try { return bnDigits(d.toLocaleDateString("bn-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long", year: "numeric" })); } catch { return ""; } };
   const ist = () => bnDigits(new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }));
   const tickerHTML = all => { const list = mode === "app" ? all.slice(0, 12) : all, items = list.map(t => `<span>${esc(t)}</span>`).join("<i>◆</i>"); return `<div class="tk-move" style="--dur:${Math.max(40, list.length * 9)}s"><div>${items}<i>◆</i></div><div aria-hidden="true">${items}<i>◆</i></div></div>`; };
-  const adBox = ad => ad?.image ? `<div class="tv-ad img"><img src="${esc(ad.image)}" alt=""></div>` : `<div class="tv-ad"><b>${esc(ad?.line1 || "")}</b><hr><small>${esc(ad?.line2 || "")}</small><hr><small>${esc(ad?.line3 || "")}</small></div>`;
-  const vJacket = (inner, band) => `<div class="vj"><img class="vj-strip" src="/brand/jacket-strip.webp" alt=""><div class="vj-logo"><img src="${LOGO}" alt=""></div><div class="vj-frame">${inner}</div><div class="vj-band"><b>${esc(band)}</b>${adBox(sponsorAd())}</div></div>`;
+  // Every 50 seconds the ad box turns over for eight seconds to show a partner, Calibrex and
+  // Raisina Wire in turn; otherwise it shows the ad (or "your ad here").
+  const PARTNERS = [
+    `<div class="tv-ad partner"><span class="pt-in"><img src="/partners/calibrex-mark.svg" alt=""><b class="pt-word">CALIBRE<i>X</i></b><small>Partner</small></span></div>`,
+    `<div class="tv-ad partner rw"><span class="pt-in"><img src="/partners/raisina-wire-mark.svg" alt=""><b class="pt-word">Raisina Wire</b><small>Partner</small></span></div>`
+  ];
+  const adBox = ad => { const k = Math.floor(Date.now() / 50000); return Date.now() % 50000 < 8000 ? PARTNERS[k % 2] : plainAd(ad); };
+  const plainAd = ad => ad?.image ? `<div class="tv-ad img"><img src="${esc(ad.image)}" alt=""></div>` : `<div class="tv-ad"><b>${esc(ad?.line1 || "")}</b><hr><small>${esc(ad?.line2 || "")}</small><hr><small>${esc(ad?.line3 || "")}</small></div>`;
+  const vJacket = (inner, band) => `<div class="vj"><img class="vj-strip" src="/brand/jacket-strip.webp" alt=""><div class="vj-logo"><img src="${LOGO}" alt=""></div><div class="vj-frame">${inner}</div><div class="vj-band"><b>${esc(band)}</b>${plainAd(sponsorAd())}</div></div>`;
   const sponsorAd = () => st.ctl?.sponsor ? { image: st.ctl.sponsor.image, line1: st.ctl.sponsor.line1, line2: st.ctl.sponsor.line2, line3: st.ctl.sponsor.line3 } : st.tv?.ad;
   function headlineSets() {
     const Hs = st.tv?.headlines || [], sets = [], used = new Set();
@@ -769,7 +786,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       el.className = "tvp-lband";
       const lines = g.lines?.length ? g.lines : (st.tv?.headlines || []).slice(0, 5).map(h => h.text);
       el.innerHTML = channel === "h"
-        ? `<div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${lines.map(t => `<p>${esc(t)}</p>`).join("")}</div><div class="lb-bottom"><b>${esc(g.text || lines[0] || "")}</b>${adBox(sponsorAd())}</div>`
+        ? `<div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${lines.map(t => `<p>${esc(t)}</p>`).join("")}</div><div class="lb-bottom"><b>${esc(g.text || lines[0] || "")}</b>${plainAd(sponsorAd())}</div>`
         : `<div class="lbv-bottom"><b>${esc(g.text || lines[0] || "")}</b>${lines.slice(0, 3).map(t => `<p>${esc(t)}</p>`).join("")}</div>`;
     } else if (g.kind === "results") el.innerHTML = resultsHTML(g.id, true);
     else if (g.kind === "poll") el.innerHTML = pollHTML(g.id, true);
@@ -814,7 +831,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         ${L.bug ? `<div class="tv-bug"><img src="${LOGO}" alt=""></div>` : ""}
         ${dtBar(L, s)}
         ${!lband && L.lower && (strap || isVideo) ? `<div class="tv-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>এই মুহূর্তে</small></span><span class="lt-text">${strap ? `${esc(strap.name)}${strap.title ? `<small>${esc(strap.title)}</small>` : ""}` : esc(s.lowerThird || sc.label || "")}</span></div>` : ""}
-        ${!lband && L.ad && isVideo ? adBox(sponsorAd()) : ""}
+        ${!lband && L.ad && isVideo ? `<div class="tv-adslot"></div>` : ""}
         ${L.ticker ? `<div class="tv-ticker"><span class="tk-label">শিরোনাম</span><div class="tk-track">${tickerHTML(ticker)}</div></div>` : ""}`;
     } else {
       const flash = s.band || (s.headlines || [])[st.flash % Math.max(1, (s.headlines || []).length)]?.text || "";
@@ -831,6 +848,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     ovl = `${o.poll ? pollHTML(o.poll, false) : ""}<div class="ovl-right">${o.results ? resultsHTML(o.results, false) : ""}${o.comments?.length ? `<div class="cm-box">${o.comments.slice(0, 3).map(x => `<p><b>${esc(x.author)}</b><span>${esc(x.text)}</span><small>${x.platform === "youtube" ? "ইউটিউব" : x.platform === "facebook" ? "ফেসবুক" : "রাষ্ট্রিক্স অ্যাপ"}</small></p>`).join("")}</div>` : ""}</div>`;
 
     put(".tvp-gfx", gfx); put(".tvp-ovl", ovl);
+    // The ad box changes on its own (partners every 50 s) without redrawing the other graphics.
+    const slot = $(".tvp-gfx .tv-adslot");
+    if (slot) { const html = adBox(sponsorAd()); if (slot.__html !== html) { slot.innerHTML = html; slot.__html = html; } }
   }
   function autoLband(sc, video, L) {
     const cfg = st.tv?.lbandAuto, layer = $(".tvp-lbl");
@@ -844,7 +864,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const Hs = (st.tv?.headlines || []).filter(h => h.text), n = Hs.length;
     const main = st.tv?.lband?.text || (n ? Hs[k % n].text : sc.label || "");
     const side = n ? [1, 2, 3, 4].map(i => Hs[(k + i) % n]).filter((h, i, a) => h && a.indexOf(h) === i && h.text !== main) : [];
-    put(".tvp-lbl", `<div class="lb-auto-box${on ? "" : " out"}" data-k="${k}"><div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${side.slice(0, 3).map((h, i) => `<p style="--n:${i}"><small>${esc(DESK_BN[h.desk] || h.desk || "")}</small>${esc(h.text)}</p>`).join("")}<div class="lb-logo"><img src="${LOGO}" alt=""><i></i></div></div><div class="lb-bottom"><b>${esc(main)}</b>${L.ad ? adBox(sponsorAd()) : ""}</div></div>`);
+    put(".tvp-lbl", `<div class="lb-auto-box${on ? "" : " out"}" data-k="${k}"><div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${side.slice(0, 3).map((h, i) => `<p style="--n:${i}"><small>${esc(DESK_BN[h.desk] || h.desk || "")}</small>${esc(h.text)}</p>`).join("")}<div class="lb-logo"><img src="${LOGO}" alt=""><i></i></div></div><div class="lb-bottom"><b>${esc(main)}</b>${L.ad ? plainAd(sponsorAd()) : ""}</div></div>`);
   }
   function showBreaking(b) {
     const el = document.createElement("div"); el.className = "tv-breaking";
