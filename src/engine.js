@@ -753,13 +753,13 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       count(); const t = setInterval(() => el.isConnected ? count() : clearInterval(t), 250);
     } else if (g.kind === "bulletin") {   // two minutes from :00 and :30, the same for everyone
       // The channel ID (five seconds), the NEWS BULLETIN opening, then the stories.
-      // The two-minute bulletins carry eight stories; the 65-second ones at :15 and :45, four.
+      // The two-minute bulletins carry up to seven stories; the 65-second ones at :15 and :45, four.
       // Each story stays on screen as long as the newsreader takes to read it (when its line is
       // ready); as many stories as fit, the spare seconds shared out among them.
-      const total = sc.dur || 120, short = total < 100, all = (st.tv?.bulletin || []).slice(0, short ? 4 : 8), intro = 12;
+      const total = sc.dur || 120, short = total < 100, all = (st.tv?.bulletin || []).slice(0, short ? 4 : 7), intro = 12;
       const even = all.length ? (total - intro) / all.length : total, plan = [];
       { let t = intro;
-        for (const x of all) { const d = x.secs ? Math.max(8, x.secs + 1.4) : even; if (plan.length && t + d > total - 0.5) break; plan.push({ x, at: t, d }); t += d; }
+        for (const x of all) { const d = x.secs ? Math.max(8, x.secs + 1) : even; if (plan.length && t + d > total - 0.5) break; plan.push({ x, at: t, d }); t += d; }
         const spare = Math.max(0, total - t) / Math.max(1, plan.length); let a = intro;
         plan.forEach(p => { p.d += spare; p.at = a; a += p.d; }); }
       const list = plan.map(p => p.x), per = plan[0]?.d || even;
