@@ -443,3 +443,13 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tvp-h .tv-l3 .lt-tag{position:relative;background:linear-gradient(135deg,#d10a0a,#8a0303)}
 .tvp-h .tv-l3 .lt-text{animation:ltwipe .7s .2s cubic-bezier(.2,.8,.2,1) both}
 @keyframes ltwipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+
+/* Under the player: full screen, like and share as one slim row of matching pills. */
+.tv-watch-player .tvp-bar{display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:8px;padding:10px 2px 0}
+.tv-watch-player .tvp-bar button{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;height:36px;min-height:0;margin:0;padding:0 14px;border-radius:999px;border:1px solid rgba(17,17,17,.14);background:#fff;color:#111;font:700 13px/1 "Hind Siliguri",sans-serif;box-shadow:none;white-space:nowrap}
+.tv-watch-player .tvp-bar svg{width:15px;height:15px;flex-shrink:0}
+.tv-watch-player .tvp-bar b{font:inherit}
+.tv-watch-player .tvp-bar .tvp-fsb{margin-right:0;background:#111;color:#fff;border-color:#111}
+.tv-watch-player .tvp-bar .tvp-like span{opacity:.75;font-weight:600}
+.tv-watch-player .tvp-bar .tvp-like.on{background:#AA0404;border-color:#AA0404;color:#fff}
+@media (max-width:480px){.tv-watch-player .tvp-bar .tvp-like b{display:none}.tv-watch-player .tvp-bar button{height:34px;padding:0 12px;font-size:12.5px}}
