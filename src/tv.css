@@ -180,7 +180,7 @@ body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 .bl-story.v p{font-size:42px;-webkit-line-clamp:14}
 
 /* Video slots: the player is laid out at its on-screen size and scaled back up to fill the slot. */
-.tvs .tvs-ytwrap{position:absolute;left:0;top:0;width:calc(100% * var(--k,1));height:calc(100% * var(--k,1));transform:scale(calc(1 / var(--k,1)));transform-origin:0 0;overflow:hidden}
+.tvs .tvs-ytwrap{position:absolute;left:0;top:0;--kk:max(var(--k,1),.6667);width:calc(100% * var(--kk));height:calc(100% * var(--kk));transform:scale(calc(1 / var(--kk)));transform-origin:0 0;overflow:hidden}
 
 /* Autoplay blocked by the phone: YouTube's own play button shows and can be tapped. */
 .tvs.tap-play .tvp-shield,.tvs.tap-play .tvs-poster{display:none}
@@ -200,7 +200,7 @@ body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 .tvp-like[hidden]{display:none}
 .tvs.tvs-shared{background:transparent}
 .tvp-ytlayer{background:#000}
-.tvp-ytlayer .tvs-ytwrap{position:absolute;left:0;top:0;width:calc(100% * var(--k,1));height:calc(100% * var(--k,1));transform:scale(calc(1 / var(--k,1)));transform-origin:0 0;overflow:hidden}
+.tvp-ytlayer .tvs-ytwrap{position:absolute;left:0;top:0;--kk:max(var(--k,1),.6667);width:calc(100% * var(--kk));height:calc(100% * var(--kk));transform:scale(calc(1 / var(--kk)));transform-origin:0 0;overflow:hidden}
 .tvp-ytlayer .tvs-yt,.tvp-ytlayer iframe{position:absolute;inset:0;width:100%!important;height:100%!important;border:0}
 .tvp-ytlayer .tvp-shield{position:absolute;inset:0;z-index:3}
 /* While a tap is needed, taps pass through the graphics to the video. */
@@ -454,8 +454,11 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tv-watch-player .tvp-bar .tvp-like.on{background:#AA0404;border-color:#AA0404;color:#fff}
 @media (max-width:480px){.tv-watch-player .tvp-bar .tvp-like b{display:none}.tv-watch-player .tvp-bar button{height:34px;padding:0 12px;font-size:12.5px}}
 
-/* The band over YouTube's title strip for the first seconds of each video (see ytMask). */
-.tvp-ytmask{position:absolute;left:0;right:0;top:0;height:19%;z-index:2;pointer-events:none;opacity:0;transition:opacity .6s ease;
-  background:linear-gradient(180deg,rgba(6,9,22,.97) 0%,rgba(6,9,22,.9) 55%,rgba(6,9,22,0) 100%);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
-  -webkit-mask-image:linear-gradient(180deg,#000 60%,transparent);mask-image:linear-gradient(180deg,#000 60%,transparent)}
+/* The band over YouTube's title strip and the corner with its logo (see ytMask). */
+.tvp-ytmask{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .6s ease}
+.tvp-ytmask:before{content:"";position:absolute;left:0;right:0;top:0;height:24%;
+  background:linear-gradient(180deg,rgba(6,9,22,.98) 0%,rgba(6,9,22,.94) 62%,rgba(6,9,22,0) 100%);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+  -webkit-mask-image:linear-gradient(180deg,#000 66%,transparent);mask-image:linear-gradient(180deg,#000 66%,transparent)}
+.tvp-ytmask i{position:absolute;right:0;bottom:0;width:22%;height:16%;background:radial-gradient(ellipse at 100% 100%,rgba(6,9,22,.97) 45%,rgba(6,9,22,0) 75%);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  -webkit-mask-image:radial-gradient(ellipse at 100% 100%,#000 55%,transparent 80%);mask-image:radial-gradient(ellipse at 100% 100%,#000 55%,transparent 80%)}
 .tvp-ytmask.on{opacity:1;transition:opacity .15s ease}
