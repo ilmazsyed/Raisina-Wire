@@ -193,7 +193,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       <div class="tvp-bg"><i class="dots"></i><i class="arc a1"></i><i class="arc a2"></i><i class="sheen"></i></div>
       ${mode === "app" ? `<div class="tvp-ytlayer" hidden><div class="tvs-ytwrap"><div class="tvs-yt"></div></div><div class="tvp-shield"></div></div>` : ""}
       <div class="tvp-stage"></div>
-      <div class="tvp-gfx"></div><div class="tvp-ovl"></div>
+      <div class="tvp-lbl"></div><div class="tvp-gfx"></div><div class="tvp-ovl"></div>
       <div class="tvp-standby" hidden><img src="${LOGO}" alt=""><b>অনুষ্ঠান একটু পরেই</b><small>আমাদের সঙ্গে থাকুন</small></div>
       <div class="tvp-off" hidden><img src="${LOGO}" alt=""><b>শিগগির ফিরছি</b></div>
     </div></div>${mode === "app" ? `<button class="tvp-sound" type="button" hidden>🔇 শব্দ চালু করতে ট্যাপ করুন</button><span class="tvp-taphint" hidden>▶ ভিডিওতে একবার ট্যাপ করুন</span>
@@ -656,11 +656,28 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         ${L.live ? `<div class="tv-live v"><i></i>LIVE</div>` : ""}${L.clock ? `<div class="tv-clock v">${ist()}</div>` : ""}
         ${L.ticker ? `<div class="tv-ticker v"><span class="tk-label">খবর</span><div class="tk-track">${tickerHTML(ticker)}</div></div>` : ""}`;
     }
+    // The automatic L-band on the horizontal channel: while a video plays, every 40 seconds the
+    // picture moves up and right for 7 seconds and the headlines fill the L around it.
+    autoLband(sc, isVideo && !lband && (sc.sources || []).length === 1 && sc.layout !== "pip", L);
     // Overlays: poll bar, results bar, curated comments.
     const o = c.overlay || {};
     ovl = `${o.poll ? pollHTML(o.poll, false) : ""}<div class="ovl-right">${o.results ? resultsHTML(o.results, false) : ""}${o.comments?.length ? `<div class="cm-box">${o.comments.slice(0, 3).map(x => `<p><b>${esc(x.author)}</b><span>${esc(x.text)}</span><small>${x.platform === "youtube" ? "ইউটিউব" : x.platform === "facebook" ? "ফেসবুক" : "রাষ্ট্রিক্স অ্যাপ"}</small></p>`).join("")}</div>` : ""}</div>`;
 
     put(".tvp-gfx", gfx); put(".tvp-ovl", ovl);
+  }
+  function autoLband(sc, video, L) {
+    const cfg = st.tv?.lbandAuto, layer = $(".tvp-lbl");
+    if (!layer) return;
+    const every = Math.max(15, Number(cfg?.every) || 40), secs = Math.max(3, Math.min(every - 5, Number(cfg?.seconds) || 7));
+    const e = st.current?.drawnAt ? (Date.now() - st.current.drawnAt) / 1000 : 0, k = Math.floor(e / every), into = e - k * every;
+    const on = channel === "h" && video && cfg?.on !== false && k >= 1 && into < secs;
+    const leaving = channel === "h" && video && cfg?.on !== false && k >= 1 && into >= secs && into < secs + 0.7;
+    stage.classList.toggle("lb-auto", on);
+    if (!on && !leaving) { put(".tvp-lbl", ""); return; }
+    const Hs = (st.tv?.headlines || []).filter(h => h.text), n = Hs.length;
+    const main = st.tv?.lband?.text || (n ? Hs[k % n].text : sc.label || "");
+    const side = n ? [1, 2, 3, 4].map(i => Hs[(k + i) % n]).filter((h, i, a) => h && a.indexOf(h) === i && h.text !== main) : [];
+    put(".tvp-lbl", `<div class="lb-auto-box${on ? "" : " out"}" data-k="${k}"><div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${side.map((h, i) => `<p style="--n:${i}"><small>${esc(DESK_BN[h.desk] || h.desk || "")}</small>${esc(h.text)}</p>`).join("")}</div><div class="lb-bottom"><b>${esc(main)}</b>${L.ad ? adBox(sponsorAd()) : ""}</div></div>`);
   }
   function showBreaking(b) {
     const el = document.createElement("div"); el.className = "tv-breaking";
