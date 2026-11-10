@@ -10,23 +10,24 @@ import { synthesize, sha256, ttsEnabled } from "./tts.js";
 
 const VOICE = { f: "bn-IN-Chirp3-HD-Despina", m: "bn-IN-Chirp3-HD-Sadachbia" };   // smooth; lively
 export const tvVoice = (env, sex = "f") => (sex === "m" ? env.TV_VOICE_MALE : env.TV_VOICE_FEMALE) || VOICE[sex];
-const rate = env => Math.min(1.4, Math.max(0.9, Number(env.TV_VOICE_RATE) || 1.16));
+const rate = env => Math.min(1.4, Math.max(0.9, Number(env.TV_VOICE_RATE) || 1.22));
 const MONTH_CAP = 800000;
 const monthKey = () => `tts_chars_${new Date().toISOString().slice(0, 7)}`;
 // Stories take turns: a woman's voice, then a man's (see prepareBulletinVoices).
 const sexAt = i => (i % 2 ? "m" : "f");
 
-// What is read: the story's text (not its headline), its first three sentences, about 300
-// characters at most, with its punctuation made clear for the reader: every sentence ends in a
+// What is read: the story's text (not its headline), up to its first three sentences but no
+// more than about 190 characters (whole sentences; about 11 seconds), so a two-minute bulletin
+// carries six or seven stories and a 65-second one three or four; with its punctuation made clear for the reader: every sentence ends in a
 // দাঁড়ি (or ? !), line breaks become sentence ends, and spaces follow commas and stops.
 export function readLine(item) {
   let t = String(item.text || "").replace(/…$/, "").replace(/\s*\n+\s*/g, "। ").replace(/\s+/g, " ").trim();
   t = t.replace(/\s*([,;:।!?])\s*/g, "$1 ").replace(/([।!?])\s*([।!?])+/g, "$1").replace(/\.(\s|$)/g, "।$1").trim();
   const sentences = t.split(/(?<=[।!?])\s+/).map(x => x.trim()).filter(Boolean);
   let line = "";
-  for (const x of sentences.slice(0, 3)) { const next = line ? `${line} ${x}` : x; if (line && next.length > 300) break; line = next; }
+  for (const x of sentences.slice(0, 3)) { const next = line ? `${line} ${x}` : x; if (line && next.length > 190) break; line = next; }
   if (!line) line = String(item.title || "").trim();
-  if (line.length > 320) line = line.slice(0, 320).replace(/[\s,]+\S*$/, "");
+  if (line.length > 220) line = line.slice(0, 220).replace(/[\s,]+\S*$/, "");
   if (!/[।!?]$/.test(line)) line += "।";
   return line;
 }
