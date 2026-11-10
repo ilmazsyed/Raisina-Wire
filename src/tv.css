@@ -359,8 +359,8 @@ body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 .tvp-lbl{position:absolute;inset:0;z-index:5;pointer-events:none}
 .tvp-h .tvp-ytlayer,.tvp-h .tvp-stage .tvp-scene{transform-origin:0 0;transition:transform .6s cubic-bezier(.2,.8,.2,1)}
 .tvp-h.lb-auto .tvp-ytlayer,.tvp-h.lb-auto .tvp-stage .tvp-scene{transform:translate(480px,0) scale(.75)}
-.tvp-h .tv-l3,.tvp-h .tvp-gfx>.tv-ad{transition:opacity .3s}
-.tvp-h.lb-auto .tv-l3,.tvp-h.lb-auto .tvp-gfx>.tv-ad{opacity:0}
+.tvp-h .tv-l3,.tvp-h .tvp-gfx .tv-adslot>.tv-ad{transition:opacity .3s}
+.tvp-h.lb-auto .tv-l3,.tvp-h.lb-auto .tvp-gfx .tv-adslot>.tv-ad{opacity:0}
 .lb-auto-box .lb-side{animation:lbin .6s cubic-bezier(.2,.8,.2,1) both}
 .lb-auto-box .lb-bottom{animation:lbup .6s .1s cubic-bezier(.2,.8,.2,1) both}
 .lb-auto-box .lb-side p{animation:tvin .5s calc(.35s + var(--n,0)*.1s) both}
@@ -454,13 +454,13 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tv-watch-player .tvp-bar .tvp-like.on{background:#AA0404;border-color:#AA0404;color:#fff}
 @media (max-width:480px){.tv-watch-player .tvp-bar .tvp-like b{display:none}.tv-watch-player .tvp-bar button{height:34px;padding:0 12px;font-size:12.5px}}
 
-/* The band over YouTube's title strip and the corner with its logo (see ytMask). */
-.tvp-ytmask{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .6s ease}
-.tvp-ytmask:before{content:"";position:absolute;left:0;right:0;top:0;height:24%;
-  background:linear-gradient(180deg,rgba(6,9,22,.98) 0%,rgba(6,9,22,.94) 62%,rgba(6,9,22,0) 100%);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
-  -webkit-mask-image:linear-gradient(180deg,#000 66%,transparent);mask-image:linear-gradient(180deg,#000 66%,transparent)}
-.tvp-ytmask i{position:absolute;right:0;bottom:0;width:22%;height:16%;background:radial-gradient(ellipse at 100% 100%,rgba(6,9,22,.97) 45%,rgba(6,9,22,0) 75%);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
-  -webkit-mask-image:radial-gradient(ellipse at 100% 100%,#000 55%,transparent 80%);mask-image:radial-gradient(ellipse at 100% 100%,#000 55%,transparent 80%)}
+/* The band over YouTube's title strip and the corner with its logo (see ytMask): slim and brief. */
+.tvp-ytmask{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .5s ease}
+.tvp-ytmask:before{content:"";position:absolute;left:0;right:0;top:0;height:15%;
+  background:linear-gradient(180deg,rgba(6,9,22,.9) 0%,rgba(6,9,22,.6) 60%,rgba(6,9,22,0) 100%);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  -webkit-mask-image:linear-gradient(180deg,#000 55%,transparent);mask-image:linear-gradient(180deg,#000 55%,transparent)}
+.tvp-ytmask i{position:absolute;right:0;bottom:0;width:16%;height:12%;background:radial-gradient(ellipse at 100% 100%,rgba(6,9,22,.9) 40%,rgba(6,9,22,0) 72%);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  -webkit-mask-image:radial-gradient(ellipse at 100% 100%,#000 50%,transparent 78%);mask-image:radial-gradient(ellipse at 100% 100%,#000 50%,transparent 78%)}
 .tvp-ytmask.on{opacity:1;transition:opacity .15s ease}
 
 /* ---------- Premium polish (date flip, NEWS UPDATE tag, ticker, ad) ---------- */
@@ -489,4 +489,24 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tv-ticker:before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,var(--gold),#ffe08a,var(--gold));z-index:2}
 .tk-track{-webkit-mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent);mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent)}
 
-.tvp-h .tvp-gfx>.tv-ad:not(.img){border:2px solid rgba(212,160,23,.8);background:linear-gradient(160deg,rgba(28,6,8,.92),rgba(110,4,6,.9));box-shadow:0 16px 36px rgba(0,0,0,.4)}
+.tvp-h .tvp-gfx .tv-adslot>.tv-ad:not(.img){border:2px solid rgba(212,160,23,.8);background:linear-gradient(160deg,rgba(28,6,8,.92),rgba(110,4,6,.9));box-shadow:0 16px 36px rgba(0,0,0,.4)}
+
+@keyframes tvmixout{to{opacity:0}}
+/* The ad box: squarer, with a shine every ten seconds; partners turn in with a swirl. */
+.tvp-h .tv-ad{width:290px;height:210px;bottom:96px;overflow:hidden}
+.tv-ad:not(.img):not(.partner):after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.35) 48%,rgba(255,215,106,.25) 52%,transparent 70%);transform:translateX(-130%);animation:adshine 10s ease-in-out infinite;pointer-events:none}
+.tv-ad:not(.img):not(.partner) b{animation:adbreath 10s ease-in-out infinite}
+@keyframes adshine{0%,80%{transform:translateX(-130%)}100%{transform:translateX(130%)}}
+@keyframes adbreath{0%,78%,100%{transform:scale(1)}86%{transform:scale(1.06)}}
+.tv-ad.partner{background:radial-gradient(circle at 50% 35%,#1b2236,#06080f 75%)!important;border:2px solid rgba(212,160,23,.85)!important;perspective:600px}
+.tv-ad.partner.rw{background:radial-gradient(circle at 50% 35%,#fff,#f1ece6 75%)!important;color:#8f0d16}
+.pt-in{display:flex;flex-direction:column;align-items:center;gap:8px;animation:ptswirl 1s cubic-bezier(.2,.9,.2,1) both}
+.pt-in img{width:92px;height:92px;animation:ptspin 1.4s .1s cubic-bezier(.2,.9,.2,1) both;filter:drop-shadow(0 8px 18px rgba(0,0,0,.35))}
+.tv-ad.partner.rw .pt-in img{border-radius:20px}
+.pt-word{font:900 30px/1 Montserrat,sans-serif;letter-spacing:.14em;color:#fff}
+.pt-word i{font-style:normal;color:#ff9933}
+.tv-ad.partner.rw .pt-word{font:700 30px/1 "Noto Serif",Georgia,serif;letter-spacing:0;color:#8f0d16}
+.pt-in small{font:700 13px Montserrat,sans-serif;letter-spacing:.3em;text-transform:uppercase;opacity:.7}
+@keyframes ptswirl{from{transform:rotateY(-90deg) scale(.8);opacity:0}to{transform:none;opacity:1}}
+@keyframes ptspin{from{transform:rotate(-540deg) scale(.3)}to{transform:none}}
+.tv-adslot{display:contents}
