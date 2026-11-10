@@ -353,3 +353,18 @@ body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 /* In the app the channel's background stays still: on a phone its endless motion (dots, sheen,
    arcs) costs graphics memory behind everything else. Outputs for OBS keep it moving. */
 .tvp-app .tvp-bg *{animation:none!important}
+
+/* The automatic L-band (horizontal channel, during videos): the picture eases up and right to
+   75% and the headlines slide in around it; then everything slides back. */
+.tvp-lbl{position:absolute;inset:0;z-index:5;pointer-events:none}
+.tvp-h .tvp-ytlayer,.tvp-h .tvp-stage .tvp-scene{transform-origin:0 0;transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+.tvp-h.lb-auto .tvp-ytlayer,.tvp-h.lb-auto .tvp-stage .tvp-scene{transform:translate(480px,0) scale(.75)}
+.tvp-h .tv-l3,.tvp-h .tvp-gfx>.tv-ad{transition:opacity .3s}
+.tvp-h.lb-auto .tv-l3,.tvp-h.lb-auto .tvp-gfx>.tv-ad{opacity:0}
+.lb-auto-box .lb-side{animation:lbin .6s cubic-bezier(.2,.8,.2,1) both}
+.lb-auto-box .lb-bottom{animation:lbup .6s .1s cubic-bezier(.2,.8,.2,1) both}
+.lb-auto-box .lb-side p{animation:tvin .5s calc(.35s + var(--n,0)*.1s) both}
+.lb-auto-box.out .lb-side{animation:lbin .5s cubic-bezier(.6,0,.8,.2) reverse both}
+.lb-auto-box.out .lb-bottom{animation:lbup .5s cubic-bezier(.6,0,.8,.2) reverse both}
+@keyframes lbin{from{transform:translateX(-100%)}}
+@keyframes lbup{from{transform:translateY(100%)}}
