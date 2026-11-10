@@ -507,7 +507,8 @@ function renderRail() {
     const u = d.updates?.[0], text = u ? (u.title || firstLine(u.body)) : d.item.title;
     return `<a class="tl-live" href="${withLang(`/coverage/${encodeURIComponent(d.item.slug)}`)}"><span class="when"><i class="dot-live"></i>Live · <span data-no-tr>${esc(d.item.title)}</span></span><b>${esc(text)}</b></a>`;
   }).slice(0, 7);
-  const wire = stories().filter(isWire).sort((x, y) => (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0)).slice(0, 7 - live.length)
+  // Up to fourteen: on desktop the rail fills its column to the bottom; phones show seven.
+  const wire = stories().filter(isWire).sort((x, y) => (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0)).slice(0, 14 - live.length)
     .map(i => `<a href="${edHref(i)}"><span class="when">${clock(i.publishedAt)} · ${esc(i.category)}</span><b>${esc(i.title)}</b></a>`);
   const items = [...live, ...wire];
   host.innerHTML = items.length ? `<div class="timeline compact">${items.join("")}</div>` : wireEmpty();
@@ -515,11 +516,15 @@ function renderRail() {
 function renderHomeDesks(used = new Set()) {
   for (const d of DESKS) {
     const host = $(`#desk-${DESK_SLUG[d]}`); if (!host) continue;
-    const list = stories().filter(a => a.category === d && !used.has(a.id));
-    // The four newest on each desk, wire briefs and reports included.
-    const pickd = list.sort((x, y) => (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0)).slice(0, 4);
+    const newest = l => l.sort((x, y) => (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0));
+    // The four newest on each desk, wire briefs and reports included; a desk with fewer new
+    // ones also shows its stories from the top of the page, and any slot still empty becomes a
+    // "more from this desk" tile, so no row has a gap.
+    const all = newest(stories().filter(a => a.category === d));
+    const pickd = [...all.filter(a => !used.has(a.id)), ...all.filter(a => used.has(a.id))].slice(0, 4);
     host.closest(".desk-band").hidden = !pickd.length;
-    host.innerHTML = pickd.map(e => edCard(e)).join("");
+    const more = pickd.length && pickd.length < 4 ? `<a class="ed-card glass desk-more" href="${deskHref(d)}"><span class="body"><span class="kicker">${esc(tr(d))}</span><h3>${esc(tr("More from this desk"))} →</h3><span class="meta">${esc(tr("All the latest stories"))}</span></span></a>` : "";
+    host.innerHTML = pickd.map(e => edCard(e)).join("") + more;
   }
 }
 function renderBriefBand() {

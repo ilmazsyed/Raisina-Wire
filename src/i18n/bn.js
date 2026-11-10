@@ -199,6 +199,8 @@ export default {
   "Share on Telegram": "টেলিগ্রামে শেয়ার করুন",
   "Share on Email": "ইমেলে পাঠান",
   "Copy link": "লিঙ্ক কপি করুন",
+  "More from this desk": "এই বিভাগের আরও খবর",
+  "All the latest stories": "সব সর্বশেষ খবর",
   "Watch full screen →": "বড় পর্দায় দেখুন →",
   "Share with picture": "ছবিসহ শেয়ার করুন",
   "Save picture": "ছবি সেভ করুন",
