@@ -107,7 +107,7 @@ export async function refreshSource(env, src) {
       const part = vids.slice(i, i + 50).map(v => v.id);
       (await env.DB.prepare(`SELECT yt_id FROM tv_items WHERE channel=? AND yt_id IN (${part.map(() => "?").join(",")})`).bind(src.channel, ...part).all()).results.forEach(r => have.add(r.yt_id));
     }
-    const fits = sec => src.channel === "v" ? sec > 0 && sec <= 180 : sec >= 61;
+    const fits = sec => src.channel === "v" ? sec > 0 && sec <= 180 : sec > 0;
     fresh = vids.filter(v => !have.has(v.id) && fits(isoSeconds(v.contentDetails?.duration)) && v.snippet?.liveBroadcastContent === "none").length;
     if (fresh) onAir = await tvState(env, src.channel).catch(() => null);
   }

@@ -13,7 +13,6 @@ import { bnLine } from "./bnline.js";
 
 export const CHANNELS = ["h", "v"];
 const SHORT_MAX = 180;          // seconds: a Short (vertical channel)
-const LONG_MIN = 61;            // seconds: the horizontal channel skips Shorts
 const now = () => new Date().toISOString();
 const randomKey = () => [...crypto.getRandomValues(new Uint8Array(18))].map(b => b.toString(36).padStart(2, "0")).join("").slice(0, 28);
 
@@ -79,15 +78,16 @@ export async function shortsList(env, limit = 60) {
 }
 
 /* ---------- The running order ---------- */
-// The vertical channel plays Shorts (up to three minutes). The horizontal channel plays the long
-// videos of its own playlists (a minute or more). With "other playlists" on in the control room
+// The vertical channel plays Shorts (up to three minutes). The horizontal channel plays every
+// video of its own playlists. With "other playlists" on in the control room
 // (or while its own playlists have nothing yet), the long videos (over three minutes) of the
 // vertical channel's sources join in. Either way the newest video plays first.
 async function playable(env, ch, s = {}) {
   const q = where => env.DB.prepare(`SELECT i.yt_id AS ytId, i.title, i.duration, i.thumb, i.headline, i.description, i.published_at AS publishedAt FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
     WHERE ${where} AND i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0 ORDER BY i.published_at DESC LIMIT 300`).all().then(r => r.results);
   if (ch === "v") return q(`i.channel='v' AND i.duration<=${SHORT_MAX}`);
-  const own = await q(`i.channel='h' AND i.duration>=${LONG_MIN}`);
+  // Everything in the horizontal playlists plays, short or long: they are chosen for this screen.
+  const own = await q(`i.channel='h'`);
   if (!s.otherSources && own.length) return own;
   const others = await q(`i.channel='v' AND i.duration>${SHORT_MAX}`), seen = new Set();
   return [...own, ...others].sort((a, b) => String(b.publishedAt || "").localeCompare(String(a.publishedAt || ""))).filter(v => !seen.has(v.ytId) && seen.add(v.ytId)).slice(0, 300);
