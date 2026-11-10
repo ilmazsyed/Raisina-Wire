@@ -1539,7 +1539,12 @@ function viewEvents() {
 /* ---------- Watch & listen (multimedia from the control room) ---------- */
 /* ---------- Shorts: YouTube Shorts from the vertical channel, in a swipe-up feed ---------- */
 async function loadYtShorts() {
-  try { const r = await fetch("/api/shorts"); state.ytShorts = r.ok ? (await r.json()).shorts || [] : []; } catch { state.ytShorts = []; }
+  // The last list that came is kept on the device: a moment when the server sends none (a failed
+  // request, an empty answer) shows that one instead of an empty page.
+  let list = null;
+  try { const r = await fetch("/api/shorts"); if (r.ok) list = (await r.json()).shorts || []; } catch { /* below */ }
+  if (list?.length) store.set("rw-last-shorts", list.slice(0, 60)); else list = store.get("rw-last-shorts", []) || [];
+  state.ytShorts = list;
   if (parseRoute().page === "home") renderHomeMedia();
 }
 const ytThumb = s => s.thumb || `https://i.ytimg.com/vi/${s.id}/hqdefault.jpg`;
@@ -1568,7 +1573,7 @@ async function loadMedia() {
   const [media, tv] = await Promise.all([
     fetch("/api/media").then(r => r.ok ? r.json() : null).then(d => d?.items || []).catch(() => []),
     fetch("/api/tv/videos").then(r => r.ok ? r.json() : null).then(d => d?.videos || []).catch(() => [])
-  ]);
+  ]).then(([m, t]) => { if (t.length) store.set("rw-last-tvvideos", t.slice(0, 240)); else t = store.get("rw-last-tvvideos", []) || []; return [m, t]; });
   // The channel's long YouTube videos sit with the desk's own videos, filed by desk.
   const yt = tv.filter(v => !v.short).map(v => ({ id: `yt-${v.id}`, title: v.title, mediaType: "video", mediaUrl: `https://www.youtube.com/watch?v=${v.id}`,
     thumbnailUrl: v.thumb || `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`, category: v.category, publishedAt: v.publishedAt, duration: v.duration, plays: 0, fromChannel: true }));

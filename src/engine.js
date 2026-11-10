@@ -879,7 +879,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   /* ---------- data ---------- */
   async function loadTv() {
     if (mode === "scene" && !fixedScene?.needsTv) { /* the PCR preview still wants headlines for graphics */ }
-    try { const r = await fetch(`/api/tv/${channel}`, { cache: "no-store" }); if (r.ok) { const s = await r.json(); st.skew = s.serverTime - Date.now(); st.tv = s; const head = s.loop?.find(x => x.type === "video")?.ytId; if (st.seq && head && head !== st.seq.head) { st.seq.head = head; st.seq.restart = true; } } } catch { /* keep */ }
+    try { const r = await fetch(`/api/tv/${channel}`, { cache: "no-store" }); if (r.ok) { const s = await r.json(); st.skew = s.serverTime - Date.now(); if (!s.loop?.length && st.tv?.loop?.length) { s.loop = st.tv.loop; s.schedule = st.tv.schedule; } st.tv = s; const head = s.loop?.find(x => x.type === "video")?.ytId; if (st.seq && head && head !== st.seq.head) { st.seq.head = head; st.seq.restart = true; } } } catch { /* keep */ }
   }
   function applyCtl(state, serverTime) {
     if (serverTime) st.skew = serverTime - Date.now();

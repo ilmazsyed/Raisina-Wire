@@ -121,7 +121,12 @@ export async function refreshSource(env, src) {
       ON CONFLICT(channel,yt_id) DO UPDATE SET headline=CASE WHEN tv_items.title=excluded.title THEN tv_items.headline ELSE '' END,description=excluded.description,vertical=excluded.vertical,source_id=excluded.source_id,title=excluded.title,duration=excluded.duration,thumb=excluded.thumb,published_at=excluded.published_at,position=excluded.position,playable=excluded.playable,seen_at=excluded.seen_at`)
       .bind(src.channel, v.id, src.id, String(v.snippet?.title || "").slice(0, 300), isoSeconds(v.contentDetails?.duration), thumbOf(v.snippet), v.snippet?.publishedAt || null, order.get(v.id) ?? 0, playable, at, String(v.snippet?.description || "").slice(0, 1500), Number(v.player?.embedHeight) > Number(v.player?.embedWidth) ? 1 : 0));
   }
-  // Videos that left the playlist leave the channel.
+  // Videos that left the playlist leave the channel. An answer with no videos at all (YouTube
+  // sometimes answers empty for a moment) never clears the channel: the list it has stays on air.
+  if (src.kind === "playlist" && !vids.length) {
+    await env.DB.prepare("UPDATE tv_sources SET last_refresh=?, last_error=? WHERE id=?").bind(at, dropped ? NOT_OWN.slice(0, 200) : "YouTube sent no videos this time; the last list stays on air.", src.id).run();
+    return { kept: true };
+  }
   if (src.kind === "playlist") stmts.push(env.DB.prepare("DELETE FROM tv_items WHERE source_id=? AND seen_at<>?").bind(src.id, at));
   const title = src.kind === "playlist" ? src.title : (vids[0]?.snippet?.title || src.title || "");
   stmts.push(env.DB.prepare("UPDATE tv_sources SET last_refresh=?, last_error=?, item_count=?, live_now=?, live_video=?, title=CASE WHEN title='' THEN ? ELSE title END WHERE id=?").bind(at, dropped && !vids.length ? NOT_OWN.slice(0, 200) : "", src.kind === "live" ? 0 : vids.length, liveNow, liveVideo, String(title).slice(0, 200), src.id));
