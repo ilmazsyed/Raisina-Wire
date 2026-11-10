@@ -754,7 +754,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     } else if (g.kind === "bulletin") {   // two minutes from :00 and :30, the same for everyone
       // The channel ID (five seconds), the NEWS BULLETIN opening, then the stories.
       // The two-minute bulletins carry eight stories; the 65-second ones at :15 and :45, four.
-      const total = sc.dur || 120, short = total < 100, list = (st.tv?.bulletin || []).slice(0, short ? 4 : 8), intro = 12, per = list.length ? (total - intro) / list.length : total;
+      // Each story stays on screen as long as the newsreader takes to read it (when its line is
+      // ready); as many stories as fit, the spare seconds shared out among them.
+      const total = sc.dur || 120, short = total < 100, all = (st.tv?.bulletin || []).slice(0, short ? 4 : 8), intro = 12;
+      const even = all.length ? (total - intro) / all.length : total, plan = [];
+      { let t = intro;
+        for (const x of all) { const d = x.secs ? Math.max(8, x.secs + 1.4) : even; if (plan.length && t + d > total - 0.5) break; plan.push({ x, at: t, d }); t += d; }
+        const spare = Math.max(0, total - t) / Math.max(1, plan.length); let a = intro;
+        plan.forEach(p => { p.d += spare; p.at = a; a += p.d; }); }
+      const list = plan.map(p => p.x), per = plan[0]?.d || even;
       const at = new Date(sc.startAt || now()), when = slotWords(at), day = bnDate(at);
       const opening = () => `<div class="nb${channel === "v" ? " v" : ""}"><i class="nb-ray"></i><i class="nb-ray r2"></i><i class="nb-ring"></i><i class="nb-ring b"></i>
         <div class="nb-logo"><img src="${LOGO}" alt="রাষ্ট্রিক্স"></div>
@@ -762,10 +770,10 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         <div class="nb-bn">${short ? "খবর সংক্ষেপে" : "সংবাদ বুলেটিন"} · ${esc(when)}</div><div class="nb-when"><span>${esc(day)}</span></div></div>`;
       // A story with a photo (free-licence, from Wikimedia Commons) shows it wiping in beside the
       // text, slowly zooming, with its credit in small type.
-      const story = (x, k) => `<div class="bs${channel === "v" ? " v" : ""}${x.image ? " has-img" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>${x.image ? `<div class="bs-img" style="--d:${per}s"><img src="${esc(x.image)}" alt="" referrerpolicy="no-referrer"></div>${x.credit ? `<small class="bs-credit">${esc(x.credit)}</small>` : ""}` : ""}
+      const story = (x, k) => `<div class="bs${channel === "v" ? " v" : ""}${x.image ? " has-img" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>${x.image ? `<div class="bs-img" style="--d:${plan[k]?.d || per}s"><img src="${esc(x.image)}" alt="" referrerpolicy="no-referrer"></div>${x.credit ? `<small class="bs-credit">${esc(x.credit)}</small>` : ""}` : ""}
         <div class="bs-side"><em>${bnDigits(k + 1)}</em><small>/ ${bnDigits(list.length)}</small><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span></div>
         <div class="bs-main"><h2>${String(x.title || "").split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</h2><p>${esc(x.text || "")}</p></div>
-        <div class="bs-strap"><b data-no-tr>NEWS BULLETIN</b><span>${esc(when)}</span><div class="bs-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${per}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div></div>`;
+        <div class="bs-strap"><b data-no-tr>NEWS BULLETIN</b><span>${esc(when)}</span><div class="bs-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${plan[j]?.d || per}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div></div>`;
       let shown = -9;
       // The newsreader reads each story while it is on screen (when its line is ready); a story
       // that is replaced cuts its line off.
@@ -778,7 +786,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         if (st.audio) { try { const src = st.audio.createMediaElementSource(a), g = st.audio.createGain(); g.gain.value = 1.25; src.connect(g).connect(st.audio.destination); } catch { /* plays on its own */ } }
         a.play().catch(() => {});
       };
-      const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = e < 5 ? -2 : e < intro || !list.length ? -1 : Math.min(list.length - 1, Math.floor((e - intro) / per)); if (k === shown) return; const first = shown === -9; shown = k;
+      const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = e < 5 ? -2 : e < intro || !list.length ? -1 : Math.max(0, plan.findLastIndex(p => e >= p.at)); if (k === shown) return; const first = shown === -9; shown = k;
         const paint = () => { el.innerHTML = k === -2 ? identHTML() : k < 0 ? opening() : story(list[k], k); speak(k >= 0 ? list[k] : null); };
         if (first || !el.isConnected) return paint();
         // A quick red slash between stories.

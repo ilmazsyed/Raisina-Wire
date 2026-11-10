@@ -188,7 +188,7 @@ export async function tvState(env, ch) {
   const bulletin = top.map(r => ({ title: r.title, desk: r.category, kind: r.kind, text: firstWords(r.body), image: pics.has(r.id) ? `/api/tv/bimg/${encodeURIComponent(r.id)}?v=${encodeURIComponent(pics.get(r.id).url.length + (pics.get(r.id).url.split("/").pop() || "").slice(-12))}` : "", credit: cleanCredit(pics.get(r.id)?.credit) }));
   // The newsreader's line for each story, when it is ready (src/bulletinvoice.js).
   const voices = await readyVoices(env, bulletin).catch(() => new Map());
-  bulletin.forEach(b => { const k = voices.get(b); if (k) b.voice = `/api/tv/voice/${k}.mp3`; });
+  bulletin.forEach(b => { const v = voices.get(b); if (v) { b.voice = `/api/tv/voice/${v.key}.mp3`; b.secs = v.secs; } });
   const loop = buildLoop(s, videos, cards);
   const schedule = s.on ? scheduleAt(loop, s.epoch, Date.now(), 5400, { hold: s.hold, anchor: s.anchor }) : [];
   // Keep a point near now (and drop a hold that has played out), so the walk stays short.
