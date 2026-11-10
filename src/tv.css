@@ -540,3 +540,17 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .lb-bottom .tv-ad b{font-size:28px}.lb-bottom .tv-ad small{font-size:12px}
 .lb-bottom .pt-in{gap:5px}.lb-bottom .pt-in img{width:64px;height:64px}.lb-bottom .pt-word{font-size:22px}.lb-bottom .pt-in small{font-size:10px}
 .vj-band .tv-ad{overflow:hidden}
+
+/* The time block: LIVE and the time on top, the date and the Bengali calendar date in a slim
+   row under it, one block of one width. */
+.tvp-h .tv-dt{flex-direction:column;align-items:stretch;height:auto;width:max-content;min-width:330px}
+.tvp-h .tv-dt>*{padding:0}
+.tvp-h .tv-dt .dt-top{display:flex;align-items:stretch;height:52px}
+.tvp-h .tv-dt .dt-top>*{display:flex;align-items:center;padding:0 18px}
+.tvp-h .tv-dt .dt-top .dt-time{flex:1;justify-content:center}
+.tvp-h .tv-dt .dt-sub{display:flex;align-items:center;justify-content:space-between;gap:12px;height:32px;padding:0 14px;border-top:1px solid rgba(212,160,23,.45);background:rgba(255,255,255,.05)}
+.tvp-h .tv-dt .dt-sub .dt-date,.tvp-h .tv-dt .dt-sub .dt-bn{padding:0;font-size:16px;letter-spacing:.04em;color:rgba(255,255,255,.85)}
+.tvp-h .tv-dt .dt-sub .dt-bn{font:600 17px "Hind Siliguri",sans-serif;letter-spacing:0;color:#ffd76a}
+.tvp-h .tv-dt .dt-sub .dt-date:before,.tvp-h .tv-dt .dt-sub .dt-bn:before{display:none}
+.tvp-h .tv-dt .dt-sub .dt-flip.d .ff.b{font:600 16px "Hind Siliguri",sans-serif}
+.tvp-h .tv-dt .dt-sub .dt-flip .ff{justify-content:flex-start}
