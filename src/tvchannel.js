@@ -18,7 +18,7 @@ const now = () => new Date().toISOString();
 const randomKey = () => [...crypto.getRandomValues(new Uint8Array(18))].map(b => b.toString(36).padStart(2, "0")).join("").slice(0, 28);
 
 const DEFAULTS = {
-  h: { on: true, key: "", newsEvery: 3, sets: 3, setSeconds: 7, lowerThird: "", lband: { on: false, text: "" }, breaking: null,
+  h: { on: true, key: "", newsEvery: 3, sets: 3, setSeconds: 7, lowerThird: "", lband: { on: false, text: "" }, otherSources: false, breaking: null,
     ticker: [], ad: { image: "", line1: "YOUR AD HERE", line2: "ADVERTISE WITH RASHTRIX", line3: "DM OR MAIL: CONTACT@RASHTRIX.IN" }, epoch: 0 },
   v: { on: true, key: "", newsEvery: 0, sets: 2, setSeconds: 6, promosOn: true, promoEvery: 3, band: "", breaking: null,
     ticker: [], ad: { image: "", line1: "YOUR AD HERE", line2: "ADVERTISE WITH RASHTRIX", line3: "DM OR MAIL: CONTACT@RASHTRIX.IN" }, epoch: 0 }
@@ -49,6 +49,7 @@ export async function saveTvSettings(env, ch, b) {
   if (b.band !== undefined) s.band = clean(b.band, 80);
   if (b.lband !== undefined) s.lband = { on: !!b.lband?.on, text: clean(b.lband?.text, 160) };
   if (b.promosOn !== undefined) s.promosOn = !!b.promosOn;
+  if (b.otherSources !== undefined) s.otherSources = !!b.otherSources;
   if (b.promoEvery !== undefined) s.promoEvery = int(b.promoEvery, 1, 20, s.promoEvery);
   if (Array.isArray(b.ticker)) s.ticker = b.ticker.map(x => clean(x, 160)).filter(Boolean).slice(0, 20);
   if (b.ad) s.ad = { image: /^(https:\/\/|\/media\/|\/brand\/)/.test(b.ad.image || "") ? clean(b.ad.image, 1500) : "", line1: clean(b.ad.line1, 40), line2: clean(b.ad.line2, 60), line3: clean(b.ad.line3, 80) };
@@ -79,16 +80,17 @@ export async function shortsList(env, limit = 60) {
 
 /* ---------- The running order ---------- */
 // The vertical channel plays Shorts (up to three minutes). The horizontal channel plays the long
-// videos: its own sources' (a minute or more), and any long video (over three minutes) that came
-// in through a vertical source — a playlist of long videos added to the vertical channel by
-// mistake still reaches the screen it belongs on.
-async function playable(env, ch) {
-  const where = ch === "v" ? `i.channel='v' AND i.duration<=${SHORT_MAX}` : `((i.channel='h' AND i.duration>=${LONG_MIN}) OR (i.channel='v' AND i.duration>${SHORT_MAX}))`;
-  const { results } = await env.DB.prepare(`SELECT i.yt_id AS ytId, i.title, i.duration, i.thumb, i.headline, i.description, i.published_at AS publishedAt FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
-    WHERE ${where} AND i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0
-    ORDER BY i.published_at DESC LIMIT 300`).all();
-  const seen = new Set();
-  return results.filter(v => !seen.has(v.ytId) && seen.add(v.ytId));
+// videos of its own playlists (a minute or more). With "other playlists" on in the control room
+// (or while its own playlists have nothing yet), the long videos (over three minutes) of the
+// vertical channel's sources join in. Either way the newest video plays first.
+async function playable(env, ch, s = {}) {
+  const q = where => env.DB.prepare(`SELECT i.yt_id AS ytId, i.title, i.duration, i.thumb, i.headline, i.description, i.published_at AS publishedAt FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
+    WHERE ${where} AND i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0 ORDER BY i.published_at DESC LIMIT 300`).all().then(r => r.results);
+  if (ch === "v") return q(`i.channel='v' AND i.duration<=${SHORT_MAX}`);
+  const own = await q(`i.channel='h' AND i.duration>=${LONG_MIN}`);
+  if (!s.otherSources && own.length) return own;
+  const others = await q(`i.channel='v' AND i.duration>${SHORT_MAX}`), seen = new Set();
+  return [...own, ...others].sort((a, b) => String(b.publishedAt || "").localeCompare(String(a.publishedAt || ""))).filter(v => !seen.has(v.ytId) && seen.add(v.ytId)).slice(0, 300);
 }
 export async function promos(env, all = false) {
   const { results } = await env.DB.prepare(`SELECT id,title,image_url AS image,seconds,active,sort FROM tv_promos ${all ? "" : "WHERE active=1"} ORDER BY sort, created_at`).all();
@@ -169,7 +171,7 @@ export async function tvState(env, ch) {
   if (hit && Date.now() - hit.at < 4000) return hit.value;
   const s = await tvSettings(env, ch);
   const [videos, cards, live, stories] = await Promise.all([
-    playable(env, ch), ch === "v" ? promos(env) : [],
+    playable(env, ch, s), ch === "v" ? promos(env) : [],
     env.DB.prepare("SELECT CASE WHEN live_video<>'' THEN live_video ELSE yt_id END AS ytId, title FROM tv_sources WHERE channel=? AND kind='live' AND active=1 AND on_air=1 AND live_now=1 LIMIT 1").bind(ch).first(),
     wireStories(env)
   ]);

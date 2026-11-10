@@ -413,6 +413,14 @@ async function api(request, env, ctx) {
     // ?wire=1 adds the wire desk's state: counts, the day's model calls and the commonest recent
     // error (quoted text and links stripped), so its health can be seen without signing in.
     const out = { ok: true, service: "Rashtrix API", time: new Date().toISOString(), database: Boolean(env.DB) };
+    // ?tv=1 adds each TV source's state (which channel, how many videos, the last refresh and
+    // error) and the day's YouTube units, so a source that brings no videos can be seen.
+    if (url.searchParams.get("tv") && env.DB) {
+      out.tv = {
+        sources: await env.DB.prepare("SELECT s.channel, s.kind, s.title, s.active, s.item_count AS items, s.last_refresh AS lastRefresh, s.last_error AS lastError, (SELECT COUNT(*) FROM tv_items i WHERE i.source_id=s.id AND i.playable=1) AS playable FROM tv_sources s ORDER BY s.channel, s.created_at").all().then(r => r.results).catch(e => [{ error: e.message }]),
+        youtube: await ytUsage(env).catch(() => null)
+      };
+    }
     if (url.searchParams.get("wire") && env.DB) {
       const since = new Date(Date.now() - 24 * 3600e3).toISOString().replace("T", " ").slice(0, 19);
       const [jobs, errs, items, last, q] = await Promise.all([
