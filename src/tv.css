@@ -383,3 +383,14 @@ body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 .tvp-h .lb-auto-box .lb-side{padding-top:116px}
 /* NEWS UPDATE tag of the lower third */
 .tvp-h .lt-tag{font:800 30px Montserrat,sans-serif;letter-spacing:.08em}
+
+/* Horizontal headline flash: six headlines in two columns that fill the screen */
+.tvp-h .nu-set.nu-wide{left:70px;right:70px;top:120px;bottom:110px;display:flex;flex-direction:column}
+.nu-wide .nu-head small{margin-left:auto;font:800 26px Montserrat,sans-serif;letter-spacing:.3em;color:var(--red)}
+.nu-wide ol{flex:1;margin-top:28px;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:22px 26px}
+.nu-wide li{align-items:center;padding:20px 26px;border-left:8px solid var(--red)}
+.nu-wide li>div{display:flex;flex-direction:column;gap:6px;min-width:0}
+.nu-wide li small{font:800 22px "Hind Siliguri",sans-serif;color:var(--red);letter-spacing:.02em}
+.nu-wide li span{font:700 40px/1.3 "Noto Serif Bengali",serif;-webkit-line-clamp:2}
+.nu-wide li em{width:64px;height:64px;font-size:34px}
+.nu-wide .nu-head{margin-right:190px}

@@ -560,9 +560,13 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const br = st.ctl?.breaking || st.tv?.breaking;
       if (br?.text) el.innerHTML = channel === "h" ? `<div class="tv-breaking static"><div class="br-slash"></div><div class="br-in"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(br.text)}</b><img src="${LOGO}" alt=""></div><div class="br-bar"></div></div>` : vJacket(`<div class="br-v"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(br.text)}</b></div>`, "এইমাত্র পাওয়া খবর");
       else {
-        const Hs = st.tv?.headlines || [], per = 4, from = Hs.length > per ? (g.n * per) % Hs.length : 0;
-        const items = [...Hs.slice(from), ...Hs.slice(0, from)].slice(0, per).map(h => h.text);
-        el.innerHTML = wrapV(setHTML("শিরোনাম", "সর্বশেষ", items, sc.dur || 10), "শিরোনাম");
+        const Hs = st.tv?.headlines || [], per = channel === "h" ? 6 : 4, from = Hs.length > per ? (g.n * per) % Hs.length : 0;
+        const pick = [...Hs.slice(from), ...Hs.slice(0, from)].slice(0, per);
+        // The horizontal screen fills its width: six headlines in two columns of cards, each with
+        // its desk, under a full-width head.
+        el.innerHTML = channel === "h"
+          ? `<div class="nu-set nu-wide"><div class="nu-head"><span>শিরোনাম</span><b>সর্বশেষ</b><small data-no-tr>HEADLINES</small><i style="--d:${sc.dur || 10}s"></i></div><ol>${pick.map((h, n) => `<li style="--n:${n}"><em>${bnDigits(n + 1)}</em><div><small>${esc(DESK_BN[h.desk] || h.desk || "খবর")}</small><span>${esc(h.text)}</span></div></li>`).join("")}</ol></div>`
+          : wrapV(setHTML("শিরোনাম", "সর্বশেষ", pick.map(h => h.text), sc.dur || 10), "শিরোনাম");
       }
     } else if (g.kind === "upnext") {   // the coming video, in one Bengali line
       const v = g.video || {}, dur = sc.dur || 6, line = String(v.line || v.title || "").trim();
