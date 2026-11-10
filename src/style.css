@@ -1910,3 +1910,12 @@ a.w-short{aspect-ratio:auto;overflow:visible;background:none;border-radius:0}
 .hl-player .tvp-bar{display:none}
 .hl-player .tvp-sound{bottom:12px}
 @media (max-width:1180px){.lead-mid{display:contents}.home-live{display:none}}
+/* Laptop and desktop: the swipe cards fill the middle column one at a time, so no half card is
+   cut off against the Shorts and Latest column; the columns get a little more air. */
+@media (min-width:1181px){
+  .lead-grid{column-gap:32px}
+  .lead-mid{overflow:hidden}
+  .lead-mid .lc-card{flex-basis:100%}
+  .lead-mid .lc-track{padding-left:0;padding-right:0}
+  .latest-col{position:relative;z-index:1}
+}
