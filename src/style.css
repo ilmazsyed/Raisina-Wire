@@ -1934,3 +1934,8 @@ a.w-short{aspect-ratio:auto;overflow:visible;background:none;border-radius:0}
 .desk-more h3{color:var(--red)}
 .card-grid>.desk-more:nth-child(2){grid-column:span 3}.card-grid>.desk-more:nth-child(3){grid-column:span 2}
 @media (max-width:1180px){.card-grid>.desk-more:nth-child(n){grid-column:auto}}
+
+/* The installed app: no rubber-band bounce at the top (the app's own pull-to-refresh shows instead). */
+html.standalone,html.standalone body{overscroll-behavior-y:none}
+.ptr{transition:opacity .15s}
+.ptr.spin{transition:transform .25s cubic-bezier(.2,.8,.2,1),opacity .15s}
