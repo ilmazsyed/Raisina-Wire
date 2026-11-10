@@ -1,3 +1,4 @@
+import { readyVoices } from "./bulletinvoice.js";
 import { bnLine } from "./bnline.js";
 // Rashtrix TV, Phase 2: two channels, each on or off, each with its own secret output address
 // for OBS / vMix.
@@ -183,7 +184,10 @@ export async function tvState(env, ch) {
   // Each bulletin story's picture and its credit (src/bulletinimg.js), when one was found.
   const top = stories.slice(0, 8), pics = new Map();
   if (top.length) (await env.DB.prepare(`SELECT article_id, url, credit FROM bulletin_images WHERE url<>'' AND article_id IN (${top.map(() => "?").join(",")})`).bind(...top.map(r => r.id)).all().catch(() => ({ results: [] }))).results.forEach(r => pics.set(r.article_id, r));
-  const bulletin = top.map(r => ({ title: r.title, desk: r.category, kind: r.kind, text: firstWords(r.body), image: pics.get(r.id)?.url || "", credit: pics.get(r.id)?.credit || "" }));
+  const bulletin = top.map(r => ({ title: r.title, desk: r.category, kind: r.kind, text: firstWords(r.body), image: pics.has(r.id) ? `/api/tv/bimg/${encodeURIComponent(r.id)}?v=${encodeURIComponent(pics.get(r.id).url.length + (pics.get(r.id).url.split("/").pop() || "").slice(-12))}` : "", credit: pics.get(r.id)?.credit || "" }));
+  // The newsreader's line for each story, when it is ready (src/bulletinvoice.js).
+  const voices = await readyVoices(env, bulletin).catch(() => new Map());
+  bulletin.forEach(b => { const k = voices.get(b); if (k) b.voice = `/api/tv/voice/${k}.mp3`; });
   const loop = buildLoop(s, videos, cards);
   const schedule = s.on ? scheduleAt(loop, s.epoch, Date.now(), 5400, { hold: s.hold, anchor: s.anchor }) : [];
   // Keep a point near now (and drop a hold that has played out), so the walk stays short.

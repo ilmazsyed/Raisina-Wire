@@ -28,7 +28,8 @@ import m0026 from "../migrations/0026_tv_headline.sql";
 import m0027 from "../migrations/0027_og_cards.sql";
 import m0028 from "../migrations/0028_tv_vertical.sql";
 import m0029 from "../migrations/0029_bulletin_images.sql";
-import { bulletinImages } from "./bulletinimg.js";
+import { bulletinImages, bulletinImageRoute } from "./bulletinimg.js";
+import { prepareBulletinVoices, voiceRoute } from "./bulletinvoice.js";
 import { ogRoute, renderCards } from "./ogcard.js";
 import { handleControlRoom, control as ctlCommand } from "./controlroom.js";
 import { serveClip, clipHousekeeping } from "./clips.js";
@@ -1051,6 +1052,9 @@ async function api(request, env, ctx) {
 
   // ---- The Watch page's videos: the channels' YouTube videos, each filed under a desk from its
   // title (long videos from the horizontal channel, Shorts from the vertical one).
+  // The bulletin's pictures and the newsreader's lines.
+  { const m = url.pathname.match(/^\/api\/tv\/bimg\/([^/]+)$/); if (m && request.method === "GET") return bulletinImageRoute(env, decodeURIComponent(m[1])); }
+  { const m = url.pathname.match(/^\/api\/tv\/voice\/([0-9a-f]{20,64})\.mp3$/); if (m && request.method === "GET") return voiceRoute(env, m[1]); }
   if (url.pathname === "/api/tv/videos" && request.method === "GET") {
     const { results } = await env.DB.prepare(`SELECT i.channel, i.yt_id AS id, i.title, i.thumb, i.duration, i.published_at AS publishedAt FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
       WHERE i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0 ORDER BY i.published_at DESC LIMIT 240`).all();
@@ -1558,6 +1562,8 @@ async function scheduled(env) {
   await step("tv headlines", () => videoHeadlines(env));
   // A free-licence photo (with its credit) for each story in the TV bulletin.
   await step("bulletin pictures", () => bulletinImages(env));
+  // The newsreader's voice for the bulletin's stories (when the Google voice key is set).
+  await step("bulletin voices", async () => prepareBulletinVoices(env, (await tvState(env, "h")).bulletin));
   // The control room: midnight archive and the day's rundowns from templates; old clips go.
   await step("rundowns", () => rundownHousekeeping(env));
   await step("clips", () => clipHousekeeping(env));

@@ -139,9 +139,9 @@ const STYLES = {
       if (k === 0 || k === 6) ch.forEach(f => v.osc("sawtooth", f, at, 0.32, 0.085, 2600, 0, 0.02)); // brass stabs
     } }
 };
-export function newsBed(ctx, seconds = 10, { style = "headlines", level = 0.85, delay = 0 } = {}) {
+export function newsBed(ctx, seconds = 10, { style = "headlines", level = 0.85, delay = 0, duck = 1 } = {}) {
   if (!ctx) return () => {};
-  const S = STYLES[style] || STYLES.headlines; level = S.level || level;
+  const S = STYLES[style] || STYLES.headlines; level = (S.level || level) * duck;
   // Notes are scheduled a second ahead as it plays, so a two-minute piece costs no more than a short one.
   const t0 = ctx.currentTime + 0.03 + delay, end = t0 + Math.min(seconds, 185), s16 = 60 / S.bpm / 4;
   const out = ctx.createGain(), tone = ctx.createBiquadFilter();
@@ -357,7 +357,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (!BEDS[kind] || st.muted || !st.audio || (mode !== "app" && !output) || st.bed) return;
     wake();
     const gone = (now() - (sc.startAt || now())) / 1000, left = Math.max(2, (sc.dur || 10) - gone);
-    if (kind === "bulletin" && gone < 4.5) { identSig(st.audio); st.bed = newsBed(st.audio, left - (4.5 - gone), { ...BEDS[kind], delay: 4.5 - gone }); return; }
+    // With the newsreader reading the stories, the bulletin's music sits low under the voice.
+    const duck = kind === "bulletin" && (st.tv?.bulletin || []).some(b => b.voice) ? 0.35 : 1;
+    if (kind === "bulletin" && gone < 4.5) { identSig(st.audio); st.bed = newsBed(st.audio, left - (4.5 - gone), { ...BEDS[kind], delay: 4.5 - gone, duck }); return; }
     st.bed = newsBed(st.audio, left, BEDS[kind]);
   }
   soundBtn?.addEventListener("click", unmute);
@@ -633,7 +635,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   /* ---------- drawing a scene, with a transition ---------- */
   function drawScene(sc) {
     const old = st.current;
-    st.bed?.(); st.bed = null;
+    st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null;
     old?.slots.forEach(s => { if (s.shared) s.destroy(); });
     const box = document.createElement("div"); box.className = "tvp-scene";
     const slots = [];
@@ -764,8 +766,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         <div class="bs-main"><h2>${String(x.title || "").split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</h2><p>${esc(x.text || "")}</p></div>
         <div class="bs-strap"><b data-no-tr>NEWS BULLETIN</b><span>${esc(when)}</span><div class="bs-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${per}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div></div>`;
       let shown = -9;
+      // The newsreader reads each story while it is on screen (when its line is ready); a story
+      // that is replaced cuts its line off.
+      const speak = x => {
+        st.voice?.pause(); st.voice = null;
+        if (!x?.voice || st.muted || (mode !== "app" && !output)) return;
+        const a = new Audio(x.voice); a.volume = 1; st.voice = a; a.play().catch(() => {});
+      };
       const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = e < 5 ? -2 : e < intro || !list.length ? -1 : Math.min(list.length - 1, Math.floor((e - intro) / per)); if (k === shown) return; const first = shown === -9; shown = k;
-        const paint = () => { el.innerHTML = k === -2 ? identHTML() : k < 0 ? opening() : story(list[k], k); };
+        const paint = () => { el.innerHTML = k === -2 ? identHTML() : k < 0 ? opening() : story(list[k], k); speak(k >= 0 ? list[k] : null); };
         if (first || !el.isConnected) return paint();
         // A quick red slash between stories.
         const w = document.createElement("div"); w.className = "bs-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
