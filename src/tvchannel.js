@@ -78,11 +78,17 @@ export async function shortsList(env, limit = 60) {
 }
 
 /* ---------- The running order ---------- */
+// The vertical channel plays Shorts (up to three minutes). The horizontal channel plays the long
+// videos: its own sources' (a minute or more), and any long video (over three minutes) that came
+// in through a vertical source — a playlist of long videos added to the vertical channel by
+// mistake still reaches the screen it belongs on.
 async function playable(env, ch) {
-  const { results } = await env.DB.prepare(`SELECT i.yt_id AS ytId, i.title, i.duration, i.thumb, i.headline, i.description FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
-    WHERE i.channel=? AND i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0 ${ch === "v" ? `AND i.duration<=${SHORT_MAX}` : `AND i.duration>=${LONG_MIN}`}
-    ORDER BY i.published_at DESC LIMIT 300`).bind(ch).all();
-  return results;
+  const where = ch === "v" ? `i.channel='v' AND i.duration<=${SHORT_MAX}` : `((i.channel='h' AND i.duration>=${LONG_MIN}) OR (i.channel='v' AND i.duration>${SHORT_MAX}))`;
+  const { results } = await env.DB.prepare(`SELECT i.yt_id AS ytId, i.title, i.duration, i.thumb, i.headline, i.description, i.published_at AS publishedAt FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
+    WHERE ${where} AND i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0
+    ORDER BY i.published_at DESC LIMIT 300`).all();
+  const seen = new Set();
+  return results.filter(v => !seen.has(v.ytId) && seen.add(v.ytId));
 }
 export async function promos(env, all = false) {
   const { results } = await env.DB.prepare(`SELECT id,title,image_url AS image,seconds,active,sort FROM tv_promos ${all ? "" : "WHERE active=1"} ORDER BY sort, created_at`).all();
