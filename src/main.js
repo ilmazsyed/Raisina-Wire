@@ -125,15 +125,16 @@ function setTextScale(delta) {
   toast(`Text size ${Math.round(scale * 100)}%`);
 }
 document.documentElement.style.setProperty("--text-scale", store.get("rw-text", 1));
-// Light or dark: follows the device until the reader picks one (index.html applies it before paint).
+// Light or dark: light unless the reader picks dark (index.html applies it before paint).
 const darkQuery = matchMedia("(prefers-color-scheme: dark)");
 function applyTheme() {
-  const pref = store.get("rw-theme", "auto");
-  document.documentElement.dataset.theme = pref === "dark" || (pref === "auto" && darkQuery.matches) ? "dark" : "light";
+  const dark = store.get("rw-theme", "light") === "dark";
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+  // The phone's status bar follows the chosen look, not the phone's own setting.
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute("content", dark ? "#111111" : "#AA0404"));
 }
 function toggleTheme() {
-  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-  store.set("rw-theme", next === (darkQuery.matches ? "dark" : "light") ? "auto" : next); applyTheme();
+  store.set("rw-theme", document.documentElement.dataset.theme === "dark" ? "light" : "dark"); applyTheme();
 }
 darkQuery.addEventListener?.("change", applyTheme); applyTheme();
 
@@ -2069,10 +2070,10 @@ async function refreshAll({ quiet = false } = {}) {
   btn?.classList.remove("spin");
   if (!quiet) toast("You’re up to date.");
 }
-// The installed app has no browser pull-to-refresh, so it gets its own, with the Rashtrix mark.
+// The installed app has no browser pull-to-refresh, so it gets its own: a round refresh button.
 function pullToRefresh() {
   if (!isStandaloneApp() || !("ontouchstart" in window)) return;
-  const el = document.createElement("div"); el.className = "ptr"; el.setAttribute("aria-hidden", "true"); el.innerHTML = brandMark("ptr-mark");
+  const el = document.createElement("div"); el.className = "ptr"; el.setAttribute("aria-hidden", "true"); el.innerHTML = `<span class="ptr-mark">${ICON_REFRESH}</span>`;
   document.body.append(el);
   let y0 = null, dy = 0, busy = false;
   const pull = () => Math.min(dy * 0.5, 96);

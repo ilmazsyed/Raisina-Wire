@@ -1691,7 +1691,6 @@ body,button,input,select,textarea{font-family:var(--serif)}
 @media(max-width:760px){
   header.wrap .nameplate{flex-wrap:nowrap}
   header.wrap .nameplate-tag p.tagline{max-width:none}
-  .utility-right [data-action=theme]{display:none}
 }
 
 /* The Shorts tab: one short at a time, swipe up for the next (YouTube Shorts). */
@@ -1939,3 +1938,22 @@ a.w-short{aspect-ratio:auto;overflow:visible;background:none;border-radius:0}
 html.standalone,html.standalone body{overscroll-behavior-y:none}
 .ptr{transition:opacity .15s}
 .ptr.spin{transition:transform .25s cubic-bezier(.2,.8,.2,1),opacity .15s}
+
+/* Phones: the light/dark switch stays in the header; the language menu opens inward from the right. */
+@media(max-width:760px){
+  .utility-right{gap:6px}
+  .utility-right [data-action=theme]{display:inline-grid;place-items:center}
+  .lang-pop{left:auto;right:0;min-width:150px;max-width:calc(100vw - 24px)}
+  .lang-pop a{padding:9px 12px;font-size:14.5px}
+}
+.ptr .ptr-mark{display:grid;place-items:center}
+.ptr .ptr-mark svg{width:22px;height:22px}
+@media(max-width:440px){
+  header.wrap{column-gap:10px}
+  header.wrap .nameplate{gap:10px}
+  header.wrap .nameplate-tag p.tagline{font-size:11.5px}
+  .utility-right{gap:5px}
+  .utility .icon-btn{width:32px;height:32px}
+  .utility .icon-btn.lang-btn{height:32px;padding:0 8px}
+  .live-tv-btn{height:30px;padding:0 8px}
+}
