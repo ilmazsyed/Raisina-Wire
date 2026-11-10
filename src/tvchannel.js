@@ -1,3 +1,4 @@
+import { readyVoices } from "./bulletinvoice.js";
 import { bnLine } from "./bnline.js";
 // Rashtrix TV, Phase 2: two channels, each on or off, each with its own secret output address
 // for OBS / vMix.
@@ -103,9 +104,11 @@ export async function promos(env, all = false) {
 //   two videos never play back to back; vertical promo cards keep their own repeat rule;
 // - a stinger, picked at random but the same on every screen, on about one change in three;
 // - at the top of every hour and at every half hour, a two-minute bulletin of the latest
-//   stories with their details. The loop stops for it and carries on where it stopped.
+//   stories with their details, and at :15 and :45 a 65-second one. The loop stops for it and
+//   carries on where it stopped.
 export const FLASH_SECONDS = 10;
-export const BULLETIN_MS = 120e3, HALF_HOUR = 1800e3;
+export const QUARTER = 900e3;
+export const bulletinMs = due => (Math.round(due / 60e3) % 30 === 0 ? 120e3 : 65e3);
 const hash = str => { let h = 2166136261; for (const c of String(str)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
 export function buildLoop(s, videos, cards = []) {
   const loop = []; let k = 0, slot = 0;
@@ -125,7 +128,7 @@ export function buildLoop(s, videos, cards = []) {
 // channel's start (or a saved point on the way): items follow one another, and once a half hour
 // has passed the bulletin goes on at the next break, never in the middle of a video. What was on
 // air when the loop restarted for a new video ("hold") plays out first.
-const nextHalf = x => Math.floor(x / HALF_HOUR) * HALF_HOUR + HALF_HOUR;
+const nextHalf = x => Math.floor(x / QUARTER) * QUARTER + QUARTER;
 export function scheduleAt(loop, epoch, t = Date.now(), ahead = 5400, opts = {}) {
   const out = [], end = t + ahead * 1000;
   for (const h of opts.hold || []) if (h.start + h.dur * 1000 > t && h.start < end) out.push(h);
@@ -136,8 +139,9 @@ export function scheduleAt(loop, epoch, t = Date.now(), ahead = 5400, opts = {})
   while (at < end && steps < 400000) {
     steps++;
     if (at >= due) {
-      if (at + BULLETIN_MS > t) out.push({ type: "bulletin", start: at, dur: BULLETIN_MS / 1000, sting: true });
-      due = nextHalf(at); at += BULLETIN_MS; continue;
+      const len = bulletinMs(due);
+      if (at + len > t) out.push({ type: "bulletin", start: at, dur: len / 1000, sting: true });
+      due = nextHalf(at); at += len; continue;
     }
     const x = loop[i], next = at + x.dur * 1000;
     if (next > t) out.push({ ...x, start: at, in: 0 });
@@ -156,7 +160,7 @@ export function scheduleAt(loop, epoch, t = Date.now(), ahead = 5400, opts = {})
 // briefs) from the last twelve hours, newest first. Older stories never go on air.
 const FRESH_HOURS = 12;
 async function wireStories(env, limit = 20) {
-  const pick = hours => env.DB.prepare(`SELECT title, category, kind, body FROM articles WHERE status='published' AND lang='bn' AND pulled_at IS NULL
+  const pick = hours => env.DB.prepare(`SELECT id, title, category, kind, body FROM articles WHERE status='published' AND lang='bn' AND pulled_at IS NULL
     AND kind IN ('rewrite','brief') AND published_at>=? ORDER BY published_at DESC LIMIT ?`).bind(new Date(Date.now() - hours * 3600e3).toISOString(), limit).all().then(r => r.results).catch(() => []);
   // A quiet night: look back a day rather than show an empty screen, never further.
   const fresh = await pick(FRESH_HOURS);
@@ -177,7 +181,13 @@ export async function tvState(env, ch) {
     wireStories(env)
   ]);
   const headlines = stories.map(a => ({ text: a.title, desk: a.category, kind: a.kind }));
-  const bulletin = stories.slice(0, 8).map(r => ({ title: r.title, desk: r.category, kind: r.kind, text: firstWords(r.body) }));
+  // Each bulletin story's picture and its credit (src/bulletinimg.js), when one was found.
+  const top = stories.slice(0, 8), pics = new Map();
+  if (top.length) (await env.DB.prepare(`SELECT article_id, url, credit FROM bulletin_images WHERE url<>'' AND article_id IN (${top.map(() => "?").join(",")})`).bind(...top.map(r => r.id)).all().catch(() => ({ results: [] }))).results.forEach(r => pics.set(r.article_id, r));
+  const bulletin = top.map(r => ({ title: r.title, desk: r.category, kind: r.kind, text: firstWords(r.body), image: pics.has(r.id) ? `/api/tv/bimg/${encodeURIComponent(r.id)}?v=${encodeURIComponent(pics.get(r.id).url.length + (pics.get(r.id).url.split("/").pop() || "").slice(-12))}` : "", credit: pics.get(r.id)?.credit || "" }));
+  // The newsreader's line for each story, when it is ready (src/bulletinvoice.js).
+  const voices = await readyVoices(env, bulletin).catch(() => new Map());
+  bulletin.forEach(b => { const k = voices.get(b); if (k) b.voice = `/api/tv/voice/${k}.mp3`; });
   const loop = buildLoop(s, videos, cards);
   const schedule = s.on ? scheduleAt(loop, s.epoch, Date.now(), 5400, { hold: s.hold, anchor: s.anchor }) : [];
   // Keep a point near now (and drop a hold that has played out), so the walk stays short.

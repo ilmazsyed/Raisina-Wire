@@ -139,9 +139,9 @@ const STYLES = {
       if (k === 0 || k === 6) ch.forEach(f => v.osc("sawtooth", f, at, 0.32, 0.085, 2600, 0, 0.02)); // brass stabs
     } }
 };
-export function newsBed(ctx, seconds = 10, { style = "headlines", level = 0.85, delay = 0 } = {}) {
+export function newsBed(ctx, seconds = 10, { style = "headlines", level = 0.85, delay = 0, duck = 1 } = {}) {
   if (!ctx) return () => {};
-  const S = STYLES[style] || STYLES.headlines; level = S.level || level;
+  const S = STYLES[style] || STYLES.headlines; level = (S.level || level) * duck;
   // Notes are scheduled a second ahead as it plays, so a two-minute piece costs no more than a short one.
   const t0 = ctx.currentTime + 0.03 + delay, end = t0 + Math.min(seconds, 185), s16 = 60 / S.bpm / 4;
   const out = ctx.createGain(), tone = ctx.createBiquadFilter();
@@ -269,7 +269,7 @@ const ytMask = (box, ms = 6000) => {
 // A YouTube player state change: 1 playing, 2 paused, 3 buffering, 0 ended, 5 cued, -1 unstarted.
 const ytMaskState = (box, state, fresh) => {
   const m = box?.querySelector(":scope > .tvp-ytmask"), held = m?.classList.contains("on") && !m._t;
-  if (state === 1) { if (fresh) ytMask(box, 3500); else if (held) ytMask(box, 2500); }
+  if (state === 1) { if (fresh) ytMask(box, 5500); else if (held) ytMask(box, 2500); }
   else if (state === 0 || state === 2) ytMask(box, 0);
 };
 // YouTube's own captions never show on air (a viewer's YouTube setting can turn them on).
@@ -357,7 +357,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (!BEDS[kind] || st.muted || !st.audio || (mode !== "app" && !output) || st.bed) return;
     wake();
     const gone = (now() - (sc.startAt || now())) / 1000, left = Math.max(2, (sc.dur || 10) - gone);
-    if (kind === "bulletin" && gone < 4.5) { identSig(st.audio); st.bed = newsBed(st.audio, left - (4.5 - gone), { ...BEDS[kind], delay: 4.5 - gone }); return; }
+    // With the newsreader reading the stories, the bulletin's music sits low under the voice.
+    const duck = kind === "bulletin" && (st.tv?.bulletin || []).some(b => b.voice) ? 0.35 : 1;
+    if (kind === "bulletin" && gone < 4.5) { identSig(st.audio); st.bed = newsBed(st.audio, left - (4.5 - gone), { ...BEDS[kind], delay: 4.5 - gone, duck }); return; }
     st.bed = newsBed(st.audio, left, BEDS[kind]);
   }
   soundBtn?.addEventListener("click", unmute);
@@ -525,12 +527,13 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // It cuts into whatever is playing, and that video is picked up again after it, where it was
   // left. What the control room puts on air (live, manual takes, rundowns, standby, breaking) is
   // also the same for every viewer at the same moment.
-  const BULLETIN_MS = 120e3, UPNEXT = 6;
+  const QUARTER = 900e3, UPNEXT = 6;
+  const bulletinMs = slot => (slot / 60e3) % 30 === 0 ? 120e3 : 65e3;   // :00 and :30 two minutes; :15 and :45 sixty-five seconds
   const upnext = v => ({ type: "upnext", video: v, dur: UPNEXT, sting: false });
   function localSeg() {
     const loop = st.tv?.loop || []; if (!loop.length) return null;
     const t = now(), q = st.seq ||= { i: 0, item: null, seg: null, start: 0, n: 0, head: loop[0]?.ytId || "" };
-    const slot = Math.floor(t / 1800e3) * 1800e3;
+    const slot = Math.floor(t / QUARTER) * QUARTER, BULLETIN_MS = bulletinMs(slot);
     if (t - slot < BULLETIN_MS && (st.tv?.bulletin || []).length) {
       if (q.item?.type !== "bulletin" || q.start !== slot) {
         // Whatever was on stops for the bulletin; a video is picked up again afterwards.
@@ -632,7 +635,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   /* ---------- drawing a scene, with a transition ---------- */
   function drawScene(sc) {
     const old = st.current;
-    st.bed?.(); st.bed = null;
+    st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null;
     old?.slots.forEach(s => { if (s.shared) s.destroy(); });
     const box = document.createElement("div"); box.className = "tvp-scene";
     const slots = [];
@@ -691,15 +694,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const bnDate = d => { try { return bnDigits(d.toLocaleDateString("bn-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long", year: "numeric" })); } catch { return ""; } };
   const ist = () => bnDigits(new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }));
   const tickerHTML = all => { const list = mode === "app" ? all.slice(0, 12) : all, items = list.map(t => `<span>${esc(t)}</span>`).join("<i>◆</i>"); return `<div class="tk-move" style="--dur:${Math.max(40, list.length * 9)}s"><div>${items}<i>◆</i></div><div aria-hidden="true">${items}<i>◆</i></div></div>`; };
-  // Every 50 seconds the ad box turns over for eight seconds to show a partner, Calibrex and
-  // Raisina Wire in turn; otherwise it shows the ad (or "your ad here").
+  // Every 50 seconds the ad box turns over to show the partners, Calibrex and then Raisina Wire,
+  // six seconds each; otherwise it shows the ad (or "your ad here").
   const PARTNERS = [
     `<div class="tv-ad partner"><span class="pt-in"><img src="/partners/calibrex-mark.svg" alt=""><b class="pt-word">CALIBRE<i>X</i></b><small>Partner</small></span></div>`,
     `<div class="tv-ad partner rw"><span class="pt-in"><img src="/partners/raisina-wire-mark.svg" alt=""><b class="pt-word">Raisina Wire</b><small>Partner</small></span></div>`
   ];
-  const adBox = ad => { const k = Math.floor(Date.now() / 50000); return Date.now() % 50000 < 8000 ? PARTNERS[k % 2] : plainAd(ad); };
+  const adBox = ad => { const r = Date.now() % 50000; return r < 6000 ? PARTNERS[0] : r < 12000 ? PARTNERS[1] : plainAd(ad); };
   const plainAd = ad => ad?.image ? `<div class="tv-ad img"><img src="${esc(ad.image)}" alt=""></div>` : `<div class="tv-ad"><b>${esc(ad?.line1 || "")}</b><hr><small>${esc(ad?.line2 || "")}</small><hr><small>${esc(ad?.line3 || "")}</small></div>`;
-  const vJacket = (inner, band) => `<div class="vj"><img class="vj-strip" src="/brand/jacket-strip.webp" alt=""><div class="vj-logo"><img src="${LOGO}" alt=""></div><div class="vj-frame">${inner}</div><div class="vj-band"><b>${esc(band)}</b>${plainAd(sponsorAd())}</div></div>`;
+  const vJacket = (inner, band) => `<div class="vj"><img class="vj-strip" src="/brand/jacket-strip.webp" alt=""><div class="vj-logo"><img src="${LOGO}" alt=""></div><div class="vj-frame">${inner}</div><div class="vj-band"><b>${esc(band)}</b><div class="tv-adslot"></div></div></div>`;
   const sponsorAd = () => st.ctl?.sponsor ? { image: st.ctl.sponsor.image, line1: st.ctl.sponsor.line1, line2: st.ctl.sponsor.line2, line3: st.ctl.sponsor.line3 } : st.tv?.ad;
   function headlineSets() {
     const Hs = st.tv?.headlines || [], sets = [], used = new Set();
@@ -749,19 +752,29 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       count(); const t = setInterval(() => el.isConnected ? count() : clearInterval(t), 250);
     } else if (g.kind === "bulletin") {   // two minutes from :00 and :30, the same for everyone
       // The channel ID (five seconds), the NEWS BULLETIN opening, then the stories.
-      const total = sc.dur || 120, list = (st.tv?.bulletin || []).slice(0, 8), intro = 12, per = list.length ? (total - intro) / list.length : total;
+      // The two-minute bulletins carry eight stories; the 65-second ones at :15 and :45, four.
+      const total = sc.dur || 120, short = total < 100, list = (st.tv?.bulletin || []).slice(0, short ? 4 : 8), intro = 12, per = list.length ? (total - intro) / list.length : total;
       const at = new Date(sc.startAt || now()), when = slotWords(at), day = bnDate(at);
       const opening = () => `<div class="nb${channel === "v" ? " v" : ""}"><i class="nb-ray"></i><i class="nb-ray r2"></i><i class="nb-ring"></i><i class="nb-ring b"></i>
         <div class="nb-logo"><img src="${LOGO}" alt="রাষ্ট্রিক্স"></div>
         <div class="nb-word" data-no-tr><b class="w1">NEWS</b><b class="w2">BULLETIN</b></div><i class="nb-line"></i>
-        <div class="nb-bn">সংবাদ বুলেটিন · ${esc(when)}</div><div class="nb-when"><span>${esc(day)}</span></div></div>`;
-      const story = (x, k) => `<div class="bs${channel === "v" ? " v" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>
+        <div class="nb-bn">${short ? "খবর সংক্ষেপে" : "সংবাদ বুলেটিন"} · ${esc(when)}</div><div class="nb-when"><span>${esc(day)}</span></div></div>`;
+      // A story with a photo (free-licence, from Wikimedia Commons) shows it wiping in beside the
+      // text, slowly zooming, with its credit in small type.
+      const story = (x, k) => `<div class="bs${channel === "v" ? " v" : ""}${x.image ? " has-img" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>${x.image ? `<div class="bs-img" style="--d:${per}s"><img src="${esc(x.image)}" alt="" referrerpolicy="no-referrer"></div>${x.credit ? `<small class="bs-credit">${esc(x.credit)}</small>` : ""}` : ""}
         <div class="bs-side"><em>${bnDigits(k + 1)}</em><small>/ ${bnDigits(list.length)}</small><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span></div>
         <div class="bs-main"><h2>${String(x.title || "").split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</h2><p>${esc(x.text || "")}</p></div>
         <div class="bs-strap"><b data-no-tr>NEWS BULLETIN</b><span>${esc(when)}</span><div class="bs-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${per}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div></div>`;
       let shown = -9;
+      // The newsreader reads each story while it is on screen (when its line is ready); a story
+      // that is replaced cuts its line off.
+      const speak = x => {
+        st.voice?.pause(); st.voice = null;
+        if (!x?.voice || st.muted || (mode !== "app" && !output)) return;
+        const a = new Audio(x.voice); a.volume = 1; st.voice = a; a.play().catch(() => {});
+      };
       const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = e < 5 ? -2 : e < intro || !list.length ? -1 : Math.min(list.length - 1, Math.floor((e - intro) / per)); if (k === shown) return; const first = shown === -9; shown = k;
-        const paint = () => { el.innerHTML = k === -2 ? identHTML() : k < 0 ? opening() : story(list[k], k); };
+        const paint = () => { el.innerHTML = k === -2 ? identHTML() : k < 0 ? opening() : story(list[k], k); speak(k >= 0 ? list[k] : null); };
         if (first || !el.isConnected) return paint();
         // A quick red slash between stories.
         const w = document.createElement("div"); w.className = "bs-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
@@ -786,7 +799,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       el.className = "tvp-lband";
       const lines = g.lines?.length ? g.lines : (st.tv?.headlines || []).slice(0, 5).map(h => h.text);
       el.innerHTML = channel === "h"
-        ? `<div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${lines.map(t => `<p>${esc(t)}</p>`).join("")}</div><div class="lb-bottom"><b>${esc(g.text || lines[0] || "")}</b>${plainAd(sponsorAd())}</div>`
+        ? `<div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${lines.map(t => `<p>${esc(t)}</p>`).join("")}</div><div class="lb-bottom"><b>${esc(g.text || lines[0] || "")}</b><div class="tv-adslot"></div></div>`
         : `<div class="lbv-bottom"><b>${esc(g.text || lines[0] || "")}</b>${lines.slice(0, 3).map(t => `<p>${esc(t)}</p>`).join("")}</div>`;
     } else if (g.kind === "results") el.innerHTML = resultsHTML(g.id, true);
     else if (g.kind === "poll") el.innerHTML = pollHTML(g.id, true);
@@ -815,6 +828,13 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const bnDayDate = () => new Date().toLocaleDateString("bn-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long" });
   const flip = (a, b, cls) => `<span class="dt-flip ${cls}"><span class="ff a">${a}</span><span class="ff b">${b}</span></span>`;
   const dtBar = (L, s) => (L.live || L.clock) ? `<div class="tv-dt">${L.live ? `<span class="dt-live"><i></i>LIVE</span>` : ""}${L.clock ? `<b class="dt-time">${flip(`${enTime()}<small>IST</small>`, `${ist()}`, "t")}</b><span class="dt-date">${flip(esc(enDate()), esc(bnDayDate()), "d")}</span>${s.bangabda ? `<span class="dt-bn">${esc(s.bangabda)}</span>` : ""}` : ""}</div>` : "";
+  // Every ad box on screen (corner, L-band, headlines, vertical band) is filled here on its own,
+  // so its turns (partners every 50 s) never redraw the other graphics; a new face turns in.
+  function fillAds() {
+    const html = adBox(sponsorAd()), turned = st.lastAd !== undefined && st.lastAd !== html;
+    stage.querySelectorAll(".tv-adslot").forEach(s => { if (s.__html === html) return; s.innerHTML = html; s.__html = html; if (turned) s.firstElementChild?.classList.add("enter"); });
+    st.lastAd = html;
+  }
   function drawJacket() {
     let gfx = "", ovl = "";
     const c = st.ctl || {}, L = c.layers || { bug: true, live: true, clock: true, lower: true, ticker: true, ad: true, weather: true }, s = st.tv || {};
@@ -848,9 +868,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     ovl = `${o.poll ? pollHTML(o.poll, false) : ""}<div class="ovl-right">${o.results ? resultsHTML(o.results, false) : ""}${o.comments?.length ? `<div class="cm-box">${o.comments.slice(0, 3).map(x => `<p><b>${esc(x.author)}</b><span>${esc(x.text)}</span><small>${x.platform === "youtube" ? "ইউটিউব" : x.platform === "facebook" ? "ফেসবুক" : "রাষ্ট্রিক্স অ্যাপ"}</small></p>`).join("")}</div>` : ""}</div>`;
 
     put(".tvp-gfx", gfx); put(".tvp-ovl", ovl);
-    // The ad box changes on its own (partners every 50 s) without redrawing the other graphics.
-    const slot = $(".tvp-gfx .tv-adslot");
-    if (slot) { const html = adBox(sponsorAd()); if (slot.__html !== html) { slot.innerHTML = html; slot.__html = html; } }
+    fillAds();
   }
   function autoLband(sc, video, L) {
     const cfg = st.tv?.lbandAuto, layer = $(".tvp-lbl");
@@ -864,7 +882,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const Hs = (st.tv?.headlines || []).filter(h => h.text), n = Hs.length;
     const main = st.tv?.lband?.text || (n ? Hs[k % n].text : sc.label || "");
     const side = n ? [1, 2, 3, 4].map(i => Hs[(k + i) % n]).filter((h, i, a) => h && a.indexOf(h) === i && h.text !== main) : [];
-    put(".tvp-lbl", `<div class="lb-auto-box${on ? "" : " out"}" data-k="${k}"><div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${side.slice(0, 3).map((h, i) => `<p style="--n:${i}"><small>${esc(DESK_BN[h.desk] || h.desk || "")}</small>${esc(h.text)}</p>`).join("")}<div class="lb-logo"><img src="${LOGO}" alt=""><i></i></div></div><div class="lb-bottom"><b>${esc(main)}</b>${L.ad ? plainAd(sponsorAd()) : ""}</div></div>`);
+    put(".tvp-lbl", `<div class="lb-auto-box${on ? "" : " out"}" data-k="${k}"><div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${side.slice(0, 3).map((h, i) => `<p style="--n:${i}"><small>${esc(DESK_BN[h.desk] || h.desk || "")}</small>${esc(h.text)}</p>`).join("")}<div class="lb-logo"><img src="${LOGO}" alt=""><i></i></div></div><div class="lb-bottom"><b>${esc(main)}</b>${L.ad ? `<div class="tv-adslot"></div>` : ""}</div></div>`);
   }
   function showBreaking(b) {
     const el = document.createElement("div"); el.className = "tv-breaking";
@@ -904,7 +922,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (mode === "app") preloadYT(st.preWant);
     const b = st.ctl?.breaking || st.tv?.breaking;
     if (mode !== "scene" && b && st.shownBreaking !== b.at && now() - Date.parse(b.at) < 90e3) { st.shownBreaking = b.at; showBreaking(b); }
-    drawJacket();
+    drawJacket(); fillAds();
     // Health: a source that has not moved for ten seconds is reported (outputs only).
     const stalled = st.current?.slots.some(s => s.stalled());
     st.stalledSince = stalled ? st.stalledSince || Date.now() : 0;

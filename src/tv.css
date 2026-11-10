@@ -510,3 +510,33 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 @keyframes ptswirl{from{transform:rotateY(-90deg) scale(.8);opacity:0}to{transform:none;opacity:1}}
 @keyframes ptspin{from{transform:rotate(-540deg) scale(.3)}to{transform:none}}
 .tv-adslot{display:contents}
+
+/* Bulletin stories with a photo: a framed panel on the right wipes in, the photo slowly zooms,
+   its credit sits small under it; the text moves left of it. */
+.bs-img{position:absolute;right:90px;top:120px;width:760px;height:600px;z-index:1;overflow:hidden;border-radius:22px;
+  box-shadow:0 30px 70px rgba(0,0,0,.55),0 0 0 2px rgba(212,160,23,.75);animation:bsimgwipe .9s .15s cubic-bezier(.7,0,.2,1) both}
+.bs-img img{width:100%;height:100%;object-fit:cover;transform-origin:60% 40%;animation:bskb var(--d,13s) linear both}
+.bs-img:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 65%,rgba(0,0,0,.35));pointer-events:none}
+.bs-img:before{content:"";position:absolute;inset:0;z-index:2;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.35) 50%,transparent 65%);transform:translateX(-120%);animation:bsimgshine 1.4s .9s ease both;pointer-events:none}
+.bs.has-img .bs-main{right:900px;z-index:2}
+.bs.has-img .bs-main h2{font-size:56px;-webkit-line-clamp:4}
+.bs.has-img .bs-main p{font-size:33px;-webkit-line-clamp:6}
+.bs.has-img .bs-side{z-index:2}
+.bs-credit{position:absolute;right:92px;top:732px;z-index:3;max-width:760px;font:500 15px "Hind Siliguri",sans-serif;color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@keyframes bsimgwipe{from{clip-path:inset(0 0 0 100% round 22px);transform:translateX(40px) scale(.96)}to{clip-path:inset(0 0 0 0 round 22px);transform:none}}
+@keyframes bskb{from{transform:scale(1.03)}to{transform:scale(1.16) translate(-2%,-1%)}}
+@keyframes bsimgshine{to{transform:translateX(120%)}}
+.bs.v .bs-img{left:60px;right:60px;width:auto;top:330px;height:520px}
+.bs.v .bs-credit{left:62px;right:62px;top:860px;max-width:none}
+.bs.v.has-img .bs-side{top:170px}
+.bs.v.has-img .bs-main{top:920px;right:60px}
+.bs.v.has-img .bs-main h2{font-size:58px}
+
+/* Ad boxes: a new face turns in (partners, and back to the ad). */
+.tv-ad.enter:not(.partner){animation:adin .7s cubic-bezier(.2,.9,.2,1) both}
+@keyframes adin{from{transform:perspective(600px) rotateY(80deg);opacity:0}to{transform:none;opacity:1}}
+/* L-band and headlines: a squarer ad box too. */
+.lb-bottom .tv-ad{width:236px;height:176px;overflow:hidden}
+.lb-bottom .tv-ad b{font-size:28px}.lb-bottom .tv-ad small{font-size:12px}
+.lb-bottom .pt-in{gap:5px}.lb-bottom .pt-in img{width:64px;height:64px}.lb-bottom .pt-word{font-size:22px}.lb-bottom .pt-in small{font-size:10px}
+.vj-band .tv-ad{overflow:hidden}

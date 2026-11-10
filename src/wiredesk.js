@@ -414,6 +414,21 @@ export { scriptLang };
 // day's free quota has room to spare; until then (or if it fails) the line is taken from the
 // title itself (src/bnline.js).
 const LINE_SCHEMA = { type: "OBJECT", properties: { items: { type: "ARRAY", items: { type: "OBJECT", properties: { id: { type: "STRING" }, line: { type: "STRING" } }, required: ["id", "line"] } } }, required: ["items"] };
+// English search terms for a photo of each story (the TV bulletin's pictures come from
+// Wikimedia Commons, which is searched in English). Specific first: the named person, place,
+// building or organisation; nothing when the story names nothing that could be pictured.
+const TERMS_SCHEMA = { type: "OBJECT", properties: { items: { type: "ARRAY", items: { type: "OBJECT", properties: { id: { type: "STRING" }, terms: { type: "ARRAY", items: { type: "STRING" } } }, required: ["id", "terms"] } } }, required: ["items"] };
+export async function imageTerms(env, stories) {
+  if (!wireReady(env) || !stories.length) return {};
+  const q = await quota(env);
+  if (!q || q.blockedUntil || q.left < 150) return {};
+  const text = `For each Bengali news story below, give up to three short English search queries (two to five words each) for finding a real photograph of what the story is about on Wikimedia Commons. Most specific first: a named person (full name), a named place, building, institution or event. Then one broader query for the place or subject (for example "Kolkata Police", "Howrah Bridge", "Supreme Court of India"). No query that would only find generic stock pictures, no dates, no Bengali. If nothing in the story can be pictured, give an empty list.\n\n${stories.map(r => `id: ${r.id}\ntitle: ${r.title}\nsummary: ${String(r.dek || "").slice(0, 300)}`).join("\n\n")}`;
+  const out = await callGemini(env, text, false, false, 0, { system: "You find photographs for news stories. Reply in JSON only.", schema: TERMS_SCHEMA });
+  const map = {};
+  for (const x of out.items || []) map[x.id] = (x.terms || []).map(t => String(t).trim()).filter(Boolean).slice(0, 3);
+  return map;
+}
+
 export async function videoHeadlines(env, n = 15) {
   const { results } = await env.DB.prepare("SELECT yt_id AS id, MAX(title) AS title, MAX(description) AS description FROM tv_items WHERE headline='' AND playable=1 AND excluded=0 GROUP BY yt_id ORDER BY MAX(published_at) DESC LIMIT ?").bind(n).all();
   if (!results.length) return { done: 0 };

@@ -41,11 +41,11 @@ export async function sha256(s) {
   return [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-export async function synthesize(env, text, voice, languageCode = "en-IN") {
+export async function synthesize(env, text, voice, languageCode = "en-IN", speakingRate = 0.96) {
   const endpoint = env.TTS_ENDPOINT || "https://texttospeech.googleapis.com/v1/text:synthesize"; // TTS_ENDPOINT: local tests only
   const res = await fetch(`${endpoint}?key=${encodeURIComponent(env.GOOGLE_TTS_API_KEY)}`, {
     method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ input: { text }, voice: { languageCode, name: voice }, audioConfig: { audioEncoding: "MP3", speakingRate: 0.96 } })
+    body: JSON.stringify({ input: { text }, voice: { languageCode, name: voice }, audioConfig: { audioEncoding: "MP3", speakingRate } })
   });
   if (!res.ok) throw new Error(`Text-to-speech returned ${res.status}`);
   const { audioContent } = await res.json();
