@@ -417,7 +417,10 @@ function watchScroll() {
   }, { passive: true });
   // The menu gets its pinned look once the masthead has scrolled away (no logo in it: the full
   // logo stays in the masthead, never shrunk into the menu).
-  new IntersectionObserver(([entry]) => document.body.classList.toggle("nav-stuck", !entry.isIntersecting), { rootMargin: "-20px 0px 0px 0px" }).observe($("#masthead"));
+  // (The header is watched, not the masthead: in the current layout the masthead has no box of
+  // its own, so it never counted as on screen and the menu's backdrop covered the header, which
+  // the installed app, with its taller top inset, showed as a blank band.)
+  new IntersectionObserver(([entry]) => document.body.classList.toggle("nav-stuck", !entry.isIntersecting), { rootMargin: "-20px 0px 0px 0px" }).observe($("header.wrap") || $("#masthead"));
   // On narrow screens the menu scrolls sideways; fade its edge until the end is reached.
   const nav = $("#siteNav");
   const edge = () => nav.classList.toggle("at-end", nav.scrollLeft + nav.clientWidth >= nav.scrollWidth - 4);
@@ -2079,7 +2082,9 @@ function pullToRefresh() {
     if (y0 == null) return;
     dy = Math.max(0, e.touches[0].clientY - y0);
     if (scrollY > 2) { y0 = null; reset(); return; }
-    el.style.transform = `translate(-50%, ${pull()}px) rotate(${dy * 1.6}deg)`; el.style.opacity = Math.min(1, pull() / 48); el.classList.toggle("ready", pull() >= 64);
+    // The mark comes down with the finger and turns once as the pull reaches the refresh point.
+    const k = Math.min(1, pull() / 64);
+    el.style.transform = `translate(-50%, ${pull()}px) scale(${0.6 + 0.4 * k}) rotate(${k * 270}deg)`; el.style.opacity = k; el.classList.toggle("ready", k >= 1);
   }, { passive: true });
   addEventListener("touchend", async () => {
     if (y0 == null) return; y0 = null;
