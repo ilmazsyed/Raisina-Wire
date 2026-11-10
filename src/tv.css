@@ -394,3 +394,52 @@ body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 .nu-wide li span{font:700 40px/1.3 "Noto Serif Bengali",serif;-webkit-line-clamp:2}
 .nu-wide li em{width:64px;height:64px;font-size:34px}
 .nu-wide .nu-head{margin-right:190px}
+
+/* ---------- Like, share and full screen sit under the player, not inside it ---------- */
+.tv-watch-player{background:transparent!important;box-shadow:none!important;border-radius:0!important;overflow:visible!important}
+.tv-watch-player .tvp-fit{border-radius:18px;box-shadow:0 24px 60px -24px rgba(17,17,17,.45)}
+.tvp-bar{background:transparent;padding:12px 2px 0;justify-content:flex-end;flex-wrap:wrap}
+.tvp-bar button{background:#fff;color:#111;border:1px solid rgba(17,17,17,.14);box-shadow:0 4px 14px rgba(17,17,17,.08)}
+.tvp-bar .tvp-fsb{margin-right:auto;background:#111;color:#fff;border-color:#111}
+.tvp-bar .tvp-like.on{background:#AA0404;border-color:#AA0404;color:#fff}
+/* ---------- Full screen ---------- */
+.tvp-fit:fullscreen{width:100vw;height:100vh;background:#000;border-radius:0}
+.tvp-fit:-webkit-full-screen{width:100vw;height:100vh;background:#000;border-radius:0}
+.tvp-fit.tvp-fsfix{position:fixed!important;inset:0;z-index:9999;width:100vw!important;height:100vh!important;height:100dvh!important;border-radius:0!important;background:#000}
+html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
+.tvp-fs-exit{display:none;position:absolute;right:14px;top:14px;z-index:50;width:44px;height:44px;border-radius:50%;border:0;background:rgba(0,0,0,.55);color:#fff;font-size:20px;cursor:pointer}
+.tvp-fit.tvp-fsfix .tvp-fs-exit,.tvp-fit.tvp-fsnative .tvp-fs-exit{display:block}
+
+/* ---------- The channel ID ---------- */
+.cid{position:absolute;inset:0;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:radial-gradient(ellipse at 50% 45%,#7a0505 0%,#2a0102 50%,#070203 100%);color:#fff}
+.cid>*{position:relative;z-index:2}
+.cid-beam{position:absolute!important;z-index:0!important;top:-20%;height:140%;width:180px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent);transform:skewX(-20deg) translateX(-1400px);animation:cidbeam 1.6s cubic-bezier(.5,0,.3,1) both}
+.cid-beam.b2{width:60px;background:linear-gradient(90deg,transparent,rgba(212,160,23,.5),transparent);animation-delay:.25s}
+@keyframes cidbeam{to{transform:skewX(-20deg) translateX(1400px)}}
+.cid-ring{position:absolute!important;z-index:1!important;left:50%;top:44%;width:300px;height:300px;margin:-150px;border-radius:50%;border:4px solid rgba(212,160,23,.8);opacity:0;animation:cidring 1.8s ease-out both}
+.cid-ring.r2{animation-delay:.35s;border-color:rgba(255,255,255,.5)}.cid-ring.r3{animation-delay:.7s;border-color:rgba(224,16,16,.7)}
+@keyframes cidring{0%{transform:scale(.4);opacity:1}100%{transform:scale(3);opacity:0}}
+.cid-logo{padding:26px 40px;background:#fff;border-radius:28px;overflow:hidden;box-shadow:0 0 0 6px #D4A017,0 30px 80px rgba(0,0,0,.6),0 0 120px rgba(224,16,16,.55);animation:cidlogo 1s .15s cubic-bezier(.2,1.5,.4,1) both}
+.cid-logo img{display:block;height:320px}
+@keyframes cidlogo{0%{transform:scale(.2) rotate(-8deg);opacity:0}100%{transform:none;opacity:1}}
+.cid-shine{position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.75) 50%,transparent 65%);transform:translateX(-130%);animation:unshine 1.1s 1.1s ease both}
+.cid-tag{font:800 58px "Noto Serif Bengali",serif;animation:nbup .6s 1s cubic-bezier(.2,.9,.2,1) both}
+.cid-line{display:block;width:900px;height:5px;background:linear-gradient(90deg,transparent,#D4A017,transparent);transform:scaleX(0);animation:nbline .8s 1.2s ease both}
+.cid-sub{font:800 30px Montserrat,sans-serif;letter-spacing:.5em;color:#D4A017;animation:nbup .6s 1.4s cubic-bezier(.2,.9,.2,1) both}
+.cid.v .cid-logo img{height:280px}.cid.v .cid-tag{font-size:54px;text-align:center}.cid.v .cid-line{width:700px}
+
+/* ---------- L-band: the logo fills the side panel ---------- */
+.lb-side .lb-logo{margin-top:auto;align-self:center;position:relative;padding:16px 26px;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 0 0 4px #D4A017,0 18px 40px rgba(170,4,4,.25);animation:lblogo .8s .5s cubic-bezier(.2,1.5,.4,1) both,lbfloat 3s 1.3s ease-in-out infinite alternate}
+.lb-side .lb-logo img{display:block;height:210px}
+.lb-side .lb-logo i{position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.8) 50%,transparent 65%);transform:translateX(-130%);animation:unshine 1.2s 1.4s ease both,lbshine 4s 2.6s ease-in-out infinite}
+@keyframes lblogo{from{transform:scale(.4);opacity:0}}
+@keyframes lbfloat{to{transform:translateY(-8px)}}
+@keyframes lbshine{0%,70%{transform:translateX(-130%)}100%{transform:translateX(130%)}}
+
+/* ---------- Finish: a shine across the logo bug, and a sharper lower third ---------- */
+.tvp-h .tv-bug{overflow:hidden}
+.tvp-h .tv-bug:after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.7) 50%,transparent 65%);transform:translateX(-130%);animation:bugshine 9s 3s ease-in-out infinite}
+@keyframes bugshine{0%,88%{transform:translateX(-130%)}100%{transform:translateX(130%)}}
+.tvp-h .tv-l3 .lt-tag{position:relative;background:linear-gradient(135deg,#d10a0a,#8a0303)}
+.tvp-h .tv-l3 .lt-text{animation:ltwipe .7s .2s cubic-bezier(.2,.8,.2,1) both}
+@keyframes ltwipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}

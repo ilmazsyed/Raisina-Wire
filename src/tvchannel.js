@@ -190,7 +190,7 @@ export async function tvState(env, ch) {
     breaking: s.breaking && Date.now() - Date.parse(s.breaking.at) < (s.breaking.seconds + 90) * 1000 ? s.breaking : null,
     lband: ch === "h" ? s.lband : null,
     // The horizontal channel's automatic L-band during videos: every 40 seconds, for 7 seconds.
-    lbandAuto: ch === "h" ? { on: s.lbandAuto?.on !== false, every: s.lbandAuto?.every || 40, seconds: s.lbandAuto?.seconds || 7 } : null, lowerThird: s.lowerThird || "", band: s.band || "", appStream: s.appStream || null,
+    lbandAuto: ch === "h" ? { on: s.lbandAuto?.on !== false, every: s.lbandAuto?.every || 40, seconds: s.lbandAuto?.seconds || 10 } : null, lowerThird: s.lowerThird || "", band: s.band || "", appStream: s.appStream || null,
     ad: s.ad, sets: s.sets, setSeconds: s.setSeconds,
     ticker: [...s.ticker, ...headlines.slice(0, 14).map(h => h.text)],
     headlines, bulletin,

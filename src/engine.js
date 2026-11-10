@@ -183,6 +183,13 @@ async function playHls(video, url, delay = 0) {
   return hls;
 }
 
+// YouTube shows the video's title, its channel's logo and a pause sign for the first seconds of
+// playback: the video's picture stays covered by its still for those seconds, then fades away.
+const liftPoster = el => {
+  const p = el?.querySelector(".tvs-poster"); if (!p || p.dataset.lift) return;
+  p.dataset.lift = "1";
+  setTimeout(() => { p.style.transition = "opacity .5s"; p.style.opacity = "0"; setTimeout(() => p.remove(), 600); }, 4000);
+};
 // YouTube's own captions never show on air (a viewer's YouTube setting can turn them on).
 const noCaptions = p => { try { p.unloadModule?.("captions"); p.unloadModule?.("cc"); } catch { /* none */ } };
 
@@ -199,11 +206,40 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       <div class="tvp-lbl"></div><div class="tvp-gfx"></div><div class="tvp-ovl"></div>
       <div class="tvp-standby" hidden><img src="${LOGO}" alt=""><b>অনুষ্ঠান একটু পরেই</b><small>আমাদের সঙ্গে থাকুন</small></div>
       <div class="tvp-off" hidden><img src="${LOGO}" alt=""><b>শিগগির ফিরছি</b></div>
-    </div></div>${mode === "app" ? `<button class="tvp-sound" type="button" hidden>🔇 শব্দ চালু করতে ট্যাপ করুন</button><span class="tvp-taphint" hidden>▶ ভিডিওতে একবার ট্যাপ করুন</span>
-      <div class="tvp-bar"><button type="button" class="tvp-like" aria-label="Like" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.3 1.1 4.1 2.3h1C12.3 6.1 13.6 5 15.6 5 19 5 21.1 8.4 19.6 11.8 17.5 16.4 12 21 12 21z"/></svg><b>ভালো লাগা</b><span>০</span></button><button type="button" class="tvp-share" aria-label="Share"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 16a3 3 0 0 0-2.4 1.2l-6.8-3.4a3 3 0 0 0 0-1.6l6.8-3.4A3 3 0 1 0 15 7l-6.8 3.4a3 3 0 1 0 0 3.2L15 17a3 3 0 1 0 3-1z"/></svg><b>শেয়ার করুন</b></button></div>` : ""}`;
+    </div>${mode === "app" ? `<button class="tvp-fs-exit" type="button" aria-label="Exit full screen">✕</button>` : ""}</div>${mode === "app" ? `<button class="tvp-sound" type="button" hidden>🔇 শব্দ চালু করতে ট্যাপ করুন</button><span class="tvp-taphint" hidden>▶ ভিডিওতে একবার ট্যাপ করুন</span>
+      <div class="tvp-bar"><button type="button" class="tvp-fsb" aria-label="Full screen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v2H6v4H4zm10 0h6v6h-2V6h-4zM4 14h2v4h4v2H4zm14 0h2v6h-6v-2h4z"/></svg><b>ফুল স্ক্রিন</b></button><button type="button" class="tvp-like" aria-label="Like" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.3 1.1 4.1 2.3h1C12.3 6.1 13.6 5 15.6 5 19 5 21.1 8.4 19.6 11.8 17.5 16.4 12 21 12 21z"/></svg><b>ভালো লাগা</b><span>০</span></button><button type="button" class="tvp-share" aria-label="Share"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 16a3 3 0 0 0-2.4 1.2l-6.8-3.4a3 3 0 0 0 0-1.6l6.8-3.4A3 3 0 1 0 15 7l-6.8 3.4a3 3 0 1 0 0 3.2L15 17a3 3 0 1 0 3-1z"/></svg><b>শেয়ার করুন</b></button></div>` : ""}`;
   const fit = host.querySelector(".tvp-fit"), stage = host.querySelector(".tvp");
   const $ = s => stage.querySelector(s);
-  const scale = () => { const k = Math.min(fit.clientWidth / W, (output ? fit.clientHeight : fit.clientWidth * H / W) / H); stage.style.transform = `scale(${k})`; stage.style.setProperty("--k", String(k || 1)); if (!output) fit.style.height = `${H * (fit.clientWidth / W)}px`; };
+  // Full screen: the whole frame (picture, logo, strips, every graphic) fills the screen,
+  // letterboxed; on phones that cannot make an element full screen (iPhone), the frame covers
+  // the page instead.
+  const fsOn = () => document.fullscreenElement === fit || document.webkitFullscreenElement === fit || fit.classList.contains("tvp-fsfix");
+  const scale = () => {
+    const fs = fsOn();
+    if (fs) {
+      fit.style.height = "";
+      const k = Math.min(fit.clientWidth / W, fit.clientHeight / H);
+      stage.style.transform = `translate(${(fit.clientWidth - W * k) / 2}px,${(fit.clientHeight - H * k) / 2}px) scale(${k})`; stage.style.setProperty("--k", String(k || 1));
+      return;
+    }
+    const k = Math.min(fit.clientWidth / W, (output ? fit.clientHeight : fit.clientWidth * H / W) / H); stage.style.transform = `scale(${k})`; stage.style.setProperty("--k", String(k || 1)); if (!output) fit.style.height = `${H * (fit.clientWidth / W)}px`;
+  };
+  const fsExit = async () => {
+    try { if (document.fullscreenElement) await document.exitFullscreen(); else if (document.webkitFullscreenElement) document.webkitExitFullscreen?.(); } catch { /* none */ }
+    fit.classList.remove("tvp-fsfix"); document.documentElement.classList.remove("tvp-fs-lock"); scale();
+  };
+  const fsEnter = async () => {
+    const req = fit.requestFullscreen || fit.webkitRequestFullscreen;
+    let native = false;
+    if (req) { try { await req.call(fit); native = true; } catch { /* not allowed */ } }
+    if (!native) { fit.classList.add("tvp-fsfix"); document.documentElement.classList.add("tvp-fs-lock"); }
+    try { await screen.orientation?.lock?.(channel === "h" ? "landscape" : "portrait"); } catch { /* not supported */ }
+    scale();
+  };
+  host.querySelector(".tvp-fsb")?.addEventListener("click", () => fsOn() ? fsExit() : fsEnter());
+  host.querySelector(".tvp-fs-exit")?.addEventListener("click", fsExit);
+  const fsChange = () => { fit.classList.toggle("tvp-fsnative", document.fullscreenElement === fit || document.webkitFullscreenElement === fit); scale(); };
+  document.addEventListener("fullscreenchange", fsChange); document.addEventListener("webkitfullscreenchange", fsChange);
   const ro = new ResizeObserver(scale); ro.observe(fit); scale();
 
   const st = { tv: null, ctl: null, queue: [], skew: 0, alive: true, muted: muted ?? (mode === "app" ? false : !output), audio: null, current: null, shownBreaking: "", flash: 0, stalledSince: 0, playing: false, ws: null, dumpUntil: 0, pkgTimer: null };
@@ -229,10 +265,10 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const firstTouch = () => { wake(); if (st.muted) unmute(); };
   if (mode === "app") { ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.addEventListener(ev, firstTouch, { passive: true })); }
   // Music under the headline flash, the "up next" card and the bulletin (faster for the bulletin).
-  const BEDS = { flash: { bpm: 128 }, upnext: { bpm: 132 }, bulletin: { bpm: 140 } };
+  const BEDS = { flash: { bpm: 128 }, upnext: { bpm: 132 }, bulletin: { bpm: 140 }, ident: { bpm: 120 } };
   function startBed(sc) {
     const kind = sc?.graphic?.kind;
-    if (!BEDS[kind] || st.muted || !st.audio || mode !== "app" || st.bed) return;
+    if (!BEDS[kind] || st.muted || !st.audio || (mode !== "app" && !output) || st.bed) return;
     wake();
     st.bed = newsBed(st.audio, Math.max(2, (sc.dur || 10) - (now() - (sc.startAt || now())) / 1000), BEDS[kind]);
   }
@@ -301,7 +337,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
             st.yt.state = e.data; st.yt.since = Date.now();
             // A video loaded in advance waits, paused and buffering, until its turn.
             if (st.yt.preloading && !st.ytOwner) { if (e.data === 1) { e.target.pauseVideo(); st.yt.preloading = false; } return; }
-            if (e.data === 0) st.yt.ended = true; if (e.data === 1) { st.ytPoster?.querySelector(".tvs-poster")?.remove(); needTap(false); noCaptions(e.target); }
+            if (e.data === 0) st.yt.ended = true; if (e.data === 1) { liftPoster(st.ytPoster); needTap(false); noCaptions(e.target); }
           },
           onError: () => { st.yt.state = 0; st.yt.ended = true; }
         } });
@@ -339,7 +375,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         if (!YT || !st.alive || !el.isConnected) return;
         player = new YT.Player(el.querySelector(".tvs-yt"), { width: "100%", height: "100%", videoId: src.id,
           playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, cc_load_policy: 0, playsinline: 1, fs: 0, autoplay: 1, mute: mute() ? 1 : 0, start: Math.floor((src.in || 0) + offset), ...(src.out ? { end: Math.floor(src.out) } : {}), origin: location.origin },
-          events: { onStateChange: e => { state = e.data; since = Date.now(); if (e.data === 1) { el.querySelector(".tvs-poster")?.remove(); played(); noCaptions(e.target); } }, onReady: e => { mute() ? e.target.mute() : e.target.unMute(); e.target.playVideo(); } } });
+          events: { onStateChange: e => { state = e.data; since = Date.now(); if (e.data === 1) { liftPoster(el); played(); noCaptions(e.target); } }, onReady: e => { mute() ? e.target.mute() : e.target.unMute(); e.target.playVideo(); } } });
       });
       // If the phone blocks autoplay (iPhone Low Power Mode, data saver), the cover that keeps
       // viewers off YouTube's controls is lifted after a few seconds so YouTube's own play button
@@ -390,7 +426,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   }
 
   /* ---------- the channel's own running order (no rundown on air) ---------- */
-  function continuitySeg() { if (mode === "app") return localSeg(); const t = now(); return st.tv?.schedule?.find(x => x.start <= t && t < x.start + x.dur * 1000) || null; }
+  // The app and the OBS outputs run the full order (up next, channel ID, headlines, bulletins);
+  // the control room's monitors follow the shared schedule.
+  function continuitySeg() { if (mode === "app" || output) return localSeg(); const t = now(); return st.tv?.schedule?.find(x => x.start <= t && t < x.start + x.dur * 1000) || null; }
   // In the app each viewer has their own running order: it starts at the newest video when the
   // viewer opens the channel and goes down the list; a video moves on only when it has played
   // to its end; a headline flash (with the stinger) comes after every video, and an animated
@@ -423,7 +461,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         : age >= it.dur * 1000;
       if (!done) return q.seg;
     }
-    if (q.restart && !["video", "upnext"].includes(q.item?.type)) { q.i = 0; q.restart = false; }
+    if (q.restart && !["video", "upnext"].includes(q.item?.type)) { q.i = 0; q.restart = false; q.pending = (q.pending || []).filter(x => x.type !== "upnext"); }
+    if (q.item?.type === "bulletin" && q.pending?.length) q.pending = q.pending.filter(x => x.type !== "flash");
     const take = () => { const x = loop[q.i % loop.length]; q.i = (q.i + 1) % loop.length; return x; };
     let next;
     if (q.item?.type === "upnext") {
@@ -431,18 +470,33 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       next = { type: "video", ytId: v.ytId, title: v.title, line: v.line, dur: v.dur, in: v.at || 0 };
       if (!v.resumed) take();
     } else if (q.resume) { next = upnext(q.resume); q.resume = null; }
+    else if (q.pending?.length) next = q.pending.shift();
     else {
       let x = loop[q.i % loop.length];
-      // No flash straight after the bulletin.
-      if (x.type === "flash" && q.item?.type === "bulletin" && loop.length > 1) { take(); x = loop[q.i % loop.length]; }
-      if (x.type === "video" && q.item?.type === "video") next = { type: "flash", dur: 10, sting: true, n: q.n };
+      // The horizontal channel places its own headline cards (below); no flash straight after
+      // the bulletin on either channel.
+      while (x.type === "flash" && (channel === "h" || q.item?.type === "bulletin") && loop.some(y => y.type === "video")) { take(); x = loop[q.i % loop.length]; }
+      if (x.type === "video" && q.item?.type === "video") {
+        // Between two videos (always after the stinger): on the horizontal channel the channel ID
+        // after every second video, and the headlines after three videos, then two, then three…;
+        // then the "up next" card.
+        const gap = [];
+        if (channel === "h") {
+          q.vids = (q.vids || 0) + 1; q.since = (q.since || 0) + 1; q.gapN ||= 3;
+          if (q.vids % 2 === 0) gap.push({ type: "ident", dur: 5, sting: false });
+          if (q.since >= q.gapN) { gap.push({ type: "flash", dur: 10, sting: true, n: q.n }); q.since = 0; q.gapN = q.gapN === 3 ? 2 : 3; }
+        } else gap.push({ type: "flash", dur: 10, sting: true, n: q.n });
+        gap.push(upnext({ ...x, at: 0 }));
+        next = gap.shift(); q.pending = gap;
+      }
       else if (x.type === "video" && q.item) next = upnext({ ...x, at: 0 });
       else next = take();
     }
     q.n++; q.item = next; q.start = t;
     q.seg = { ...next, start: t, in: next.in || 0, n: next.n ?? q.n };
     // While a flash or the "up next" card is on, the video after it is loaded in advance.
-    const after = next.type === "upnext" ? next.video : next.type !== "video" ? loop.slice(q.i).concat(loop.slice(0, q.i)).find(x => x.type === "video") : null;
+    const up = next.type === "upnext" ? next : (q.pending || []).find(x => x.type === "upnext");
+    const after = up ? up.video : next.type !== "video" ? loop.slice(q.i).concat(loop.slice(0, q.i)).find(x => x.type === "video") : null;
     st.preWant = after ? { id: after.ytId, at: after.at || 0 } : null;
     return q.seg;
   }
@@ -453,6 +507,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const transition = seg.sting ? { type: "stinger", ms: 1200 } : { type: "mix", ms: 500 };
     if (seg.type === "video") return { layout: "full", sources: [{ kind: "yt", id: seg.ytId, in: seg.in || 0, title: seg.line || seg.title }], label: seg.line || seg.title, startAt: seg.start, key: `c:${seg.ytId}:${seg.start}`, transition };
     if (seg.type === "flash") return { layout: "graphic", graphic: { kind: "flash", n: seg.n || 0 }, startAt: seg.start, dur: seg.dur, key: `c:flash:${seg.start}`, transition };
+    if (seg.type === "ident") return { layout: "graphic", graphic: { kind: "ident" }, startAt: seg.start, dur: seg.dur, key: `c:ident:${seg.start}`, transition: { type: "mix", ms: 200 }, full: true };
     if (seg.type === "upnext") return { layout: "graphic", graphic: { kind: "upnext", video: seg.video }, startAt: seg.start, dur: seg.dur, key: `c:upnext:${seg.start}`, transition: { type: "mix", ms: 250 }, full: true };
     if (seg.type === "bulletin") return { layout: "graphic", graphic: { kind: "bulletin" }, startAt: seg.start, dur: seg.dur, key: `c:bulletin:${seg.start}`, transition, full: true };
     if (seg.type === "news") return { layout: "graphic", graphic: { kind: "news" }, startAt: seg.start, dur: seg.dur, key: `c:news:${seg.start}`, transition };
@@ -548,6 +603,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     return sets.slice(0, st.tv?.sets || 3);
   }
   const setHTML = (name, label, items, step) => `<div class="nu-set"><div class="nu-head"><span>${esc(name)}</span><b>${esc(label)}</b><i style="--d:${step}s"></i></div><ol>${items.map((h, n) => `<li style="--n:${n}"><em>${bnDigits(n + 1)}</em><span>${esc(h)}</span></li>`).join("")}</ol></div>`;
+  const identHTML = () => `<div class="cid${channel === "v" ? " v" : ""}"><i class="cid-beam b1"></i><i class="cid-beam b2"></i><i class="cid-ring"></i><i class="cid-ring r2"></i><i class="cid-ring r3"></i>
+    <div class="cid-logo"><img src="${LOGO}" alt="Rashtrix 24x7 News"><i class="cid-shine"></i></div>
+    <div class="cid-tag">দেশ প্রথম । বলিদান পরম ধর্ম</div><i class="cid-line"></i><div class="cid-sub" data-no-tr>LIVE · 24×7 · KOLKATA</div></div>`;
   function graphic(sc) {
     const g = sc.graphic, el = document.createElement("div"); el.className = "tvp-pkg";
     const wrapV = (inner, band) => channel === "v" ? vJacket(inner, band) : inner;
@@ -568,6 +626,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           ? `<div class="nu-set nu-wide"><div class="nu-head"><span>শিরোনাম</span><b>সর্বশেষ</b><small data-no-tr>HEADLINES</small><i style="--d:${sc.dur || 10}s"></i></div><ol>${pick.map((h, n) => `<li style="--n:${n}"><em>${bnDigits(n + 1)}</em><div><small>${esc(DESK_BN[h.desk] || h.desk || "খবর")}</small><span>${esc(h.text)}</span></div></li>`).join("")}</ol></div>`
           : wrapV(setHTML("শিরোনাম", "সর্বশেষ", pick.map(h => h.text), sc.dur || 10), "শিরোনাম");
       }
+    } else if (g.kind === "ident") {   // the channel ID: the Rashtrix logo, five seconds
+      el.innerHTML = identHTML();
+      if (!st.muted && (mode === "app" || output)) { riser(st.audio); breakingSting(st.audio, 3); }
     } else if (g.kind === "upnext") {   // the coming video, in one Bengali line
       const v = g.video || {}, dur = sc.dur || 6, line = String(v.line || v.title || "").trim();
       const thumb = `https://i.ytimg.com/vi/${esc(v.ytId)}/hqdefault.jpg`;
@@ -578,11 +639,12 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         <h2 class="un-line">${line.split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</h2>
         <div class="un-count"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44"/><circle class="p" cx="50" cy="50" r="44" style="--d:${dur}s"/></svg><b></b></div>
         <i class="un-bar" style="--d:${dur}s"></i></div>`;
-      if (!st.muted && mode === "app") riser(st.audio);
+      if (!st.muted && (mode === "app" || output)) riser(st.audio);
       const count = () => { if (!el.isConnected && st.current) return; const left = Math.max(1, Math.ceil(dur - (now() - (sc.startAt || now())) / 1000)); const b = el.querySelector(".un-count b"); if (b && b.textContent !== bnDigits(left)) b.textContent = bnDigits(left); };
       count(); const t = setInterval(() => el.isConnected ? count() : clearInterval(t), 250);
     } else if (g.kind === "bulletin") {   // two minutes from :00 and :30, the same for everyone
-      const total = sc.dur || 120, list = (st.tv?.bulletin || []).slice(0, 8), intro = 7, per = list.length ? (total - intro) / list.length : total;
+      // The channel ID (five seconds), the NEWS BULLETIN opening, then the stories.
+      const total = sc.dur || 120, list = (st.tv?.bulletin || []).slice(0, 8), intro = 12, per = list.length ? (total - intro) / list.length : total;
       const at = new Date(sc.startAt || now()), when = slotWords(at), day = bnDate(at);
       const opening = () => `<div class="nb${channel === "v" ? " v" : ""}"><i class="nb-ray"></i><i class="nb-ray r2"></i><i class="nb-ring"></i><i class="nb-ring b"></i>
         <div class="nb-logo"><img src="${LOGO}" alt="রাষ্ট্রিক্স"></div>
@@ -592,9 +654,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         <div class="bs-side"><em>${bnDigits(k + 1)}</em><small>/ ${bnDigits(list.length)}</small><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span></div>
         <div class="bs-main"><h2>${String(x.title || "").split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</h2><p>${esc(x.text || "")}</p></div>
         <div class="bs-strap"><b data-no-tr>NEWS BULLETIN</b><span>${esc(when)}</span><div class="bs-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${per}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div></div>`;
-      let shown = -2;
-      const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = e < intro || !list.length ? -1 : Math.min(list.length - 1, Math.floor((e - intro) / per)); if (k === shown) return; const first = shown === -2; shown = k;
-        const paint = () => { el.innerHTML = k < 0 ? opening() : story(list[k], k); };
+      let shown = -9;
+      const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = e < 5 ? -2 : e < intro || !list.length ? -1 : Math.min(list.length - 1, Math.floor((e - intro) / per)); if (k === shown) return; const first = shown === -9; shown = k;
+        const paint = () => { el.innerHTML = k === -2 ? identHTML() : k < 0 ? opening() : story(list[k], k); };
         if (first || !el.isConnected) return paint();
         // A quick red slash between stories.
         const w = document.createElement("div"); w.className = "bs-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
@@ -680,7 +742,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   function autoLband(sc, video, L) {
     const cfg = st.tv?.lbandAuto, layer = $(".tvp-lbl");
     if (!layer) return;
-    const every = Math.max(15, Number(cfg?.every) || 40), secs = Math.max(3, Math.min(every - 5, Number(cfg?.seconds) || 7));
+    const every = Math.max(15, Number(cfg?.every) || 40), secs = Math.max(3, Math.min(every - 5, Number(cfg?.seconds) || 10));
     const e = st.current?.drawnAt ? (Date.now() - st.current.drawnAt) / 1000 : 0, k = Math.floor(e / every), into = e - k * every;
     const on = channel === "h" && video && cfg?.on !== false && k >= 1 && into < secs;
     const leaving = channel === "h" && video && cfg?.on !== false && k >= 1 && into >= secs && into < secs + 0.7;
@@ -689,7 +751,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const Hs = (st.tv?.headlines || []).filter(h => h.text), n = Hs.length;
     const main = st.tv?.lband?.text || (n ? Hs[k % n].text : sc.label || "");
     const side = n ? [1, 2, 3, 4].map(i => Hs[(k + i) % n]).filter((h, i, a) => h && a.indexOf(h) === i && h.text !== main) : [];
-    put(".tvp-lbl", `<div class="lb-auto-box${on ? "" : " out"}" data-k="${k}"><div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${side.map((h, i) => `<p style="--n:${i}"><small>${esc(DESK_BN[h.desk] || h.desk || "")}</small>${esc(h.text)}</p>`).join("")}</div><div class="lb-bottom"><b>${esc(main)}</b>${L.ad ? adBox(sponsorAd()) : ""}</div></div>`);
+    put(".tvp-lbl", `<div class="lb-auto-box${on ? "" : " out"}" data-k="${k}"><div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${side.slice(0, 3).map((h, i) => `<p style="--n:${i}"><small>${esc(DESK_BN[h.desk] || h.desk || "")}</small>${esc(h.text)}</p>`).join("")}<div class="lb-logo"><img src="${LOGO}" alt=""><i></i></div></div><div class="lb-bottom"><b>${esc(main)}</b>${L.ad ? adBox(sponsorAd()) : ""}</div></div>`);
   }
   function showBreaking(b) {
     const el = document.createElement("div"); el.className = "tv-breaking";
@@ -761,7 +823,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   loadTv().then(tick); connect(); poll();
   const timers = [setInterval(loadTv, 15000), setInterval(tick, 500), setInterval(() => { st.flash++; }, 8000), setInterval(poll, 5000), setInterval(heartbeat, 5000)];
   return {
-    destroy() { st.alive = false; ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
+    destroy() { st.alive = false; document.removeEventListener("fullscreenchange", fsChange); document.removeEventListener("webkitfullscreenchange", fsChange); document.documentElement.classList.remove("tvp-fs-lock"); ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
     unmute, setScene(sc) { fixedScene = sc; tick(); }, get state() { return st.ctl; }
   };
 }
