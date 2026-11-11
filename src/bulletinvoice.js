@@ -11,8 +11,12 @@ import { synthesize, sha256, ttsEnabled } from "./tts.js";
 const VOICE = { f: "bn-IN-Chirp3-HD-Despina", m: "bn-IN-Chirp3-HD-Sadachbia" };   // smooth; lively
 export const tvVoice = (env, sex = "f") => (sex === "m" ? env.TV_VOICE_MALE : env.TV_VOICE_FEMALE) || VOICE[sex];
 const rate = env => Math.min(1.4, Math.max(0.9, Number(env.TV_VOICE_RATE) || 1.22));
-const MONTH_CAP = 800000;
+// Shared by the bulletin and the AVO engine (src/avo.js), inside Google's free million a month.
+const MONTH_CAP = 950000;
 const monthKey = () => `tts_chars_${new Date().toISOString().slice(0, 7)}`;
+export const voiceRate = env => rate(env);
+export async function voiceBudget(env) { const used = Number((await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(monthKey()).first().catch(() => null))?.value || 0); return MONTH_CAP - used; }
+export async function chargeVoice(env, chars) { await env.DB.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=CAST(CAST(value AS INTEGER)+? AS TEXT)").bind(monthKey(), String(chars), chars).run(); }
 // Stories take turns: a woman's voice, then a man's (see prepareBulletinVoices).
 const sexAt = i => (i % 2 ? "m" : "f");
 

@@ -1,5 +1,6 @@
 import { readyVoices } from "./bulletinvoice.js";
 import { cleanCredit } from "./bulletinimg.js";
+import { avoForScreens } from "./avo.js";
 import { bnLine } from "./bnline.js";
 // Rashtrix TV, Phase 2: two channels, each on or off, each with its own secret output address
 // for OBS / vMix.
@@ -50,6 +51,7 @@ export async function saveTvSettings(env, ch, b) {
   if (b.band !== undefined) s.band = clean(b.band, 80);
   if (b.lband !== undefined) s.lband = { on: !!b.lband?.on, text: clean(b.lband?.text, 160) };
   if (b.promosOn !== undefined) s.promosOn = !!b.promosOn;
+  if (b.avoOn !== undefined) s.avoOn = !!b.avoOn;
   if (b.otherSources !== undefined) s.otherSources = !!b.otherSources;
   if (b.promoEvery !== undefined) s.promoEvery = int(b.promoEvery, 1, 20, s.promoEvery);
   if (Array.isArray(b.ticker)) s.ticker = b.ticker.map(x => clean(x, 160)).filter(Boolean).slice(0, 20);
@@ -235,10 +237,10 @@ export async function tvState(env, ch) {
   const hit = memo.get(ch);
   if (hit && Date.now() - hit.at < 4000) return hit.value;
   const s = await tvSettings(env, ch);
-  const [videos, cards, live, stories, cuts] = await Promise.all([
+  const [videos, cards, live, stories, cuts, avo] = await Promise.all([
     playable(env, ch, s), ch === "v" ? promos(env) : [],
     env.DB.prepare("SELECT CASE WHEN live_video<>'' THEN live_video ELSE yt_id END AS ytId, title FROM tv_sources WHERE channel=? AND kind='live' AND active=1 AND on_air=1 AND live_now=1 LIMIT 1").bind(ch).first(),
-    wireStories(env), cutinsOnAir(env, ch).catch(() => [])
+    wireStories(env), cutinsOnAir(env, ch).catch(() => []), s.avoOn === false ? [] : avoForScreens(env).catch(() => [])
   ]);
   const headlines = stories.map(a => ({ text: a.title, desk: a.category, kind: a.kind }));
   // Each bulletin story's picture and its credit (src/bulletinimg.js), when one was found.
@@ -267,7 +269,9 @@ export async function tvState(env, ch) {
     // The app plays its own copy of the order for each viewer, newest video first (src/engine.js).
     loop: s.on ? loop : [],
     // Scheduled cut-ins (the control room's Scheduler): at each time, these videos go on air.
-    cutins: s.on ? cuts : []
+    cutins: s.on ? cuts : [],
+    // The AVO engine's stories in rotation (src/avo.js); empty when the control room turns it off.
+    avoOn: s.avoOn !== false, avo: s.on ? avo : []
   };
   memo.set(ch, { at: Date.now(), value });
   return value;

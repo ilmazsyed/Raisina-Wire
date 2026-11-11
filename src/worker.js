@@ -30,8 +30,10 @@ import m0028 from "../migrations/0028_tv_vertical.sql";
 import m0029 from "../migrations/0029_bulletin_images.sql";
 import m0030 from "../migrations/0030_tv_keep.sql";
 import m0031 from "../migrations/0031_tv_cutins.sql";
+import m0032 from "../migrations/0032_avo.sql";
 import { bulletinImages, bulletinImageRoute } from "./bulletinimg.js";
 import { prepareBulletinVoices, voiceRoute } from "./bulletinvoice.js";
+import { avoStep, avoImageRoute, avoPlayed, avoLog, avoFromBreaking } from "./avo.js";
 import { marketBrief } from "./markets.js";
 import { ogRoute, renderCards } from "./ogcard.js";
 import { handleControlRoom, control as ctlCommand } from "./controlroom.js";
@@ -94,7 +96,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031], ["0032_avo.sql", m0032]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -1058,6 +1060,13 @@ async function api(request, env, ctx) {
   // The bulletin's pictures and the newsreader's lines.
   { const m = url.pathname.match(/^\/api\/tv\/bimg\/([^/]+)$/); if (m && request.method === "GET") return bulletinImageRoute(env, decodeURIComponent(m[1])); }
   { const m = url.pathname.match(/^\/api\/tv\/voice\/([0-9a-f]{20,64})\.mp3$/); if (m && request.method === "GET") return voiceRoute(env, m[1]); }
+  // The AVO engine (src/avo.js): a story's pictures, and each time a story goes out.
+  { const m = url.pathname.match(/^\/api\/tv\/aimg\/([^/]+)\/(\d{1,2})$/); if (m && request.method === "GET") return avoImageRoute(env, decodeURIComponent(m[1]), m[2]); }
+  if (url.pathname === "/api/tv/avo/played" && request.method === "POST") {
+    const b = await request.json().catch(() => ({}));
+    const outputOk = !!b.key && CHANNELS.includes(b.ch) && await checkKey(env, b.ch, String(b.key));
+    return json(await avoPlayed(env, b, outputOk), 200, { "cache-control": "no-store" });
+  }
   if (url.pathname === "/api/tv/videos" && request.method === "GET") {
     const { results } = await env.DB.prepare(`SELECT i.channel, i.yt_id AS id, i.title, i.thumb, i.duration, i.published_at AS publishedAt FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
       WHERE i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0 ORDER BY i.published_at DESC LIMIT 240`).all();
@@ -1116,6 +1125,8 @@ async function api(request, env, ctx) {
         return json({ channels: { h, v }, sources, counts, promos: cards, usage, ready: ytReady(env) }, 200, { "cache-control": "no-store" });
       }
       const [first, second, third] = parts;
+      // The AVO engine's log for the producer: stories, their state and every airing.
+      if (first === "avo" && request.method === "GET") return json(await avoLog(env), 200, { "cache-control": "no-store" });
       if (CHANNELS.includes(first)) {
         if (!second && request.method === "PUT") { await saveTvSettings(env, first, b); await audit(env, user, "tv.settings", "tv", first, { keys: Object.keys(b) }); return done(); }
         // The Scheduler: cut-ins of one video or a set of videos at set times (India time).
@@ -1144,7 +1155,7 @@ async function api(request, env, ctx) {
         if (second === "cutins" && third && request.method === "PUT") { await env.DB.prepare("UPDATE tv_cutins SET active=? WHERE id=? AND channel=?").bind(b.active ? 1 : 0, third, first).run(); await audit(env, user, "tv.cutin.active", "tv", first, { id: third, active: !!b.active }); return done(); }
         if (second === "cutins" && third && request.method === "DELETE") { await env.DB.prepare("DELETE FROM tv_cutins WHERE id=? AND channel=?").bind(third, first).run(); await audit(env, user, "tv.cutin.delete", "tv", first, { id: third }); return done(); }
         if (second === "key" && request.method === "POST") { const key = await newOutputKey(env, first); await audit(env, user, "tv.key", "tv", first, {}); return done({ ok: true, key }); }
-        if (second === "breaking" && request.method === "POST") { const br = await setBreaking(env, first, b); await ctlCommand(env, first, "breaking", br ? br : { clear: true }, user.display_name || user.email, "breaking").catch(() => {}); await audit(env, user, br ? "tv.breaking" : "tv.breaking.clear", "tv", first, br || {}); return done({ ok: true, breaking: br }); }
+        if (second === "breaking" && request.method === "POST") { const br = await setBreaking(env, first, b); if (br) await avoFromBreaking(env, br).catch(() => {}); await ctlCommand(env, first, "breaking", br ? br : { clear: true }, user.display_name || user.email, "breaking").catch(() => {}); await audit(env, user, br ? "tv.breaking" : "tv.breaking.clear", "tv", first, br || {}); return done({ ok: true, breaking: br }); }
         if (second === "items" && request.method === "GET") {
           const { results } = await env.DB.prepare("SELECT i.yt_id AS ytId,i.title,i.duration,i.thumb,i.published_at AS publishedAt,i.excluded,i.keep,i.playable,s.title AS source FROM tv_items i LEFT JOIN tv_sources s ON s.id=i.source_id WHERE i.channel=? ORDER BY i.published_at DESC LIMIT 400").bind(first).all();
           return json({ items: results }, 200, { "cache-control": "no-store" });
@@ -1597,6 +1608,8 @@ async function scheduled(env) {
   await step("market brief", () => marketBrief(env));
   // The newsreader's voice for the bulletin's stories (when the Google voice key is set).
   await step("bulletin voices", async () => prepareBulletinVoices(env, (await tvState(env, "h")).bulletin));
+  // The AVO Breaking Engine: major new stories, their reading and pictures (src/avo.js).
+  await step("avo engine", () => avoStep(env));
   // The control room: midnight archive and the day's rundowns from templates; old clips go.
   await step("rundowns", () => rundownHousekeeping(env));
   await step("clips", () => clipHousekeeping(env));

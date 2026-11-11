@@ -1,0 +1,181 @@
+// The AVO Breaking Engine: major stories from the wire read by the AI newsreader over full-screen
+// pictures, 30 seconds each. A story still goes out as before (breaking card, headlines, the
+// bulletin); a major one also becomes an AVO story here, and the screens play them in blocks of
+// four to six, newest first, between every three videos (src/engine.js).
+//
+// - Major only, with a Bengal focus: up to 45 a day (India time), shared 60% Bengal and Kolkata,
+//   20% India, 15% Bangladesh, the USA, China, Russia and South Asia (seen from India), 5% the
+//   rest of the world, paced across the day. "Major" is scored from how many outlets carried the
+//   story and whether it went out as a breaking alert; entertainment and lifestyle are left out.
+// - The script: the story's own Bengali text (the wire desk's, in the house style), five or six
+//   sentences, about 30 seconds read at the bulletin's pace. Its first part is the bulletin's own
+//   line (the same recording, so it costs nothing twice); the rest is recorded once.
+// - The newsreader: Despina and Sadachbia in turn, story by story.
+// - Pictures: four or more clean, credited photographs (src/bulletinimg.js storyPhotos); the
+//   screens fill any gap with the channel's graphic cards.
+// - A story leaves the rotation when it is six hours old or has been on air four times.
+import { readLine, voiceKey, tvVoice, voiceRate, voiceBudget, chargeVoice } from "./bulletinvoice.js";
+import { synthesize, sha256, ttsEnabled } from "./tts.js";
+import { storyPhotos } from "./bulletinimg.js";
+
+export const AVO_DAILY = 45, AVO_HOURS = 6, AVO_MAX_AIRED = 4, AVO_SECONDS = 30;
+const QUOTA = { bengal: 27, india: 9, neighbours: 7, world: 2 };
+const IST = 5.5 * 3600e3;
+const istDay = (t = Date.now()) => new Date(t + IST).toISOString().slice(0, 10);
+const NEIGH = /বাংলাদেশ|ঢাকা|ইউনূস|হাসিনা|আমেরিকা|মার্কিন|যুক্তরাষ্ট্র|ওয়াশিংটন|ট্রাম্প|হোয়াইট হাউস|চিন|চীন|বেজিং|জিনপিং|রাশিয়া|মস্কো|পুতিন|পাকিস্তান|ইসলামাবাদ|নেপাল|কাঠমান্ডু|ভুটান|শ্রীলঙ্কা|মায়ানমার|মায়ানমার|আফগানিস্তান|কাবুল|মালদ্বীপ|bangladesh|dhaka|america|united states|washington|trump|china|beijing|russia|moscow|putin|pakistan|nepal|bhutan|sri lanka|myanmar|afghanistan|maldives/i;
+const BENGAL_SPORT = /কলকাতা|মোহনবাগান|ইস্টবেঙ্গল|মহমেডান|ইডেন|সৌরভ|বাংলা দল/;
+// The same opening words the bulletin reads (src/tvchannel.js firstWords), so the line is shared.
+const firstWords = (body, n = 100) => {
+  const words = String(body || "").replace(/<[^>]+>/g, " ").replace(/[#*_>]+/g, " ").replace(/\s+/g, " ").trim().split(" ");
+  return words.slice(0, n).join(" ") + (words.length > n ? "…" : "");
+};
+const plain = body => String(body || "").replace(/<[^>]+>/g, " ").replace(/[#*_>]+/g, " ").replace(/\s+/g, " ").trim();
+const sentencesOf = text => String(text || "").replace(/…$/, "").replace(/\s*\n+\s*/g, "। ").replace(/\s+/g, " ").trim()
+  .replace(/\s*([,;:।!?])\s*/g, "$1 ").replace(/([।!?])\s*([।!?])+/g, "$1").replace(/\.(\s|$)/g, "।$1").trim()
+  .split(/(?<=[।!?])\s+/).map(x => x.trim()).filter(Boolean);
+
+export function regionOf(a) {
+  const text = `${a.title || ""} ${a.dek || ""} ${a.tags || ""}`;
+  if (["Kolkata", "West Bengal"].includes(a.category)) return "bengal";
+  if (["India", "Probashi Bangali"].includes(a.category)) return "india";
+  if (a.category === "Sports") return BENGAL_SPORT.test(text) ? "bengal" : "india";
+  return NEIGH.test(text) ? "neighbours" : "world";
+}
+// The script: the bulletin's line first, then the next sentences up to about 30 seconds.
+export function avoScript(a) {
+  const item = { text: firstWords(a.body), title: a.title };
+  const first = readLine(item), all = sentencesOf(plain(a.body));
+  const firstN = sentencesOf(first).length;
+  let rest = "", total = first.length;
+  for (const x of all.slice(firstN, 6)) { if (total + x.length + 1 > 420) break; rest = rest ? `${rest} ${x}` : x; total += x.length + 1; }
+  return { item, first, rest, lines: [...sentencesOf(first), ...sentencesOf(rest)] };
+}
+
+// Which new stories become AVO stories: the major ones, within each region's share of the day.
+async function choose(env) {
+  const day = istDay(), hour = new Date(Date.now() + IST).getUTCHours() + new Date(Date.now() + IST).getUTCMinutes() / 60;
+  const used = Object.fromEntries((await env.DB.prepare("SELECT region, COUNT(*) AS n FROM avo_stories WHERE day=? AND article_id NOT LIKE 'brk:%' GROUP BY region").bind(day).all()).results.map(r => [r.region, r.n]));
+  const total = Object.values(used).reduce((n, x) => n + x, 0);
+  if (total >= AVO_DAILY) return 0;
+  const { results } = await env.DB.prepare(`SELECT a.id, a.title, a.dek, a.tags, a.category, a.kind, a.body, a.published_at, a.alert_state,
+      (SELECT COUNT(*) FROM wire_jobs j JOIN wire_items i ON i.job_id=j.id WHERE j.article_id=a.id) AS outlets
+    FROM articles a LEFT JOIN avo_stories v ON v.article_id=a.id
+    WHERE v.article_id IS NULL AND a.status='published' AND a.lang='bn' AND a.pulled_at IS NULL AND a.kind IN ('rewrite','brief')
+      AND a.category NOT IN ('Entertainment','Lifestyle') AND a.published_at>=? ORDER BY a.published_at DESC LIMIT 40`)
+    .bind(new Date(Date.now() - 3 * 3600e3).toISOString()).all();
+  const scored = results.map(a => ({ a, region: regionOf(a), score: 2 * Math.min(5, a.outlets || 0) + (a.alert_state === "sent" ? 6 : 0) + (a.kind === "rewrite" ? 1 : 0) }))
+    .filter(x => x.a.category !== "Sports" || x.a.alert_state === "sent").sort((x, y) => y.score - x.score);
+  let added = 0;
+  for (const x of scored) {
+    // Paced: a region may have used its share in proportion to the hours gone (plus two).
+    const allowed = Math.ceil(QUOTA[x.region] * Math.min(1, (hour + 2) / 24)), have = used[x.region] || 0;
+    if (have >= allowed || total + added >= AVO_DAILY) continue;
+    // Major: carried by two or more outlets, or a breaking alert; a region well behind its pace
+    // takes the best single-outlet story too.
+    const need = have < allowed / 2 && hour > 4 ? 3 : 5;
+    if (x.score < need) continue;
+    const s = avoScript(x.a);
+    await env.DB.prepare("INSERT OR IGNORE INTO avo_stories (article_id,title,desk,region,score,script,status,day,published_at) VALUES (?,?,?,?,?,?,?,?,?)")
+      .bind(x.a.id, x.a.title, x.a.category, x.region, x.score, JSON.stringify(s.lines), "new", day, x.a.published_at).run();
+    used[x.region] = have + 1; added++;
+  }
+  return added;
+}
+
+// Breaking news put in by hand in the control room: an AVO story at once (headline read).
+export async function avoFromBreaking(env, br) {
+  if (!br?.text) return;
+  const id = `brk:${Date.parse(br.at) || Date.now()}`;
+  await env.DB.prepare("INSERT OR IGNORE INTO avo_stories (article_id,title,desk,region,score,script,status,day,published_at) VALUES (?,?,?,?,?,?,?,?,?)")
+    .bind(id, String(br.text).slice(0, 300), "Breaking", "bengal", 99, JSON.stringify(sentencesOf(br.text).length ? sentencesOf(br.text) : [String(br.text)]), "new", istDay(), new Date().toISOString()).run().catch(() => {});
+}
+
+// Voice and pictures for a chosen story.
+async function prepare(env, row, sex) {
+  const isBrk = row.article_id.startsWith("brk:");
+  const a = isBrk ? { id: row.article_id, title: row.title, dek: "", body: row.title } : await env.DB.prepare("SELECT id, title, dek, body FROM articles WHERE id=?").bind(row.article_id).first();
+  if (!a) { await env.DB.prepare("UPDATE avo_stories SET status='failed' WHERE article_id=?").bind(row.article_id).run(); return; }
+  const s = isBrk ? { item: { text: a.title, title: a.title }, first: readLine({ text: a.title, title: a.title }), rest: "", lines: JSON.parse(row.script || "[]") } : avoScript(a);
+  const keys = []; let bytes = 0;
+  if (ttsEnabled(env) && await voiceBudget(env) > 600) {
+    const voice = tvVoice(env, sex), rate = voiceRate(env);
+    const k1 = await voiceKey(env, s.item, sex);
+    const k2 = s.rest ? (await sha256(`${voice}|avo|${rate}|${s.rest}`)).slice(0, 40) : "";
+    let chars = 0;
+    for (const [k, text] of [[k1, s.first], [k2, s.rest]]) {
+      if (!k || !text) continue;
+      const have = await env.DB.prepare("SELECT length(data) AS n FROM tts_audio WHERE key=?").bind(k).first();
+      if (have) { keys.push(k); bytes += have.n; continue; }
+      const audio = await synthesize(env, text, voice, "bn-IN", rate);
+      await env.DB.prepare("INSERT OR REPLACE INTO tts_audio (key,voice,chars,data) VALUES (?,?,?,?)").bind(k, voice, text.length, audio.buffer).run();
+      keys.push(k); bytes += audio.byteLength; chars += text.length;
+    }
+    if (chars) await chargeVoice(env, chars);
+  }
+  const photos = await storyPhotos(env, { id: a.id, title: a.title, dek: a.dek || "" }, 6).catch(() => []);
+  await env.DB.prepare("UPDATE avo_stories SET script=?, sex=?, voice=?, secs=?, images=?, status='ready' WHERE article_id=?")
+    .bind(JSON.stringify(s.lines), sex, JSON.stringify(keys), Math.round(bytes / 4000 * 10) / 10, JSON.stringify(photos), row.article_id).run();
+}
+
+// The minute cron: choose new stories, then prepare up to two.
+export async function avoStep(env) {
+  const added = await choose(env);
+  const { results } = await env.DB.prepare("SELECT * FROM avo_stories WHERE status='new' ORDER BY score DESC, published_at DESC LIMIT 2").all();
+  let prepared = 0;
+  for (const row of results) {
+    // The newsreaders take turns: the opposite of the last story read.
+    const last = await env.DB.prepare("SELECT sex FROM avo_stories WHERE status='ready' ORDER BY created_at DESC LIMIT 1").first();
+    try { await prepare(env, row, last?.sex === "f" ? "m" : "f"); prepared++; }
+    catch (e) { console.error("avo prepare", row.article_id, e?.message || e); await env.DB.prepare("UPDATE avo_stories SET status='failed' WHERE article_id=? AND created_at < datetime('now','-30 minutes')").bind(row.article_id).run(); }
+  }
+  return { added, prepared };
+}
+
+// What the screens get: the stories in rotation, newest first.
+export async function avoForScreens(env) {
+  const { results } = await env.DB.prepare(`SELECT * FROM avo_stories WHERE status='ready' AND published_at>=? AND aired<? ORDER BY published_at DESC LIMIT 12`)
+    .bind(new Date(Date.now() - AVO_HOURS * 3600e3).toISOString(), AVO_MAX_AIRED).all().catch(() => ({ results: [] }));
+  return results.map(screenStory);
+}
+export function screenStory(r) {
+  const j = (v, d) => { try { return JSON.parse(v || d); } catch { return JSON.parse(d); } };
+  return { id: r.article_id, title: r.title, desk: r.desk, region: r.region, sex: r.sex, lines: j(r.script, "[]"),
+    voice: j(r.voice, "[]").map(k => `/api/tv/voice/${k}.mp3`), secs: r.secs,
+    images: j(r.images, "[]").map((x, i) => ({ src: `/api/tv/aimg/${encodeURIComponent(r.article_id)}/${i}`, credit: x.credit || "" })), at: r.published_at };
+}
+
+// GET /api/tv/aimg/<id>/<n>: one of a story's pictures, fetched once and cached at the edge.
+export async function avoImageRoute(env, id, n) {
+  const row = await env.DB.prepare("SELECT images FROM avo_stories WHERE article_id=?").bind(id).first().catch(() => null);
+  let url = ""; try { url = JSON.parse(row?.images || "[]")[Number(n)]?.url || ""; } catch { /* none */ }
+  if (!url) return new Response("Not found", { status: 404 });
+  const r = await fetch(url, { headers: { "user-agent": "Mozilla/5.0 (compatible; RashtrixTV/1.0)", accept: "image/*" }, cf: { cacheTtl: 86400, cacheEverything: true }, signal: AbortSignal.timeout(10000) }).catch(() => null);
+  if (!r?.ok || !/^image\//.test(r.headers.get("content-type") || "")) return Response.redirect(url, 302);
+  return new Response(r.body, { headers: { "content-type": r.headers.get("content-type"), "cache-control": "public, max-age=86400" } });
+}
+
+// POST /api/tv/avo/played {id, ch, key?}: a story went out. From the broadcast output (with its
+// key) it counts as an airing, goes in the story's log and the as-run log; from the app or the
+// site it counts as a view.
+export async function avoPlayed(env, b, outputOk) {
+  const row = await env.DB.prepare("SELECT article_id, title FROM avo_stories WHERE article_id=?").bind(String(b.id || "")).first();
+  if (!row) return { ok: false };
+  const ch = b.ch === "v" ? "v" : "h", now = new Date().toISOString();
+  if (!outputOk) { await env.DB.prepare("UPDATE avo_stories SET views=views+1 WHERE article_id=?").bind(row.article_id).run(); return { ok: true }; }
+  await env.DB.batch([
+    env.DB.prepare("UPDATE avo_stories SET aired=aired+1, last_aired=? WHERE article_id=?").bind(now, row.article_id),
+    env.DB.prepare("INSERT INTO avo_plays (id,article_id,channel,at,where_played) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(), row.article_id, ch, now, "output"),
+    env.DB.prepare("INSERT INTO asrun (id,channel,day,at,type,title,planned,how) VALUES (?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(), ch, istDay(), now, "avo", row.title.slice(0, 200), AVO_SECONDS, "autopilot")
+  ]);
+  return { ok: true };
+}
+
+// The producer's AVO log: the last two days' stories with every airing.
+export async function avoLog(env) {
+  const { results } = await env.DB.prepare("SELECT * FROM avo_stories WHERE created_at>=datetime('now','-2 days') ORDER BY created_at DESC LIMIT 150").all();
+  const plays = (await env.DB.prepare("SELECT article_id, channel, at FROM avo_plays WHERE at>=? ORDER BY at DESC LIMIT 2000").bind(new Date(Date.now() - 2 * 864e5).toISOString()).all()).results;
+  const by = new Map(); plays.forEach(p => { if (!by.has(p.article_id)) by.set(p.article_id, []); by.get(p.article_id).push({ ch: p.channel, at: p.at }); });
+  const day = istDay(), today = results.filter(r => r.day === day && !r.article_id.startsWith("brk:"));
+  const count = Object.fromEntries(Object.keys(QUOTA).map(k => [k, today.filter(r => r.region === k).length]));
+  return { quota: QUOTA, today: count, daily: AVO_DAILY, stories: results.map(r => ({ ...screenStory(r), status: r.status, score: r.score, aired: r.aired, views: r.views, lastAired: r.last_aired, createdAt: r.created_at, nImages: (() => { try { return JSON.parse(r.images || "[]").length; } catch { return 0; } })(), plays: by.get(r.article_id) || [], inRotation: r.status === "ready" && Date.parse(r.published_at) >= Date.now() - AVO_HOURS * 3600e3 && r.aired < AVO_MAX_AIRED })) };
+}

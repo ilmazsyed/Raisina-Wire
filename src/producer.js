@@ -43,6 +43,32 @@ async function autopilot() {
   if (!confirm("Switch AUTOPILOT on? The channel's own running order goes on air now (any rundown stops).")) return;
   try { await api(`/api/ctl/${S.ch}/cmd`, { method: "POST", body: { cmd: "autopilot", args: { on: true } } }); toast("Autopilot on."); loadOnAir(); } catch (e) { fail(e); }
 }
+// The AVO engine: its switch (per channel) and its log (every story, its state and airings).
+async function loadAvoState() { try { S.avoOn = (await api(`/api/tv/${S.ch}`)).avoOn !== false; } catch { S.avoOn = null; } drawAvoSwitch(); }
+function drawAvoSwitch() { const b = $("#avoSwitch"); if (!b) return; b.classList.toggle("on", S.avoOn === true); $("#avoState").textContent = S.avoOn === null ? "…" : S.avoOn ? "ON: AVO stories between videos" : "OFF"; }
+async function toggleAvo() {
+  const on = !S.avoOn;
+  if (!confirm(on ? "Switch the AVO engine on? AVO stories play in blocks between every three videos." : "Switch the AVO engine off? Only videos play between the bulletins.")) return;
+  try { await api(`/api/admin/tv/${S.ch}`, { method: "PUT", body: { avoOn: on } }); S.avoOn = on; drawAvoSwitch(); toast(on ? "AVO engine on." : "AVO engine off."); } catch (e) { fail(e); }
+}
+const REGION = { bengal: "Bengal & Kolkata", india: "India", neighbours: "Bangladesh, USA, China, Russia, South Asia", world: "World" };
+async function avoDialog() {
+  const d = dialog(`<h3>AVO stories</h3><div id="al" class="clips-list"><p class="muted">Loading…</p></div>`);
+  try {
+    const L = await api("/api/admin/avo"), t = s => new Date(s).toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" });
+    const head = `<p class="muted">Today: ${Object.entries(L.quota).map(([k, q]) => `${REGION[k]} ${L.today[k] || 0}/${q}`).join(" · ")} (of ${L.daily} a day). A story is in rotation for 6 hours or 4 airings.</p>`;
+    $("#al", d).innerHTML = head + (L.stories.map(x => `<div class="clip"><img src="${x.images[0] ? esc(x.images[0].src) : "/brand/logo-xs.webp"}" alt="" style="width:120px;height:68px;object-fit:cover;border-radius:6px"><div style="flex:1">
+      <b data-no-tr>${esc(x.title)}</b><br><small>${esc(REGION[x.region] || x.region)} · ${x.status === "ready" ? (x.inRotation ? '<span class="tag green">IN ROTATION</span>' : '<span class="tag">DONE</span>') : x.status === "new" ? '<span class="tag amber">PREPARING</span>' : '<span class="tag red">FAILED</span>'} · voice ${x.voice.length ? (x.sex === "m" ? "male" : "female") + ` ${digits(Math.round(x.secs))} s` : "none"} · pictures ${digits(x.nImages)} · score ${digits(x.score)} · chosen ${t(x.createdAt + "Z")}</small><br>
+      <small>On air ${digits(x.aired)}×${x.plays.length ? ": " + x.plays.slice(0, 8).map(p => `${t(p.at)} ${p.ch === "h" ? "TV" : "Shorts"}`).join(", ") : ""} · app views ${digits(x.views)}</small>
+      <details><summary class="muted">Script</summary><p data-no-tr>${x.lines.map(esc).join(" ")}</p></details></div>
+      ${x.status === "ready" ? `<button class="btn sm" data-avoadd="${esc(x.id)}">Add to rundown</button>` : ""}</div>`).join("") || `<p class="muted">No AVO stories yet. Major stories become AVO stories as they arrive.</p>`);
+    $$("[data-avoadd]", d).forEach(b => b.onclick = async () => {
+      if (!S.rd) return toast("Open a rundown first.");
+      const x = L.stories.find(y => y.id === b.dataset.avoadd), story = { id: x.id, title: x.title, desk: x.desk, region: x.region, sex: x.sex, lines: x.lines, voice: x.voice, secs: x.secs, images: x.images, at: x.at };
+      try { await api(`/api/admin/rundowns/${S.rd.id}/items`, { method: "POST", body: { type: "avo", title: x.title.slice(0, 200), duration: 30, data: { story, avoId: x.id } } }); b.textContent = "Added"; b.disabled = true; openRundown(S.rd.id); } catch (e) { fail(e); }
+    });
+  } catch (e) { $("#al", d).innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+}
 // Stories: every video playing on the channel now, to pick into the open rundown.
 async function storiesDialog() {
   if (!S.rd) return toast("Open a rundown first.");
@@ -58,17 +84,19 @@ async function storiesDialog() {
 /* ---------- left: the day's rundowns ---------- */
 function drawList() {
   const L = $(".pr-list");
-  L.innerHTML = `<button class="ap-switch" id="apSwitch" type="button" style="margin-bottom:10px"><i></i><span><b>AUTOPILOT</b><small id="apState">…</small></span></button><div class="chtabs"><button class="btn ${S.ch === "h" ? "on" : ""}" data-ch="h">Rashtrix TV</button><button class="btn ${S.ch === "v" ? "on" : ""}" data-ch="v">Rashtrix Shorts</button></div>
+  L.innerHTML = `<button class="ap-switch" id="apSwitch" type="button" style="margin-bottom:8px"><i></i><span><b>AUTOPILOT</b><small id="apState">…</small></span></button><button class="ap-switch" id="avoSwitch" type="button" style="margin-bottom:10px"><i></i><span><b>AVO ENGINE</b><small id="avoState">…</small></span></button><div class="chtabs"><button class="btn ${S.ch === "h" ? "on" : ""}" data-ch="h">Rashtrix TV</button><button class="btn ${S.ch === "v" ? "on" : ""}" data-ch="v">Rashtrix Shorts</button></div>
     <div class="row" style="margin-bottom:8px">${S.archive
       ? `<label>From<input type="date" id="aFrom" value="${S.from || istDay(Date.now() - 30 * 864e5)}"></label><label>To<input type="date" id="aTo" value="${S.to || istDay()}"></label>`
       : `<label style="flex:1">Day<input type="date" id="day" value="${S.day}"></label>`}</div>
     <div class="row" style="margin-bottom:10px"><button class="btn" id="archToggle">${S.archive ? "← Working rundowns" : "Archive"}</button>${S.archive ? "" : `<button class="btn green" id="newRd">+ New rundown</button>`}</div>
     ${S.archive ? "" : `<div class="row" style="margin-bottom:10px"><select id="fromTpl" style="flex:1"><option value="">From a template…</option>${S.templates.filter(t => t.channel === S.ch).map(t => `<option value="${t.id}">${esc(t.title)} · ${esc(t.slot_start || "")}</option>`).join("")}</select></div>`}
     <div>${S.list.length ? S.list.map(r => `<button class="rd" data-id="${r.id}"${S.rd?.id === r.id ? ' aria-current="true"' : ""}><b data-no-tr>${esc(r.title)}</b><small>${S.archive ? `${digits(r.day)} · ` : ""}${r.slot_start ? digits(r.slot_start) + " · " : ""}${digits(fmt(r.seconds))} / ${digits(r.slot_minutes)} min · ${digits(r.items)} items</small></button>`).join("") : `<p class="muted">No rundowns${S.archive ? " in these dates" : " for this day yet"}.</p>`}</div>
-    <hr style="border-color:var(--line)"><div class="row"><button class="btn" id="storiesBtn">Channel videos</button><button class="btn" id="clipsBtn">Clips library</button><button class="btn" id="tplBtn">Templates</button><button class="btn" id="asrunBtn">As-run log</button></div>`;
+    <hr style="border-color:var(--line)"><div class="row"><button class="btn" id="avoBtn">AVO stories</button><button class="btn" id="storiesBtn">Channel videos</button><button class="btn" id="clipsBtn">Clips library</button><button class="btn" id="tplBtn">Templates</button><button class="btn" id="asrunBtn">As-run log</button></div>`;
   $$("[data-ch]", L).forEach(b => b.onclick = () => { S.ch = b.dataset.ch; S.rd = null; loadList().then(() => drawRundown()); loadOnAir(); });
   $$(".rd", L).forEach(b => b.onclick = () => openRundown(b.dataset.id).catch(fail));
   $("#apSwitch", L).onclick = autopilot; drawAutopilot();
+  $("#avoSwitch", L).onclick = toggleAvo; loadAvoState();
+  $("#avoBtn", L)?.addEventListener("click", avoDialog);
   $("#storiesBtn", L)?.addEventListener("click", storiesDialog);
   $("#day", L)?.addEventListener("change", e => { S.day = e.target.value; S.rd = null; loadList().then(drawRundown).catch(fail); });
   $("#aFrom", L)?.addEventListener("change", e => { S.from = e.target.value; loadList().catch(fail); });
