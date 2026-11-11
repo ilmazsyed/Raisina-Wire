@@ -55,7 +55,7 @@ const REGION = { bengal: "Bengal & Kolkata", india: "India", neighbours: "Bangla
 async function avoDialog() {
   const d = dialog(`<h3>AVO stories</h3><div id="al" class="clips-list"><p class="muted">Loading…</p></div>`);
   try {
-    const L = await api("/api/admin/avo"), t = s => new Date(s).toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" });
+    const L = await api("/api/admin/tv/avo"), t = s => new Date(s).toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" });
     const head = `<p class="muted">Today: ${Object.entries(L.quota).map(([k, q]) => `${REGION[k]} ${L.today[k] || 0}/${q}`).join(" · ")} (of ${L.daily} a day). A story is in rotation for 6 hours or 4 airings.</p>`;
     $("#al", d).innerHTML = head + (L.stories.map(x => `<div class="clip"><img src="${x.images[0] ? esc(x.images[0].src) : "/brand/logo-xs.webp"}" alt="" style="width:120px;height:68px;object-fit:cover;border-radius:6px"><div style="flex:1">
       <b data-no-tr>${esc(x.title)}</b><br><small>${esc(REGION[x.region] || x.region)} · ${x.status === "ready" ? (x.inRotation ? '<span class="tag green">IN ROTATION</span>' : '<span class="tag">DONE</span>') : x.status === "new" ? '<span class="tag amber">PREPARING</span>' : '<span class="tag red">FAILED</span>'} · voice ${x.voice.length ? (x.sex === "m" ? "male" : "female") + ` ${digits(Math.round(x.secs))} s` : "none"} · pictures ${digits(x.nImages)} · score ${digits(x.score)} · chosen ${t(x.createdAt + "Z")}</small><br>
