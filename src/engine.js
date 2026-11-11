@@ -818,8 +818,20 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const mover = (x, i) => `<div class="mk-mover ${up(x) ? "up" : "down"}" style="--i:${i}"><span class="mk-rank">${flip(String(i + 1), bnDigits(i + 1))}</span><span class="mk-co">${flip(esc(x.en), esc(x.bn), "mn")}</span><span class="mk-px">${flip(`₹${fx(x.value)}`, `₹${bnDigits(fx(x.value))}`)}</span><span class="mk-pc"><i class="mk-arrow"></i>${flip(`${up(x) ? "+" : "−"}${fx(Math.abs(x.pct))}%`, `${up(x) ? "+" : "−"}${bnDigits(fx(Math.abs(x.pct)))}%`)}</span></div>`;
       // Commodities also in rupees, in Indian units (at the international rate, before Indian duties and taxes).
       const inr = x => x?.inr ? `<div class="mk-inr">${flip(`≈ ₹${fx(x.inr, 0)} ${esc(x.inrUnitEn)}`, `≈ ₹${bnDigits(fx(x.inr, 0))} ${esc(x.inrUnitBn)}`)}</div>` : "";
-      const tile = (x, unit, i, d = 2) => x ? `<div class="mk-tile ${up(x) ? "up" : "down"}" style="--i:${i}"><div class="mk-name">${flip(esc(x.en), esc(x.bn), "mn")}</div><div class="mk-val">${flip(`${unit[0]}${fx(x.value, d)}`, `${unit[1]}${bnDigits(fx(x.value, d))}`)}</div>${inr(x)}<div class="mk-chg"><i class="mk-arrow"></i>${flip(...chg(x))}</div></div>` : "";
-      const head = (en, bn) => `<div class="mk-head"><b data-no-tr>MARKET UPDATE</b><span>${bn} · ${en}</span>${M.open ? "" : `<em>${flip("Last close", "শেষ দর")}</em>`}</div>`;
+      // An animated picture for each commodity and currency: gold and silver bars catching the
+      // light, an oil barrel with a falling drop, and a coin turning with the currency's sign.
+      const bar = c => `<svg viewBox="0 0 160 120"><defs><linearGradient id="mk${c}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--hi)"/><stop offset="1" stop-color="var(--lo)"/></linearGradient></defs>${[[10, 70], [86, 70], [48, 26]].map(([x, y], j) => `<g style="--j:${j}"><path d="M${x + 10},${y} h44 l10,36 h-64z" fill="url(#mk${c})" stroke="var(--edge)" stroke-width="2"/><path d="M${x + 10},${y} h44 l-4,8 h-36z" fill="var(--top)" opacity=".7"/></g>`).join("")}</svg><i class="mk-shine"></i>`;
+      const ICON = {
+        gold: () => `<div class="mk-ico gold">${bar("g")}</div>`,
+        silver: () => `<div class="mk-ico silver">${bar("s")}</div>`,
+        crude: () => `<div class="mk-ico crude"><svg viewBox="0 0 120 140"><rect x="22" y="14" width="76" height="104" rx="10" fill="#2b2b33" stroke="#6b6b78" stroke-width="3"/><rect x="18" y="40" width="84" height="8" rx="3" fill="#55555f"/><rect x="18" y="84" width="84" height="8" rx="3" fill="#55555f"/><rect x="34" y="56" width="52" height="20" rx="4" fill="var(--red)"/><text x="60" y="71" text-anchor="middle" font-family="Montserrat,sans-serif" font-weight="900" font-size="13" fill="#fff">OIL</text><circle cx="48" cy="20" r="5" fill="#18181d"/></svg><i class="mk-drop"></i><i class="mk-pool"></i></div>`,
+        usd: () => `<div class="mk-ico coin"><b>$</b></div>`,
+        gbp: () => `<div class="mk-ico coin"><b>£</b></div>`,
+        eur: () => `<div class="mk-ico coin"><b>€</b></div>`
+      };
+      const icon = x => { const k = Object.keys(ICON).find(k => M[k] === x); return k ? ICON[k]() : ""; };
+      const tile = (x, unit, i, d = 2) => x ? `<div class="mk-tile ${up(x) ? "up" : "down"}" style="--i:${i}">${icon(x)}<div class="mk-name">${flip(esc(x.en), esc(x.bn), "mn")}</div><div class="mk-val">${flip(`${unit[0]}${fx(x.value, d)}`, `${unit[1]}${bnDigits(fx(x.value, d))}`)}</div>${inr(x)}<div class="mk-chg"><i class="mk-arrow"></i>${flip(...chg(x))}</div></div>` : "";
+      const head = (en, bn) => `<div class="mk-head"><b data-no-tr>${en.toUpperCase()}</b><span>${bn}</span>${M.open ? "" : `<em>${flip("Last close", "শেষ দর")}</em>`}</div>`;
       const opener = sub => `<div class="mk-open"><i class="mk-grid"></i><svg class="mk-line" viewBox="0 0 1920 400" preserveAspectRatio="none"><path d="M0,330 L180,300 L320,320 L470,240 L620,262 L760,180 L900,210 L1060,120 L1220,150 L1380,80 L1540,110 L1700,40 L1920,60"/></svg><div class="mk-open-in"><div class="wx-logo"><img src="${LOGO}" alt=""></div><b class="w1" data-no-tr>MARKET</b><b class="w2" data-no-tr>UPDATE</b><i class="wx-line"></i><span class="wx-bn">বাজারের খবর</span><small>${sub}</small></div></div>`;
       const screens = [
         { d: 4, h: () => opener(M.open ? "লাইভ · LIVE" : "শেষ দর · LAST CLOSE") },
@@ -834,7 +846,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       let at = 0; screens.forEach(x => { x.d *= scale; x.at = at; at += x.d; });
       let shownM = -1;
       const drawM = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = Math.max(0, screens.findLastIndex(x => e >= x.at)); if (k === shownM) return; const first = shownM < 0; shownM = k;
-        const paint = () => { el.innerHTML = `<div class="mk">${screens[k].h()}</div>`; };
+        const paint = () => { el.innerHTML = `<div class="mk${channel === "v" ? " v" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>${screens[k].h()}${k > 0 && k < screens.length - 1 ? segStrap("MARKET UPDATE", "বাজারের খবর", screens, k) : ""}</div>`; };
         if (first || !el.isConnected) return paint();
         const w = document.createElement("div"); w.className = "bs-wipe mk-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
         stage.append(w); if (!st.muted) whoosh(st.audio);
@@ -861,10 +873,10 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         <div class="wx-facts"><span>${flip(`H ${p.hi}° · L ${p.lo}°`, `সর্বোচ্চ ${bnDigits(p.hi)}° · সর্বনিম্ন ${bnDigits(p.lo)}°`, "wf")}</span><span>${flip(`Humidity ${p.hum}% · Wind ${p.wind} km/h`, `আর্দ্রতা ${bnDigits(p.hum)}% · হাওয়া ${bnDigits(p.wind)} কিমি`, "wf")}</span></div></div>`;
       const screenHTML = x => x.t === "open" ? big(esc(day)) : x.t === "close" ? big("রাষ্ট্রিক্সের সঙ্গে থাকুন · Stay with Rashtrix")
         : x.t === "sec" ? `<div class="wx-sec"><b data-no-tr>${ZONE[x.zone][0]}</b><span>${ZONE[x.zone][1]}</span><i></i></div>`
-        : `<div class="wx-cards n${x.c.length}"><div class="wx-head"><b data-no-tr>WEATHER UPDATE</b><span>${ZONE[x.zone][1]} · ${ZONE[x.zone][0]}</span></div><div class="wx-row">${x.c.map(card).join("")}</div></div>`;
+        : `<div class="wx-cards n${x.c.length}"><div class="wx-head"><b data-no-tr>${ZONE[x.zone][0]}</b><span>${ZONE[x.zone][1]}</span></div><div class="wx-row">${x.c.map(card).join("")}</div></div>`;
       let shownW = -1;
       const drawW = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = Math.max(0, screens.findLastIndex(x => e >= x.at)); if (k === shownW) return; const first = shownW < 0; shownW = k;
-        const paint = () => { el.innerHTML = `<div class="wx${channel === "v" ? " v" : ""}">${screenHTML(screens[k])}</div>`; };
+        const paint = () => { el.innerHTML = `<div class="wx${channel === "v" ? " v" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>${screenHTML(screens[k])}${k > 0 && k < screens.length - 1 ? segStrap("WEATHER UPDATE", "আবহাওয়ার খবর", screens, k) : ""}</div>`; };
         if (first || !el.isConnected) return paint();
         const w = document.createElement("div"); w.className = "bs-wipe wx-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
         stage.append(w); if (!st.muted) whoosh(st.audio);
@@ -958,6 +970,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // redrawn when the minute changes, which starts the ten-second cycle afresh on the minute.
   const enTime = () => new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
   const bnDayDate = () => new Date().toLocaleDateString("bn-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long" });
+  // The bulletin's bottom strap, shared by the weather and market updates so they read as the
+  // same channel: the red label, the gold progress bars (one per screen) and the logo.
+  const segStrap = (en, bn, screens, k) => `<div class="bs-strap seg-strap"><b data-no-tr>${en}</b><span>${bn}</span><div class="bs-steps">${screens.slice(1, -1).map((x, j) => `<i class="${j < k - 1 ? "done" : j === k - 1 ? "on" : ""}" style="--d:${x.d}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div>`;
   const flip = (a, b, cls) => `<span class="dt-flip ${cls}"><span class="ff a">${a}</span><span class="ff b">${b}</span></span>`;
   // One block at the top left: LIVE and the time on top; under it, a slim row of the date
   // (flipping between English and Bengali) and the Bengali calendar date, the same width.
@@ -984,8 +999,10 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     box.hidden = !(on && M?.nifty);
     if (box.hidden) return;
     const f = (n, d = 2) => Number(n).toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d });
-    const item = (name, value, pct, pre = "") => value == null ? "" : `<span class="mkt-i ${pct >= 0 ? "up" : "down"}"><b>${esc(name)}</b><em>${pre}${f(value)}</em><i></i><small>${pct >= 0 ? "+" : "−"}${f(Math.abs(pct ?? 0))}%</small></span>`;
-    const x = k => M[k] ? item(M[k].en === "Crude oil (Brent)" ? "Brent" : M[k].en, M[k].value, M[k].pct, ["usd", "gbp", "eur"].includes(k) ? "₹" : ["crude", "gold", "silver"].includes(k) ? "$" : "") : "";
+    const item = (name, value, pct, pre = "", d = 2, unit = "") => value == null ? "" : `<span class="mkt-i ${pct >= 0 ? "up" : "down"}"><b>${esc(name)}</b><em>${pre}${f(value, d)}${unit ? `<u>${esc(unit)}</u>` : ""}</em><i></i><small>${pct >= 0 ? "+" : "−"}${f(Math.abs(pct ?? 0))}%</small></span>`;
+    const name = k => ({ crude: "Brent", usd: "USD/INR", gbp: "GBP/INR", eur: "EUR/INR" })[k] || M[k].en;
+    // Crude, gold and silver in rupees (Indian units) when the rupee rate is in; else in dollars.
+    const x = k => !M[k] ? "" : M[k].inr != null ? item(name(k), M[k].inr, M[k].pct, "₹", 0, M[k].inrUnitEn?.replace("per ", "/")) : item(name(k), M[k].value, M[k].pct, ["usd", "gbp", "eur"].includes(k) ? "₹" : ["crude", "gold", "silver"].includes(k) ? "$" : "");
     const rows = [x("nifty"), x("sensex"), ...(M.all || []).map(([n, v, p]) => item(n, v, p, "₹")), x("crude"), x("gold"), x("silver"), x("usd"), x("gbp"), x("eur")].filter(Boolean);
     const html = rows.join("");
     if (box.__html === html) return;
