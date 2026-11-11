@@ -331,6 +331,7 @@ const noCaptions = p => { try { p.unloadModule?.("captions"); p.unloadModule?.("
 // ("Running order" is the channel's automatic schedule, not a headline).
 const INTERNAL_LABELS = /^(running order|continuity|program|preview|standby|slate)$/i;
 const airLabel = sc => { const l = String(sc?.label || "").trim(); return !l || INTERNAL_LABELS.test(l) || sc?.sources?.[0]?.kind === "continuity" ? "" : l; };
+const MAPS = {};   // the map outlines, loaded once when a map is first on air
 // The running order's variety rules: never two stories from the same desk in a row (so Bengal,
 // India and the world take turns), and a light story after every two heavy ones. The first `keep`
 // items (the lead) stay where they are; each next item is the first that fits, else the nearest.
@@ -432,9 +433,12 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // Music under the headline flash, the "up next" card and the bulletin (faster for the bulletin).
   // Each kind of graphic has its own music; the channel ID plays its signature, and the bulletin
   // opens with the signature under its channel ID, then its own music.
-  const BEDS = { flash: { style: "headlines" }, upnext: { style: "upnext" }, bulletin: { style: "bulletin" }, weather: { style: "weather" }, market: { style: "market" }, avo: { style: "avo", duck: 0.7 } };
+  const BEDS = { flash: { style: "headlines" }, upnext: { style: "upnext" }, bulletin: { style: "bulletin" }, weather: { style: "weather" }, market: { style: "market" }, avo: { style: "avo", duck: 0.7 },
+    // The segments: each its own music (the newsreader's lines over it, softer).
+    "seg:kolkata10": { style: "bulletin", duck: 0.6 }, "seg:city": { style: "weather", duck: 0.7 }, "seg:world": { style: "headlines", duck: 0.6 }, "seg:bangladesh": { style: "headlines", duck: 0.6 },
+    "seg:sports": { style: "market", duck: 0.6 }, "seg:numbers": { style: "market", duck: 0.8 }, "seg:onthisday": { style: "avo", duck: 0.8 }, "seg:soth": { style: "avo", duck: 0.7 } };
   function startBed(sc) {
-    const kind = sc?.graphic?.kind;
+    const kind = sc?.graphic?.kind === "seg" ? `seg:${sc.graphic.name}` : sc?.graphic?.kind;
     if (!BEDS[kind] || st.muted || !st.audio || (mode !== "app" && !output) || st.bed) return;
     wake();
     const gone = (now() - (sc.startAt || now())) / 1000, left = Math.max(2, (sc.dur || 10) - gone);
@@ -631,7 +635,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const avoPool = () => { const all = st.tv?.avoOn === false ? [] : st.tv?.avo || [], fresh = all.filter(x => (avoSeen[x.id] || 0) < AVO_REPEAT); return fresh.length >= Math.min(AVO_MIN, all.length) ? fresh : all; };
   // Due: when the channel opens (nothing played yet) and after every three videos, when the item
   // on air is done and nothing else (a resumed video, the "up next" card) is waiting.
-  const avoDue = q => !q.resume && !(q.pending || []).length && q.item?.type !== "upnext" && q.item?.type !== "avo" && (q.sinceAvo === undefined || q.sinceAvo >= AVO_EVERY) && avoBlock().length > 0;
+  const avoDue = q => !q.resume && !(q.pending || []).length && q.item?.type !== "upnext" && q.item?.type !== "avo" && (q.sinceAvo === undefined || q.sinceAvo >= avoEvery()) && avoBlock().length > 0;
   // A block is two or three stories (three when the pool is large), rotating through the pool:
   // only stories this viewer has not seen in the last fifteen minutes, least seen first, then the
   // newest, in the variety order. Fewer than two such stories: no AVO block this time (a thin
@@ -658,6 +662,59 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     let best = q.i % loop.length;
     loop.forEach((y, k) => { if (y.type === "video" && (vidLast[y.ytId] || 0) < (vidLast[loop[best].ytId] || Infinity)) best = k; });
     q.i = best; return loop[best];
+  }
+  // The programming clock (src/segments.js): the daypart now (India time), its AVO rhythm, and
+  // the two segment slots of each half-hour (eight and twenty-two minutes in). A slot plays when the
+  // item on air ends (never cutting a video), within six minutes of its time; its list rotates
+  // half-hour by half-hour, and a segment with nothing to show gives way to the next that has.
+  const SLOT_MIN = { a: 8, b: 22 }, SEG_FALLBACK = ["kolkata10", "numbers", "world", "bangladesh", "onthisday"];
+  const SEG_ITEM = { kolkata10: 8, world: 10, bangladesh: 10, sports: 10, city: 10, numbers: 8, onthisday: 10 };
+  const daypart = t => { const h = new Date(t + 5.5 * 3600e3).getUTCHours(), c = st.tv?.clock || {}; const order = Object.entries(c).sort((a, b) => a[1].from - b[1].from); let dp = order[order.length - 1]; for (const e of order) if (h >= e[1].from) dp = e; return dp ? dp[1] : null; };
+  const avoEvery = () => daypart(now())?.avoEvery || AVO_EVERY;
+  // A segment's running order: its items, each as long as its line (the newsreader's, when the
+  // bulletin has one) or its kind's default, after a four-second title card.
+  function segBuild(name) {
+    const S = st.tv?.segs || {};
+    let items = [];
+    if (name === "soth") {
+      // The story of the hour: the lead read in full over its picture, then its map, a quote from
+      // the report, the earlier stories on it, its key points and more of its pictures.
+      const x = S.soth; if (!x?.voice?.length) return null;
+      items.push({ lead: x, d0: Math.max(10, (x.secs || 20) + 1.5) });
+      if (x.places?.length) items.push({ map: x.places, d0: 8 });
+      if (x.quote) items.push({ quote: x.quote, d0: 8 });
+      if ((x.timeline || []).length >= 2) items.push({ timeline: x.timeline, title: x.t, d0: 10 });
+      if ((x.lines || []).length >= 3) items.push({ pts: x.lines.slice(1, 4), d0: 9 });
+      for (const im of (x.images || []).slice(1, 3)) items.push({ photo: im, title: x.t, d0: 6 });
+      if (items.length < 3) return null;
+      return { name, items: items.map(i => ({ ...i })), dur: 4 + items.reduce((a, b) => a + b.d0, 0) };
+    }
+    if (name === "city") {
+      const wx = (st.tv?.weatherPlaces || []).filter(w => w.zone === "wb").slice(0, 4);
+      if (wx.length) items.push({ wx });
+      items.push(...(S.city || []));
+      if (S.notice) items.push({ notice: S.notice });
+      if (items.length < 2) return null;
+    } else {
+      items = (S[name] || []).slice();
+      const need = { kolkata10: 4, numbers: 2, onthisday: 1 }[name] ?? 2;
+      if (items.length < need) return null;
+    }
+    const secs = items.map(x => x.secs ? Math.max(6, Math.min(14, x.secs + 1.2)) : SEG_ITEM[name] || 9);
+    return { name, items: items.map((x, i) => ({ ...x, d0: secs[i] })), dur: 4 + secs.reduce((a, b) => a + b, 0) };
+  }
+  function segDue(t, q) {
+    if (!st.tv?.segs || q.resume || (q.pending || []).length || q.item?.type === "upnext" || q.item?.type === "seg") return null;
+    const half = Math.floor(t / 1800e3) * 1800e3, dp = daypart(t); if (!dp) return null;
+    q.segDone ||= [];
+    for (const k of ["a", "b"]) {
+      const at = half + SLOT_MIN[k] * 60e3;
+      if (t < at || t >= at + 6 * 60e3 || q.segDone.includes(at)) continue;
+      q.segDone = [...q.segDone.slice(-8), at];
+      const list = dp[k] || [], r = Math.floor(t / 1800e3) % Math.max(1, list.length);
+      for (const name of [...list.slice(r), ...list.slice(0, r), ...SEG_FALLBACK]) { const b = segBuild(name); if (b) return b; }
+    }
+    return null;
   }
   // The bulletin's stories, the same for everyone at that moment: stories published since the last
   // bulletin lead (marked নতুন), then stories updated since (নতুন তথ্য), then the rest, newest first.
@@ -749,6 +806,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         : age >= it.dur * 1000;
       if (!done) return q.seg;
     }
+    // A segment whose slot has come (src/segments.js), when the item on air is done.
+    const sd = segDue(t, q);
+    if (sd) {
+      q.n++; q.item = { type: "seg", dur: sd.dur }; q.start = t;
+      q.seg = { type: "seg", name: sd.name, items: sd.items, dur: sd.dur, start: t, in: 0, sting: true, n: q.n };
+      const after = loop.slice(q.i).concat(loop.slice(0, q.i)).find(x => x.type === "video");
+      st.preWant = after ? { id: after.ytId, at: 0 } : null;
+      return q.seg;
+    }
     // The AVO Breaking Engine: a block of four to six AVO stories opens the channel and comes back
     // after every three videos (stories this viewer has seen least first, then the newest).
     if (avoDue(q)) {
@@ -813,6 +879,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const seg = continuitySeg(); if (!seg) return { layout: "graphic", graphic: { kind: "headlines" }, key: "c:none" };
     const transition = seg.sting ? { type: "stinger", ms: 1200 } : { type: "mix", ms: 500 };
     if (seg.type === "video") return { layout: "full", sources: [{ kind: "yt", id: seg.ytId, in: seg.in || 0, title: seg.line || seg.title }], label: seg.line || seg.title, startAt: seg.start, key: `c:${seg.ytId}:${seg.start}`, transition };
+    if (seg.type === "seg") return { layout: "graphic", graphic: { kind: "seg", name: seg.name, items: seg.items }, startAt: seg.start, dur: seg.dur, key: `c:seg:${seg.start}`, transition, full: true };
     if (seg.type === "flash") return { layout: "graphic", graphic: { kind: "flash", n: seg.n || 0 }, startAt: seg.start, dur: seg.dur, key: `c:flash:${seg.start}`, transition };
     if (seg.type === "ident") return { layout: "graphic", graphic: { kind: "ident" }, startAt: seg.start, dur: seg.dur, key: `c:ident:${seg.start}`, transition: { type: "mix", ms: 200 }, full: true };
     if (seg.type === "upnext") return { layout: "graphic", graphic: { kind: "upnext", video: seg.video }, startAt: seg.start, dur: seg.dur, key: `c:upnext:${seg.start}`, transition: { type: "mix", ms: 250 }, full: true };
@@ -1058,6 +1125,66 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         stage.append(w); if (!st.muted) whoosh(st.audio);
         setTimeout(paint, 330); setTimeout(() => w.remove(), 900); };
       drawW(); const tw = setInterval(() => el.isConnected ? drawW() : clearInterval(tw), 250);
+    } else if (g.kind === "seg") {   // a segment (src/segments.js): a title card, then its items one by one
+      const NAMES = st.tv?.segNames || {}, name = g.name, title = NAMES[name] || "", items = g.items || [], v = channel === "v" ? " v" : "";
+      const starts = []; { let a = 4; for (const x of items) { starts.push(a); a += x.d0; } }
+      const kick = { kolkata10: "শহর ও রাজ্যের দশ খবর", world: "দুনিয়ার বড় খবর", bangladesh: "পড়শি দেশের খবর", sports: "মাঠের খবর", numbers: "আজকের খবরের অঙ্ক", onthisday: "ইতিহাসের পাতা থেকে", city: "আবহাওয়া, যাতায়াত, শহর", soth: "বিস্তারিত" }[name] || "";
+      const count = n => { const to = Number(n.dataset.to), dec = n.dataset.dec === "1", t0 = performance.now(); const step = t => { if (!n.isConnected) return; const p = Math.min(1, (t - t0) / 1300), e = 1 - Math.pow(1 - p, 3); n.textContent = bnDigits((dec ? (to * e).toFixed(1) : Math.round(to * e)).toLocaleString("en-IN")); if (p < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+      const tIST = v => { try { return bnDigits(new Date(Date.parse(v) + 5.5 * 3600e3).toISOString().slice(11, 16)); } catch { return ""; } };
+      const itemHTML = (x, i) => {
+        if (x.lead) { const L = x.lead, im = (L.images || [])[0]; return `<div class="sg-item sg-lead">${im ? `<div class="sg-lead-img"><img src="${esc(im.src)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')"></div>` : ""}<i class="s1"></i><i class="s2"></i><div class="sg-lead-in"><span class="brk-tag">${L.upd ? "নতুন তথ্য" : "এই ঘণ্টার বড় খবর"}</span><small>${esc(DESK_BN[L.d] || L.d || "খবর")}</small><b>${esc(L.t)}</b></div></div>`; }
+        if (x.map) return `<div class="sg-item sg-map"><span class="sg-lbl">কোথায়</span><div class="sg-mapbox"><svg viewBox="0 0 1600 760" preserveAspectRatio="xMidYMid meet"></svg></div></div>`;
+        if (x.quote) return `<div class="sg-item sg-quote"><b class="q">“</b><p>${esc(x.quote)}</p><small>— প্রতিবেদন থেকে</small></div>`;
+        if (x.timeline) return `<div class="sg-item sg-tl"><span class="sg-lbl">ঘটনাক্রম</span><ol>${x.timeline.map((r, j) => `<li style="--i:${j}"><em>${tIST(r.at)}</em><span>${esc(r.t)}</span></li>`).join("")}<li class="now" style="--i:${x.timeline.length}"><em>এখন</em><span>${esc(x.title)}</span></li></ol></div>`;
+        if (x.pts) return `<div class="sg-item sg-pts"><span class="sg-lbl">মূল তথ্য</span><ol>${x.pts.map((t, j) => `<li style="--i:${j}"><i>${bnDigits(j + 1)}</i><span>${esc(t)}</span></li>`).join("")}</ol></div>`;
+        if (x.photo) return `<div class="sg-item sg-photo"><img src="${esc(x.photo.src)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')"><b>${esc(x.title)}</b>${x.photo.credit ? `<small>${esc(x.photo.credit)}</small>` : ""}</div>`;
+        if (x.wx) return `<div class="sg-item sg-wx"><span class="sg-lbl">আবহাওয়া</span><div class="sg-wxl">${x.wx.map(w => `<div><b>${esc(w.bn || w.en)}</b><em>${bnDigits(Math.round(w.temp))}°</em><small>${esc(w.kindBn || "")}</small></div>`).join("")}</div></div>`;
+        if (x.notice) return `<div class="sg-item sg-notice"><span class="sg-lbl">ডেস্কের বার্তা</span><p>${esc(x.notice)}</p></div>`;
+        if (name === "numbers") return `<div class="sg-item sg-fig"><span class="sg-lbl">${esc(DESK_BN[x.d] || x.d || "খবর")}</span><div class="fig"><b class="num" data-to="${x.n}" data-dec="${x.dec ? 1 : 0}">০</b><em>${esc(x.unit)}</em></div><p>${esc(x.line)}</p></div>`;
+        if (name === "onthisday") return `<div class="sg-item sg-otd"><b class="sg-year">${bnDigits(x.y)}</b><p>${esc(x.text)}</p></div>`;
+        return `<div class="sg-item${x.img ? " has-img" : ""}"><div class="sg-num">${bnDigits(i + 1)}</div><div class="sg-body"><span class="sg-lbl">${esc(DESK_BN[x.d] || x.d || "খবর")}</span><h2>${esc(x.t)}</h2>${x.line && x.line !== x.t ? `<p>${esc(x.line)}</p>` : ""}</div>${x.img ? `<div class="sg-img"><img src="${esc(x.img)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')"></div>` : ""}</div>`;
+      };
+      const score = name === "sports" && st.tv?.segs?.score ? `<div class="sg-score"><span>স্কোর</span><b>${esc(st.tv.segs.score)}</b></div>` : "";
+      el.innerHTML = `<div class="sg sg-${esc(name)}${v}"><i class="sg-bg"></i><div class="sg-stage"></div>
+        <div class="sg-title"><small>রাষ্ট্রিক্স ২৪×৭</small><b>${esc(title)}</b><span>${esc(kick)}</span><i></i></div>${score}
+        <div class="sg-strap"><b>${esc(title)}</b><div class="sg-steps">${items.map((x, j) => `<i style="--d:${x.d0}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div></div>`;
+      let shownI = -1, tok = {};
+      // An item's line (or, for the story of the hour, its recordings one after the other).
+      const say = x => { tok.off = true; try { tok.src?.stop(); } catch { /* done */ } tok = {}; const me = tok, list = x.lead ? x.lead.voice || [] : x.voice ? [x.voice] : [];
+        const play = k => { if (me.off || k >= list.length || st.muted || !st.audio) return; voiceBuf(list[k]).then(buf => { if (me.off || !buf || st.muted || !el.isConnected) return; const src = st.audio.createBufferSource(), gn = st.audio.createGain(); gn.gain.value = 1.25; src.buffer = buf; src.connect(gn).connect(st.audio.destination); src.onended = () => setTimeout(() => play(k + 1), 120); src.start(); me.src = src; }); };
+        play(0); };
+      // The map: the region's outlines (Natural Earth, public/tv/), the places as pins, in Bengali.
+      const drawMap = async (svg, places) => {
+        const near = places.every(p => p.lon > 60 && p.lon < 100 && p.lat > 5 && p.lat < 40);
+        const shapes = await (MAPS[near ? "sa" : "w"] ||= fetch(near ? "/tv/map-southasia.json" : "/tv/map-world.json").then(r => r.json()).catch(() => []));
+        if (!svg.isConnected) return;
+        let [lo0, lo1, la0, la1] = [Math.min(...places.map(p => p.lon)), Math.max(...places.map(p => p.lon)), Math.min(...places.map(p => p.lat)), Math.max(...places.map(p => p.lat))];
+        const padX = Math.max(3.5, (lo1 - lo0) * 0.35), padY = Math.max(2.2, (la1 - la0) * 0.35);
+        lo0 -= padX; lo1 += padX; la0 -= padY; la1 += padY;
+        const W = 1600, H = 760, k = Math.min(W / (lo1 - lo0), H / ((la1 - la0) * 1.1)), cx = (lo0 + lo1) / 2, cy = (la0 + la1) / 2;
+        const P = (lon, lat) => [W / 2 + (lon - cx) * k, H / 2 - (lat - cy) * k * 1.1];
+        const path = r => "M" + r.map(([x, y]) => P(x, y).map(v => v.toFixed(1)).join(",")).join("L") + "Z";
+        const home = new Set(["356"]);
+        svg.innerHTML = shapes.map(c => `<path class="${home.has(c.id) ? "home" : ""}" d="${c.r.map(path).join("")}"/>`).join("") +
+          places.map((p, j) => { const [x, y] = P(p.lon, p.lat); return `<g class="pin" style="--i:${j}" transform="translate(${x.toFixed(0)},${y.toFixed(0)})"><circle r="16"/><circle class="ring" r="16"/><text x="26" y="12">${esc(p.name)}</text></g>`; }).join("");
+      };
+      const drawS = () => {
+        if (!el.isConnected && st.current) { tok.off = true; try { tok.src?.stop(); } catch { /* done */ } return; }
+        const e = (now() - (sc.startAt || now())) / 1000, box = el.querySelector(".sg"); if (!box) return;
+        if (e >= 3.4) box.classList.add("on");
+        let i = -1; for (let j = 0; j < starts.length; j++) if (e >= starts[j]) i = j;
+        if (i <= shownI) return;   // forward only: a clock correction never steps back
+        if (i >= 0) box.classList.add("on");
+        shownI = i; const stage = box.querySelector(".sg-stage");
+        stage.insertAdjacentHTML("beforeend", itemHTML(items[i], i));
+        [...stage.children].slice(0, -1).forEach(n => { n.classList.add("out"); setTimeout(() => n.remove(), 700); });
+        box.querySelectorAll(".sg-steps i").forEach((n, j) => { n.className = j < i ? "done" : j === i ? "on" : ""; });
+        stage.querySelectorAll(".num[data-to]").forEach(n => { if (!n.dataset.go) { n.dataset.go = 1; count(n); } });
+        if (items[i].map) { const svg = stage.lastElementChild?.querySelector("svg"); if (svg) drawMap(svg, items[i].map); }
+        say(items[i]);
+      };
+      drawS(); const tS = setInterval(() => el.isConnected ? drawS() : (clearInterval(tS), drawS()), 250);
+      st.resumeVoice = () => { if (el.isConnected && shownI >= 0) say(items[shownI]); };
     } else if (g.kind === "avo") {   // the AVO Breaking Engine: each story 30 seconds, read over its pictures
       const list = (g.stories || []).filter(Boolean), at0 = sc.startAt || now();
       const lens = list.map(avoLen), starts = lens.map((_, i) => lens.slice(0, i).reduce((a, b) => a + b, 0));
@@ -1110,7 +1237,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         if (sl.fact) return `<div class="avo-slide"><div class="avo-info fact"><span class="lbl">${desk} · সংখ্যায়</span><div class="fig"><b class="num" data-to="${sl.fact.n}" data-dec="${sl.fact.dec ? 1 : 0}">০</b><em>${esc(sl.fact.unit)}</em></div><p>${esc(sl.fact.line)}</p><i class="rule"></i></div></div>`;
         if (sl.pts) return `<div class="avo-slide"><div class="avo-info pts"><span class="lbl">মূল তথ্য</span><ol>${sl.pts.map((p, i) => `<li style="--i:${i}"><i>${bnDigits(i + 1)}</i><span>${esc(p)}</span></li>`).join("")}</ol></div></div>`;
         const bg = bgOf(x);
-        return `<div class="avo-slide"><div class="avo-brk">${bg ? `<img class="bg" src="${esc(bg.src)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')">` : ""}<i class="s1"></i><i class="s2"></i><div class="in"><span class="brk-tag">এইমাত্র পাওয়া খবর</span><small data-no-tr>BREAKING NEWS</small><b>${esc(x.title)}</b></div></div></div>`;
+        return `<div class="avo-slide"><div class="avo-brk">${bg ? `<img class="bg" src="${esc(bg.src)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')">` : ""}<i class="s1"></i><i class="s2"></i><div class="in"><span class="brk-tag">${x.upd ? "নতুন তথ্য" : "এইমাত্র পাওয়া খবর"}</span><small data-no-tr>BREAKING NEWS</small><b>${esc(x.title)}</b></div></div></div>`;
       };
       // The key figure counts up in Bengali digits.
       const countUp = box => box.querySelectorAll(".num[data-to]").forEach(n => { if (n.dataset.done) return; n.dataset.done = 1; const to = Number(n.dataset.to), dec = n.dataset.dec === "1", t0 = performance.now(), dur = 1300;
@@ -1443,7 +1570,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     while (st.queue.length && st.queue[0].at <= Date.now()) { st.ctl = st.queue.shift().state; onState?.(st.ctl); }
     let sc = resolve();
     // The running-order simulator (scripts/playout-sim.mjs) records each item put on air.
-    if (window.__rwPlayout && st.seq?.seg && st.seq.seg !== st.lastSeg) { const g = st.lastSeg = st.seq.seg; window.__rwPlayout.push({ type: g.type, start: g.start, dur: g.dur, title: g.title || "", yt: g.ytId || "", eg: !!g.eg, resumed: !!g.resumed, stories: (g.stories || []).map(x => ({ id: x.id, dk: x.dk, weight: x.weight })) }); }
+    if (window.__rwPlayout && st.seq?.seg && st.seq.seg !== st.lastSeg) { const g = st.lastSeg = st.seq.seg; window.__rwPlayout.push({ type: g.type, start: g.start, dur: g.dur, title: g.title || "", yt: g.ytId || "", eg: !!g.eg, resumed: !!g.resumed, name: g.name || "", items: (g.items || []).length, stories: (g.stories || []).map(x => ({ id: x.id, dk: x.dk, weight: x.weight })) }); }
     if (window.__rwScenes && sc?.key !== st.current?.key) window.__rwScenes.push({ at: now(), key: sc?.key || "", seg: st.seq?.seg?.type || "", item: st.seq?.item?.type || "" });
     if (sc?.key !== st.current?.key) drawScene(sc);
     if (mode === "app") preloadYT(st.preWant);
@@ -1455,12 +1582,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     st.stalledSince = stalled ? st.stalledSince || Date.now() : 0;
   }
   /* ---------- data ---------- */
+  // The clock correction against the server: a change under a second and a half is network
+  // jitter and is ignored, so the picture never steps back and forth (a real correction applies).
+  function setSkew(v) { if (!Number.isFinite(v)) return; if (!st.skewSet || Math.abs(v - st.skew) > 1500) st.skew = v; st.skewSet = true; }
   async function loadTv() {
     if (mode === "scene" && !fixedScene?.needsTv) { /* the PCR preview still wants headlines for graphics */ }
-    try { const r = await fetch(`/api/tv/${channel}`, { cache: "no-store" }); if (r.ok) { const s = await r.json(); st.skew = s.serverTime - Date.now(); if (keepOrder) LAST[channel] = { tv: s, skew: st.skew, at: Date.now() }; if (!s.loop?.length && st.tv?.loop?.length) { s.loop = st.tv.loop; s.schedule = st.tv.schedule; } st.tv = s; const head = s.loop?.find(x => x.type === "video")?.ytId; if (st.seq && head && head !== st.seq.head) { st.seq.head = head; st.seq.restart = true; } } } catch { /* keep */ }
+    try { const r = await fetch(`/api/tv/${channel}`, { cache: "no-store" }); if (r.ok) { const s = await r.json(); setSkew(s.serverTime - Date.now()); if (keepOrder) LAST[channel] = { tv: s, skew: st.skew, at: Date.now() }; if (!s.loop?.length && st.tv?.loop?.length) { s.loop = st.tv.loop; s.schedule = st.tv.schedule; } st.tv = s; const head = s.loop?.find(x => x.type === "video")?.ytId; if (st.seq && head && head !== st.seq.head) { st.seq.head = head; st.seq.restart = true; } } } catch { /* keep */ }
   }
   function applyCtl(state, serverTime) {
-    if (serverTime) st.skew = serverTime - Date.now();
+    if (serverTime) setSkew(serverTime - Date.now());
     const delay = mode === "program" && output ? (state.delay || 0) * 1000 : 0;
     if (state.dumpAt && state.dumpAt !== st.ctl?.dumpAt && Date.now() - state.dumpAt < 15000) { st.queue = []; st.dumpUntil = now() + delay; st.ctl = state; return; }
     if (!delay) { st.queue = []; st.ctl = state; onState?.(state); if (keepOrder) LAST[`ctl-${channel}`] = state; }

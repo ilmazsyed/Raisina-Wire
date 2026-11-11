@@ -91,6 +91,20 @@ To switch on YouTube sourcing: Google Cloud console → APIs & Services → **En
 Data API v3* → Credentials → **Create API key** (restrict it to that API) → `npx wrangler secret put
 YOUTUBE_API_KEY`.
 
+### Autopilot programming (src/segments.js, src/labels.js)
+
+- **Variety:** every story carries a desk and a weight (heavy, medium, light). Bulletins, AVO blocks and headline cards never put two from one desk in a row, and run a light story after every two heavy ones.
+- **No repeats:** AVO blocks are 2–3 stories, and a story doesn't return within 15 minutes for a viewer. Videos don't return within the hour; evergreen videos (control room › Videos on each channel › Evergreen) fill in first.
+- **Bulletins:**
+  - New stories lead (নতুন) and updated stories are marked (নতুন তথ্য).
+  - :15 and :45 read four stories the last bulletin didn't.
+- **Programming clock:**
+  - Two segment slots each half-hour (:08 and :22), filled by daypart: morning, day, prime time, late night.
+  - Segments: শহরের খবর, কলকাতা ১০, বাংলাদেশ ডেস্ক, এক মিনিটে বিশ্ব, সংখ্যায় আজ, খেলার খবর, আজকের দিনে, and the story of the hour (map, quote, timeline, key points).
+  - Edit it in Scheduler › Programming clock, which also holds the score strip and the city notice.
+- **Map outlines:** Natural Earth (public domain), via the `world-atlas` package, pre-converted in `public/tv/map-*.json`.
+- **Check the running order:** `npm run build && NODE_PATH=$(npm root -g) npm run sim -- --at 20:00 --minutes 30` plays the autopilot at speed with the live data and prints it.
+
 ## Phase 3: bulletin producer and PCR
 
 - **Realtime control** (`src/control.js`): each channel has a Durable Object that holds what is on
