@@ -85,98 +85,29 @@ export async function shortsList(env, limit = 60) {
 // on the horizontal screen). With "other playlists" on in the control room
 // (or while its own playlists have nothing yet), the long videos (over three minutes) of the
 // vertical channel's sources join in. Either way the newest video plays first.
+// Freshness (a news channel): today's uploads (India time) play, newest first; when there are
+// fewer than ten, the most recent of the day before fill in up to ten. Nothing older than 30
+// hours goes on air, except videos the control room marks "keep running".
+export const FRESH_HOURS = 30, DAILY_MIN = 10;
+export function freshOnly(list, now = Date.now()) {
+  const t = v => Date.parse(v.publishedAt || "") || 0;
+  const ist = new Date(now + 5.5 * 3600e3), midnight = Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()) - 5.5 * 3600e3;
+  const recent = list.filter(v => !v.keep && t(v) >= now - FRESH_HOURS * 3600e3).sort((a, b) => t(b) - t(a));
+  const today = recent.filter(v => t(v) >= midnight), earlier = recent.filter(v => t(v) < midnight);
+  const pick = [...today, ...earlier.slice(0, Math.max(0, DAILY_MIN - today.length))];
+  const kept = list.filter(v => v.keep);
+  return [...pick, ...kept].sort((a, b) => t(b) - t(a));
+}
 async function playable(env, ch, s = {}) {
-  const q = where => env.DB.prepare(`SELECT i.yt_id AS ytId, i.title, i.duration, i.thumb, i.headline, i.description, i.published_at AS publishedAt FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
+  const q = where => env.DB.prepare(`SELECT i.yt_id AS ytId, i.title, i.duration, i.thumb, i.headline, i.description, i.published_at AS publishedAt, i.keep FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
     WHERE ${where} AND ${ch === "h" ? "i.vertical=0 AND " : ""}i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0 ORDER BY i.published_at DESC LIMIT 300`).all().then(r => r.results);
-  if (ch === "v") return q(`i.channel='v' AND i.duration<=${SHORT_MAX}`);
+  if (ch === "v") return freshOnly(await q(`i.channel='v' AND i.duration<=${SHORT_MAX}`));
   // Everything in the horizontal playlists plays, short or long: they are chosen for this screen.
-  const own = await q(`i.channel='h'`);
+  const own = freshOnly(await q(`i.channel='h'`));
   if (!s.otherSources && own.length) return own;
   const others = await q(`i.channel='v' AND i.duration>${SHORT_MAX}`), seen = new Set();
-  return [...own, ...others].sort((a, b) => String(b.publishedAt || "").localeCompare(String(a.publishedAt || ""))).filter(v => !seen.has(v.ytId) && seen.add(v.ytId)).slice(0, 300);
+  return freshOnly([...own, ...others].filter(v => !seen.has(v.ytId) && seen.add(v.ytId)));
 }
-export async function promos(env, all = false) {
-  const { results } = await env.DB.prepare(`SELECT id,title,image_url AS image,seconds,active,sort FROM tv_promos ${all ? "" : "WHERE active=1"} ORDER BY sort, created_at`).all();
-  return results;
-}
-// The running order (both channels):
-// - videos newest first, on a loop; a newly sourced video restarts the loop (src/youtube.js);
-// - a 10-second full-screen flash of the headlines (or the breaking story) after every video, so
-//   two videos never play back to back; vertical promo cards keep their own repeat rule;
-// - a stinger, picked at random but the same on every screen, on about one change in three;
-// - at the top of every hour and at every half hour, a two-minute bulletin of the latest
-//   stories with their details, and at :15 and :45 a 65-second one. The loop stops for it and
-//   carries on where it stopped.
-export const FLASH_SECONDS = 10;
-export const QUARTER = 900e3;
-export const bulletinMs = due => (Math.round(due / 60e3) % 30 === 0 ? 120e3 : 65e3);
-const hash = str => { let h = 2166136261; for (const c of String(str)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
-export function buildLoop(s, videos, cards = []) {
-  const loop = []; let k = 0, slot = 0;
-  for (const v of videos) {
-    loop.push({ type: "video", ytId: v.ytId, title: v.title, line: (v.headline || "").trim() || bnLine(v.title, v.description), dur: v.duration, thumb: v.thumb });
-    loop.push({ type: "flash", dur: FLASH_SECONDS, n: k });
-    k++;
-    if (s.promosOn && cards.length && s.promoEvery && k % s.promoEvery === 0) { const p = cards[slot++ % cards.length]; loop.push({ type: "promo", id: p.id, image: p.image, title: p.title, dur: p.seconds }); }
-  }
-  if (!videos.length && cards.length && s.promosOn) cards.forEach(p => loop.push({ type: "promo", id: p.id, image: p.image, title: p.title, dur: p.seconds }));
-  if (!loop.length) loop.push({ type: "flash", dur: FLASH_SECONDS, n: 0 });
-  // The Rashtrix stinger between every video: going into the flash after it and into the next.
-  loop.forEach((x, i) => { x.sting = x.type === "flash" || x.type === "video" ? true : x.type === "promo" ? hash(`${x.id}:${i}`) % 3 === 0 : false; });
-  return loop;
-}
-// Every video plays whole, from its first second to its last. The schedule is walked from the
-// channel's start (or a saved point on the way): items follow one another, and once a half hour
-// has passed the bulletin goes on at the next break, never in the middle of a video. What was on
-// air when the loop restarted for a new video ("hold") plays out first.
-const nextHalf = x => Math.floor(x / QUARTER) * QUARTER + QUARTER;
-export function scheduleAt(loop, epoch, t = Date.now(), ahead = 5400, opts = {}) {
-  const out = [], end = t + ahead * 1000;
-  for (const h of opts.hold || []) if (h.start + h.dur * 1000 > t && h.start < end) out.push(h);
-  const total = loop.reduce((n, x) => n + x.dur, 0) * 1000;
-  if (!total) return out;
-  const a = opts.anchor && opts.anchor.epoch === epoch && opts.anchor.len === loop.length && opts.anchor.at <= t ? opts.anchor : null;
-  let at = a ? a.at : epoch, i = a ? a.i % loop.length : 0, due = a ? a.due : nextHalf(epoch), steps = 0, mark = null;
-  while (at < end && steps < 400000) {
-    steps++;
-    if (at >= due) {
-      const len = bulletinMs(due), wx = opts.weather ? (len === 120e3 ? 90e3 : 60e3) : 0;
-      if (at + len > t) out.push({ type: "bulletin", start: at, dur: len / 1000, sting: true });
-      // The weather briefing straight after it (horizontal channel).
-      if (wx && at + len + wx > t) out.push({ type: "weather", start: at + len, dur: wx / 1000, sting: true });
-      // Then the 30-second market update.
-      const mk = wx ? 30e3 : 0;
-      if (mk && at + len + wx + mk > t) out.push({ type: "market", start: at + len + wx, dur: 30, sting: true });
-      due = nextHalf(at); at += len + wx + mk; continue;
-    }
-    const x = loop[i], next = at + x.dur * 1000;
-    if (next > t) out.push({ ...x, start: at, in: 0 });
-    else if (steps % 500 === 0) mark = { epoch, len: loop.length, at: next, i: (i + 1) % loop.length, due };
-    at = next; i = (i + 1) % loop.length;
-  }
-  // A saved point near now, so the next walk is short.
-  out.anchor = mark && steps > 1500 ? mark : null;
-  return out;
-}
-
-/* ---------- What every screen reads ---------- */
-// The bulletin: the eight newest Bengali stories (wire briefs and reports, and the desk's own),
-// each with about a hundred words of its text.
-// What the channel's headlines, flashes and bulletins show: the wire's stories (reports and
-// briefs) from the last twelve hours, newest first. Older stories never go on air.
-const FRESH_HOURS = 12;
-async function wireStories(env, limit = 20) {
-  const pick = hours => env.DB.prepare(`SELECT id, title, category, kind, body FROM articles WHERE status='published' AND lang='bn' AND pulled_at IS NULL
-    AND kind IN ('rewrite','brief') AND published_at>=? ORDER BY published_at DESC LIMIT ?`).bind(new Date(Date.now() - hours * 3600e3).toISOString(), limit).all().then(r => r.results).catch(() => []);
-  // A quiet night: look back a day rather than show an empty screen, never further.
-  const fresh = await pick(FRESH_HOURS);
-  return fresh.length >= 4 ? fresh : pick(24);
-}
-const firstWords = (body, n = 100) => {
-  const words = String(body || "").replace(/<[^>]+>/g, " ").replace(/[#*_>]+/g, " ").replace(/\s+/g, " ").trim().split(" ");
-  return words.slice(0, n).join(" ") + (words.length > n ? "…" : "");
-};
-const memo = new Map();
 export async function tvState(env, ch) {
   const hit = memo.get(ch);
   if (hit && Date.now() - hit.at < 4000) return hit.value;

@@ -1068,6 +1068,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     // market updates, intro cards and breaking news (the control room can still turn it off).
     { const bug = $(".tv-bug-fixed"); if (bug) bug.hidden = L.bug === false; }
     marketTicker(channel === "h" && L.ticker !== false && !fullGfx && sc && !sc.off && !sc.standby && sc.layout !== "lband");
+    // The automatic L-band is decided here, before any early return: a graphic, a stand-by or an
+    // empty scene that cuts in while it is showing takes it off at once (it used to stay frozen).
+    autoLband(sc, !!sc && !sc.off && !sc.standby && !fullGfx && !!(sc.sources || []).length && !sc.graphic && sc.layout !== "lband" && (sc.sources || []).length === 1 && sc.layout !== "pip", L);
     if (!sc || sc.off || sc.standby || mode === "scene" && !sc.sources?.length && !sc.graphic) { put(".tvp-gfx", ""); put(".tvp-ovl", ""); return; }
     // Full-screen graphics (the bulletin, promos): LIVE and the clock stay on screen.
     if (fullGfx && channel === "h") { put(".tvp-gfx", dtBar(L, s)); put(".tvp-ovl", ""); return; }
@@ -1090,7 +1093,6 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     }
     // The automatic L-band on the horizontal channel: while a video plays, every 40 seconds the
     // picture moves up and right for 7 seconds and the headlines fill the L around it.
-    autoLband(sc, isVideo && !lband && (sc.sources || []).length === 1 && sc.layout !== "pip", L);
     // Overlays: poll bar, results bar, curated comments.
     const o = c.overlay || {};
     ovl = `${o.poll ? pollHTML(o.poll, false) : ""}<div class="ovl-right">${o.results ? resultsHTML(o.results, false) : ""}${o.comments?.length ? `<div class="cm-box">${o.comments.slice(0, 3).map(x => `<p><b>${esc(x.author)}</b><span>${esc(x.text)}</span><small>${x.platform === "youtube" ? "ইউটিউব" : x.platform === "facebook" ? "ফেসবুক" : "রাষ্ট্রিক্স অ্যাপ"}</small></p>`).join("")}</div>` : ""}</div>`;
@@ -1108,7 +1110,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     stage.classList.toggle("lb-auto", on);
     if (!on && !leaving) { put(".tvp-lbl", ""); return; }
     const Hs = (st.tv?.headlines || []).filter(h => h.text), n = Hs.length;
-    const main = st.tv?.lband?.text || (n ? Hs[k % n].text : sc.label || "");
+    const main = st.tv?.lband?.text || (n ? Hs[k % n].text : sc?.label || "");
     const side = n ? [1, 2, 3, 4].map(i => Hs[(k + i) % n]).filter((h, i, a) => h && a.indexOf(h) === i && h.text !== main) : [];
     put(".tvp-lbl", `<div class="lb-auto-box${on ? "" : " out"}" data-k="${k}"><div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${side.slice(0, 3).map((h, i) => `<p style="--n:${i}"><small>${esc(DESK_BN[h.desk] || h.desk || "")}</small>${esc(h.text)}</p>`).join("")}<div class="lb-logo"><img src="${LOGO}" alt=""><i></i></div></div><div class="lb-bottom"><b>${esc(main)}</b>${L.ad ? `<div class="tv-adslot"></div>` : ""}</div></div>`);
   }
