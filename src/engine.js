@@ -598,9 +598,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       st.preWant = null;
       return q.seg;
     }
-    // Straight after each bulletin, the weather briefing: 45 seconds after the two-minute ones,
-    // 30 after the 65-second ones (horizontal channel, when the weather has come in).
-    const WX = channel === "h" && (st.tv?.weatherPlaces || []).length && (st.tv?.bulletin || []).length ? (BULLETIN_MS === 120e3 ? 45e3 : 30e3) : 0;
+    // Every 30 minutes, straight after the two-minute bulletins at :00 and :30, the weather
+    // briefing (45 seconds), then the markets (horizontal channel, when the weather has come in).
+    const WX = channel === "h" && (st.tv?.weatherPlaces || []).length && (st.tv?.bulletin || []).length && BULLETIN_MS === 120e3 ? 45e3 : 0;
     // Then the market update, 20 seconds (when its figures have come in).
     const MK = WX && st.tv?.market?.nifty ? 20e3 : 0;
     if (MK && t - slot >= BULLETIN_MS + WX && t - slot < BULLETIN_MS + WX + MK) {
@@ -631,7 +631,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const blockEnd = at => {
       if (!(st.tv?.bulletin || []).length) return at;
       const sl = Math.floor(at / QUARTER) * QUARTER, bm = bulletinMs(sl);
-      const wx = channel === "h" && (st.tv?.weatherPlaces || []).length ? (bm === 120e3 ? 45e3 : 30e3) : 0, mk = wx && st.tv?.market?.nifty ? 20e3 : 0;
+      const wx = channel === "h" && (st.tv?.weatherPlaces || []).length && bm === 120e3 ? 45e3 : 0, mk = wx && st.tv?.market?.nifty ? 20e3 : 0;
       return at < sl + bm + wx + mk ? sl + bm + wx + mk : at;
     };
     for (const c of st.tv?.cutins || []) {
