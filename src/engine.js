@@ -773,13 +773,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const bnDate = d => { try { return bnDigits(d.toLocaleDateString("bn-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long", year: "numeric" })); } catch { return ""; } };
   const ist = () => bnDigits(new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }));
   const tickerHTML = all => { const list = mode === "app" ? all.slice(0, 12) : all, items = list.map(t => `<span>${esc(t)}</span>`).join("<i>◆</i>"); return `<div class="tk-move" style="--dur:${Math.max(40, list.length * 9)}s"><div>${items}<i>◆</i></div><div aria-hidden="true">${items}<i>◆</i></div></div>`; };
-  // Every 50 seconds the ad box turns over to show the partners, Calibrex and then Raisina Wire,
-  // six seconds each; otherwise it shows the ad (or "your ad here").
-  const PARTNERS = [
-    `<div class="tv-ad partner"><span class="pt-in"><img src="/partners/calibrex-mark.svg" alt=""><b class="pt-word">CALIBRE<i>X</i></b><small>Partner</small></span></div>`,
-    `<div class="tv-ad partner rw"><span class="pt-in"><img src="/partners/raisina-wire-mark.svg" alt=""><b class="pt-word">Raisina Wire</b><small>Partner</small></span></div>`
-  ];
-  const adBox = ad => { const r = Date.now() % 50000; return r < 6000 ? PARTNERS[0] : r < 12000 ? PARTNERS[1] : plainAd(ad); };
+  // The ad box shows the ad (or "your ad here").
+  const adBox = ad => plainAd(ad);
   const plainAd = ad => ad?.image ? `<div class="tv-ad img"><img src="${esc(ad.image)}" alt=""></div>` : `<div class="tv-ad"><b>${esc(ad?.line1 || "")}</b><hr><small>${esc(ad?.line2 || "")}</small><hr><small>${esc(ad?.line3 || "")}</small></div>`;
   const vJacket = (inner, band) => `<div class="vj"><img class="vj-strip" src="/brand/jacket-strip.webp" alt=""><div class="vj-logo"><img src="${LOGO}" alt=""></div><div class="vj-frame">${inner}</div><div class="vj-band"><b>${esc(band)}</b><div class="tv-adslot"></div></div></div>`;
   const sponsorAd = () => st.ctl?.sponsor ? { image: st.ctl.sponsor.image, line1: st.ctl.sponsor.line1, line2: st.ctl.sponsor.line2, line3: st.ctl.sponsor.line3 } : st.tv?.ad;
@@ -1002,7 +997,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // (flipping between English and Bengali) and the Bengali calendar date, the same width.
   const dtBar = (L, s) => (L.live || L.clock) ? `<div class="tv-dt"><div class="dt-top">${L.live ? `<span class="dt-live"><i></i>LIVE</span>` : ""}${L.clock ? `<b class="dt-time">${flip(`${enTime()}<small>IST</small>`, `${ist()}`, "t")}</b>` : ""}</div>${L.clock ? `<div class="dt-sub"><span class="dt-date">${flip(esc(enDate()), esc(bnDayDate()), "d")}</span>${s.bangabda ? `<span class="dt-bn">${esc(s.bangabda)}</span>` : ""}</div>` : ""}${L.weather !== false && (s.weatherPlaces || []).length ? `<div class="tv-wxslot"></div>` : ""}</div>` : "";
   // Every ad box on screen (corner, L-band, headlines, vertical band) is filled here on its own,
-  // so its turns (partners every 50 s) never redraw the other graphics; a new face turns in.
+  // so a change of ad never redraws the other graphics; a new face turns in.
   // The weather row under the clock: two places at a time, the next two every eight seconds,
   // names and figures flipping between English and Bengali like the date.
   function fillWx() {
