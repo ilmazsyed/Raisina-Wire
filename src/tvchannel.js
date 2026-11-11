@@ -195,8 +195,9 @@ export function scheduleAt(loop, epoch, t = Date.now(), ahead = 5400, opts = {})
   while (at < end && steps < 400000) {
     steps++;
     if (at >= due) {
-      // Fast-paced: 45 seconds of weather after the two-minute bulletins, 30 after the short ones.
-      const len = bulletinMs(due), wx = opts.weather ? (len === 120e3 ? 45e3 : 30e3) : 0;
+      // Every 30 minutes: 45 seconds of weather (then the markets) after the two-minute bulletins
+      // at :00 and :30; none after the short ones at :15 and :45.
+      const len = bulletinMs(due), wx = opts.weather && len === 120e3 ? 45e3 : 0;
       if (at + len > t) out.push({ type: "bulletin", start: at, dur: len / 1000, sting: true });
       // The weather briefing straight after it (horizontal channel).
       if (wx && at + len + wx > t) out.push({ type: "weather", start: at + len, dur: wx / 1000, sting: true });
