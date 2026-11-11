@@ -20,3 +20,7 @@ jobs:
       - name: Syntax check (every script in src/)
         run: for f in src/*.js; do cp "$f" /tmp/check.mjs && node --check /tmp/check.mjs || { echo "::error file=$f::syntax error in $f"; exit 1; }; done
       - run: npm run build
+      # Bundles the Worker exactly as the Cloudflare deploy does (without deploying), so a missing
+      # export or a broken import fails here instead of silently stopping the live deploy.
+      - name: Worker bundles
+        run: npx wrangler deploy --dry-run --outdir /tmp/worker-build
