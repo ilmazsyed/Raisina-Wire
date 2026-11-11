@@ -611,6 +611,31 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       st.preWant = null;
       return q.seg;
     }
+    // Scheduled cut-ins (control room > Scheduler): at the set time the chosen videos go on air,
+    // in order, then the channel goes back to its running order (picking up the video that was
+    // cut). A time that falls in the bulletin, weather and market block starts straight after it.
+    const blockEnd = at => {
+      if (!(st.tv?.bulletin || []).length) return at;
+      const sl = Math.floor(at / QUARTER) * QUARTER, bm = bulletinMs(sl);
+      const wx = channel === "h" && (st.tv?.weatherPlaces || []).length ? (bm === 120e3 ? 45e3 : 30e3) : 0, mk = wx && st.tv?.market?.nifty ? 20e3 : 0;
+      return at < sl + bm + wx + mk ? sl + bm + wx + mk : at;
+    };
+    for (const c of st.tv?.cutins || []) {
+      const vids = (c.videos || []).filter(v => v.ytId && v.dur > 0); if (!vids.length) continue;
+      const start = blockEnd(c.at), end = start + vids.reduce((n, v) => n + v.dur, 0) * 1000;
+      if (t < start || t >= end) continue;
+      let off = (t - start) / 1000, k = 0, vStart = start;
+      while (k < vids.length - 1 && off >= vids[k].dur) { off -= vids[k].dur; vStart += vids[k].dur * 1000; k++; }
+      const v = vids[k];
+      if (q.item?.type !== "cutin" || q.start !== vStart || q.item.ytId !== v.ytId) {
+        if (q.item?.type === "video") { const at = (q.item.in || 0) + ytPos(q.item.ytId); q.resume = at < q.item.dur - 8 ? { ...q.item, at, resumed: true } : null; }
+        else if (q.item?.type === "upnext") q.resume = q.item.video;
+        q.item = { type: "cutin", ytId: v.ytId, dur: v.dur, cut: c.id }; q.start = vStart; q.n++;
+        q.seg = { type: "video", ytId: v.ytId, title: v.title, line: v.line || v.title, dur: v.dur, start: vStart, in: 0, sting: k === 0, n: q.n };
+      }
+      st.preWant = vids[k + 1] ? { id: vids[k + 1].ytId, at: 0 } : null;
+      return q.seg;
+    }
     if (q.item) {
       const it = q.item, age = t - q.start;
       const done = it.type === "video"

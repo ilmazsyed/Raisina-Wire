@@ -112,6 +112,11 @@ export class TvControl {
         s.mode = "auto"; s.program = null; s.standby = { on: false, auto: false, reason: "" };
         await this.asrun(this.onAir(), "auto"); break;
       }
+      case "autopilot": {   // AUTOPILOT on: the channel's own running order goes on air (any rundown stops)
+        if (a.on === false) break;   // switching it off happens by taking something else on air
+        s.rundown = null; s.mode = "auto"; s.program = null; s.standby = { on: false, auto: false, reason: "" };
+        await this.asrun(this.onAir(), how || "autopilot"); break;
+      }
       case "transition": s.transition = { type: ["cut", "mix", "wipe", "stinger"].includes(a.type) ? a.type : "mix", ms: Math.max(0, Math.min(3000, Number(a.ms) || 600)) }; break;
       case "layers": s.layers = { ...s.layers, ...Object.fromEntries(Object.entries(a).filter(([k]) => k in DEFAULT.layers).map(([k, v]) => [k, !!v])) }; break;
       case "lower": s.lower = a && a.name ? { name: String(a.name).slice(0, 80), title: String(a.title || "").slice(0, 120) } : null; break;

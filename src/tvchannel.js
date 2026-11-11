@@ -103,15 +103,51 @@ export function freshOnly(list, now = Date.now()) {
   return [...pick, ...kept].sort((a, b) => t(b) - t(a));
 }
 async function playable(env, ch, s = {}) {
-  const q = where => env.DB.prepare(`SELECT i.yt_id AS ytId, i.title, i.duration, i.thumb, i.headline, i.description, i.published_at AS publishedAt, i.keep FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
-    WHERE ${where} AND ${ch === "h" ? "i.vertical=0 AND " : ""}i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0 ORDER BY i.published_at DESC LIMIT 300`).all().then(r => r.results);
-  if (ch === "v") return freshOnly(await q(`i.channel='v' AND i.duration<=${SHORT_MAX}`));
-  // Everything in the horizontal playlists plays, short or long: they are chosen for this screen.
-  const own = freshOnly(await q(`i.channel='h'`));
-  if (!s.otherSources && own.length) return own;
-  const others = await q(`i.channel='v' AND i.duration>${SHORT_MAX}`), seen = new Set();
-  return freshOnly([...own, ...others].filter(v => !seen.has(v.ytId) && seen.add(v.ytId)));
+  // By shape, whichever channel's source brought the video in: portrait videos play only on the
+  // vertical channel, landscape videos only on the horizontal one (YouTube's player size says
+  // which). A video in both channels' sources counts once.
+  const rows = (await env.DB.prepare(`SELECT i.yt_id AS ytId, i.title, i.duration, i.thumb, i.headline, i.description, i.published_at AS publishedAt, i.keep, i.channel AS src FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
+    WHERE i.vertical=? AND i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0 ORDER BY (i.channel=?) DESC, i.published_at DESC LIMIT 400`).bind(ch === "v" ? 1 : 0, ch).all()).results;
+  const seen = new Set(), list = rows.filter(v => !seen.has(v.ytId) && seen.add(v.ytId));
+  // Safety net for the vertical channel: if YouTube reports no portrait video at all, its own
+  // Shorts play as before.
+  if (ch === "v" && !list.length) return freshOnly((await env.DB.prepare(`SELECT i.yt_id AS ytId, i.title, i.duration, i.thumb, i.headline, i.description, i.published_at AS publishedAt, i.keep FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
+    WHERE i.channel='v' AND i.duration<=${SHORT_MAX} AND i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0 ORDER BY i.published_at DESC LIMIT 300`).all()).results);
+  return freshOnly(list);
 }
+
+/* ---------- Scheduled cut-ins (control room > Scheduler) ---------- */
+// Each active cut-in's coming times (India time) as moments, from an hour ago to a day ahead,
+// with the videos to play; the screens put them on air (src/engine.js), after any bulletin,
+// weather and market update that is on at that moment. Scheduled videos ignore the 30-hour
+// freshness rule: scheduling them is the control room's choice.
+const IST = 5.5 * 3600e3;
+export function cutinTimes(row, now = Date.now()) {
+  const out = [], times = (() => { try { return JSON.parse(row.times || "[]"); } catch { return []; } })();
+  const today = new Date(now + IST).toISOString().slice(0, 10), tomorrow = new Date(now + IST + 86400e3).toISOString().slice(0, 10);
+  const days = row.day ? [row.day] : [today, tomorrow];
+  for (const d of days) for (const t of times) {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(t).trim()); if (!m) continue;
+    const at = Date.parse(`${d}T${m[1].padStart(2, "0")}:${m[2]}:00Z`) - IST;
+    if (at > now - 3600e3 && at < now + 86400e3) out.push(at);
+  }
+  return out.sort((a, b) => a - b);
+}
+export async function cutins(env, ch, all = false) {
+  const { results } = await env.DB.prepare(`SELECT * FROM tv_cutins WHERE channel=? ${all ? "" : "AND active=1"} ORDER BY created_at DESC`).bind(ch).all().catch(() => ({ results: [] }));
+  return results.map(r => { let videos = []; try { videos = JSON.parse(r.videos || "[]"); } catch { /* none */ } let times = []; try { times = JSON.parse(r.times || "[]"); } catch { /* none */ }
+    return { id: r.id, channel: r.channel, title: r.title, videos, times, day: r.day, active: !!r.active, createdAt: r.created_at }; });
+}
+async function cutinsOnAir(env, ch) {
+  const now = Date.now(), out = [];
+  for (const c of await cutins(env, ch)) {
+    const videos = c.videos.filter(v => v.ytId && v.dur > 0); if (!videos.length) continue;
+    const dur = videos.reduce((n, v) => n + v.dur, 0);
+    for (const at of cutinTimes({ times: JSON.stringify(c.times), day: c.day }, now)) if (at + dur * 1000 > now) out.push({ id: c.id, title: c.title, at, dur, videos });
+  }
+  return out.sort((a, b) => a.at - b.at).slice(0, 24);
+}
+
 export async function promos(env, all = false) {
   const { results } = await env.DB.prepare(`SELECT id,title,image_url AS image,seconds,active,sort FROM tv_promos ${all ? "" : "WHERE active=1"} ORDER BY sort, created_at`).all();
   return results;
@@ -199,10 +235,10 @@ export async function tvState(env, ch) {
   const hit = memo.get(ch);
   if (hit && Date.now() - hit.at < 4000) return hit.value;
   const s = await tvSettings(env, ch);
-  const [videos, cards, live, stories] = await Promise.all([
+  const [videos, cards, live, stories, cuts] = await Promise.all([
     playable(env, ch, s), ch === "v" ? promos(env) : [],
     env.DB.prepare("SELECT CASE WHEN live_video<>'' THEN live_video ELSE yt_id END AS ytId, title FROM tv_sources WHERE channel=? AND kind='live' AND active=1 AND on_air=1 AND live_now=1 LIMIT 1").bind(ch).first(),
-    wireStories(env)
+    wireStories(env), cutinsOnAir(env, ch).catch(() => [])
   ]);
   const headlines = stories.map(a => ({ text: a.title, desk: a.category, kind: a.kind }));
   // Each bulletin story's picture and its credit (src/bulletinimg.js), when one was found.
@@ -229,7 +265,9 @@ export async function tvState(env, ch) {
     ticker: [...s.ticker, ...headlines.slice(0, 14).map(h => h.text)],
     headlines, bulletin,
     // The app plays its own copy of the order for each viewer, newest video first (src/engine.js).
-    loop: s.on ? loop : []
+    loop: s.on ? loop : [],
+    // Scheduled cut-ins (the control room's Scheduler): at each time, these videos go on air.
+    cutins: s.on ? cuts : []
   };
   memo.set(ch, { at: Date.now(), value });
   return value;

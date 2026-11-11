@@ -3,7 +3,7 @@
 // worked out as you go. Rundowns are archived at midnight India time (kept 90 days) and can be
 // printed (PDF). A rundown goes on air from here; the PCR takes over from there.
 import { shell, api, toast, fail, esc, $, $$, fmt, parseTime, istDay, istClock, printDoc } from "./crshell.js";
-import { ITEM_TYPES, LAYOUTS, timings } from "./scenes.js";
+import { ITEM_TYPES, LAYOUTS, timings, autopilotOn } from "./scenes.js";
 import { digits } from "./i18n.js";
 
 const S = { ch: "h", day: istDay(), list: [], rd: null, sel: null, clips: [], templates: [], onair: null, archive: false };
@@ -27,22 +27,49 @@ async function openRundown(id) {
 }
 async function loadOnAir() {
   try { const d = await api(`/api/ctl/${S.ch}/state`); S.onair = d.state; } catch { S.onair = null; }
+  drawAutopilot();
   if (S.rd) drawItems();
+}
+// AUTOPILOT (the same switch as in the PCR): on, the channel runs its own running order; putting
+// a rundown on air (or a PCR take) switches it off; switching it on again brings the running
+// order back at once.
+function drawAutopilot() {
+  const b = $("#apSwitch"); if (!b) return; const c = S.onair, on = autopilotOn(c);
+  b.classList.toggle("on", on);
+  $("#apState").textContent = !c ? "…" : on ? "ON: the channel runs itself" : c.standby?.on ? "OFF: standby on air" : c.rundown && c.mode === "auto" ? `OFF: "${c.rundown.title || "rundown"}" on air` : "OFF: a PCR take is on air";
+}
+async function autopilot() {
+  if (autopilotOn(S.onair)) return toast("Autopilot is on. Put a rundown on air to go off it.");
+  if (!confirm("Switch AUTOPILOT on? The channel's own running order goes on air now (any rundown stops).")) return;
+  try { await api(`/api/ctl/${S.ch}/cmd`, { method: "POST", body: { cmd: "autopilot", args: { on: true } } }); toast("Autopilot on."); loadOnAir(); } catch (e) { fail(e); }
+}
+// Stories: every video playing on the channel now, to pick into the open rundown.
+async function storiesDialog() {
+  if (!S.rd) return toast("Open a rundown first.");
+  const d = dialog(`<h3>Channel videos: add as stories</h3><p class="muted">Every video now playing on ${S.ch === "h" ? "Rashtrix TV" : "Rashtrix Shorts"}. Add any to the rundown, then drag to arrange.</p><div id="sl" class="clips-list"><p class="muted">Loading…</p></div>`);
+  try {
+    const tv = await api(`/api/tv/${S.ch}`), vids = (tv.loop || []).filter(x => x.type === "video");
+    $("#sl", d).innerHTML = vids.map(v => `<div class="clip"><img src="https://i.ytimg.com/vi/${esc(v.ytId)}/mqdefault.jpg" alt="" style="width:120px;border-radius:6px"><div style="flex:1"><b data-no-tr>${esc(v.line || v.title)}</b><br><small>${digits(fmt(v.dur || 0))}</small></div><button class="btn sm" data-add="${esc(v.ytId)}">Add</button></div>`).join("") || `<p class="muted">No videos on the channel right now.</p>`;
+    $$("[data-add]", d).forEach(b => b.onclick = async () => { const v = vids.find(x => x.ytId === b.dataset.add);
+      try { await api(`/api/admin/rundowns/${S.rd.id}/items`, { method: "POST", body: { type: "video", title: (v.line || v.title || "").slice(0, 200), duration: v.dur || 60, data: { ytId: v.ytId, text: v.line || v.title || "" } } }); b.textContent = "Added"; b.disabled = true; openRundown(S.rd.id); } catch (e) { fail(e); } });
+  } catch (e) { $("#sl", d).innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
 }
 
 /* ---------- left: the day's rundowns ---------- */
 function drawList() {
   const L = $(".pr-list");
-  L.innerHTML = `<div class="chtabs"><button class="btn ${S.ch === "h" ? "on" : ""}" data-ch="h">Rashtrix TV</button><button class="btn ${S.ch === "v" ? "on" : ""}" data-ch="v">Rashtrix Shorts</button></div>
+  L.innerHTML = `<button class="ap-switch" id="apSwitch" type="button" style="margin-bottom:10px"><i></i><span><b>AUTOPILOT</b><small id="apState">…</small></span></button><div class="chtabs"><button class="btn ${S.ch === "h" ? "on" : ""}" data-ch="h">Rashtrix TV</button><button class="btn ${S.ch === "v" ? "on" : ""}" data-ch="v">Rashtrix Shorts</button></div>
     <div class="row" style="margin-bottom:8px">${S.archive
       ? `<label>From<input type="date" id="aFrom" value="${S.from || istDay(Date.now() - 30 * 864e5)}"></label><label>To<input type="date" id="aTo" value="${S.to || istDay()}"></label>`
       : `<label style="flex:1">Day<input type="date" id="day" value="${S.day}"></label>`}</div>
     <div class="row" style="margin-bottom:10px"><button class="btn" id="archToggle">${S.archive ? "← Working rundowns" : "Archive"}</button>${S.archive ? "" : `<button class="btn green" id="newRd">+ New rundown</button>`}</div>
     ${S.archive ? "" : `<div class="row" style="margin-bottom:10px"><select id="fromTpl" style="flex:1"><option value="">From a template…</option>${S.templates.filter(t => t.channel === S.ch).map(t => `<option value="${t.id}">${esc(t.title)} · ${esc(t.slot_start || "")}</option>`).join("")}</select></div>`}
     <div>${S.list.length ? S.list.map(r => `<button class="rd" data-id="${r.id}"${S.rd?.id === r.id ? ' aria-current="true"' : ""}><b data-no-tr>${esc(r.title)}</b><small>${S.archive ? `${digits(r.day)} · ` : ""}${r.slot_start ? digits(r.slot_start) + " · " : ""}${digits(fmt(r.seconds))} / ${digits(r.slot_minutes)} min · ${digits(r.items)} items</small></button>`).join("") : `<p class="muted">No rundowns${S.archive ? " in these dates" : " for this day yet"}.</p>`}</div>
-    <hr style="border-color:var(--line)"><div class="row"><button class="btn" id="clipsBtn">Clips library</button><button class="btn" id="tplBtn">Templates</button><button class="btn" id="asrunBtn">As-run log</button></div>`;
+    <hr style="border-color:var(--line)"><div class="row"><button class="btn" id="storiesBtn">Channel videos</button><button class="btn" id="clipsBtn">Clips library</button><button class="btn" id="tplBtn">Templates</button><button class="btn" id="asrunBtn">As-run log</button></div>`;
   $$("[data-ch]", L).forEach(b => b.onclick = () => { S.ch = b.dataset.ch; S.rd = null; loadList().then(() => drawRundown()); loadOnAir(); });
   $$(".rd", L).forEach(b => b.onclick = () => openRundown(b.dataset.id).catch(fail));
+  $("#apSwitch", L).onclick = autopilot; drawAutopilot();
+  $("#storiesBtn", L)?.addEventListener("click", storiesDialog);
   $("#day", L)?.addEventListener("change", e => { S.day = e.target.value; S.rd = null; loadList().then(drawRundown).catch(fail); });
   $("#aFrom", L)?.addEventListener("change", e => { S.from = e.target.value; loadList().catch(fail); });
   $("#aTo", L)?.addEventListener("change", e => { S.to = e.target.value; loadList().catch(fail); });
@@ -276,7 +303,7 @@ async function nrcsDialog() {
   main.innerHTML = `<div class="pr"><aside class="pr-list panel"></aside><section class="pr-rd panel"></section><aside class="pr-item panel"></aside></div>`;
   await Promise.all([api("/api/admin/templates").then(d => { S.templates = d.templates; }).catch(() => {}), loadClips()]);
   await loadList().catch(fail);
-  drawRundown(); loadOnAir();
+  drawRundown(); loadOnAir(); setInterval(loadOnAir, 5000);
   setInterval(loadOnAir, 5000);
   const q = new URLSearchParams(location.search).get("rundown"); if (q) openRundown(q).catch(fail);
 })();

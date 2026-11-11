@@ -65,3 +65,7 @@ export function timings(items, slotSeconds = 0) {
   return { rows, total, slot: slotSeconds, over: slotSeconds ? total - slotSeconds : 0 };
 }
 export const fmtDur = s => { s = Math.round(Math.abs(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return `${h ? `${h}:` : ""}${String(m).padStart(h ? 2 : 1, "0")}:${String(x).padStart(2, "0")}`; };
+
+// AUTOPILOT: the channel's own running order is on air (no rundown, and no take other than it).
+// It is on by default; taking a scene or putting a rundown on air switches it off.
+export const autopilotOn = c => !!c && !c.standby?.on && ((c.mode === "auto" && !c.rundown) || (c.mode === "manual" && !c.program?.graphic && (c.program?.sources || []).length === 1 && c.program.sources[0].kind === "continuity"));

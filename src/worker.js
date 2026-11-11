@@ -29,6 +29,7 @@ import m0027 from "../migrations/0027_og_cards.sql";
 import m0028 from "../migrations/0028_tv_vertical.sql";
 import m0029 from "../migrations/0029_bulletin_images.sql";
 import m0030 from "../migrations/0030_tv_keep.sql";
+import m0031 from "../migrations/0031_tv_cutins.sql";
 import { bulletinImages, bulletinImageRoute } from "./bulletinimg.js";
 import { prepareBulletinVoices, voiceRoute } from "./bulletinvoice.js";
 import { marketBrief } from "./markets.js";
@@ -40,7 +41,7 @@ import { handleExtras, tvExtras } from "./extras.js";
 import { rundownHousekeeping } from "./rundown.js";
 export { TvControl } from "./control.js";
 import { shortsList } from "./tvchannel.js";
-import { CHANNELS, tvSettings, saveTvSettings, newOutputKey, setBreaking, tvState, clearTvCache, checkKey, promos as tvPromos, copyImage } from "./tvchannel.js";
+import { CHANNELS, tvSettings, saveTvSettings, newOutputKey, setBreaking, tvState, clearTvCache, checkKey, promos as tvPromos, copyImage, cutins as tvCutins } from "./tvchannel.js";
 import { parseYouTubeRef, refreshSources, refreshSource, playlistTitle, ytUsage, ytReady, addChannelSource, ownChannel, ownerOf, NOT_OWN } from "./youtube.js";
 import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
@@ -93,7 +94,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -1117,6 +1118,31 @@ async function api(request, env, ctx) {
       const [first, second, third] = parts;
       if (CHANNELS.includes(first)) {
         if (!second && request.method === "PUT") { await saveTvSettings(env, first, b); await audit(env, user, "tv.settings", "tv", first, { keys: Object.keys(b) }); return done(); }
+        // The Scheduler: cut-ins of one video or a set of videos at set times (India time).
+        if (second === "cutins" && request.method === "GET") {
+          // The cut-ins, and the videos one can schedule: this channel's shape, newest first (any age).
+          const videos = (await env.DB.prepare(`SELECT yt_id AS ytId, MAX(title) AS title, MAX(headline) AS line, MAX(duration) AS dur, MAX(published_at) AS publishedAt FROM tv_items WHERE vertical=? AND playable=1 AND excluded=0 AND duration>0 GROUP BY yt_id ORDER BY MAX(published_at) DESC LIMIT 200`).bind(first === "v" ? 1 : 0).all()).results;
+          return json({ cutins: await tvCutins(env, first, true), videos }, 200, { "cache-control": "no-store" });
+        }
+        if (second === "cutins" && !third && request.method === "POST") {
+          const ids = [...new Set((Array.isArray(b.videos) ? b.videos : []).map(x => String(x || "").trim()).filter(x => /^[\w-]{11}$/.test(x)))].slice(0, 30);
+          if (!ids.length) return err("Choose at least one video.");
+          const times = [...new Set((Array.isArray(b.times) ? b.times : String(b.times || "").split(/[\s,]+/)).map(x => String(x).trim()).filter(Boolean).map(x => { const m = /^(\d{1,2})[:.](\d{2})$/.exec(x); return m && +m[1] < 24 && +m[2] < 60 ? `${m[1].padStart(2, "0")}:${m[2]}` : null; }))];
+          if (!times.length || times.includes(null)) return err("Give the time(s) as HH:MM, India time, e.g. 18:00, 21:30.");
+          const day = /^\d{4}-\d{2}-\d{2}$/.test(String(b.day || "")) ? b.day : "";
+          // Only videos of this channel's shape: portrait on vertical, landscape on horizontal.
+          const rows = (await env.DB.prepare(`SELECT yt_id, MAX(title) AS title, MAX(headline) AS headline, MAX(duration) AS duration, MAX(vertical) AS vertical FROM tv_items WHERE yt_id IN (${ids.map(() => "?").join(",")}) AND playable=1 GROUP BY yt_id`).bind(...ids).all()).results;
+          const byId = new Map(rows.map(r => [r.yt_id, r]));
+          const videos = [], wrong = [];
+          for (const id of ids) { const r = byId.get(id); if (!r) continue; if (!!r.vertical !== (first === "v")) { wrong.push(r.title || id); continue; } videos.push({ ytId: id, title: String(r.title || "").slice(0, 300), line: String(r.headline || "").slice(0, 300), dur: Number(r.duration) || 0 }); }
+          if (!videos.length) return err(wrong.length ? `Those videos are ${first === "v" ? "landscape; the vertical channel plays only portrait videos" : "portrait; the horizontal channel plays only landscape videos"}.` : "Those videos are not on the channel yet. Add their link under Sources first.");
+          const id = randomId();
+          await env.DB.prepare("INSERT INTO tv_cutins (id,channel,title,videos,times,day,active) VALUES (?,?,?,?,?,?,1)").bind(id, first, clean(b.title, 120) || videos[0].title.slice(0, 120), JSON.stringify(videos), JSON.stringify(times), day).run();
+          await audit(env, user, "tv.cutin.add", "tv", first, { id, times, day, n: videos.length });
+          return done({ ok: true, id, skipped: wrong.length });
+        }
+        if (second === "cutins" && third && request.method === "PUT") { await env.DB.prepare("UPDATE tv_cutins SET active=? WHERE id=? AND channel=?").bind(b.active ? 1 : 0, third, first).run(); await audit(env, user, "tv.cutin.active", "tv", first, { id: third, active: !!b.active }); return done(); }
+        if (second === "cutins" && third && request.method === "DELETE") { await env.DB.prepare("DELETE FROM tv_cutins WHERE id=? AND channel=?").bind(third, first).run(); await audit(env, user, "tv.cutin.delete", "tv", first, { id: third }); return done(); }
         if (second === "key" && request.method === "POST") { const key = await newOutputKey(env, first); await audit(env, user, "tv.key", "tv", first, {}); return done({ ok: true, key }); }
         if (second === "breaking" && request.method === "POST") { const br = await setBreaking(env, first, b); await ctlCommand(env, first, "breaking", br ? br : { clear: true }, user.display_name || user.email, "breaking").catch(() => {}); await audit(env, user, br ? "tv.breaking" : "tv.breaking.clear", "tv", first, br || {}); return done({ ok: true, breaking: br }); }
         if (second === "items" && request.method === "GET") {

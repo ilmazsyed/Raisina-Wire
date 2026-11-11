@@ -165,3 +165,13 @@ dialog::backdrop { background: #000a; }
   .monitors { grid-template-columns: 1fr; }
   .switcher { grid-template-columns: 1fr; }
 }
+
+/* AUTOPILOT switch (PCR and producer) */
+.ap-switch{display:flex;align-items:center;gap:14px;width:100%;padding:12px 16px;border-radius:14px;border:2px solid #3a3a44;background:#1b1b22;color:#ddd;cursor:pointer;text-align:left;font:inherit}
+.ap-switch i{flex:none;position:relative;width:54px;height:30px;border-radius:999px;background:#44444f;transition:background .2s}
+.ap-switch i:after{content:"";position:absolute;left:4px;top:4px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .2s}
+.ap-switch b{display:block;font-size:18px;letter-spacing:.12em}
+.ap-switch small{display:block;font-size:12px;opacity:.8}
+.ap-switch.on{border-color:#1f9d55;background:#0f2a1c;color:#fff}
+.ap-switch.on i{background:#22c55e}
+.ap-switch.on i:after{transform:translateX(24px)}
