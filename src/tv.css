@@ -949,3 +949,20 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .avo.v .fx-split .sp{width:100%;height:50%}
 .avo.v .fx-split .sp.a{top:0;bottom:auto}.avo.v .fx-split .sp.b{bottom:0;top:auto;right:auto;left:0}
 .avo.v .fx-split .sp-line{left:0;right:0;width:auto;top:calc(50% - 4px);bottom:auto;height:8px}
+
+/* AVO: the key points sit clear of the এই মুহূর্তে tag, with room between them; the BREAKING tag
+   pulses instead of fading. */
+.avo-info{padding:300px 160px 300px;gap:30px}
+.avo-info.pts ol{gap:26px}
+.avo-info.pts li{align-items:flex-start;padding:20px 28px}
+.avo-info.pts li i{margin-top:4px}
+.avo-info.pts li span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.avo.v .avo-info{padding:440px 60px 660px}
+.avo-brk .brk-tag{animation:nupop .5s .35s cubic-bezier(.2,1.6,.4,1) both,avopulse 1.4s 1s ease-in-out infinite}
+@keyframes avopulse{50%{transform:scale(1.05);box-shadow:0 0 0 6px rgba(255,255,255,.25)}}
+/* Never a black frame: the stage and every slide sit on the channel's dark red, and the BREAKING
+   card's photo only fades in over its red once it has painted. */
+.avo,.avo-slide{background:radial-gradient(circle at 30% 30%,#5a0a10,#24040a 70%)}
+.avo-brk{background:linear-gradient(120deg,#b3121c,#5a0a10)}
+.avo-brk .bg{opacity:0;transition:opacity .5s}
+.avo-brk .bg.ok{opacity:1}

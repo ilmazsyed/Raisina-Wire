@@ -99,6 +99,8 @@ const noise = ctx => { if (!noiseBuf || noiseBuf.sampleRate !== ctx.sampleRate) 
 //   bulletin  – urgent timpani and strings ostinato with brass stabs (D minor, 140 bpm)
 //   weather   – airy and bright: soft pads, marimba-like plucks, a light shaker (F major, 100 bpm)
 //   market    – sleek and driving: a ticking hi-hat, a pulsing synth arpeggio, deep bass (E minor, 122 bpm)
+//   avo       – a calm newsroom underscore under the AVO stories: a soft pad, a low heartbeat
+//               pulse, a ticking clock and a sparse bell, kept low under the reading (D minor, 96 bpm)
 //   ident     – the channel's signature: a boom, a brass swell and a four-note bell motif
 //   stinger   – a rising swoosh into a deep hit and a metallic ring
 const busOf = ctx => {
@@ -163,6 +165,17 @@ const STYLES = {
       v.hiss(at, 0.025, k % 2 ? 0.07 : 0.12, "highpass", 10000);                                     // ticking hat
       v.osc("square", ch[[0, 1, 2, 1][k % 4]] * 2, at, s16 * 0.7, 0.045, 2600);                    // arpeggio
       if (k % 2 === 0) v.osc("sawtooth", root * 2, at, s16 * 1.4, 0.32, 380);                      // bass
+    } },
+  avo: { bpm: 96, level: 0.8, roots: [73.42, 58.27, 87.31, 65.41], chords: [[293.7, 349.2, 440], [233.1, 293.7, 349.2], [261.6, 349.2, 440], [261.6, 329.6, 392]],
+    step(v, at, k, bar, ch, root, s16) {
+      if (k === 0) ch.forEach(f => v.osc("triangle", f, at, s16 * 16, 0.045, 1300, 0, 0.8));          // soft pad
+      if (k === 0 && bar % 4 === 0) v.hiss(at, 2.2, 0.08, "highpass", 6000, 0.5);                     // gentle swell
+      if (k === 0 || k === 8) v.osc("sine", 96, at, 0.4, 0.42, 500, 44);                             // muted kick
+      if (k % 4 === 0) v.osc("sine", root, at, s16 * 3, 0.26, 280);                                  // heartbeat bass
+      if (k % 2 === 0) v.hiss(at, 0.02, k % 4 === 0 ? 0.07 : 0.045, "highpass", 9000);               // ticking clock
+      if (k === 4 || k === 12) v.hiss(at, 0.05, 0.05, "bandpass", 3800, 2);                          // soft tick accent
+      if (k % 4 === 2) v.osc("sine", ch[0] * 2, at, 0.16, 0.03, 2000);                               // newsroom pulse
+      if (bar % 2 === 1 && (k === 0 || k === 10)) v.osc("sine", ch[k === 0 ? 2 : 1] * 2, at, 1.4, 0.045, 6000); // sparse bell
     } },
   bulletin: { bpm: 140, roots: [73.42, 58.27, 65.41, 55], chords: [[293.7, 349.2, 440], [233.1, 293.7, 349.2], [261.6, 329.6, 392], [220, 277.2, 329.6]],
     step(v, at, k, bar, ch, root, s16) {
@@ -391,7 +404,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // Music under the headline flash, the "up next" card and the bulletin (faster for the bulletin).
   // Each kind of graphic has its own music; the channel ID plays its signature, and the bulletin
   // opens with the signature under its channel ID, then its own music.
-  const BEDS = { flash: { style: "headlines" }, upnext: { style: "upnext" }, bulletin: { style: "bulletin" }, weather: { style: "weather" }, market: { style: "market" }, avo: { style: "bulletin", duck: 0.6 } };
+  const BEDS = { flash: { style: "headlines" }, upnext: { style: "upnext" }, bulletin: { style: "bulletin" }, weather: { style: "weather" }, market: { style: "market" }, avo: { style: "avo", duck: 0.7 } };
   function startBed(sc) {
     const kind = sc?.graphic?.kind;
     if (!BEDS[kind] || st.muted || !st.audio || (mode !== "app" && !output) || st.bed) return;
@@ -983,12 +996,16 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         if (f) ex.unshift({ fact: f });
         if (pts.length >= 2) ex.push({ pts });
         const v = P.length ? [{ img: P[0], fx: "duo" }, { img: P[P.length > 1 ? 1 : 0], fx: "split" }] : [];
-        const target = Math.min(6, Math.max(4, P.length + 1)), ph = P.map(i => ({ img: i })), out = [];
-        // Photo first when there is one, then an animated card, then a photo, and so on.
-        const lanes = [ph, ex, ph, v, ex];
-        for (let r = 0; out.length < target && lanes.some(l => l.length); r++) { const l = lanes[r % lanes.length]; if (l.length) out.push(l.shift()); }
+        // Every story opens with the red BREAKING NEWS card, then its key points (or its key
+        // figure), then its photographs (and their re-treated versions), then any other card.
+        const out = [{ brk: 1 }];
+        const info = pts.length >= 2 ? { pts } : f ? { fact: f } : null;
+        if (info) out.push(info);
+        out.push(...P.map(i => ({ img: i })));
+        if (out.length < 4) out.push(...v);
+        if (out.length < 4 && f && !out.some(o => o.fact)) out.push({ fact: f });
         while (out.length < 4) out.push({ brk: 2 + out.length });
-        return out;
+        return out.slice(0, 7);
       };
       const bgOf = x => (x.images || []).find(i => imgState.get(i.src) === "ok");
       const slideHTML = (x, sl) => {
@@ -999,13 +1016,13 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         if (sl.fact) return `<div class="avo-slide"><div class="avo-info fact"><span class="lbl">${desk} · সংখ্যায়</span><div class="fig"><b class="num" data-to="${sl.fact.n}" data-dec="${sl.fact.dec ? 1 : 0}">০</b><em>${esc(sl.fact.unit)}</em></div><p>${esc(sl.fact.line)}</p><i class="rule"></i></div></div>`;
         if (sl.pts) return `<div class="avo-slide"><div class="avo-info pts"><span class="lbl">মূল তথ্য</span><ol>${sl.pts.map((p, i) => `<li style="--i:${i}"><i>${bnDigits(i + 1)}</i><span>${esc(p)}</span></li>`).join("")}</ol></div></div>`;
         const bg = bgOf(x);
-        return `<div class="avo-slide"><div class="avo-brk">${bg ? `<img class="bg" src="${esc(bg.src)}" alt="" referrerpolicy="no-referrer">` : ""}<i class="s1"></i><i class="s2"></i><div class="in"><span class="brk-tag">এইমাত্র পাওয়া খবর</span><small data-no-tr>BREAKING NEWS</small><b>${esc(x.title)}</b></div><i class="bar"></i></div></div>`;
+        return `<div class="avo-slide"><div class="avo-brk">${bg ? `<img class="bg" src="${esc(bg.src)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')">` : ""}<i class="s1"></i><i class="s2"></i><div class="in"><span class="brk-tag">এইমাত্র পাওয়া খবর</span><small data-no-tr>BREAKING NEWS</small><b>${esc(x.title)}</b></div><i class="bar"></i></div></div>`;
       };
       // The key figure counts up in Bengali digits.
       const countUp = box => box.querySelectorAll(".num[data-to]").forEach(n => { if (n.dataset.done) return; n.dataset.done = 1; const to = Number(n.dataset.to), dec = n.dataset.dec === "1", t0 = performance.now(), dur = 1300;
         const step = t => { if (!n.isConnected) return; const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3), v = to * e; n.textContent = bnDigits((dec ? v.toFixed(1) : Math.round(v)).toLocaleString("en-IN")); if (p < 1) requestAnimationFrame(step); };
         requestAnimationFrame(step); });
-      const storyHTML = (x, k) => `<div class="avo${channel === "v" ? " v" : ""}"><div class="avo-pics"></div><i class="avo-shade"></i>
+      const storyHTML = (x, k) => `<div class="avo${channel === "v" ? " v" : ""}" data-k="${k}"><div class="avo-pics"></div><i class="avo-shade"></i>
         <div class="avo-kick"><i class="lt-pulse"></i><b>এই মুহূর্তে</b><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span></div>
         <div class="avo-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>এই মুহূর্তে</small></span><span class="lt-text">${esc(x.title)}</span></div>
         <small class="avo-credit"></small>
@@ -1029,7 +1046,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         const into = e - k * AVO_SECS, slides = slidesOf(x), si = Math.min(slides.length - 1, Math.floor(into / (AVO_SECS / slides.length)));
         if (k !== shownK) {
           const first = shownK < 0; shownK = k; shownS = -1;
-          const paint = () => { el.innerHTML = storyHTML(x, k); speakAvo(x); st.resumeVoice = () => { if (el.isConnected) speakAvo(x); }; drawA(); };
+          // A fresh frame always gets its first slide (a slide drawn into the old frame during the
+          // wipe must not count, or the new story stays black until its second slide).
+          const paint = () => { el.innerHTML = storyHTML(x, k); shownS = -1; speakAvo(x); st.resumeVoice = () => { if (el.isConnected) speakAvo(x); }; drawA(); };
           // Each story is logged: an airing from the broadcast output, a view from the app or site.
           const logKey = `${x.id}@${Math.round(at0 + k * AVO_SECS * 1000)}`;
           if ((mode === "app" || output) && !avoLogged.has(logKey)) { avoLogged.add(logKey); markAvoSeen(x.id); fetch("/api/tv/avo/played", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: x.id, ch: channel, key: output ? key : "" }), keepalive: true }).catch(() => {}); }
@@ -1038,7 +1057,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           stage.append(w); if (!st.muted) whoosh(st.audio);
           setTimeout(paint, 330); setTimeout(() => w.remove(), 900); return;
         }
-        const box = el.querySelector(".avo"); if (!box) return;
+        const box = el.querySelector(".avo"); if (!box || box.dataset.k !== String(k)) return;
         if (si !== shownS) {
           const firstSlide = shownS < 0; shownS = si; const pics = box.querySelector(".avo-pics"), sl = slides[si];
           const put = () => {
