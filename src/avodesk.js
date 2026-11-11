@@ -64,8 +64,8 @@ async function save() {
   if (body.brief.length < 20) return toast("Write the brief to be read.");
   if (body.brief.length > MAX) return toast(`The brief is longer than ${MAX} characters.`);
   try {
-    if (S.edit) await api(`/api/admin/avo/${encodeURIComponent(S.edit.id)}`, { method: "PUT", body });
-    else await api("/api/admin/avo", { method: "POST", body });
+    if (S.edit) await api(`/api/admin/tv/avo/${encodeURIComponent(S.edit.id)}`, { method: "PUT", body });
+    else await api("/api/admin/tv/avo", { method: "POST", body });
     toast(S.edit ? "Saved. It is voiced again within a minute." : "Made. It is voiced and goes into rotation within a minute.");
     S.edit = null; S.images = []; drawForm(); load();
   } catch (e) { fail(e); }
@@ -90,9 +90,9 @@ function drawList() {
   $$("[data-rdsel]").forEach(sel => sel.onchange = async () => { const x = find(sel.dataset.rdsel), rd = sel.value; if (!rd) return;
     const story = { id: x.id, title: x.title, desk: x.desk, region: x.region, sex: x.sex, lines: x.lines, voice: x.voice, secs: x.secs, images: x.images, at: x.at };
     try { await api(`/api/admin/rundowns/${rd}/items`, { method: "POST", body: { type: "avo", title: x.title.slice(0, 200), duration: 30, data: { story, avoId: x.id } } }); toast("Added to the rundown."); } catch (e) { fail(e); } sel.value = ""; });
-  $$("[data-off]").forEach(b => b.onclick = async () => { try { await api(`/api/admin/avo/${encodeURIComponent(b.dataset.off)}`, { method: "PUT", body: { off: b.dataset.v === "1" } }); toast(b.dataset.v === "1" ? "Taken out of rotation." : "Back in rotation."); load(); } catch (e) { fail(e); } });
+  $$("[data-off]").forEach(b => b.onclick = async () => { try { await api(`/api/admin/tv/avo/${encodeURIComponent(b.dataset.off)}`, { method: "PUT", body: { off: b.dataset.v === "1" } }); toast(b.dataset.v === "1" ? "Taken out of rotation." : "Back in rotation."); load(); } catch (e) { fail(e); } });
   $$("[data-edit]").forEach(b => b.onclick = () => { const x = find(b.dataset.edit); S.edit = x; S.images = (x.given || []).map(g => ({ url: g.url, credit: g.credit || "" })); drawForm(); window.scrollTo({ top: 0, behavior: "smooth" }); });
-  $$("[data-del]").forEach(b => b.onclick = async () => { if (!confirm("Delete this AVO story?")) return; try { await api(`/api/admin/avo/${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" }); toast("Deleted."); load(); } catch (e) { fail(e); } });
+  $$("[data-del]").forEach(b => b.onclick = async () => { if (!confirm("Delete this AVO story?")) return; try { await api(`/api/admin/tv/avo/${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" }); toast("Deleted."); load(); } catch (e) { fail(e); } });
 }
 // Preview: the story on the channel's own engine (silent; use Listen for the voice).
 let pv = null;
@@ -109,7 +109,7 @@ function listen(x) { au?.pause(); const q = [...x.voice]; const next = () => { c
 
 async function load() {
   try {
-    const [d, r] = await Promise.all([api("/api/admin/avo"), api(`/api/admin/rundowns?day=${istDay()}`).catch(() => ({ rundowns: [] }))]);
+    const [d, r] = await Promise.all([api("/api/admin/tv/avo"), api(`/api/admin/rundowns?day=${istDay()}`).catch(() => ({ rundowns: [] }))]);
     S.list = d.stories; S.quota = d.quota; S.today = d.today; S.daily = d.daily; S.rundowns = r.rundowns || [];
     drawList();
   } catch (e) { fail(e); }
