@@ -823,8 +823,8 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .avo{position:absolute;inset:0;overflow:hidden;background:#0b0203;color:#fff}
 .avo-pics,.avo-slide{position:absolute;inset:0}
 .avo-slide{overflow:hidden}
-.avo-slide img{width:100%;height:100%;object-fit:cover;transform-origin:50% 40%;animation:avokb var(--d,8s) linear both}
-.avo-slide:nth-child(even) img{transform-origin:30% 60%;animation-name:avokb2}
+.avo-slide>img{width:100%;height:100%;object-fit:cover;transform-origin:50% 40%;animation:avokb var(--d,8s) linear both}
+.avo-slide:nth-child(even)>img{transform-origin:30% 60%;animation-name:avokb2}
 @keyframes avokb{from{transform:scale(1.02)}to{transform:scale(1.16) translateX(-1.5%)}}
 @keyframes avokb2{from{transform:scale(1.15) translateX(1.5%)}to{transform:scale(1.03)}}
 .avo-slide.in{animation:avoin .7s cubic-bezier(.7,0,.25,1) both}

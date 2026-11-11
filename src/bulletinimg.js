@@ -160,3 +160,54 @@ export async function storyPhotos(env, story, want = 6) {
   }
   return out;
 }
+
+// News photographs of one particular story, for the AVO engine: the lead photos of the reports it
+// was written from, then of other outlets' reports on the same story, found by searching Bing News
+// for its headline (Bengali, then the English search terms) and kept only when the report's own
+// headline shares words with ours. Never a television channel's picture; no general stock photos
+// (a picture with no connection to the story is worse than the channel's text cards).
+const words = t => new Set(String(t || "").toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s]/gu, " ").split(/\s+/).filter(w => w.length >= 3));
+const overlap = (a, b) => { const A = words(a); let n = 0; for (const w of words(b)) if (A.has(w)) n++; return n; };
+async function newsSearch(query) {
+  const u = `https://www.bing.com/news/search?q=${encodeURIComponent(query)}&format=rss`;
+  const r = await fetch(u, { headers: { "user-agent": BROWSER_UA, accept: "application/rss+xml, text/xml" }, signal: AbortSignal.timeout(8000) }).catch(() => null);
+  if (!r?.ok) return [];
+  const xml = (await r.text()).slice(0, 300000), out = [];
+  for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+    const it = m[1], get = tag => (it.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`))?.[1] || "").replace(/<!\[CDATA\[|\]\]>/g, "").replace(/&amp;/g, "&").trim();
+    let link = get("link");
+    try { const q = new URL(link).searchParams.get("url"); if (q) link = q; } catch { continue; }
+    out.push({ title: get("title"), url: link, source: get("News:Source") || (() => { try { return new URL(link).hostname.replace(/^www\./, ""); } catch { return ""; } })() });
+  }
+  return out;
+}
+export async function newsPhotos(env, story, want = 6) {
+  const out = [], seenImg = new Set(), seenHost = new Map(), add = x => {
+    if (!x?.url || seenImg.has(x.url) || out.length >= want) return;
+    let host = ""; try { host = new URL(x.page || x.url).hostname; } catch { /* none */ }
+    if ((seenHost.get(host) || 0) >= 2) return;   // two at most from one outlet
+    seenImg.add(x.url); seenHost.set(host, (seenHost.get(host) || 0) + 1); out.push(x);
+  };
+  // 1. The reports the story was written from.
+  const { results } = await env.DB.prepare(`SELECT i.url, i.source_name FROM wire_jobs j JOIN wire_items i ON i.job_id=j.id WHERE j.article_id=? ORDER BY i.published_at DESC LIMIT 6`).bind(story.id).all().catch(() => ({ results: [] }));
+  for (const it of results) {
+    if (broadcaster(it.source_name, it.url)) continue;
+    const url = await pagePhoto(it.url).catch(() => "");
+    if (url) add({ url, page: it.url, credit: `ছবি: সৌজন্যে ${pubName(it.source_name)}` });
+  }
+  // 2. Other outlets' reports on the same story.
+  let terms = [];
+  if (out.length < want) { try { terms = (await imageTerms(env, [story]))[story.id] || []; } catch { /* none today */ } }
+  const tried = new Set(results.map(r => r.url));
+  for (const q of [story.title, ...terms.slice(0, 1)]) {
+    if (out.length >= want || !q) break;
+    const hits = (await newsSearch(q).catch(() => [])).filter(h => !tried.has(h.url) && !broadcaster(h.source, h.url) && overlap(h.title, q) >= (q === story.title ? 2 : 1)).slice(0, 8);
+    for (const h of hits) {
+      if (out.length >= want) break;
+      tried.add(h.url);
+      const url = await pagePhoto(h.url).catch(() => "");
+      if (url) add({ url, page: h.url, credit: `ছবি: সৌজন্যে ${h.source || "সংবাদমাধ্যম"}` });
+    }
+  }
+  return out;
+}
