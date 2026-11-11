@@ -9,6 +9,8 @@ import { digits } from "./i18n.js";
 const S = { list: [], quota: {}, today: {}, daily: 45, edit: null, images: [], rundowns: [] };
 const REGION = { bengal: "Bengal & Kolkata", india: "India", neighbours: "Bangladesh, USA, China, Russia, South Asia", world: "World" };
 const DESKS = { Kolkata: "কলকাতা", "West Bengal": "রাজ্য", India: "দেশ", "Probashi Bangali": "প্রবাসী বাঙালি", World: "বিশ্ব", Sports: "খেলা", Entertainment: "বিনোদন", Lifestyle: "লাইফস্টাইল", Breaking: "এইমাত্র" };
+const DK = { kolkata: "Kolkata", bengal: "Bengal", india: "India", bangladesh: "Bangladesh", world: "World", sports: "Sports", business: "Business", other: "Other" };
+const WT = { heavy: "Heavy", mid: "Medium", light: "Light" };
 const ORIGIN = { auto: "Wire", manual: "Desk", breaking: "Breaking" };
 const MAX = 450;
 const t = s => new Date(s).toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" });
@@ -81,7 +83,7 @@ function drawList() {
         <b data-no-tr>${esc(x.title)}</b>
         <small class="muted">Voice: ${x.voice.length ? `${x.sex === "m" ? "male" : "female"}, ${digits(Math.round(x.secs))} s` : "none yet"} · pictures ${digits(x.nImages)} · on air ${digits(x.aired)}×${x.plays.length ? ` (${x.plays.slice(0, 6).map(p => `${t(p.at)} ${p.ch === "h" ? "TV" : "Shorts"}`).join(", ")})` : ""} · app views ${digits(x.views)}</small>
         <details><summary class="muted">Script</summary><p data-no-tr>${x.lines.map(esc).join(" ")}</p></details>
-        <div class="row" style="flex-wrap:wrap">${x.status === "ready" || x.status === "off" ? `<button class="btn sm" data-prev="${esc(x.id)}">Preview</button>${x.voice.length ? `<button class="btn sm" data-listen="${esc(x.id)}">Listen</button>` : ""}<select data-rdsel="${esc(x.id)}"><option value="">Add to rundown…</option>${S.rundowns.map(r => `<option value="${r.id}">${esc(r.title)} · ${r.channel === "h" ? "TV" : "Shorts"}</option>`).join("")}</select><button class="btn sm" data-off="${esc(x.id)}" data-v="${x.status === "off" ? 0 : 1}">${x.status === "off" ? "Back in rotation" : "Take out of rotation"}</button>` : ""}
+        <div class="row" style="flex-wrap:wrap">${x.status === "ready" || x.status === "off" ? `<button class="btn sm" data-prev="${esc(x.id)}">Preview</button>${x.voice.length ? `<button class="btn sm" data-listen="${esc(x.id)}">Listen</button>` : ""}<select data-rdsel="${esc(x.id)}"><option value="">Add to rundown…</option>${S.rundowns.map(r => `<option value="${r.id}">${esc(r.title)} · ${r.channel === "h" ? "TV" : "Shorts"}</option>`).join("")}</select><select data-dk="${esc(x.id)}" title="Desk, for the running order's variety (never two from one desk in a row)">${Object.entries(DK).map(([k, v]) => `<option value="${k}"${(x.dk || "other") === k ? " selected" : ""}>${v}</option>`).join("")}</select><select data-wt="${esc(x.id)}" title="Weight: a light story follows every two heavy ones">${Object.entries(WT).map(([k, v]) => `<option value="${k}"${(x.weight || "mid") === k ? " selected" : ""}>${v}</option>`).join("")}</select><button class="btn sm" data-off="${esc(x.id)}" data-v="${x.status === "off" ? 0 : 1}">${x.status === "off" ? "Back in rotation" : "Take out of rotation"}</button>` : ""}
           ${x.origin === "manual" ? `<button class="btn sm" data-edit="${esc(x.id)}">Edit</button><button class="btn sm red" data-del="${esc(x.id)}">Delete</button>` : ""}</div></div></div>`).join("") || `<p class="muted">No AVO stories yet.</p>`}</div>`;
   $("#reload").onclick = load;
   const find = id => S.list.find(x => x.id === id);
@@ -91,6 +93,9 @@ function drawList() {
     const story = { id: x.id, title: x.title, desk: x.desk, region: x.region, sex: x.sex, lines: x.lines, voice: x.voice, secs: x.secs, images: x.images, at: x.at };
     try { await api(`/api/admin/rundowns/${rd}/items`, { method: "POST", body: { type: "avo", title: x.title.slice(0, 200), duration: Math.ceil(x.secs > 0 ? Math.max(8, x.secs + 2) : 20), data: { story, avoId: x.id } } }); toast("Added to the rundown."); } catch (e) { fail(e); } sel.value = ""; });
   $$("[data-off]").forEach(b => b.onclick = async () => { try { await api(`/api/admin/tv/avo/${encodeURIComponent(b.dataset.off)}`, { method: "PUT", body: { off: b.dataset.v === "1" } }); toast(b.dataset.v === "1" ? "Taken out of rotation." : "Back in rotation."); load(); } catch (e) { fail(e); } });
+  const relabel = async (id, part) => { const x = find(id); const cur = { dk: x.dk, weight: x.weight, ...(x.labelsSet || {}) }; try { await api(`/api/admin/tv/avo/${encodeURIComponent(id)}`, { method: "PUT", body: { labels: { ...cur, ...part } } }); toast("Relabelled."); } catch (e) { fail(e); } };
+  $$("[data-dk]").forEach(b => b.onchange = () => relabel(b.dataset.dk, { dk: b.value }));
+  $$("[data-wt]").forEach(b => b.onchange = () => relabel(b.dataset.wt, { weight: b.value }));
   $$("[data-edit]").forEach(b => b.onclick = () => { const x = find(b.dataset.edit); S.edit = x; S.images = (x.given || []).map(g => ({ url: g.url, credit: g.credit || "" })); drawForm(); window.scrollTo({ top: 0, behavior: "smooth" }); });
   $$("[data-del]").forEach(b => b.onclick = async () => { if (!confirm("Delete this AVO story?")) return; try { await api(`/api/admin/tv/avo/${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" }); toast("Deleted."); load(); } catch (e) { fail(e); } });
 }

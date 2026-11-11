@@ -8,7 +8,8 @@
     "build": "node scripts/check-migrations.mjs && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "dev:worker": "wrangler dev",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "sim": "node scripts/playout-sim.mjs"
   },
   "devDependencies": {
     "vite": "^6.4.1",
