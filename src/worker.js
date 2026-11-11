@@ -1066,6 +1066,25 @@ async function api(request, env, ctx) {
   { const m = url.pathname.match(/^\/api\/tv\/voice\/([0-9a-f]{20,64})\.mp3$/); if (m && request.method === "GET") return voiceRoute(env, m[1]); }
   // The AVO engine (src/avo.js): a story's pictures, and each time a story goes out.
   { const m = url.pathname.match(/^\/api\/tv\/aimg\/([^/]+)\/(\d{1,2})$/); if (m && request.method === "GET") return avoImageRoute(env, decodeURIComponent(m[1]), m[2]); }
+  // Video-start diagnostics: each screen reports how long a video took to start after its turn
+  // (whether it was loaded in advance, the player's states with their timings, the kind of device).
+  // No personal data; the last 60 are kept, to find what holds a video back on real phones.
+  if (url.pathname === "/api/tv/diag") {
+    const KEY = "tv:diag";
+    if (request.method === "POST") {
+      const b = await request.json().catch(() => null);
+      if (b && typeof b === "object") {
+        const clean = { at: new Date().toISOString(), plat: String(b.plat || "").slice(0, 12), ch: b.ch === "v" ? "v" : "h", pre: !!b.pre, preState: Number(b.preState) || 0, muted: !!b.muted, card: Math.round(Number(b.card) || 0), timeout: !!b.timeout,
+          seq: (Array.isArray(b.seq) ? b.seq : []).slice(0, 20).map(x => [Math.round(Number(x?.[0]) || 0), Number(x?.[1]) || 0]) };
+        const row = await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(KEY).first().catch(() => null);
+        let list = []; try { list = JSON.parse(row?.value || "[]"); } catch { /* fresh */ }
+        list = [clean, ...list].slice(0, 60);
+        await env.DB.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(KEY, JSON.stringify(list)).run().catch(() => {});
+      }
+      return json({ ok: true }, 200, { "cache-control": "no-store" });
+    }
+    if (request.method === "GET") { const row = await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(KEY).first().catch(() => null); let starts = []; try { starts = JSON.parse(row?.value || "[]"); } catch { /* none */ } return json({ starts }, 200, { "cache-control": "no-store" }); }
+  }
   if (url.pathname === "/api/tv/avo/played" && request.method === "POST") {
     const b = await request.json().catch(() => ({}));
     const outputOk = !!b.key && CHANNELS.includes(b.ch) && await checkKey(env, b.ch, String(b.key));
