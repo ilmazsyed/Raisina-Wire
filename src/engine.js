@@ -402,7 +402,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     st.bed = newsBed(st.audio, left, BEDS[kind]);
   }
   soundBtn?.addEventListener("click", unmute);
-  const soundOff = () => { st.muted = true; if (soundBtn) soundBtn.hidden = false; };
+  const soundOff = () => { st.muted = true; st.voice?.pause(); st.voice = null; if (soundBtn) soundBtn.hidden = false; };
   // Some phones (iPhone in Low Power Mode) start a YouTube video only from a tap inside it: the
   // cover over it is lifted, with a hint, until it plays. The one player then plays every video.
   const needTap = on => { host.querySelector(".tvp-ytlayer")?.classList.toggle("tap", on); host.querySelector(".tvp")?.classList.toggle("yt-tap", on); if (tapHint) tapHint.hidden = !on; };
@@ -930,12 +930,23 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const speak = x => {
         st.voice?.pause(); st.voice = null;
         if (!x?.voice || st.muted || (mode !== "app" && !output)) return;
-        const a = new Audio(x.voice); a.volume = 1; st.voice = a;
-        // Through the same sound output as the music, so the phone plays both together (a
-        // separate player can make an iPhone stop the music).
-        if (st.audio) { try { const src = st.audio.createMediaElementSource(a), g = st.audio.createGain(); g.gain.value = 1.25; src.connect(g).connect(st.audio.destination); } catch { /* plays on its own */ } }
-        a.play().catch(() => {});
+        // Played through the same sound engine as the music: a separate audio player started by
+        // the programme (not by a tap) is blocked by phones and browsers, so the newsreader was
+        // silent while the music played.
+        if (st.audio) {
+          const tok = {}; st.voice = { pause() { tok.off = true; try { tok.src?.stop(); } catch { /* done */ } } };
+          voiceBuf(x.voice).then(buf => {
+            if (tok.off || !buf || st.muted || st.alive === false) return;
+            const src = st.audio.createBufferSource(), g = st.audio.createGain(); g.gain.value = 1.25;
+            src.buffer = buf; src.connect(g).connect(st.audio.destination); src.start(); tok.src = src;
+          });
+          return;
+        }
+        const a = new Audio(x.voice); st.voice = a; a.play().catch(() => {});
       };
+      // Every story's reading is loaded as the bulletin opens, so each starts the moment its
+      // story comes in.
+      list.forEach(x => x.voice && voiceBuf(x.voice));
       const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = e < 5 ? -2 : e < intro || !list.length ? -1 : Math.max(0, plan.findLastIndex(p => e >= p.at)); if (k === shown) return; const first = shown === -9; shown = k;
         const paint = () => { el.innerHTML = k === -2 ? identHTML() : k < 0 ? opening() : story(list[k], k); speak(k >= 0 ? list[k] : null); };
         if (first || !el.isConnected) return paint();
@@ -991,6 +1002,12 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const bnDayDate = () => new Date().toLocaleDateString("bn-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long" });
   // The bulletin's bottom strap, shared by the weather and market updates so they read as the
   // same channel: the red label, the gold progress bars (one per screen) and the logo.
+  // The newsreader's readings, decoded once for the sound engine (and kept for the bulletin).
+  const voiceCache = new Map();
+  const voiceBuf = url => { if (!st.audio) return Promise.resolve(null);
+    if (!voiceCache.has(url)) { if (voiceCache.size > 24) voiceCache.delete(voiceCache.keys().next().value);
+      voiceCache.set(url, fetch(url).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status)).then(b => new Promise((ok, no) => st.audio.decodeAudioData(b, ok, no))).catch(() => { voiceCache.delete(url); return null; })); }
+    return voiceCache.get(url); };
   // The weather and market screens' shared pieces, in the channel's look: a heading (red chip,
   // gold Bengali) with the time the figures were updated, and the big opening/closing card.
   const updWords = at => { if (!at) return null; const d = new Date(at), o = { timeZone: "Asia/Kolkata" };
@@ -1175,7 +1192,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   loadTv().then(tick); connect(); poll();
   const timers = [setInterval(loadTv, 15000), setInterval(tick, 500), setInterval(() => { st.flash++; }, 8000), setInterval(poll, 5000), setInterval(heartbeat, 5000)];
   return {
-    destroy() { st.alive = false; document.removeEventListener("fullscreenchange", fsChange); document.removeEventListener("webkitfullscreenchange", fsChange); document.documentElement.classList.remove("tvp-fs-lock"); ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
+    destroy() { st.alive = false; st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null; try { st.audio?.close(); } catch { /* closed */ } document.removeEventListener("fullscreenchange", fsChange); document.removeEventListener("webkitfullscreenchange", fsChange); document.documentElement.classList.remove("tvp-fs-lock"); ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
     unmute, setScene(sc) { fixedScene = sc; tick(); }, get state() { return st.ctl; }
   };
 }
