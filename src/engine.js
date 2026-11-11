@@ -327,10 +327,15 @@ const noCaptions = p => { try { p.unloadModule?.("captions"); p.unloadModule?.("
 /* ---------- The engine ---------- */
 // mode: "program" (follow the channel), "scene" (draw a given scene: PCR preview), "app" (program
 // in the app, muted until tapped). key: an output key (outputs) – sends heartbeats.
+// What a scene may show viewers as its line: never the control room's own names for a source
+// ("Running order" is the channel's automatic schedule, not a headline).
+const INTERNAL_LABELS = /^(running order|continuity|program|preview|standby|slate)$/i;
+const airLabel = sc => { const l = String(sc?.label || "").trim(); return !l || INTERNAL_LABELS.test(l) || sc?.sources?.[0]?.kind === "continuity" ? "" : l; };
 // A viewer's running order outlives its player: when a page redraws and mounts the player afresh
 // (the Watch page draws once from its cache, then again with fresh data), the new player carries
 // on with the same block at the same moment instead of choosing again and jumping.
 const RUNNING = {};
+const LAST = {};   // the channel's latest data, shared by every player on the page
 export function mountTV(host, { channel = "h", output = false, mode, key = "", scene: fixedScene = null, guestToken = "", onState, muted, tapUnmute = true } = {}) {
   mode ||= output ? "program" : "app";
   const [W, H] = SIZE[channel];
@@ -381,7 +386,11 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
 
   const st = { tv: null, ctl: null, queue: [], skew: 0, alive: true, muted: muted ?? (mode === "app" ? false : !output), audio: null, current: null, shownBreaking: "", flash: 0, stalledSince: 0, playing: false, ws: null, dumpUntil: 0, pkgTimer: null };
   const keepOrder = mode === "app" && !output && !fixedScene;
-  if (keepOrder && RUNNING[channel] && Date.now() - RUNNING[channel].at < 120e3) st.seq = RUNNING[channel].seq;
+  // A remounted player also starts from the channel's data and control state it had a moment ago,
+  // so it draws at once instead of showing an empty stage while it fetches them again.
+  if (keepOrder && RUNNING[channel] && Date.now() - RUNNING[channel].at < 120e3) { const r = RUNNING[channel]; st.seq = r.seq; st.tv = r.tv; st.ctl = r.ctl; st.skew = r.skew || 0; }
+  if (keepOrder && !st.tv && LAST[channel] && Date.now() - LAST[channel].at < 60e3) { st.tv = LAST[channel].tv; st.skew = LAST[channel].skew || 0; }
+  if (keepOrder && !st.ctl && LAST[`ctl-${channel}`]) st.ctl = LAST[`ctl-${channel}`];
   const now = () => Date.now() + st.skew;
   const auth = key ? { ch: channel, key } : guestToken ? { t: guestToken } : mode === "app" ? { viewer: 1 } : {};
 
@@ -601,7 +610,10 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const markAvoSeen = id => { avoSeen[id] = (avoSeen[id] || 0) + 1; try { const keep = Object.fromEntries(Object.entries(avoSeen).slice(-80)); localStorage.setItem(`rw-avo-seen-${channel}`, JSON.stringify(keep)); } catch { /* private mode */ } };
   // Each story of a block is logged once, however often it is redrawn (or its player remounted).
   const avoLogged = keepOrder ? (RUNNING[`log-${channel}`] ||= new Set()) : new Set();
-  const avoPool = () => (st.tv?.avoOn === false ? [] : st.tv?.avo || []).filter(x => (avoSeen[x.id] || 0) < AVO_REPEAT);
+  // Stories this viewer has seen fewer than four times; when every story has been seen that often
+  // (a screen left on all evening after the day's stories are used), all of them, least seen first,
+  // so the AVO segment never disappears.
+  const avoPool = () => { const all = st.tv?.avoOn === false ? [] : st.tv?.avo || [], fresh = all.filter(x => (avoSeen[x.id] || 0) < AVO_REPEAT); return fresh.length >= Math.min(AVO_MIN, all.length) ? fresh : all; };
   // Due: when the channel opens (nothing played yet) and after every three videos, when the item
   // on air is done and nothing else (a resumed video, the "up next" card) is waiting.
   const avoDue = q => !q.resume && !(q.pending || []).length && q.item?.type !== "upnext" && q.item?.type !== "avo" && (q.sinceAvo === undefined || q.sinceAvo >= AVO_EVERY) && avoPool().length > 0;
@@ -858,7 +870,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const tickerHTML = all => { const list = mode === "app" ? all.slice(0, 12) : all, items = list.map(t => `<span>${esc(t)}</span>`).join("<i>◆</i>"); return `<div class="tk-move" style="--dur:${Math.max(40, list.length * 9)}s"><div>${items}<i>◆</i></div><div aria-hidden="true">${items}<i>◆</i></div></div>`; };
   // The ad box shows the ad (or "your ad here").
   const adBox = ad => plainAd(ad);
-  const plainAd = ad => ad?.image ? `<div class="tv-ad img"><img src="${esc(ad.image)}" alt=""></div>` : `<div class="tv-ad"><b>${esc(ad?.line1 || "")}</b><hr><small>${esc(ad?.line2 || "")}</small><hr><small>${esc(ad?.line3 || "")}</small></div>`;
+  // Nothing until the ad (or the "your ad here" lines) has arrived: never an empty box.
+  const plainAd = ad => !ad || (!ad.image && !ad.line1) ? "" : ad.image ? `<div class="tv-ad img"><img src="${esc(ad.image)}" alt=""></div>` : `<div class="tv-ad"><b>${esc(ad?.line1 || "")}</b><hr><small>${esc(ad?.line2 || "")}</small><hr><small>${esc(ad?.line3 || "")}</small></div>`;
   const vJacket = (inner, band) => `<div class="vj"><img class="vj-strip" src="/brand/jacket-strip.webp" alt=""><div class="vj-logo"><img src="${LOGO}" alt=""></div><div class="vj-frame">${inner}</div><div class="vj-band"><b>${esc(band)}</b><div class="tv-adslot"></div></div></div>`;
   const sponsorAd = () => st.ctl?.sponsor ? { image: st.ctl.sponsor.image, line1: st.ctl.sponsor.line1, line2: st.ctl.sponsor.line2, line3: st.ctl.sponsor.line3 } : st.tv?.ad;
   function headlineSets() {
@@ -1287,7 +1300,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (channel === "h") {
       gfx = `
         ${dtBar(L, s)}
-        ${!lband && L.lower && (strap || isVideo) ? `<div class="tv-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>এই মুহূর্তে</small></span><span class="lt-text">${strap ? `${esc(strap.name)}${strap.title ? `<small>${esc(strap.title)}</small>` : ""}` : esc(s.lowerThird || sc.label || "")}</span></div>` : ""}
+        ${!lband && L.lower && (strap || (isVideo && (s.lowerThird || airLabel(sc)))) ? `<div class="tv-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>এই মুহূর্তে</small></span><span class="lt-text">${strap ? `${esc(strap.name)}${strap.title ? `<small>${esc(strap.title)}</small>` : ""}` : esc(s.lowerThird || airLabel(sc))}</span></div>` : ""}
         ${!lband && L.ad && isVideo ? `<div class="tv-adslot"></div>` : ""}
         ${L.ticker ? `<div class="tv-ticker"><span class="tk-label">শিরোনাম</span><div class="tk-track">${tickerHTML(ticker)}</div></div>` : ""}`;
     } else {
@@ -1316,7 +1329,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     stage.classList.toggle("lb-auto", on);
     if (!on && !leaving) { put(".tvp-lbl", ""); return; }
     const Hs = (st.tv?.headlines || []).filter(h => h.text), n = Hs.length;
-    const main = st.tv?.lband?.text || (n ? Hs[k % n].text : sc?.label || "");
+    const main = st.tv?.lband?.text || (n ? Hs[k % n].text : airLabel(sc));
     const side = n ? [1, 2, 3, 4].map(i => Hs[(k + i) % n]).filter((h, i, a) => h && a.indexOf(h) === i && h.text !== main) : [];
     put(".tvp-lbl", `<div class="lb-auto-box${on ? "" : " out"}" data-k="${k}"><div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${side.slice(0, 3).map((h, i) => `<p style="--n:${i}"><small>${esc(DESK_BN[h.desk] || h.desk || "")}</small>${esc(h.text)}</p>`).join("")}<div class="lb-logo"><img src="${LOGO}" alt=""><i></i></div></div><div class="lb-bottom"><b>${esc(main)}</b>${L.ad ? `<div class="tv-adslot"></div>` : ""}</div></div>`);
   }
@@ -1376,13 +1389,13 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   /* ---------- data ---------- */
   async function loadTv() {
     if (mode === "scene" && !fixedScene?.needsTv) { /* the PCR preview still wants headlines for graphics */ }
-    try { const r = await fetch(`/api/tv/${channel}`, { cache: "no-store" }); if (r.ok) { const s = await r.json(); st.skew = s.serverTime - Date.now(); if (!s.loop?.length && st.tv?.loop?.length) { s.loop = st.tv.loop; s.schedule = st.tv.schedule; } st.tv = s; const head = s.loop?.find(x => x.type === "video")?.ytId; if (st.seq && head && head !== st.seq.head) { st.seq.head = head; st.seq.restart = true; } } } catch { /* keep */ }
+    try { const r = await fetch(`/api/tv/${channel}`, { cache: "no-store" }); if (r.ok) { const s = await r.json(); st.skew = s.serverTime - Date.now(); if (keepOrder) LAST[channel] = { tv: s, skew: st.skew, at: Date.now() }; if (!s.loop?.length && st.tv?.loop?.length) { s.loop = st.tv.loop; s.schedule = st.tv.schedule; } st.tv = s; const head = s.loop?.find(x => x.type === "video")?.ytId; if (st.seq && head && head !== st.seq.head) { st.seq.head = head; st.seq.restart = true; } } } catch { /* keep */ }
   }
   function applyCtl(state, serverTime) {
     if (serverTime) st.skew = serverTime - Date.now();
     const delay = mode === "program" && output ? (state.delay || 0) * 1000 : 0;
     if (state.dumpAt && state.dumpAt !== st.ctl?.dumpAt && Date.now() - state.dumpAt < 15000) { st.queue = []; st.dumpUntil = now() + delay; st.ctl = state; return; }
-    if (!delay) { st.queue = []; st.ctl = state; onState?.(state); }
+    if (!delay) { st.queue = []; st.ctl = state; onState?.(state); if (keepOrder) LAST[`ctl-${channel}`] = state; }
     else st.queue.push({ at: Date.now() + delay, state });
   }
   function connect() {
@@ -1397,10 +1410,12 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   async function poll() { if (st.ws?.readyState === 1 || mode === "scene") return; try { const r = await fetch(`/api/ctl/${channel}/state`, { cache: "no-store" }); if (r.ok) { const d = await r.json(); applyCtl(d.state, d.serverTime); } } catch { /* offline */ } }
   function heartbeat() { if (!output || st.ws?.readyState !== 1) return; st.ws.send(JSON.stringify({ type: "hb", playing: st.current?.slots.some(s => s.playing?.()) || !!st.current?.scene?.graphic, stalledFor: st.stalledSince ? Math.round((Date.now() - st.stalledSince) / 1000) : 0, item: st.current?.scene?.label || "", ua: navigator.userAgent })); }
 
+  // A remounted player that already has the channel's data draws its first frame at once.
+  if (st.tv) tick();
   loadTv().then(tick); connect(); poll();
   const timers = [setInterval(loadTv, 15000), setInterval(tick, 500), setInterval(() => { st.flash++; }, 8000), setInterval(poll, 5000), setInterval(heartbeat, 5000)];
   return {
-    destroy() { if (keepOrder && st.seq) RUNNING[channel] = { seq: st.seq, at: Date.now() }; st.alive = false; st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null; try { st.audio?.close(); } catch { /* closed */ } document.removeEventListener("fullscreenchange", fsChange); document.removeEventListener("webkitfullscreenchange", fsChange); document.documentElement.classList.remove("tvp-fs-lock"); ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
+    destroy() { if (keepOrder && st.seq) RUNNING[channel] = { seq: st.seq, tv: st.tv, ctl: st.ctl, skew: st.skew, at: Date.now() }; st.alive = false; st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null; try { st.audio?.close(); } catch { /* closed */ } document.removeEventListener("fullscreenchange", fsChange); document.removeEventListener("webkitfullscreenchange", fsChange); document.documentElement.classList.remove("tvp-fs-lock"); ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
     unmute, setScene(sc) { fixedScene = sc; tick(); }, get state() { return st.ctl; }
   };
 }

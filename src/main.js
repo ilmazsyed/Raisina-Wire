@@ -1750,6 +1750,11 @@ function viewWatch() {
   const cats = [...DESKS.filter(d => byCat[d]?.length).map(d => [d, byCat[d]]), ...Object.entries(byCat).filter(([c, l]) => !DESKS.includes(c) && c !== "More" && l.length >= 2)];
   const more = Object.entries(byCat).filter(([c, l]) => !cats.some(([k]) => k === c)).flatMap(([, l]) => l);
   const popular = films.filter(m => m.plays > 0).sort((a, b) => b.plays - a.plays).slice(0, 12);
+  // The live player is carried across a redraw of the page untouched (the Watch page draws once
+  // from its cache, then again with fresh data): moved aside and back without being reloaded, where
+  // the browser can move an element that way.
+  const oldTV = $("#tvWatch"), carry = oldTV && tvInstance && tvHost === oldTV && "moveBefore" in Element.prototype;
+  if (carry) document.body.moveBefore(oldTV, null);
   $("#view").innerHTML = `<div class="watch">
     <div class="wrap"><section class="tv-watch"><div class="tv-watch-head"><div><div class="kicker"><span class="dot-live"></span> Rashtrix TV</div><h1>Watch live</h1></div>
       <div class="pill-tabs" role="tablist" aria-label="Channel">${[["h", "Rashtrix TV"], ["v", "Rashtrix Shorts"]].map(([k, l]) => `<button type="button" role="tab" data-action="tv-ch" data-ch="${k}" aria-selected="${k === tvChannel()}">${l}</button>`).join("")}</div></div>
@@ -1781,11 +1786,12 @@ function viewWatch() {
     if (k >= 0) openShorts(k);
     else if (films.some(m => m.id === want)) openCinema(want, "latest");
   }
+  if (carry) { const fresh = $("#tvWatch"); if (fresh) { oldTV.className = fresh.className; fresh.parentNode.moveBefore(oldTV, fresh); fresh.remove(); } else oldTV.remove(); }
   mountWatchTV();
 }
 // Rashtrix TV in the app: the channel's own player (not the YouTube page of the stream).
 const tvChannel = () => store.get("rw-tv-ch", "h") === "v" ? "v" : "h";
-let tvInstance = null, homeTV = null;
+let tvInstance = null, homeTV = null, tvHost = null, tvHostCh = "";
 // The home page's live player (desktop): Rashtrix TV, muted until its sound button is tapped.
 function mountHomeTV() {
   homeTV?.destroy(); homeTV = null;
@@ -1795,7 +1801,9 @@ function mountHomeTV() {
 }
 function mountWatchTV() {
   const host = $("#tvWatch"); if (!host) return;
-  tvInstance?.destroy(); tvInstance = mountTV(host, { channel: tvChannel() });
+  // The same player, still in its place on the same channel, plays on.
+  if (tvInstance && host === tvHost && tvHostCh === tvChannel()) { drawTvInteract(); return; }
+  tvInstance?.destroy(); tvInstance = mountTV(host, { channel: tvChannel() }); tvHost = host; tvHostCh = tvChannel();
   drawTvInteract();
 }
 // Under the player: the channel's open poll (one vote per device a day) and a comment box
