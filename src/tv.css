@@ -807,3 +807,29 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .mkt-i em{color:rgba(255,255,255,.82)}
 .mkt-i.up i{border-bottom-color:#3ddc84}.mkt-i.up small{color:#3ddc84}
 .mkt-i.down i{border-top-color:#ff6b6b}.mkt-i.down small{color:#ff6b6b}
+
+/* Market: animated pictures on the commodity and currency tiles */
+.mk-tile{justify-content:flex-end}
+.mk-ico{position:absolute;right:30px;top:26px;width:170px;height:130px;z-index:0;animation:mkico .8s calc(.15s + .12s * var(--i,0)) cubic-bezier(.2,1.4,.4,1) both}
+.mk-tile>*:not(.mk-ico){position:relative;z-index:1}
+@keyframes mkico{from{opacity:0;transform:translateY(-30px) scale(.6)}to{opacity:1;transform:none}}
+.mk-ico svg{width:100%;height:100%;overflow:visible}
+.mk-ico.gold{--hi:#ffe27a;--lo:#c8901a;--edge:#8a5d0b;--top:#fff3b8;filter:drop-shadow(0 10px 18px rgba(212,160,23,.45))}
+.mk-ico.silver{--hi:#f4f6f8;--lo:#9aa3ad;--edge:#5d6670;--top:#ffffff;filter:drop-shadow(0 10px 18px rgba(200,210,220,.35))}
+.mk-ico.gold g,.mk-ico.silver g{animation:mkstack .5s calc(.3s + .15s * var(--j)) cubic-bezier(.2,1.5,.4,1) both}
+@keyframes mkstack{from{opacity:0;transform:translateY(-40px)}to{opacity:1;transform:none}}
+.mk-ico .mk-shine{position:absolute;inset:0;overflow:hidden;-webkit-mask:linear-gradient(#000,#000);pointer-events:none}
+.mk-ico .mk-shine:before{content:"";position:absolute;top:-20%;bottom:-20%;width:30%;left:-40%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.85),transparent);transform:skewX(-18deg);animation:mkshine 2.4s 1s ease-in-out infinite}
+@keyframes mkshine{0%{left:-40%}55%,100%{left:120%}}
+.mk-ico.crude{width:120px;height:150px;right:44px;filter:drop-shadow(0 10px 18px rgba(0,0,0,.5));animation-name:mkico,mkbob;animation-duration:.8s,3s;animation-delay:calc(.15s + .12s * var(--i,0)),1s;animation-iteration-count:1,infinite;animation-timing-function:cubic-bezier(.2,1.4,.4,1),ease-in-out}
+@keyframes mkbob{50%{transform:translateY(-4px) rotate(-1.5deg)}}
+.mk-drop{position:absolute;left:44px;top:118px;width:14px;height:18px;background:#141418;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;box-shadow:inset -3px -3px 0 rgba(255,255,255,.15);animation:mkdrop 1.8s 1.2s ease-in infinite;opacity:0}
+@keyframes mkdrop{0%{opacity:0;transform:translateY(-6px) scale(.4)}20%{opacity:1;transform:translateY(0) scale(1)}70%{opacity:1;transform:translateY(34px)}75%,100%{opacity:0;transform:translateY(38px) scaleY(.4)}}
+.mk-pool{position:absolute;left:30px;top:156px;width:44px;height:8px;border-radius:50%;background:rgba(20,20,24,.85);transform:scaleX(0);animation:mkpool 1.8s 1.2s ease-out infinite}
+@keyframes mkpool{0%,70%{transform:scaleX(.3);opacity:0}78%{transform:scaleX(1);opacity:1}100%{transform:scaleX(1.3);opacity:0}}
+.mk-ico.coin{width:140px;height:140px;right:36px;perspective:600px}
+.mk-ico.coin b{position:absolute;inset:0;display:grid;place-items:center;border-radius:50%;font:900 76px/1 Montserrat,sans-serif;color:#7a4f00;
+  background:radial-gradient(circle at 35% 30%,#fff3b8,#f1c94a 45%,#c8901a 80%);box-shadow:inset 0 0 0 8px #d9a62c,inset 0 0 0 11px #a8740f,0 14px 28px rgba(0,0,0,.45);
+  text-shadow:0 2px 0 rgba(255,255,255,.5);animation:mkcoin 4s 1s ease-in-out infinite}
+@keyframes mkcoin{0%,60%{transform:rotateY(0)}80%{transform:rotateY(180deg) scaleX(.9)}100%{transform:rotateY(360deg)}}
+.mk-ico.coin:after{content:"";position:absolute;left:20%;right:20%;bottom:-16px;height:10px;border-radius:50%;background:rgba(0,0,0,.35);filter:blur(4px)}

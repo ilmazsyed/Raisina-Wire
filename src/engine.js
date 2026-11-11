@@ -818,7 +818,19 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const mover = (x, i) => `<div class="mk-mover ${up(x) ? "up" : "down"}" style="--i:${i}"><span class="mk-rank">${flip(String(i + 1), bnDigits(i + 1))}</span><span class="mk-co">${flip(esc(x.en), esc(x.bn), "mn")}</span><span class="mk-px">${flip(`₹${fx(x.value)}`, `₹${bnDigits(fx(x.value))}`)}</span><span class="mk-pc"><i class="mk-arrow"></i>${flip(`${up(x) ? "+" : "−"}${fx(Math.abs(x.pct))}%`, `${up(x) ? "+" : "−"}${bnDigits(fx(Math.abs(x.pct)))}%`)}</span></div>`;
       // Commodities also in rupees, in Indian units (at the international rate, before Indian duties and taxes).
       const inr = x => x?.inr ? `<div class="mk-inr">${flip(`≈ ₹${fx(x.inr, 0)} ${esc(x.inrUnitEn)}`, `≈ ₹${bnDigits(fx(x.inr, 0))} ${esc(x.inrUnitBn)}`)}</div>` : "";
-      const tile = (x, unit, i, d = 2) => x ? `<div class="mk-tile ${up(x) ? "up" : "down"}" style="--i:${i}"><div class="mk-name">${flip(esc(x.en), esc(x.bn), "mn")}</div><div class="mk-val">${flip(`${unit[0]}${fx(x.value, d)}`, `${unit[1]}${bnDigits(fx(x.value, d))}`)}</div>${inr(x)}<div class="mk-chg"><i class="mk-arrow"></i>${flip(...chg(x))}</div></div>` : "";
+      // An animated picture for each commodity and currency: gold and silver bars catching the
+      // light, an oil barrel with a falling drop, and a coin turning with the currency's sign.
+      const bar = c => `<svg viewBox="0 0 160 120"><defs><linearGradient id="mk${c}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--hi)"/><stop offset="1" stop-color="var(--lo)"/></linearGradient></defs>${[[10, 70], [86, 70], [48, 26]].map(([x, y], j) => `<g style="--j:${j}"><path d="M${x + 10},${y} h44 l10,36 h-64z" fill="url(#mk${c})" stroke="var(--edge)" stroke-width="2"/><path d="M${x + 10},${y} h44 l-4,8 h-36z" fill="var(--top)" opacity=".7"/></g>`).join("")}</svg><i class="mk-shine"></i>`;
+      const ICON = {
+        gold: () => `<div class="mk-ico gold">${bar("g")}</div>`,
+        silver: () => `<div class="mk-ico silver">${bar("s")}</div>`,
+        crude: () => `<div class="mk-ico crude"><svg viewBox="0 0 120 140"><rect x="22" y="14" width="76" height="104" rx="10" fill="#2b2b33" stroke="#6b6b78" stroke-width="3"/><rect x="18" y="40" width="84" height="8" rx="3" fill="#55555f"/><rect x="18" y="84" width="84" height="8" rx="3" fill="#55555f"/><rect x="34" y="56" width="52" height="20" rx="4" fill="var(--red)"/><text x="60" y="71" text-anchor="middle" font-family="Montserrat,sans-serif" font-weight="900" font-size="13" fill="#fff">OIL</text><circle cx="48" cy="20" r="5" fill="#18181d"/></svg><i class="mk-drop"></i><i class="mk-pool"></i></div>`,
+        usd: () => `<div class="mk-ico coin"><b>$</b></div>`,
+        gbp: () => `<div class="mk-ico coin"><b>£</b></div>`,
+        eur: () => `<div class="mk-ico coin"><b>€</b></div>`
+      };
+      const icon = x => { const k = Object.keys(ICON).find(k => M[k] === x); return k ? ICON[k]() : ""; };
+      const tile = (x, unit, i, d = 2) => x ? `<div class="mk-tile ${up(x) ? "up" : "down"}" style="--i:${i}">${icon(x)}<div class="mk-name">${flip(esc(x.en), esc(x.bn), "mn")}</div><div class="mk-val">${flip(`${unit[0]}${fx(x.value, d)}`, `${unit[1]}${bnDigits(fx(x.value, d))}`)}</div>${inr(x)}<div class="mk-chg"><i class="mk-arrow"></i>${flip(...chg(x))}</div></div>` : "";
       const head = (en, bn) => `<div class="mk-head"><b data-no-tr>${en.toUpperCase()}</b><span>${bn}</span>${M.open ? "" : `<em>${flip("Last close", "শেষ দর")}</em>`}</div>`;
       const opener = sub => `<div class="mk-open"><i class="mk-grid"></i><svg class="mk-line" viewBox="0 0 1920 400" preserveAspectRatio="none"><path d="M0,330 L180,300 L320,320 L470,240 L620,262 L760,180 L900,210 L1060,120 L1220,150 L1380,80 L1540,110 L1700,40 L1920,60"/></svg><div class="mk-open-in"><div class="wx-logo"><img src="${LOGO}" alt=""></div><b class="w1" data-no-tr>MARKET</b><b class="w2" data-no-tr>UPDATE</b><i class="wx-line"></i><span class="wx-bn">বাজারের খবর</span><small>${sub}</small></div></div>`;
       const screens = [
