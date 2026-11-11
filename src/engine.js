@@ -969,11 +969,42 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const imgState = st.avoImg ||= new Map();
       const preload = x => (x.images || []).forEach(i => { if (imgState.has(i.src)) return; imgState.set(i.src, "loading"); const im = new Image(); im.referrerPolicy = "no-referrer"; im.onload = () => imgState.set(i.src, im.naturalWidth >= 320 ? "ok" : "bad"); im.onerror = () => imgState.set(i.src, "bad"); im.src = i.src; });
       list.forEach(preload);
-      const slidesOf = x => { const out = (x.images || []).filter(i => imgState.get(i.src) === "ok").slice(0, 6).map(i => ({ img: i })); for (let c = 0; out.length < 4; c++) out.push({ card: c }); return out; };
-      const cardHTML = (x, c) => c % 3 === 0 ? `<div class="avo-card c0"><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span><b>${esc(x.title)}</b></div>`
-        : c % 3 === 1 ? `<div class="avo-card c1"><i></i><b>${esc(x.lines?.[1] || x.lines?.[0] || x.title)}</b></div>`
-        : `<div class="avo-card c2"><img src="${LOGO}" alt=""><b>${esc(x.title)}</b></div>`;
-      const slideHTML = (x, sl) => sl.img ? `<div class="avo-slide"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"></div>` : `<div class="avo-slide">${cardHTML(x, sl.card)}</div>`;
+      // The slides of a story: its photographs, and to keep it lively (and to make up four when
+      // photos are few) the channel's animated cards: BREAKING NEWS, a Bengali infographic with a
+      // key figure counting up, the story's key points one by one, and its photos re-treated (a red
+      // duotone with the headline, a split frame). Never a logo card, never a blank.
+      const BN0 = "০১২৩৪৫৬৭৮৯", toNum = t => Number(String(t).replace(/[০-৯]/g, d => BN0.indexOf(d)).replace(/,/g, ""));
+      const UNITS = "কোটি|লক্ষ|লাখ|হাজার|টাকা|জন|শতাংশ|%|ফুট|কিমি|কিলোমিটার|ডিগ্রি|বছর|দিন|ঘণ্টা|মিটার|টন|বিঘা|একর|কেজি|বার|টি";
+      const factOf = x => { for (const l of x.lines || []) { const m = l.match(new RegExp(`([০-৯0-9][০-৯0-9,.]*)\\s*(${UNITS})`)); if (m && toNum(m[1]) > 0) return { n: toNum(m[1]), dec: /[.]/.test(m[1]), unit: m[2], line: l.length > 120 ? l.slice(0, 118).replace(/\s+\S*$/, "") + "…" : l }; } return null; };
+      const pointsOf = x => (x.lines || []).slice(1, 4).map(l => l.length > 84 ? l.slice(0, 82).replace(/\s+\S*$/, "") + "…" : l);
+      const slidesOf = x => {
+        const P = (x.images || []).filter(i => imgState.get(i.src) === "ok").slice(0, 6);
+        const ex = [{ brk: 1 }], f = factOf(x), pts = pointsOf(x);
+        if (f) ex.unshift({ fact: f });
+        if (pts.length >= 2) ex.push({ pts });
+        const v = P.length ? [{ img: P[0], fx: "duo" }, { img: P[P.length > 1 ? 1 : 0], fx: "split" }] : [];
+        const target = Math.min(6, Math.max(4, P.length + 1)), ph = P.map(i => ({ img: i })), out = [];
+        // Photo first when there is one, then an animated card, then a photo, and so on.
+        const lanes = [ph, ex, ph, v, ex];
+        for (let r = 0; out.length < target && lanes.some(l => l.length); r++) { const l = lanes[r % lanes.length]; if (l.length) out.push(l.shift()); }
+        while (out.length < 4) out.push({ brk: 2 + out.length });
+        return out;
+      };
+      const bgOf = x => (x.images || []).find(i => imgState.get(i.src) === "ok");
+      const slideHTML = (x, sl) => {
+        const desk = esc(DESK_BN[x.desk] || x.desk || "খবর");
+        if (sl.img && sl.fx === "duo") return `<div class="avo-slide fx-duo"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"><i class="duo"></i><b class="avo-big">${esc(x.title)}</b></div>`;
+        if (sl.img && sl.fx === "split") return `<div class="avo-slide fx-split"><div class="sp a"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"></div><div class="sp b"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"></div><i class="sp-line"></i></div>`;
+        if (sl.img) return `<div class="avo-slide"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"></div>`;
+        if (sl.fact) return `<div class="avo-slide"><div class="avo-info fact"><span class="lbl">${desk} · সংখ্যায়</span><div class="fig"><b class="num" data-to="${sl.fact.n}" data-dec="${sl.fact.dec ? 1 : 0}">০</b><em>${esc(sl.fact.unit)}</em></div><p>${esc(sl.fact.line)}</p><i class="rule"></i></div></div>`;
+        if (sl.pts) return `<div class="avo-slide"><div class="avo-info pts"><span class="lbl">মূল তথ্য</span><ol>${sl.pts.map((p, i) => `<li style="--i:${i}"><i>${bnDigits(i + 1)}</i><span>${esc(p)}</span></li>`).join("")}</ol></div></div>`;
+        const bg = bgOf(x);
+        return `<div class="avo-slide"><div class="avo-brk">${bg ? `<img class="bg" src="${esc(bg.src)}" alt="" referrerpolicy="no-referrer">` : ""}<i class="s1"></i><i class="s2"></i><div class="in"><span class="brk-tag">এইমাত্র পাওয়া খবর</span><small data-no-tr>BREAKING NEWS</small><b>${esc(x.title)}</b></div><i class="bar"></i></div></div>`;
+      };
+      // The key figure counts up in Bengali digits.
+      const countUp = box => box.querySelectorAll(".num[data-to]").forEach(n => { if (n.dataset.done) return; n.dataset.done = 1; const to = Number(n.dataset.to), dec = n.dataset.dec === "1", t0 = performance.now(), dur = 1300;
+        const step = t => { if (!n.isConnected) return; const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3), v = to * e; n.textContent = bnDigits((dec ? v.toFixed(1) : Math.round(v)).toLocaleString("en-IN")); if (p < 1) requestAnimationFrame(step); };
+        requestAnimationFrame(step); });
       const storyHTML = (x, k) => `<div class="avo${channel === "v" ? " v" : ""}"><div class="avo-pics"></div><i class="avo-shade"></i>
         <div class="avo-kick"><i class="lt-pulse"></i><b>এই মুহূর্তে</b><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span></div>
         <div class="avo-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>এই মুহূর্তে</small></span><span class="lt-text">${esc(x.title)}</span></div>
@@ -1003,16 +1034,21 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           const logKey = `${x.id}@${Math.round(at0 + k * AVO_SECS * 1000)}`;
           if ((mode === "app" || output) && !avoLogged.has(logKey)) { avoLogged.add(logKey); markAvoSeen(x.id); fetch("/api/tv/avo/played", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: x.id, ch: channel, key: output ? key : "" }), keepalive: true }).catch(() => {}); }
           if (first || !el.isConnected) return paint();
-          const w = document.createElement("div"); w.className = "bs-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
+          const w = document.createElement("div"); w.className = "bs-wipe wx-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
           stage.append(w); if (!st.muted) whoosh(st.audio);
           setTimeout(paint, 330); setTimeout(() => w.remove(), 900); return;
         }
         const box = el.querySelector(".avo"); if (!box) return;
         if (si !== shownS) {
-          shownS = si; const pics = box.querySelector(".avo-pics");
-          pics.insertAdjacentHTML("beforeend", slideHTML(x, slides[si]).replace('class="avo-slide"', `class="avo-slide in" style="--d:${(AVO_SECS / slides.length + 1).toFixed(1)}s"`));
-          [...pics.children].slice(0, -2).forEach(n => n.remove());
-          const cr = slides[si].img?.credit || ""; box.querySelector(".avo-credit").textContent = cr;
+          const firstSlide = shownS < 0; shownS = si; const pics = box.querySelector(".avo-pics"), sl = slides[si];
+          const put = () => {
+            pics.insertAdjacentHTML("beforeend", slideHTML(x, sl).replace(/class="avo-slide([^"]*)"/, `class="avo-slide$1" style="--d:${(AVO_SECS / slides.length + 1.5).toFixed(1)}s"`));
+            [...pics.children].slice(0, -1).forEach(n => n.remove());
+            countUp(pics);
+            box.querySelector(".avo-credit").textContent = sl.img?.credit || (sl.brk ? bgOf(x)?.credit || "" : "");
+          };
+          if (firstSlide) put();
+          else { const w = document.createElement("div"); w.className = "avo-sting"; w.innerHTML = "<i></i><i></i><i></i>"; box.append(w); setTimeout(put, 300); setTimeout(() => w.remove(), 800); }
         }
       };
       drawA(); const ta = setInterval(() => el.isConnected ? drawA() : clearInterval(ta), 250);
