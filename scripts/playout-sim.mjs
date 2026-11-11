@@ -33,6 +33,8 @@ await p.route(/youtube\.com|ytimg|googlevideo/, r => r.abort());
 // (Fetched by the page itself, so it goes through whatever network the browser has.)
 await p.route(/\/api\/tv\/[hv]$/, async r => { const j = JSON.parse(await p.evaluate(u => fetch(`${u}?sim=1`).then(x => x.text()), r.request().url())); j.serverTime = await p.evaluate(() => Date.now()); return r.fulfill({ json: j }); });
 await p.route(/\/api\/ws\//, r => r.abort());
+// The control room's live connection carries the real clock: closed, so the simulated time holds.
+if (p.routeWebSocket) await p.routeWebSocket(/\/api\/ws\//, ws => ws.close());
 // The control room's state, as now, with its clock moved too (else the player takes the real clock).
 await p.route(/\/api\/ctl\/[hv]\/state$/, async r => { const j = JSON.parse(await p.evaluate(u => fetch(`${u}?sim=1`).then(x => x.text()), r.request().url())); j.serverTime = await p.evaluate(() => Date.now()); return r.fulfill({ json: j }); });
 await p.goto(`${SITE}/watch`, { waitUntil: "domcontentloaded" });
