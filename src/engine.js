@@ -83,6 +83,7 @@ const noise = ctx => { if (!noiseBuf || noiseBuf.sampleRate !== ctx.sampleRate) 
 //   headlines – driving newsroom groove (A minor, 126 bpm)
 //   upnext    – bright, rising, expectant (C major, 116 bpm, the filter opens as it runs)
 //   bulletin  – urgent timpani and strings ostinato with brass stabs (D minor, 140 bpm)
+//   weather   – airy and bright: soft pads, marimba-like plucks, a light shaker (F major, 100 bpm)
 //   ident     – the channel's signature: a boom, a brass swell and a four-note bell motif
 //   stinger   – a rising swoosh into a deep hit and a metallic ring
 const busOf = ctx => {
@@ -127,6 +128,17 @@ const STYLES = {
       if (k % 2 === 1) v.hiss(at, 0.04, 0.09, "highpass", 9000);
       const bell = [0, 1, 2, 1, 0, 2, 1, 2][k % 8];
       v.osc("sine", ch[bell] * 4, at, 0.35, 0.07, 6000); v.osc("triangle", ch[bell] * 8, at, 0.12, 0.02, 8000);
+    } },
+  weather: { bpm: 100, level: 0.95, roots: [87.31, 58.27, 65.41, 73.42], chords: [[349.2, 440, 523.3], [233.1, 293.7, 349.2], [261.6, 329.6, 392], [293.7, 349.2, 440]],
+    step(v, at, k, bar, ch, root, s16) {
+      if (k === 0) ch.forEach(f => v.osc("triangle", f, at, s16 * 16, 0.05, 1800, 0, 0.4));          // pad
+      if (k === 0 || k === 10) v.osc("sine", 110, at, 0.35, 0.55, 500, 48);                        // soft kick
+      if (k === 4 || k === 12) v.hiss(at, 0.12, 0.18, "bandpass", 3200, 1.5);                       // brush
+      if (k % 2 === 1) v.hiss(at, 0.03, 0.06, "highpass", 9500);                                    // shaker
+      const pl = [0, 2, 1, 2, 0, 1, 2, 1][k % 8];
+      if (k % 2 === 0) v.osc("sine", ch[pl] * 2, at, 0.26, 0.09, 5000);                            // marimba-like pluck
+      if (k === 6 || k === 14) v.osc("triangle", ch[pl] * 4, at, 0.18, 0.03, 7000);                 // sparkle
+      if (k % 4 === 0) v.osc("sine", root, at, s16 * 3.5, 0.32, 300);                              // bass
     } },
   bulletin: { bpm: 140, roots: [73.42, 58.27, 65.41, 55], chords: [[293.7, 349.2, 440], [233.1, 293.7, 349.2], [261.6, 329.6, 392], [220, 277.2, 329.6]],
     step(v, at, k, bar, ch, root, s16) {
@@ -351,7 +363,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // Music under the headline flash, the "up next" card and the bulletin (faster for the bulletin).
   // Each kind of graphic has its own music; the channel ID plays its signature, and the bulletin
   // opens with the signature under its channel ID, then its own music.
-  const BEDS = { flash: { style: "headlines" }, upnext: { style: "upnext" }, bulletin: { style: "bulletin" } };
+  const BEDS = { flash: { style: "headlines" }, upnext: { style: "upnext" }, bulletin: { style: "bulletin" }, weather: { style: "weather" } };
   function startBed(sc) {
     const kind = sc?.graphic?.kind;
     if (!BEDS[kind] || st.muted || !st.audio || (mode !== "app" && !output) || st.bed) return;
@@ -546,6 +558,20 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       st.preWant = null;
       return q.seg;
     }
+    // Straight after each bulletin, the weather briefing: 90 seconds after the two-minute ones,
+    // 60 after the 65-second ones (horizontal channel, when the weather has come in).
+    const WX = channel === "h" && (st.tv?.weatherPlaces || []).length && (st.tv?.bulletin || []).length ? (BULLETIN_MS === 120e3 ? 90e3 : 60e3) : 0;
+    if (WX && t - slot >= BULLETIN_MS && t - slot < BULLETIN_MS + WX) {
+      const ws = slot + BULLETIN_MS;
+      if (q.item?.type !== "weather" || q.start !== ws) {
+        if (q.item?.type === "video") { const at = (q.item.in || 0) + ytPos(q.item.ytId); q.resume = at < q.item.dur - 8 ? { ...q.item, at, resumed: true } : null; }
+        else if (q.item?.type === "upnext") q.resume = q.item.video;
+        q.item = { type: "weather", dur: WX / 1000, sting: true }; q.start = ws; q.n++;
+        q.seg = { ...q.item, start: ws, in: 0 };
+      }
+      st.preWant = null;
+      return q.seg;
+    }
     if (q.item) {
       const it = q.item, age = t - q.start;
       const done = it.type === "video"
@@ -554,7 +580,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (!done) return q.seg;
     }
     if (q.restart && !["video", "upnext"].includes(q.item?.type)) { q.i = 0; q.restart = false; q.pending = (q.pending || []).filter(x => x.type !== "upnext"); }
-    if (q.item?.type === "bulletin" && q.pending?.length) q.pending = q.pending.filter(x => x.type !== "flash");
+    if (["bulletin", "weather"].includes(q.item?.type) && q.pending?.length) q.pending = q.pending.filter(x => x.type !== "flash");
     const take = () => { const x = loop[q.i % loop.length]; q.i = (q.i + 1) % loop.length; return x; };
     let next;
     if (q.item?.type === "upnext") {
@@ -602,6 +628,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (seg.type === "ident") return { layout: "graphic", graphic: { kind: "ident" }, startAt: seg.start, dur: seg.dur, key: `c:ident:${seg.start}`, transition: { type: "mix", ms: 200 }, full: true };
     if (seg.type === "upnext") return { layout: "graphic", graphic: { kind: "upnext", video: seg.video }, startAt: seg.start, dur: seg.dur, key: `c:upnext:${seg.start}`, transition: { type: "mix", ms: 250 }, full: true };
     if (seg.type === "bulletin") return { layout: "graphic", graphic: { kind: "bulletin" }, startAt: seg.start, dur: seg.dur, key: `c:bulletin:${seg.start}`, transition, full: true };
+    if (seg.type === "weather") return { layout: "graphic", graphic: { kind: "weather" }, startAt: seg.start, dur: seg.dur, key: `c:weather:${seg.start}`, transition, full: true };
     if (seg.type === "news") return { layout: "graphic", graphic: { kind: "news" }, startAt: seg.start, dur: seg.dur, key: `c:news:${seg.start}`, transition };
     if (seg.type === "promo") return { layout: "graphic", graphic: { kind: "promo", image: seg.image }, key: `c:promo:${seg.start}`, full: true };
     return null;
@@ -681,6 +708,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     stage.classList.toggle("lband", sc?.layout === "lband");
     stage.classList.toggle("vid", !sc?.graphic && sc?.layout === "full" && (sc?.sources || []).length === 1);
     stage.classList.toggle("full-gfx", !!sc?.full || sc?.graphic?.kind === "promo" || sc?.graphic?.kind === "ads");
+    stage.classList.toggle("wx-on", sc?.graphic?.kind === "weather");
   }
 
   /* ---------- graphics ---------- */
@@ -724,6 +752,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = Math.floor((e - 5) / step), x = sets[Math.min(sets.length - 1, k)]; el.innerHTML = e < 5 || !x ? card() : wrapV(setHTML(name, x.label, x.items, step), x.label); };
       draw(); const t = setInterval(() => el.isConnected ? draw() : clearInterval(t), 1000);
     } else if (g.kind === "flash") {   // 10 seconds between videos: the breaking story, or the headlines
+      // First a short card names what is coming (HEADLINES or BREAKING NEWS), then it wipes to it.
+      setTimeout(() => { const html = el.innerHTML; el.innerHTML = introCard(!!(st.ctl?.breaking || st.tv?.breaking)?.text); setTimeout(() => { if (!el.isConnected && st.current) return; el.innerHTML = html; }, 2200); }, 0);
       const br = st.ctl?.breaking || st.tv?.breaking;
       if (br?.text) el.innerHTML = channel === "h" ? `<div class="tv-breaking static"><div class="br-slash"></div><div class="br-in"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(br.text)}</b><img src="${LOGO}" alt=""></div><div class="br-bar"></div></div>` : vJacket(`<div class="br-v"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(br.text)}</b></div>`, "এইমাত্র পাওয়া খবর");
       else {
@@ -732,7 +762,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         // The horizontal screen fills its width: six headlines in two columns of cards, each with
         // its desk, under a full-width head.
         el.innerHTML = channel === "h"
-          ? `<div class="nu-set nu-wide"><div class="nu-head"><span>শিরোনাম</span><b>সর্বশেষ</b><small data-no-tr>HEADLINES</small><i style="--d:${sc.dur || 10}s"></i></div><ol>${pick.map((h, n) => `<li style="--n:${n}"><em>${bnDigits(n + 1)}</em><div><small>${esc(DESK_BN[h.desk] || h.desk || "খবর")}</small><span>${esc(h.text)}</span></div></li>`).join("")}</ol></div>`
+          ? `<div class="nu-set nu-wide"><div class="nu-head"><span>শিরোনাম</span><b>সর্বশেষ</b><small data-no-tr>HEADLINES</small><i style="--d:${(sc.dur || 10) - 2.2}s"></i></div><ol>${pick.map((h, n) => `<li style="--n:${n}"><em>${bnDigits(n + 1)}</em><div><small>${esc(DESK_BN[h.desk] || h.desk || "খবর")}</small><span>${esc(h.text)}</span></div></li>`).join("")}</ol></div>`
           : wrapV(setHTML("শিরোনাম", "সর্বশেষ", pick.map(h => h.text), sc.dur || 10), "শিরোনাম");
       }
     } else if (g.kind === "ident") {   // the channel ID: the Rashtrix logo, five seconds
@@ -751,6 +781,36 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (!st.muted && (mode === "app" || output)) riser(st.audio);
       const count = () => { if (!el.isConnected && st.current) return; const left = Math.max(1, Math.ceil(dur - (now() - (sc.startAt || now())) / 1000)); const b = el.querySelector(".un-count b"); if (b && b.textContent !== bnDigits(left)) b.textContent = bnDigits(left); };
       count(); const t = setInterval(() => el.isConnected ? count() : clearInterval(t), 250);
+    } else if (g.kind === "weather") {   // after each bulletin: the weather, West Bengal then India
+      const P = st.tv?.weatherPlaces || [], total = sc.dur || 90, wb = P.filter(p => p.zone === "wb"), ind = P.filter(p => p.zone === "in");
+      const chunk = (a, n) => a.reduce((o, x, i) => (i % n ? o[o.length - 1].push(x) : o.push([x]), o), []);
+      const screens = [{ t: "open", d: 6 }];
+      const cardScreens = [...(wb.length ? [{ t: "sec", zone: "wb" }, ...chunk(wb, 3).map(c => ({ t: "cards", zone: "wb", c }))] : []), ...(ind.length ? [{ t: "sec", zone: "in" }, ...chunk(ind, 3).map(c => ({ t: "cards", zone: "in", c }))] : [])];
+      const nCards = cardScreens.filter(x => x.t === "cards").length, nSec = cardScreens.length - nCards;
+      const per = Math.max(5, (total - 6 - 5 - nSec * 3) / Math.max(1, nCards));
+      cardScreens.forEach(x => screens.push({ ...x, d: x.t === "sec" ? 3 : per }));
+      screens.push({ t: "close", d: 5 });
+      let at = 0; screens.forEach(x => { x.at = at; at += x.d; });
+      const ZONE = { wb: ["WEST BENGAL", "পশ্চিমবঙ্গ"], in: ["INDIA", "দেশ"] };
+      const day = new Date(sc.startAt || now()).toLocaleDateString("en-GB", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long" });
+      const sky = k => `<div class="wx-sky k-${k}"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i></div>`;
+      const big = (sub) => `<div class="wx-open">${sky("sun")}<div class="wx-open-in"><div class="wx-logo"><img src="${LOGO}" alt=""></div><b class="w1" data-no-tr>WEATHER</b><b class="w2" data-no-tr>UPDATE</b><i class="wx-line"></i><span class="wx-bn">আবহাওয়ার খবর</span><small>${sub}</small></div></div>`;
+      const card = (p, i) => `<div class="wx-card k-${p.kind}" style="--i:${i}">${sky(p.kind)}
+        <div class="wx-name">${flip(esc(p.en), esc(p.bn), "wn")}</div>
+        <div class="wx-temp">${flip(`${p.temp}<sup>°C</sup>`, `${bnDigits(p.temp)}<sup>°সে</sup>`, "wt")}</div>
+        <div class="wx-kind">${flip(esc(p.kindEn), esc(p.kindBn), "wk")}</div>
+        <div class="wx-facts"><span>${flip(`H ${p.hi}° · L ${p.lo}°`, `সর্বোচ্চ ${bnDigits(p.hi)}° · সর্বনিম্ন ${bnDigits(p.lo)}°`, "wf")}</span><span>${flip(`Humidity ${p.hum}% · Wind ${p.wind} km/h`, `আর্দ্রতা ${bnDigits(p.hum)}% · হাওয়া ${bnDigits(p.wind)} কিমি`, "wf")}</span></div></div>`;
+      const screenHTML = x => x.t === "open" ? big(esc(day)) : x.t === "close" ? big("রাষ্ট্রিক্সের সঙ্গে থাকুন · Stay with Rashtrix")
+        : x.t === "sec" ? `<div class="wx-sec"><b data-no-tr>${ZONE[x.zone][0]}</b><span>${ZONE[x.zone][1]}</span><i></i></div>`
+        : `<div class="wx-cards n${x.c.length}"><div class="wx-head"><b data-no-tr>WEATHER UPDATE</b><span>${ZONE[x.zone][1]} · ${ZONE[x.zone][0]}</span></div><div class="wx-row">${x.c.map(card).join("")}</div></div>`;
+      let shownW = -1;
+      const drawW = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = Math.max(0, screens.findLastIndex(x => e >= x.at)); if (k === shownW) return; const first = shownW < 0; shownW = k;
+        const paint = () => { el.innerHTML = `<div class="wx${channel === "v" ? " v" : ""}">${screenHTML(screens[k])}</div>`; };
+        if (first || !el.isConnected) return paint();
+        const w = document.createElement("div"); w.className = "bs-wipe wx-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
+        stage.append(w); if (!st.muted) whoosh(st.audio);
+        setTimeout(paint, 330); setTimeout(() => w.remove(), 900); };
+      drawW(); const tw = setInterval(() => el.isConnected ? drawW() : clearInterval(tw), 250);
     } else if (g.kind === "bulletin") {   // two minutes from :00 and :30, the same for everyone
       // The channel ID (five seconds), the NEWS BULLETIN opening, then the stories.
       // The two-minute bulletins carry up to seven stories; the 65-second ones at :15 and :45, four.
@@ -842,9 +902,19 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const flip = (a, b, cls) => `<span class="dt-flip ${cls}"><span class="ff a">${a}</span><span class="ff b">${b}</span></span>`;
   // One block at the top left: LIVE and the time on top; under it, a slim row of the date
   // (flipping between English and Bengali) and the Bengali calendar date, the same width.
-  const dtBar = (L, s) => (L.live || L.clock) ? `<div class="tv-dt"><div class="dt-top">${L.live ? `<span class="dt-live"><i></i>LIVE</span>` : ""}${L.clock ? `<b class="dt-time">${flip(`${enTime()}<small>IST</small>`, `${ist()}`, "t")}</b>` : ""}</div>${L.clock ? `<div class="dt-sub"><span class="dt-date">${flip(esc(enDate()), esc(bnDayDate()), "d")}</span>${s.bangabda ? `<span class="dt-bn">${esc(s.bangabda)}</span>` : ""}</div>` : ""}</div>` : "";
+  const dtBar = (L, s) => (L.live || L.clock) ? `<div class="tv-dt"><div class="dt-top">${L.live ? `<span class="dt-live"><i></i>LIVE</span>` : ""}${L.clock ? `<b class="dt-time">${flip(`${enTime()}<small>IST</small>`, `${ist()}`, "t")}</b>` : ""}</div>${L.clock ? `<div class="dt-sub"><span class="dt-date">${flip(esc(enDate()), esc(bnDayDate()), "d")}</span>${s.bangabda ? `<span class="dt-bn">${esc(s.bangabda)}</span>` : ""}</div>` : ""}${L.weather !== false && (s.weatherPlaces || []).length ? `<div class="tv-wxslot"></div>` : ""}</div>` : "";
   // Every ad box on screen (corner, L-band, headlines, vertical band) is filled here on its own,
   // so its turns (partners every 50 s) never redraw the other graphics; a new face turns in.
+  // The weather row under the clock: two places at a time, the next two every eight seconds,
+  // names and figures flipping between English and Bengali like the date.
+  function fillWx() {
+    const P = st.tv?.weatherPlaces || [], slot = stage.querySelector(".tv-wxslot");
+    if (!slot || !P.length) return;
+    const sets = Math.ceil(P.length / 2), k = Math.floor(Date.now() / 8000) % sets, pair = P.slice(k * 2, k * 2 + 2);
+    const html = pair.map(p => `<span class="wx-mini k-${p.kind}"><i class="wx-ico k-${p.kind}"></i><span class="wm-n">${flip(esc(p.en), esc(p.bn), "wm")}</span><b>${flip(`${p.temp}°C`, `${bnDigits(p.temp)}°সে`, "wm")}</b></span>`).join("");
+    if (slot.__html === html) return;
+    slot.innerHTML = `<div class="wx-pair">${html}</div>`; slot.__html = html;
+  }
   function fillAds() {
     const html = adBox(sponsorAd()), turned = st.lastAd !== undefined && st.lastAd !== html;
     stage.querySelectorAll(".tv-adslot").forEach(s => { if (s.__html === html) return; s.innerHTML = html; s.__html = html; if (turned) s.firstElementChild?.classList.add("enter"); });
@@ -899,13 +969,23 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const side = n ? [1, 2, 3, 4].map(i => Hs[(k + i) % n]).filter((h, i, a) => h && a.indexOf(h) === i && h.text !== main) : [];
     put(".tvp-lbl", `<div class="lb-auto-box${on ? "" : " out"}" data-k="${k}"><div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${side.slice(0, 3).map((h, i) => `<p style="--n:${i}"><small>${esc(DESK_BN[h.desk] || h.desk || "")}</small>${esc(h.text)}</p>`).join("")}<div class="lb-logo"><img src="${LOGO}" alt=""><i></i></div></div><div class="lb-bottom"><b>${esc(main)}</b>${L.ad ? `<div class="tv-adslot"></div>` : ""}</div></div>`);
   }
+  // The card that names what is coming, before the headlines or a breaking story: the word
+  // wipes in over a bar of light, in English and Bengali, then the screen wipes to the story.
+  function introCard(breaking) {
+    return `<div class="gx-intro${breaking ? " br" : ""}${channel === "v" ? " v" : ""}"><i class="gx-bg"></i><i class="gx-bar"></i><div class="gx-in"><img src="${LOGO}" alt=""><b data-no-tr>${breaking ? "BREAKING NEWS" : "HEADLINES"}</b><span>${breaking ? "এইমাত্র পাওয়া খবর" : "শিরোনাম"}</span></div></div>`;
+  }
   function showBreaking(b) {
+    // A short BREAKING NEWS card first, then the story.
+    const intro = document.createElement("div"); intro.className = "tv-intro"; intro.innerHTML = introCard(true); stage.append(intro);
+    if (b.music && !st.muted) breakingSting(st.audio, Math.min(b.seconds, 8));
+    setTimeout(() => { intro.remove(); showBreakingStory(b); }, 2000);
+  }
+  function showBreakingStory(b) {
     const el = document.createElement("div"); el.className = "tv-breaking";
     el.innerHTML = channel === "h"
       ? `<div class="br-slash"></div><div class="br-in"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(b.text)}</b><img src="${LOGO}" alt=""></div><div class="br-bar"></div>`
       : vJacket(`<div class="br-v"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(b.text)}</b></div>`, "এইমাত্র পাওয়া খবর");
     stage.append(el);
-    if (b.music && !st.muted) breakingSting(st.audio, Math.min(b.seconds, 8));
     st.current?.slots.forEach(s => s.setMuted(true));
     setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 600); st.current?.slots.forEach(s => s.setMuted(st.muted)); }, b.seconds * 1000);
   }
@@ -937,7 +1017,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (mode === "app") preloadYT(st.preWant);
     const b = st.ctl?.breaking || st.tv?.breaking;
     if (mode !== "scene" && b && st.shownBreaking !== b.at && now() - Date.parse(b.at) < 90e3) { st.shownBreaking = b.at; showBreaking(b); }
-    drawJacket(); fillAds();
+    drawJacket(); fillAds(); fillWx();
     // Health: a source that has not moved for ten seconds is reported (outputs only).
     const stalled = st.current?.slots.some(s => s.stalled());
     st.stalledSince = stalled ? st.stalledSince || Date.now() : 0;
