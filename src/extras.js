@@ -56,19 +56,61 @@ export async function weather(env) {
   }
 }
 
+/* ---------- The weather briefing: West Bengal and India (Open-Meteo, one request), every 30 min ---------- */
+// The channel's full-screen weather briefing after each bulletin, and the two-place weather row
+// under the clock, read this: each place's temperature (now, today's high and low), humidity,
+// wind and the kind of weather, which picks the animation (sun, cloud, rain, storm, wind, heat,
+// fog, clear night).
+export const WX_PLACES = [
+  ["wb", "Kolkata", "কলকাতা", 22.5726, 88.3639], ["wb", "Darjeeling", "দার্জিলিং", 27.041, 88.2663], ["wb", "Howrah", "হাওড়া", 22.5958, 88.2636],
+  ["wb", "Nadia", "নদিয়া", 23.4058, 88.4906], ["wb", "Bankura", "বাঁকুড়া", 23.2324, 87.0716], ["wb", "Birbhum", "বীরভূম", 23.9095, 87.5276],
+  ["wb", "Medinipur", "মেদিনীপুর", 22.4246, 87.3214], ["wb", "Murshidabad", "মুর্শিদাবাদ", 24.0983, 88.2675], ["wb", "South 24 Parganas", "দক্ষিণ ২৪ পরগনা", 22.3565, 88.432],
+  ["in", "Delhi", "দিল্লি", 28.6139, 77.209], ["in", "Mumbai", "মুম্বই", 19.076, 72.8777], ["in", "Bengaluru", "বেঙ্গালুরু", 12.9716, 77.5946],
+  ["in", "Hyderabad", "হায়দরাবাদ", 17.385, 78.4867], ["in", "Chennai", "চেন্নাই", 13.0827, 80.2707], ["in", "Guwahati", "গুয়াহাটি", 26.1445, 91.7362],
+  ["in", "Srinagar", "শ্রীনগর", 34.0837, 74.7973], ["in", "Ahmedabad", "আমদাবাদ", 23.0225, 72.5714]
+];
+const WX_KIND = { storm: ["Thunderstorm", "ঝড়বৃষ্টি"], rain: ["Rain", "বৃষ্টি"], heat: ["Heatwave", "তীব্র গরম"], wind: ["Windy", "ঝোড়ো হাওয়া"], fog: ["Fog", "কুয়াশা"], cloud: ["Cloudy", "মেঘলা"], sun: ["Sunny", "রোদ ঝলমলে"], clear: ["Clear sky", "পরিষ্কার আকাশ"] };
+const wxKind = (code, temp, wind, day) => code >= 95 ? "storm" : (code >= 51 && code <= 67) || (code >= 80 && code <= 82) ? "rain" : temp >= 36 ? "heat" : wind >= 30 ? "wind" : code === 45 || code === 48 ? "fog" : code >= 2 ? "cloud" : day ? "sun" : "clear";
+export async function weatherBrief(env) {
+  const w = await getSetting(env, "weather_brief");
+  if (w && Date.now() - w.at < 30 * 60e3) return w;
+  try {
+    const u = new URL(env.WEATHER_BRIEF_ENDPOINT || "https://api.open-meteo.com/v1/forecast");
+    u.searchParams.set("latitude", WX_PLACES.map(p => p[3]).join(","));
+    u.searchParams.set("longitude", WX_PLACES.map(p => p[4]).join(","));
+    u.searchParams.set("current", "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,is_day");
+    u.searchParams.set("daily", "temperature_2m_max,temperature_2m_min");
+    u.searchParams.set("timezone", "Asia/Kolkata"); u.searchParams.set("forecast_days", "1");
+    const r = await fetch(u, { signal: AbortSignal.timeout(8000) });
+    const data = await r.json(), list = Array.isArray(data) ? data : [data];
+    const places = WX_PLACES.map(([zone, en, bnName], i) => {
+      const c = list[i]?.current || {}, d = list[i]?.daily || {};
+      const temp = Math.round(c.temperature_2m), wind = Math.round(c.wind_speed_10m), kind = wxKind(c.weather_code, temp, wind, c.is_day !== 0);
+      return { zone, en, bn: bnName, temp, hi: Math.round(d.temperature_2m_max?.[0]), lo: Math.round(d.temperature_2m_min?.[0]), hum: Math.round(c.relative_humidity_2m), wind, kind, kindEn: WX_KIND[kind][0], kindBn: WX_KIND[kind][1] };
+    }).filter(p => Number.isFinite(p.temp));
+    const out = { at: Date.now(), places };
+    if (places.length) await putSetting(env, "weather_brief", out);
+    return places.length ? out : (w || null);
+  } catch {
+    if (w) await putSetting(env, "weather_brief", { ...w, at: Date.now() - 20 * 60e3 }).catch(() => {});
+    return w || null;
+  }
+}
+
 /* ---------- for every screen, alongside the channel state (/api/tv/<ch>) ---------- */
 let cache = { at: 0, value: null };
 export async function tvExtras(env) {
   if (Date.now() - cache.at < 5000 && cache.value) return cache.value;
-  const [polls, boards, w] = await Promise.all([
+  const [polls, boards, w, brief] = await Promise.all([
     env.DB.prepare("SELECT id,question,options,status FROM polls WHERE status IN ('open','closed') AND created_at > datetime('now','-7 days') ORDER BY created_at DESC LIMIT 10").all().then(r => r.results).catch(() => []),
     env.DB.prepare("SELECT * FROM results_boards ORDER BY updated_at DESC LIMIT 10").all().then(r => r.results).catch(() => []),
-    weather(env)
+    weather(env), weatherBrief(env).catch(() => null)
   ]);
   const counts = polls.length ? (await env.DB.prepare(`SELECT poll_id, choice, COUNT(*) AS n FROM poll_votes WHERE poll_id IN (${polls.map(() => "?").join(",")}) GROUP BY poll_id, choice`).bind(...polls.map(p => p.id)).all()).results : [];
   const value = {
     bangabda: bangabda().text,
     weather: w?.line || "",
+    weatherPlaces: brief?.places || [],
     polls: polls.map(p => { const options = parse(p.options, []); return { id: p.id, question: p.question, options, status: p.status, counts: options.map((_, i) => counts.find(c => c.poll_id === p.id && c.choice === i)?.n || 0) }; }),
     // During the blackout nothing but the board's title leaves the server.
     boards: boards.map(b => { const blackout = b.blackout_until && Date.parse(b.blackout_until) > Date.now(); return { id: b.id, title: b.title, kind: b.kind, total: b.total, source: b.source, blackout, rows: blackout ? [] : parse(b.rows, []), updatedAt: b.updated_at }; })

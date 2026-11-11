@@ -140,9 +140,11 @@ export function scheduleAt(loop, epoch, t = Date.now(), ahead = 5400, opts = {})
   while (at < end && steps < 400000) {
     steps++;
     if (at >= due) {
-      const len = bulletinMs(due);
+      const len = bulletinMs(due), wx = opts.weather ? (len === 120e3 ? 90e3 : 60e3) : 0;
       if (at + len > t) out.push({ type: "bulletin", start: at, dur: len / 1000, sting: true });
-      due = nextHalf(at); at += len; continue;
+      // The weather briefing straight after it (horizontal channel).
+      if (wx && at + len + wx > t) out.push({ type: "weather", start: at + len, dur: wx / 1000, sting: true });
+      due = nextHalf(at); at += len + wx; continue;
     }
     const x = loop[i], next = at + x.dur * 1000;
     if (next > t) out.push({ ...x, start: at, in: 0 });
@@ -190,7 +192,7 @@ export async function tvState(env, ch) {
   const voices = await readyVoices(env, bulletin).catch(() => new Map());
   bulletin.forEach(b => { const v = voices.get(b); if (v) { b.voice = `/api/tv/voice/${v.key}.mp3`; b.secs = v.secs; } });
   const loop = buildLoop(s, videos, cards);
-  const schedule = s.on ? scheduleAt(loop, s.epoch, Date.now(), 5400, { hold: s.hold, anchor: s.anchor }) : [];
+  const schedule = s.on ? scheduleAt(loop, s.epoch, Date.now(), 5400, { hold: s.hold, anchor: s.anchor, weather: ch === "h" }) : [];
   // Keep a point near now (and drop a hold that has played out), so the walk stays short.
   const holdOver = (s.hold || []).length && (s.hold || []).every(h => h.start + h.dur * 1000 < Date.now());
   if (schedule.anchor || holdOver) { const fresh = await tvSettings(env, ch); if (schedule.anchor && fresh.epoch === s.epoch) fresh.anchor = schedule.anchor; if (holdOver) delete fresh.hold; await putSettings(env, ch, fresh); }
