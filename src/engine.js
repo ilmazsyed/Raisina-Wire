@@ -995,7 +995,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         const ex = [{ brk: 1 }], f = factOf(x), pts = pointsOf(x);
         if (f) ex.unshift({ fact: f });
         if (pts.length >= 2) ex.push({ pts });
-        const v = P.length ? [{ img: P[0], fx: "duo" }, { img: P[P.length > 1 ? 1 : 0], fx: "split" }] : [];
+        // No split frame (it only repeated the same picture twice).
+        const v = P.length ? [{ img: P[0], fx: "duo" }] : [];
         // Every story opens with the red BREAKING NEWS card, then its key points (or its key
         // figure), then its photographs (and their re-treated versions), then any other card.
         const out = [{ brk: 1 }];
@@ -1016,7 +1017,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         if (sl.fact) return `<div class="avo-slide"><div class="avo-info fact"><span class="lbl">${desk} · সংখ্যায়</span><div class="fig"><b class="num" data-to="${sl.fact.n}" data-dec="${sl.fact.dec ? 1 : 0}">০</b><em>${esc(sl.fact.unit)}</em></div><p>${esc(sl.fact.line)}</p><i class="rule"></i></div></div>`;
         if (sl.pts) return `<div class="avo-slide"><div class="avo-info pts"><span class="lbl">মূল তথ্য</span><ol>${sl.pts.map((p, i) => `<li style="--i:${i}"><i>${bnDigits(i + 1)}</i><span>${esc(p)}</span></li>`).join("")}</ol></div></div>`;
         const bg = bgOf(x);
-        return `<div class="avo-slide"><div class="avo-brk">${bg ? `<img class="bg" src="${esc(bg.src)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')">` : ""}<i class="s1"></i><i class="s2"></i><div class="in"><span class="brk-tag">এইমাত্র পাওয়া খবর</span><small data-no-tr>BREAKING NEWS</small><b>${esc(x.title)}</b></div><i class="bar"></i></div></div>`;
+        return `<div class="avo-slide"><div class="avo-brk">${bg ? `<img class="bg" src="${esc(bg.src)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')">` : ""}<i class="s1"></i><i class="s2"></i><div class="in"><span class="brk-tag">এইমাত্র পাওয়া খবর</span><small data-no-tr>BREAKING NEWS</small><b>${esc(x.title)}</b></div></div></div>`;
       };
       // The key figure counts up in Bengali digits.
       const countUp = box => box.querySelectorAll(".num[data-to]").forEach(n => { if (n.dataset.done) return; n.dataset.done = 1; const to = Number(n.dataset.to), dec = n.dataset.dec === "1", t0 = performance.now(), dur = 1300;
