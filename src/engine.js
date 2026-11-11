@@ -489,9 +489,11 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const load = () => {
       const y = st.yt;
       if (!y?.ready || st.ytOwner !== token) return;
+      // A record of this start (sent once it plays, or after ten seconds).
+      if (mode === "app" && !st.ytDiag) { st.ytDiag = { t0: Date.now(), pre: y.pre === src.id, preState: y.state, muted: !!st.muted, seq: [] }; setTimeout(() => sendDiag(), 10000); }
       try {
         y.ended = false;
-        if (y.pre === src.id) { y.pre = null; y.preloading = false; let at = 0; try { at = y.player.getCurrentTime() || 0; } catch { /* none */ } if (Math.abs(at - start) > 1.5) y.player.seekTo(start, true); st.muted ? y.player.mute() : y.player.unMute(); y.player.playVideo(); }
+        if (y.pre === src.id) { y.pre = null; y.preloading = false; y.rolling = null; let at = 0; try { at = y.player.getCurrentTime() || 0; } catch { /* none */ } if (Math.abs(at - start) > 0.6) y.player.seekTo(start, true); st.muted ? y.player.mute() : y.player.unMute(); y.player.playVideo(); }
         else { y.pre = null; y.player.loadVideoById({ videoId: src.id, startSeconds: start }); st.muted ? y.player.mute() : y.player.unMute(); }
       } catch { /* none */ }
       checkStart();
@@ -535,6 +537,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         },
         onStateChange: e => {
           st.yt.state = e.data; st.yt.since = Date.now();
+          if (st.ytDiag) { st.ytDiag.seq.push([Date.now() - st.ytDiag.t0, e.data]); if (e.data === 1 && st.ytOwner) sendDiag(); }
           // A video loaded in advance waits, paused and buffered, until its turn.
           if (st.yt.preloading && !st.ytOwner) { if (e.data === 1) { e.target.pauseVideo(); st.yt.preloading = false; } return; }
           if (e.data === 0) st.yt.ended = true; ytMaskState(layer, e.data, e.data === 1 && !!st.ytPoster?.querySelector(".tvs-poster")); if (e.data === 1) { liftPoster(st.ytPoster); needTap(false); noCaptions(e.target); }
@@ -544,6 +547,23 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   }
   // The next video is loaded into the one player while the flash or the "up next" card is on
   // (the player is invisible then), so it plays the moment its turn comes, without a wait.
+  // The last second and a half of the "up next" card: the video loaded behind it starts playing,
+  // muted and unseen, so that when its turn comes it is already running (its decoder warm, its
+  // first seconds buffered) and the card hands over at once. Its turn then takes it back to its
+  // start, which is already loaded.
+  function preRoll() {
+    const q = st.seq, y = st.yt;
+    if (!q || q.item?.type !== "upnext" || !y?.ready || st.ytOwner || !y.pre || y.pre !== q.item.video?.ytId || y.rolling === y.pre) return;
+    if (now() - q.start < (q.item.dur - 1.5) * 1000) return;
+    y.rolling = y.pre; y.preloading = false;
+    try { y.player.mute(); y.player.playVideo(); } catch { /* none */ }
+  }
+  function sendDiag(extra = {}) {
+    const d = st.ytDiag; if (!d || d.sent) return; d.sent = true; st.ytDiag = null;
+    const ua = navigator.userAgent, plat = /iPhone|iPad|iPod/.test(ua) ? "ios" : /Android/.test(ua) ? "android" : /Mac/.test(ua) ? "mac" : /Windows/.test(ua) ? "windows" : "other";
+    const body = JSON.stringify({ plat, ch: channel, pre: d.pre, preState: d.preState, muted: d.muted, seq: d.seq, card: st.lastCardMs || 0, timeout: !!st.lastCardTimeout, ...extra });
+    try { navigator.sendBeacon ? navigator.sendBeacon("/api/tv/diag", new Blob([body], { type: "application/json" })) : fetch("/api/tv/diag", { method: "POST", headers: { "content-type": "application/json" }, body, keepalive: true }); } catch { /* none */ }
+  }
   function preloadYT(want) {
     if (want && !st.yt && !st.ytOwner && !st.ytMaking) { st.ytMaking = true; loadYT().then(YT => { st.ytMaking = false; if (YT && st.alive && !st.yt && !st.ytOwner) makeYT(YT, want.id, Math.floor(want.at || 0), true); }); return; }
     const y = st.yt;
@@ -1001,6 +1021,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (intoVideo) {
       const t0 = Date.now(), iv = setInterval(() => {
         if (!(slots[0].playing() || Date.now() - t0 > 4000 || !st.alive || st.current?.box !== box)) return;
+        st.lastCardMs = Date.now() - t0; st.lastCardTimeout = !slots[0].playing();
         clearInterval(iv); old.box.style.animation = "tvmixout .45s ease both"; setTimeout(finish, 450);
       }, 80);
     }
@@ -1670,7 +1691,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (window.__rwPlayout && st.seq?.seg && st.seq.seg !== st.lastSeg) { const g = st.lastSeg = st.seq.seg; window.__rwPlayout.push({ type: g.type, start: g.start, dur: g.dur, title: g.title || "", yt: g.ytId || "", eg: !!g.eg, resumed: !!g.resumed, name: g.name || "", items: (g.items || []).length, stories: (g.stories || []).map(x => ({ id: x.id, dk: x.dk, weight: x.weight })) }); }
     if (window.__rwScenes && sc?.key !== st.current?.key) window.__rwScenes.push({ at: now(), key: sc?.key || "", seg: st.seq?.seg?.type || "", item: st.seq?.item?.type || "" });
     if (sc?.key !== st.current?.key) drawScene(sc);
-    if (mode === "app") preloadYT(st.preWant);
+    if (mode === "app") { preloadYT(st.preWant); preRoll(); }
     const b = st.ctl?.breaking || st.tv?.breaking;
     if (mode !== "scene" && b && st.shownBreaking !== b.at && now() - Date.parse(b.at) < 90e3) { st.shownBreaking = b.at; showBreaking(b); }
     drawJacket(); fillAds(); fillWx(); drawCues();
