@@ -13,12 +13,13 @@ const UA = "RashtrixTV/1.0 (bulletin pictures; https://rashtrix.ilmazsyed.worker
 const FREE = /^(cc0|public domain|pd\b|pd-|cc[- ]by(-sa)?[- ]\d)/i;
 const strip = h => String(h || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
 
-async function commons(query) {
+async function commonsAll(query, max = 6) {
   const u = new URL("https://commons.wikimedia.org/w/api.php");
   Object.entries({ action: "query", format: "json", generator: "search", gsrnamespace: "6", gsrlimit: "10", gsrsearch: `${query} filetype:bitmap`, prop: "imageinfo", iiprop: "url|extmetadata|size|mime", iiurlwidth: "1280" })
     .forEach(([k, v]) => u.searchParams.set(k, v));
   const r = await fetch(u, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(10000) });
-  if (!r.ok) return null;
+  if (!r.ok) return [];
+  const out = [];
   const pages = Object.values((await r.json()).query?.pages || {}).sort((a, b) => (a.index || 0) - (b.index || 0));
   // Relevance: the file's name or description must mention a word of the query.
   const words = query.toLowerCase().split(/\s+/).filter(w => w.length >= 4);
@@ -31,17 +32,20 @@ async function commons(query) {
     if (words.length && !words.some(w => about.includes(w))) continue;
     const author = strip(md.Artist?.value).slice(0, 60) || "Unknown";
     const pd = /public domain|^pd|cc0/i.test(licence);
-    return { url: ii.thumburl || ii.url, page: ii.descriptionurl || "", credit: `ছবি: ${author}${pd ? "" : `, ${licence}`} · Wikimedia Commons` };
+    out.push({ url: ii.thumburl || ii.url, page: ii.descriptionurl || "", credit: `ছবি: ${author}${pd ? "" : `, ${licence}`} · Wikimedia Commons` });
+    if (out.length >= max) break;
   }
-  return null;
+  return out;
 }
+const commons = async query => (await commonsAll(query, 1))[0] || null;
 
 // Openverse (Flickr and other open collections): free-licence photographs, landscape and large.
-async function openverse(query) {
+async function openverseAll(query, max = 6) {
   const u = new URL("https://api.openverse.org/v1/images/");
   Object.entries({ q: query, license: "by,by-sa,cc0,pdm", aspect_ratio: "wide", size: "large", mature: "false", page_size: "10" }).forEach(([k, v]) => u.searchParams.set(k, v));
   const r = await fetch(u, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(10000) });
-  if (!r.ok) return null;
+  if (!r.ok) return [];
+  const out = [];
   const words = query.toLowerCase().split(/\s+/).filter(w => w.length >= 4);
   for (const it of (await r.json()).results || []) {
     if (!it.url || (it.width && it.width < 800) || (it.height && it.height < 450) || THUMB.test(it.url)) continue;
@@ -49,10 +53,12 @@ async function openverse(query) {
     if (words.length && !words.some(w => about.includes(w))) continue;
     const lic = /^(cc0|pdm)$/i.test(it.license) ? "" : `, CC ${String(it.license).toUpperCase()} ${it.license_version || ""}`.trimEnd();
     const where = it.source ? it.source[0].toUpperCase() + it.source.slice(1) : "Openverse";
-    return { url: it.url, page: it.foreign_landing_url || "", credit: `ছবি: ${String(it.creator || "Unknown").slice(0, 60)}${lic} · ${where}` };
+    out.push({ url: it.url, page: it.foreign_landing_url || "", credit: `ছবি: ${String(it.creator || "Unknown").slice(0, 60)}${lic} · ${where}` });
+    if (out.length >= max) break;
   }
-  return null;
+  return out;
 }
+const openverse = async query => (await openverseAll(query, 1))[0] || null;
 
 // A publication's name for the credit, from the wire feed's internal label ("ABP ANANDA DIST" →
 // "ABP Ananda"): section words dropped, capitals eased (short acronyms kept).
@@ -132,4 +138,25 @@ export async function bulletinImageRoute(env, id) {
   const r = await fetch(row.url, { headers: { "user-agent": BROWSER_UA, accept: "image/*" }, cf: { cacheTtl: 86400, cacheEverything: true }, signal: AbortSignal.timeout(10000) }).catch(() => null);
   if (!r?.ok || !/^image\//.test(r.headers.get("content-type") || "")) return Response.redirect(row.url, 302);
   return new Response(r.body, { headers: { "content-type": r.headers.get("content-type"), "cache-control": "public, max-age=86400" } });
+}
+
+// Several clean photographs for one story (the AVO engine wants four or more): every usable
+// photo of the reports it was written from (never a television channel's), then Commons and
+// Openverse pictures for the search terms, without repeats. Each carries its credit.
+export async function storyPhotos(env, story, want = 6) {
+  const out = [], seen = new Set(), add = x => { if (x?.url && !seen.has(x.url) && out.length < want) { seen.add(x.url); out.push(x); } };
+  const { results } = await env.DB.prepare(`SELECT i.url, i.source_name FROM wire_jobs j JOIN wire_items i ON i.job_id=j.id WHERE j.article_id=? ORDER BY i.published_at DESC LIMIT 6`).bind(story.id).all().catch(() => ({ results: [] }));
+  for (const it of results) {
+    if (broadcaster(it.source_name, it.url)) continue;
+    const url = await pagePhoto(it.url).catch(() => "");
+    if (url) add({ url, page: it.url, credit: `ছবি: সৌজন্যে ${pubName(it.source_name)}` });
+  }
+  let terms = [];
+  try { terms = (await imageTerms(env, [story]))[story.id] || []; } catch { /* none today */ }
+  for (const q of terms) {
+    if (out.length >= want) break;
+    for (const x of await commonsAll(q, want).catch(() => [])) add(x);
+    if (out.length < want) for (const x of await openverseAll(q, want).catch(() => [])) add(x);
+  }
+  return out;
 }

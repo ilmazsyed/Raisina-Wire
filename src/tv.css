@@ -818,3 +818,57 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 /* A YouTube upload that isn't exactly 16:9 comes with black bars; the picture is zoomed a little
    (like a TV's overscan) so it always fills the frame. */
 .tvs-ytwrap .tvs-yt{transform:scale(1.08);transform-origin:50% 50%}
+
+/* ---------- The AVO Breaking Engine: a story read over full-screen pictures ---------- */
+.avo{position:absolute;inset:0;overflow:hidden;background:#0b0203;color:#fff}
+.avo-pics,.avo-slide{position:absolute;inset:0}
+.avo-slide{overflow:hidden}
+.avo-slide img{width:100%;height:100%;object-fit:cover;transform-origin:50% 40%;animation:avokb var(--d,8s) linear both}
+.avo-slide:nth-child(even) img{transform-origin:30% 60%;animation-name:avokb2}
+@keyframes avokb{from{transform:scale(1.02)}to{transform:scale(1.16) translateX(-1.5%)}}
+@keyframes avokb2{from{transform:scale(1.15) translateX(1.5%)}to{transform:scale(1.03)}}
+.avo-slide.in{animation:avoin .7s cubic-bezier(.7,0,.25,1) both}
+@keyframes avoin{from{clip-path:polygon(0 0,0 0,-12% 100%,-12% 100%)}to{clip-path:polygon(0 0,112% 0,100% 100%,0 100%)}}
+.avo-shade{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.35) 0%,transparent 22%,transparent 48%,rgba(10,2,3,.82) 100%)}
+.avo-kick{position:absolute;left:40px;top:172px;display:flex;align-items:center;gap:12px;padding:8px 18px 8px 14px;border-radius:999px;background:var(--red);box-shadow:0 0 0 2px rgba(212,160,23,.8),0 12px 28px rgba(0,0,0,.4);animation:unslide .5s .2s cubic-bezier(.2,.9,.2,1) both}
+.avo-kick .lt-pulse{position:static;width:14px;height:14px}
+.avo-kick b{font:800 34px "Hind Siliguri",sans-serif}
+.avo-kick span{padding:2px 12px;border-radius:999px;background:#f2c14e;color:#1a0405;font:800 26px "Hind Siliguri",sans-serif}
+.avo-cap{position:absolute;left:120px;right:120px;bottom:262px;display:flex;justify-content:center;pointer-events:none}
+.avo-cap span{max-width:1500px;padding:14px 30px;border-radius:14px;background:rgba(10,2,3,.72);border-left:6px solid var(--gold);font:700 50px/1.4 "Noto Serif Bengali",serif;text-align:center;text-shadow:0 2px 10px rgba(0,0,0,.5)}
+.avo-cap span:empty{display:none}
+.avo-cap span.in{animation:nbup .45s cubic-bezier(.2,.9,.2,1) both}
+.avo-l3{position:absolute;left:56px;right:56px;bottom:84px;display:flex;align-items:stretch;min-height:120px;border-radius:12px;overflow:hidden;background:#fff;color:#111;border-bottom:4px solid var(--gold);box-shadow:0 18px 40px rgba(0,0,0,.4);animation:tvin .7s .3s cubic-bezier(.2,.8,.2,1) both}
+.avo-l3 .lt-text{display:flex;align-items:center;padding:14px 28px;font:700 50px/1.25 "Noto Serif Bengali",serif;color:#111}
+.avo-credit{position:absolute;right:64px;bottom:214px;max-width:900px;font:500 18px "Hind Siliguri",sans-serif;color:rgba(255,255,255,.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.avo-steps{position:absolute;left:56px;right:56px;bottom:40px;display:flex;gap:10px}
+.avo-steps i{flex:1;height:10px;border-radius:5px;background:rgba(255,255,255,.22);overflow:hidden;position:relative}
+.avo-steps i.done{background:var(--gold)}
+.avo-steps i.on:after{content:"";position:absolute;left:0;top:0;bottom:0;width:0;background:var(--gold);animation:tvprog var(--d) linear forwards}
+/* graphic cards when a story has fewer than four photographs */
+.avo-card{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:26px;padding:120px 160px 300px;background:linear-gradient(135deg,#120203 0%,#3a0507 55%,#7a0709 100%)}
+.avo-card:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.04) 0 2px,transparent 2px 40px)}
+.avo-card>*{position:relative}
+.avo-card span{align-self:flex-start;padding:8px 22px;border-radius:10px;background:var(--red);box-shadow:0 0 0 2px rgba(212,160,23,.8);font:800 40px "Hind Siliguri",sans-serif}
+.avo-card b{font:800 84px/1.3 "Noto Serif Bengali",serif;animation:nbup .7s .2s both}
+.avo-card.c1{background:linear-gradient(135deg,#2a0405,#120203)}
+.avo-card.c1 i{width:160px;height:8px;border-radius:4px;background:var(--gold)}
+.avo-card.c1 b{font-size:70px;color:#fff;border-left:8px solid var(--gold);padding-left:36px}
+.avo-card.c2{align-items:center;text-align:center;background:radial-gradient(ellipse at 50% 35%,#5a0608,#120203 70%)}
+.avo-card.c2 img{height:200px;padding:14px 18px;background:#fff;border-radius:18px;box-shadow:0 0 0 4px var(--gold)}
+.avo-card.c2 b{font-size:66px}
+/* vertical channel (1080 x 1920) */
+.avo.v .avo-kick{top:300px;left:44px}
+.avo.v .avo-cap{left:50px;right:50px;bottom:560px}
+.avo.v .avo-cap span{font-size:52px}
+.avo.v .avo-l3{left:44px;right:44px;bottom:200px;flex-direction:column}
+.avo.v .avo-l3 .lt-tag{padding:12px 22px}
+.avo.v .avo-l3 .lt-text{font-size:54px}
+.avo.v .avo-credit{right:44px;bottom:500px;max-width:900px}
+.avo.v .avo-steps{left:44px;right:44px;bottom:120px}
+.avo.v .avo-card{padding:420px 70px 700px}
+.avo.v .avo-card b{font-size:76px}
+.avo-l3 .lt-tag{flex-direction:column;justify-content:center;align-items:flex-start;gap:4px;padding:0 26px;position:relative}
+.avo-l3 .lt-tag .lt-pulse{position:absolute;left:10px;top:14px}
+.avo-l3 .lt-tag b{font:900 30px/1.05 Montserrat,sans-serif}
+.avo-l3 .lt-tag small{font:700 20px "Hind Siliguri",sans-serif;color:#ffe08a}
