@@ -872,3 +872,20 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .avo-l3 .lt-tag .lt-pulse{position:absolute;left:10px;top:14px}
 .avo-l3 .lt-tag b{font:900 30px/1.05 Montserrat,sans-serif}
 .avo-l3 .lt-tag small{font:700 20px "Hind Siliguri",sans-serif;color:#ffe08a}
+
+/* Full-screen headlines: clear of the LIVE/time/date/weather block, and quicker and livelier:
+   cards slide in from alternate sides, the numbers pop, and a red highlight runs down the
+   stories in turn. */
+.tvp-h .nu-set.nu-wide{top:172px;bottom:96px}
+.nu-wide .nu-head{margin-right:200px}
+.nu-wide ol{margin-top:22px;gap:18px 24px}
+.nu-set li{position:relative;animation:nuL .45s calc(var(--n) * .07s) cubic-bezier(.2,.9,.2,1) both}
+.nu-wide li:nth-child(even){animation-name:nuR}
+@keyframes nuL{from{opacity:0;transform:translateX(-70px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes nuR{from{opacity:0;transform:translateX(70px) scale(.97)}to{opacity:1;transform:none}}
+.nu-set li em{animation:nupop .5s calc(.25s + var(--n) * .07s) cubic-bezier(.2,1.6,.4,1) both}
+@keyframes nupop{from{transform:scale(0) rotate(-20deg)}to{transform:none}}
+.nu-set li:after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;box-shadow:0 0 0 4px var(--red),0 18px 36px rgba(170,4,4,.25);animation:nuhl 1s calc(.9s + var(--n) * 1s) ease-in-out both}
+@keyframes nuhl{0%,100%{opacity:0}35%,70%{opacity:1}}
+.nu-head span{animation:nupop .45s .05s cubic-bezier(.2,1.6,.4,1) both}
+.nu-head b{animation:unslide .45s .12s cubic-bezier(.2,.9,.2,1) both}

@@ -693,8 +693,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         if (channel === "h") {
           q.vids = (q.vids || 0) + 1; q.since = (q.since || 0) + 1; q.gapN ||= 3;
           if (q.vids % 2 === 0) gap.push({ type: "ident", dur: 5, sting: false });
-          if (q.since >= q.gapN) { gap.push({ type: "flash", dur: 10, sting: true, n: q.n }); q.since = 0; q.gapN = q.gapN === 3 ? 2 : 3; }
-        } else gap.push({ type: "flash", dur: 10, sting: true, n: q.n });
+          if (q.since >= q.gapN) { gap.push({ type: "flash", dur: 8, sting: true, n: q.n }); q.since = 0; q.gapN = q.gapN === 3 ? 2 : 3; }
+        } else gap.push({ type: "flash", dur: 8, sting: true, n: q.n });
         gap.push(upnext({ ...x, at: 0 }));
         next = gap.shift(); q.pending = gap;
       }
@@ -854,7 +854,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       draw(); const t = setInterval(() => el.isConnected ? draw() : clearInterval(t), 1000);
     } else if (g.kind === "flash") {   // 10 seconds between videos: the breaking story, or the headlines
       // First a short card names what is coming (HEADLINES or BREAKING NEWS), then it wipes to it.
-      setTimeout(() => { const html = el.innerHTML; el.innerHTML = introCard(!!(st.ctl?.breaking || st.tv?.breaking)?.text); setTimeout(() => { if (!el.isConnected && st.current) return; el.innerHTML = html; }, 2200); }, 0);
+      setTimeout(() => { const html = el.innerHTML; el.innerHTML = introCard(!!(st.ctl?.breaking || st.tv?.breaking)?.text); setTimeout(() => { if (!el.isConnected && st.current) return; el.innerHTML = html; }, 1400); }, 0);
       const br = st.ctl?.breaking || st.tv?.breaking;
       if (br?.text) el.innerHTML = channel === "h" ? `<div class="tv-breaking static"><div class="br-slash"></div><div class="br-in"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(br.text)}</b><img src="${LOGO}" alt=""></div><div class="br-bar"></div></div>` : vJacket(`<div class="br-v"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(br.text)}</b></div>`, "এইমাত্র পাওয়া খবর");
       else {
@@ -863,7 +863,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         // The horizontal screen fills its width: six headlines in two columns of cards, each with
         // its desk, under a full-width head.
         el.innerHTML = channel === "h"
-          ? `<div class="nu-set nu-wide"><div class="nu-head"><span>শিরোনাম</span><b>সর্বশেষ</b><small data-no-tr>HEADLINES</small><i style="--d:${(sc.dur || 10) - 2.2}s"></i></div><ol>${pick.map((h, n) => `<li style="--n:${n}"><em>${bnDigits(n + 1)}</em><div><small>${esc(DESK_BN[h.desk] || h.desk || "খবর")}</small><span>${esc(h.text)}</span></div></li>`).join("")}</ol></div>`
+          ? `<div class="nu-set nu-wide"><div class="nu-head"><span>শিরোনাম</span><b>সর্বশেষ</b><small data-no-tr>HEADLINES</small><i style="--d:${(sc.dur || 8) - 1.4}s"></i></div><ol>${pick.map((h, n) => `<li style="--n:${n}"><em>${bnDigits(n + 1)}</em><div><small>${esc(DESK_BN[h.desk] || h.desk || "খবর")}</small><span>${esc(h.text)}</span></div></li>`).join("")}</ol></div>`
           : wrapV(setHTML("শিরোনাম", "সর্বশেষ", pick.map(h => h.text), sc.dur || 10), "শিরোনাম");
       }
     } else if (g.kind === "ident") {   // the channel ID: the Rashtrix logo, five seconds
