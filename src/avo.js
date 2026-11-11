@@ -156,6 +156,14 @@ export async function avoStep(env) {
 export async function avoForScreens(env) {
   const { results } = await env.DB.prepare(`SELECT * FROM avo_stories WHERE status='ready' AND published_at>=? AND aired<? ORDER BY published_at DESC LIMIT 12`)
     .bind(new Date(Date.now() - AVO_HOURS * 3600e3).toISOString(), AVO_MAX_AIRED).all().catch(() => ({ results: [] }));
+  // Never an empty AVO segment: with fewer than four in rotation (the day's 45 used, the rest aged
+  // out or aired four times), the most recent ready stories of the last day make up six.
+  if (results.length < 4) {
+    const have = new Set(results.map(r => r.article_id));
+    const { results: more } = await env.DB.prepare(`SELECT * FROM avo_stories WHERE status='ready' AND published_at>=? ORDER BY published_at DESC LIMIT 12`)
+      .bind(new Date(Date.now() - 24 * 3600e3).toISOString()).all().catch(() => ({ results: [] }));
+    for (const r of more) if (results.length < 6 && !have.has(r.article_id)) { results.push(r); have.add(r.article_id); }
+  }
   return results.map(screenStory);
 }
 export function screenStory(r) {
