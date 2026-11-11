@@ -122,7 +122,7 @@ async function prepare(env, row, sex) {
     const seen = new Set(photos.map(x => x.url));
     for (const x of found) if (photos.length < 6 && !seen.has(x.url)) { photos.push(x); seen.add(x.url); }
   }
-  await env.DB.prepare("UPDATE avo_stories SET script=?, sex=?, voice=?, secs=?, images=?, img_v=2, status='ready' WHERE article_id=?")
+  await env.DB.prepare("UPDATE avo_stories SET script=?, sex=?, voice=?, secs=?, images=?, img_v=3, status='ready' WHERE article_id=?")
     .bind(JSON.stringify(s.lines), sex, JSON.stringify(keys), Math.round(bytes / 4000 * 10) / 10, JSON.stringify(photos), row.article_id).run();
 }
 
@@ -130,11 +130,11 @@ async function prepare(env, row, sex) {
 // Stories pictured before the news-only finder: their pictures are looked up again (two a minute,
 // newest first, only those still in rotation; hand-written ones keep the pictures they were given).
 async function repicture(env) {
-  const { results } = await env.DB.prepare("SELECT article_id, title FROM avo_stories WHERE status IN ('ready','off') AND img_v<2 AND origin='auto' AND published_at>=? ORDER BY published_at DESC LIMIT 2")
+  const { results } = await env.DB.prepare("SELECT article_id, title FROM avo_stories WHERE status IN ('ready','off') AND img_v<3 AND origin='auto' AND published_at>=? ORDER BY published_at DESC LIMIT 2")
     .bind(new Date(Date.now() - AVO_HOURS * 3600e3).toISOString()).all().catch(() => ({ results: [] }));
   for (const r of results) {
     const photos = await newsPhotos(env, { id: r.article_id, title: r.title, dek: "" }, 6).catch(() => []);
-    await env.DB.prepare("UPDATE avo_stories SET images=?, img_v=2 WHERE article_id=?").bind(JSON.stringify(photos), r.article_id).run();
+    await env.DB.prepare("UPDATE avo_stories SET images=?, img_v=3 WHERE article_id=?").bind(JSON.stringify(photos), r.article_id).run();
   }
   return results.length;
 }

@@ -80,6 +80,24 @@ export const broadcaster = (name, url) => { try { if (BROADCAST_HOST.test(new UR
 
 // The lead photo of a web page: og:image, else twitter:image.
 const BROWSER_UA = "Mozilla/5.0 (compatible; RashtrixTV/1.0; +https://rashtrix.ilmazsyed.workers.dev)";
+// A publication's own logo or house card (the picture a site shares when a report has no photo of
+// its own) is never used: by its address, and by being the same picture the site's front page shares.
+const HOUSE = /logo|placeholder|default|fallback|og[-_]?image|share[-_]?(img|image)|social[-_]?(share|image|card)|masthead|brand|no[-_]?image|1x1|spacer|\/theme\/|\/static\/(img|images)\/|\/assets\/(img|images)\//i;
+const houseImg = new Map();
+const sameImg = (a, b) => { try { const x = new URL(a), y = new URL(b); return x.hostname === y.hostname && x.pathname === y.pathname; } catch { return false; } };
+async function siteCard(pageUrl) {
+  let origin; try { origin = new URL(pageUrl).origin; } catch { return ""; }
+  if (houseImg.has(origin)) return houseImg.get(origin);
+  const p = (async () => {
+    const r = await fetch(origin + "/", { headers: { "user-agent": BROWSER_UA, accept: "text/html" }, redirect: "follow", signal: AbortSignal.timeout(6000) }).catch(() => null);
+    if (!r?.ok) return "";
+    const html = (await r.text()).slice(0, 150000);
+    const m = html.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]*content=["']([^"']+)["']/i) || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["'](?:og:image|twitter:image)["']/i);
+    try { return m ? new URL(m[1].replace(/&amp;/g, "&"), r.url || origin).href : ""; } catch { return ""; }
+  })().catch(() => "");
+  houseImg.set(origin, p); return p;
+}
+export const houseLike = u => { try { return HOUSE.test(new URL(u).pathname); } catch { return true; } };
 async function pagePhoto(url) {
   const r = await fetch(url, { headers: { "user-agent": BROWSER_UA, accept: "text/html" }, redirect: "follow", signal: AbortSignal.timeout(8000) });
   if (!r.ok || !/html/i.test(r.headers.get("content-type") || "")) return "";
@@ -89,7 +107,10 @@ async function pagePhoto(url) {
   let img = meta("og:image") || meta("og:image:url") || meta("twitter:image") || meta("twitter:image:src");
   img = img.replace(/&amp;/g, "&").trim();
   if (!img) return "";
-  try { const u = new URL(img, r.url || url); return /^https?:$/.test(u.protocol) && !/logo|placeholder|default[-_]?(og|share)|favicon/i.test(u.pathname) && !THUMB.test(u.href) && !BROADCAST_HOST.test(u.hostname + ".") ? u.href : ""; } catch { return ""; }
+  let u; try { u = new URL(img, r.url || url); } catch { return ""; }
+  if (!/^https?:$/.test(u.protocol) || /favicon/i.test(u.pathname) || houseLike(u.href) || THUMB.test(u.href) || BROADCAST_HOST.test(u.hostname + ".")) return "";
+  const card = await siteCard(r.url || url);
+  return card && sameImg(card, u.href) ? "" : u.href;
 }
 // The reports a wire story was written from (kept internally), newest first.
 async function sourcePhoto(env, articleId) {
@@ -105,7 +126,7 @@ async function sourcePhoto(env, articleId) {
 export async function bulletinImages(env, n = 3) {
   // Pictures already taken from a television channel are dropped and looked up again.
   const { results: old } = await env.DB.prepare("SELECT article_id, credit, page, url FROM bulletin_images WHERE query='source' AND url<>''").all().catch(() => ({ results: [] }));
-  const redo = old.filter(r => broadcaster(r.credit.replace(/^ছবি: সৌজন্যে /, ""), r.page) || THUMB.test(r.url) || BROADCAST_HOST.test((() => { try { return new URL(r.url).hostname + "."; } catch { return ""; } })()));
+  const redo = old.filter(r => houseLike(r.url) || broadcaster(r.credit.replace(/^ছবি: সৌজন্যে /, ""), r.page) || THUMB.test(r.url) || BROADCAST_HOST.test((() => { try { return new URL(r.url).hostname + "."; } catch { return ""; } })()));
   if (redo.length) await env.DB.batch(redo.map(r => env.DB.prepare("UPDATE bulletin_images SET url='', credit='', query='', checked_at='2000-01-01T00:00:00Z' WHERE article_id=?").bind(r.article_id)));
   const { results: stories } = await env.DB.prepare(`SELECT a.id, a.title, a.dek FROM articles a LEFT JOIN bulletin_images b ON b.article_id=a.id
     WHERE a.status='published' AND a.lang='bn' AND a.pulled_at IS NULL AND a.kind IN ('rewrite','brief') AND a.published_at>=?
