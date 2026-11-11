@@ -6,6 +6,7 @@
 // from the Rashtrix Command Centre (NRCS) into rundowns.
 import { ytCall, ytReady } from "./youtube.js";
 import { control } from "./controlroom.js";
+import { marketForScreens } from "./markets.js";
 
 const now = () => new Date().toISOString();
 const clean = (v, n) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
@@ -101,16 +102,17 @@ export async function weatherBrief(env) {
 let cache = { at: 0, value: null };
 export async function tvExtras(env) {
   if (Date.now() - cache.at < 5000 && cache.value) return cache.value;
-  const [polls, boards, w, brief] = await Promise.all([
+  const [polls, boards, w, brief, market] = await Promise.all([
     env.DB.prepare("SELECT id,question,options,status FROM polls WHERE status IN ('open','closed') AND created_at > datetime('now','-7 days') ORDER BY created_at DESC LIMIT 10").all().then(r => r.results).catch(() => []),
     env.DB.prepare("SELECT * FROM results_boards ORDER BY updated_at DESC LIMIT 10").all().then(r => r.results).catch(() => []),
-    weather(env), weatherBrief(env).catch(() => null)
+    weather(env), weatherBrief(env).catch(() => null), marketForScreens(env).catch(() => null)
   ]);
   const counts = polls.length ? (await env.DB.prepare(`SELECT poll_id, choice, COUNT(*) AS n FROM poll_votes WHERE poll_id IN (${polls.map(() => "?").join(",")}) GROUP BY poll_id, choice`).bind(...polls.map(p => p.id)).all()).results : [];
   const value = {
     bangabda: bangabda().text,
     weather: w?.line || "",
     weatherPlaces: brief?.places || [],
+    market: market || null,
     polls: polls.map(p => { const options = parse(p.options, []); return { id: p.id, question: p.question, options, status: p.status, counts: options.map((_, i) => counts.find(c => c.poll_id === p.id && c.choice === i)?.n || 0) }; }),
     // During the blackout nothing but the board's title leaves the server.
     boards: boards.map(b => { const blackout = b.blackout_until && Date.parse(b.blackout_until) > Date.now(); return { id: b.id, title: b.title, kind: b.kind, total: b.total, source: b.source, blackout, rows: blackout ? [] : parse(b.rows, []), updatedAt: b.updated_at }; })

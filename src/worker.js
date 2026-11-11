@@ -30,6 +30,7 @@ import m0028 from "../migrations/0028_tv_vertical.sql";
 import m0029 from "../migrations/0029_bulletin_images.sql";
 import { bulletinImages, bulletinImageRoute } from "./bulletinimg.js";
 import { prepareBulletinVoices, voiceRoute } from "./bulletinvoice.js";
+import { marketBrief } from "./markets.js";
 import { ogRoute, renderCards } from "./ogcard.js";
 import { handleControlRoom, control as ctlCommand } from "./controlroom.js";
 import { serveClip, clipHousekeeping } from "./clips.js";
@@ -1562,6 +1563,8 @@ async function scheduled(env) {
   await step("tv headlines", () => videoHeadlines(env));
   // A free-licence photo (with its credit) for each story in the TV bulletin.
   await step("bulletin pictures", () => bulletinImages(env));
+  // The market update's figures (every 10 minutes while the market is open, else hourly).
+  await step("market brief", () => marketBrief(env));
   // The newsreader's voice for the bulletin's stories (when the Google voice key is set).
   await step("bulletin voices", async () => prepareBulletinVoices(env, (await tvState(env, "h")).bulletin));
   // The control room: midnight archive and the day's rundowns from templates; old clips go.
