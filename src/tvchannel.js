@@ -87,14 +87,18 @@ export async function shortsList(env, limit = 60) {
 // vertical channel's sources join in. Either way the newest video plays first.
 // Freshness (a news channel): today's uploads (India time) play, newest first; when there are
 // fewer than ten, the most recent of the day before fill in up to ten. Nothing older than 30
-// hours goes on air, except videos the control room marks "keep running".
+// hours goes on air, except videos the control room marks "keep running" (and, when nothing at
+// all is that new, the most recent ten).
 export const FRESH_HOURS = 30, DAILY_MIN = 10;
 export function freshOnly(list, now = Date.now()) {
   const t = v => Date.parse(v.publishedAt || "") || 0;
   const ist = new Date(now + 5.5 * 3600e3), midnight = Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()) - 5.5 * 3600e3;
   const recent = list.filter(v => !v.keep && t(v) >= now - FRESH_HOURS * 3600e3).sort((a, b) => t(b) - t(a));
   const today = recent.filter(v => t(v) >= midnight), earlier = recent.filter(v => t(v) < midnight);
-  const pick = [...today, ...earlier.slice(0, Math.max(0, DAILY_MIN - today.length))];
+  let pick = [...today, ...earlier.slice(0, Math.max(0, DAILY_MIN - today.length))];
+  // Nothing new in 30 hours: the most recent videos there are play (up to ten), so the channel
+  // never runs without pictures.
+  if (!pick.length) pick = list.filter(v => !v.keep).sort((a, b) => t(b) - t(a)).slice(0, DAILY_MIN);
   const kept = list.filter(v => v.keep);
   return [...pick, ...kept].sort((a, b) => t(b) - t(a));
 }
