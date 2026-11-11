@@ -309,6 +309,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       <div class="tvp-stage"></div>
       <div class="tvp-lbl"></div><div class="tvp-gfx"></div><div class="tvp-ovl"></div>
       <div class="tv-bug tv-bug-fixed"><img src="${LOGO}" alt=""></div>
+      <div class="tv-mkt" hidden><span class="mkt-label" data-no-tr>MARKETS</span><div class="mkt-track"></div></div>
       <div class="tvp-standby" hidden><img src="${LOGO}" alt=""><b>অনুষ্ঠান একটু পরেই</b><small>আমাদের সঙ্গে থাকুন</small></div>
       <div class="tvp-off" hidden><img src="${LOGO}" alt=""><b>শিগগির ফিরছি</b></div>
     </div>${mode === "app" ? `<button class="tvp-fs-exit" type="button" aria-label="Exit full screen">✕</button>` : ""}</div>${mode === "app" ? `<button class="tvp-sound" type="button" hidden>🔇 শব্দ চালু করতে ট্যাপ করুন</button><span class="tvp-taphint" hidden>▶ ভিডিওতে একবার ট্যাপ করুন</span>
@@ -973,6 +974,25 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (slot.__html === html) return;
     slot.innerHTML = `<div class="wx-pair">${html}</div>`; slot.__html = html;
   }
+  // The market ticker: a slim strip above the headline ticker, every index, Nifty 50 stock,
+  // commodity and currency with its change and a green or red arrow. It is its own layer, so it
+  // scrolls on smoothly through the other graphics' redraws, and is rebuilt only when the
+  // figures change.
+  function marketTicker(on) {
+    const box = $(".tv-mkt"), M = st.tv?.market;
+    if (!box) return;
+    box.hidden = !(on && M?.nifty);
+    if (box.hidden) return;
+    const f = (n, d = 2) => Number(n).toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d });
+    const item = (name, value, pct, pre = "") => value == null ? "" : `<span class="mkt-i ${pct >= 0 ? "up" : "down"}"><b>${esc(name)}</b><em>${pre}${f(value)}</em><i></i><small>${pct >= 0 ? "+" : "−"}${f(Math.abs(pct ?? 0))}%</small></span>`;
+    const x = k => M[k] ? item(M[k].en === "Crude oil (Brent)" ? "Brent" : M[k].en, M[k].value, M[k].pct, ["usd", "gbp", "eur"].includes(k) ? "₹" : ["crude", "gold", "silver"].includes(k) ? "$" : "") : "";
+    const rows = [x("nifty"), x("sensex"), ...(M.all || []).map(([n, v, p]) => item(n, v, p, "₹")), x("crude"), x("gold"), x("silver"), x("usd"), x("gbp"), x("eur")].filter(Boolean);
+    const html = rows.join("");
+    if (box.__html === html) return;
+    box.__html = html;
+    const track = box.querySelector(".mkt-track");
+    track.innerHTML = `<div class="mkt-move" style="--dur:${Math.max(60, rows.length * 3.2)}s"><div>${html}</div><div aria-hidden="true">${html}</div></div>`;
+  }
   function fillAds() {
     const html = adBox(sponsorAd()), turned = st.lastAd !== undefined && st.lastAd !== html;
     stage.querySelectorAll(".tv-adslot").forEach(s => { if (s.__html === html) return; s.innerHTML = html; s.__html = html; if (turned) s.firstElementChild?.classList.add("enter"); });
@@ -985,6 +1005,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     // The channel's logo stays on screen throughout: videos, graphics, bulletins, the weather and
     // market updates, intro cards and breaking news (the control room can still turn it off).
     { const bug = $(".tv-bug-fixed"); if (bug) bug.hidden = L.bug === false; }
+    marketTicker(channel === "h" && L.ticker !== false && !fullGfx && sc && !sc.off && !sc.standby && sc.layout !== "lband");
     if (!sc || sc.off || sc.standby || mode === "scene" && !sc.sources?.length && !sc.graphic) { put(".tvp-gfx", ""); put(".tvp-ovl", ""); return; }
     // Full-screen graphics (the bulletin, promos): LIVE and the clock stay on screen.
     if (fullGfx && channel === "h") { put(".tvp-gfx", dtBar(L, s)); put(".tvp-ovl", ""); return; }

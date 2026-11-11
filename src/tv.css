@@ -737,3 +737,23 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .mk-inr{font:800 40px Montserrat,"Hind Siliguri",sans-serif;color:#ffd76a}
 .mk-note{text-align:center;margin-top:-22px;font:600 22px "Hind Siliguri",Montserrat,sans-serif;color:rgba(255,255,255,.6)}
 .mk-note .dt-flip .ff{justify-content:center}
+
+/* ---------- The market ticker: a slim strip just above the headline ticker ---------- */
+.tv-mkt{position:absolute;left:0;right:0;bottom:72px;height:40px;z-index:6;display:flex;align-items:stretch;background:linear-gradient(180deg,rgba(8,12,18,.92),rgba(4,7,11,.94));border-top:1px solid rgba(212,160,23,.35);box-shadow:0 -6px 20px rgba(0,0,0,.25);color:#fff;overflow:hidden;animation:tvin .5s both}
+.tv-mkt[hidden]{display:none}
+.mkt-label{flex:0 0 auto;display:flex;align-items:center;padding:0 18px 0 22px;background:linear-gradient(90deg,#0f7a4a,#0b5e3a);font:900 18px Montserrat,sans-serif;letter-spacing:.16em;clip-path:polygon(0 0,100% 0,88% 100%,0 100%);padding-right:34px}
+.mkt-track{flex:1;overflow:hidden;white-space:nowrap;-webkit-mask-image:linear-gradient(90deg,transparent,#000 2%,#000 98%,transparent);mask-image:linear-gradient(90deg,transparent,#000 2%,#000 98%,transparent)}
+.mkt-move{display:inline-flex;height:100%;animation:tvtick var(--dur) linear infinite}
+.mkt-move>div{display:inline-flex;align-items:center}
+.mkt-i{display:inline-flex;align-items:center;gap:8px;padding:0 22px;height:40px;border-right:1px solid rgba(255,255,255,.1)}
+.mkt-i b{font:700 18px Montserrat,sans-serif;letter-spacing:.02em;color:rgba(255,255,255,.92)}
+.mkt-i em{font:600 18px Montserrat,sans-serif;font-style:normal;color:rgba(255,255,255,.8)}
+.mkt-i i{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent}
+.mkt-i.up i{border-bottom:10px solid #2ee59d}
+.mkt-i.down i{border-top:10px solid #ff5c66}
+.mkt-i small{font:800 17px Montserrat,sans-serif}
+.mkt-i.up small{color:#2ee59d}.mkt-i.down small{color:#ff5c66}
+/* make room above it: the name strap and the ad box sit a little higher */
+.tvp-h .tv-l3{bottom:126px}
+.tvp-h .tvp-gfx .tv-adslot>.tv-ad{bottom:126px}
+.tvp-h.lb-auto .tv-mkt{display:none}

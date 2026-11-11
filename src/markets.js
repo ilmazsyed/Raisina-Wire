@@ -66,7 +66,9 @@ export async function marketBrief(env, { force = false } = {}) {
     if (pick.crude) Object.assign(pick.crude, { inr: Math.round(pick.crude.value * usd), inrUnitEn: "per barrel", inrUnitBn: "প্রতি ব্যারেল" });
   }
   const moved = NIFTY50.map(([s, en, bn], i) => stocks[i] && stocks[i].pct != null ? { en, bn, value: round(stocks[i].value), change: round(stocks[i].change), pct: round(stocks[i].pct) } : null).filter(Boolean).sort((a, b) => b.pct - a.pct);
-  const out = { at: Date.now(), open: marketHours(), ...pick, gainers: moved.slice(0, 3), losers: moved.slice(-3).reverse() };
+  // Every Nifty 50 stock, for the market ticker (in index order, compact).
+  const all = NIFTY50.map(([, en], i) => stocks[i] && stocks[i].pct != null ? [en, round(stocks[i].value), round(stocks[i].pct)] : null).filter(Boolean);
+  const out = { at: Date.now(), open: marketHours(), ...pick, gainers: moved.slice(0, 3), losers: moved.slice(-3).reverse(), all };
   // Only a brief with the indices in it replaces the last good one.
   if (out.nifty || out.sensex) {
     await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('market_brief',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(JSON.stringify(out)).run();
