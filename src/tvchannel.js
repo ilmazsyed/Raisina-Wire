@@ -1,4 +1,4 @@
-import { readyVoices } from "./bulletinvoice.js";
+import { readyVoices, readyLinks } from "./bulletinvoice.js";
 import { cleanCredit } from "./bulletinimg.js";
 import { avoForScreens } from "./avo.js";
 import { labelsOf } from "./labels.js";
@@ -300,7 +300,11 @@ export async function tvState(env, ch) {
     // Evergreen videos (explainers, features) marked in the control room: they fill the channel
     // when every fresh video has played within the hour, before anything repeats.
     evergreen: s.on ? evergreen : [],
-    segs, clock: clockOf(s), segNames: SEG_NAMES
+    segs, clock: clockOf(s), segNames: SEG_NAMES,
+    // Viewers' comments the desk approved in the last twelve hours, for the autopilot's comment box.
+    comments: s.on ? (await env.DB.prepare("SELECT author, text, platform FROM viewer_comments WHERE status='approved' AND at >= datetime('now','-12 hours') ORDER BY at DESC LIMIT 10").all().catch(() => ({ results: [] }))).results : [],
+    // The voice-over links that are recorded (src/bulletinvoice.js LINKS).
+    links: s.on ? await readyLinks(env).catch(() => ({})) : {}
   };
   memo.set(ch, { at: Date.now(), value });
   return value;

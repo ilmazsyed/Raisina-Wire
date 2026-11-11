@@ -36,7 +36,7 @@ import m0034 from "../migrations/0034_avo_pictures.sql";
 import m0035 from "../migrations/0035_tv_evergreen.sql";
 import m0036 from "../migrations/0036_avo_updates.sql";
 import { bulletinImages, bulletinImageRoute } from "./bulletinimg.js";
-import { prepareBulletinVoices, voiceRoute } from "./bulletinvoice.js";
+import { prepareBulletinVoices, prepareLinks, voiceRoute } from "./bulletinvoice.js";
 import { avoStep, avoImageRoute, avoPlayed, avoLog, avoFromBreaking, avoManualAdd, avoManualEdit, avoManualDelete } from "./avo.js";
 import { marketBrief } from "./markets.js";
 import { ogRoute, renderCards } from "./ogcard.js";
@@ -1617,6 +1617,7 @@ async function scheduled(env) {
   await step("market brief", () => marketBrief(env));
   // The newsreader's voice for the bulletin's stories (when the Google voice key is set).
   await step("bulletin voices", async () => prepareBulletinVoices(env, (await tvState(env, "h")).bulletin));
+  await step("tv links", () => prepareLinks(env));
   // The AVO Breaking Engine: major new stories, their reading and pictures (src/avo.js).
   await step("avo engine", () => avoStep(env));
   // The control room: midnight archive and the day's rundowns from templates; old clips go.
