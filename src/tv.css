@@ -726,3 +726,14 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 @keyframes mkslide{from{opacity:0;transform:translateX(-80px)}to{opacity:1;transform:none}}
 .mk-wipe i{background:#16a34a!important}
 .mk .mk-idx .mk-name,.mk .mk-idx .mk-val,.mk .mk-tile .mk-name,.mk .mk-tile .mk-val,.mk .mk-co{color:#fff;opacity:1}
+
+/* The channel's logo: always on top, on every scene. */
+.tv-bug-fixed{position:absolute;z-index:40;pointer-events:none}
+.tv-bug-fixed[hidden]{display:none}
+.tvp-v .tv-bug-fixed{left:40px;top:40px;padding:8px 10px;background:#fff;border-radius:12px;box-shadow:0 0 0 3px var(--gold),0 12px 26px rgba(0,0,0,.25)}
+.tvp-v .tv-bug-fixed img{display:block;height:110px;width:auto}
+.tvp-v:has(.vj-logo) .tv-bug-fixed{display:none}
+/* Market: rupee values under the dollar price. */
+.mk-inr{font:800 40px Montserrat,"Hind Siliguri",sans-serif;color:#ffd76a}
+.mk-note{text-align:center;margin-top:-22px;font:600 22px "Hind Siliguri",Montserrat,sans-serif;color:rgba(255,255,255,.6)}
+.mk-note .dt-flip .ff{justify-content:center}

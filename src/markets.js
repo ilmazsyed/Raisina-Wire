@@ -57,6 +57,14 @@ export async function marketBrief(env, { force = false } = {}) {
   ]);
   const pick = {};
   keys.forEach((k, i) => { const q = others[i]; pick[k] = q ? { en: OTHERS[k][1], bn: OTHERS[k][2], value: round(q.value), change: round(q.change), pct: round(q.pct), state: q.state, ...(k === "nifty" || k === "sensex" ? { spark: q.spark.map(v => round(v, 1)) } : {}) } : null; });
+  // Commodities in rupees, in Indian units: gold per 10 grams, silver per kilogram, crude per
+  // barrel (the international price at today's rupee rate; Indian duties and taxes not included).
+  const usd = pick.usd?.value, OZ = 31.1035;
+  if (usd) {
+    if (pick.gold) Object.assign(pick.gold, { inr: Math.round(pick.gold.value * usd / OZ * 10), inrUnitEn: "per 10 g", inrUnitBn: "প্রতি ১০ গ্রাম" });
+    if (pick.silver) Object.assign(pick.silver, { inr: Math.round(pick.silver.value * usd / OZ * 1000), inrUnitEn: "per kg", inrUnitBn: "প্রতি কেজি" });
+    if (pick.crude) Object.assign(pick.crude, { inr: Math.round(pick.crude.value * usd), inrUnitEn: "per barrel", inrUnitBn: "প্রতি ব্যারেল" });
+  }
   const moved = NIFTY50.map(([s, en, bn], i) => stocks[i] && stocks[i].pct != null ? { en, bn, value: round(stocks[i].value), change: round(stocks[i].change), pct: round(stocks[i].pct) } : null).filter(Boolean).sort((a, b) => b.pct - a.pct);
   const out = { at: Date.now(), open: marketHours(), ...pick, gainers: moved.slice(0, 3), losers: moved.slice(-3).reverse() };
   // Only a brief with the indices in it replaces the last good one.
