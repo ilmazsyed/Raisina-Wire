@@ -16,7 +16,7 @@
 // - A story leaves the rotation when it is six hours old or has been on air four times.
 import { readLine, voiceKey, tvVoice, voiceRate, voiceBudget, chargeVoice } from "./bulletinvoice.js";
 import { synthesize, sha256, ttsEnabled } from "./tts.js";
-import { storyPhotos } from "./bulletinimg.js";
+import { newsPhotos } from "./bulletinimg.js";
 
 export const AVO_DAILY = 45, AVO_HOURS = 6, AVO_MAX_AIRED = 4, AVO_SECONDS = 30;
 const QUOTA = { bengal: 27, india: 9, neighbours: 7, world: 2 };
@@ -118,17 +118,29 @@ async function prepare(env, row, sex) {
   // fewer than four and the desk asked for it).
   let photos = own ? JSON.parse(row.images || "[]") : [];
   if (!own || (photos.length < 4 && row.find_more)) {
-    const found = await storyPhotos(env, { id: a.id, title: a.title, dek: a.dek || "" }, 6).catch(() => []);
+    const found = await newsPhotos(env, { id: a.id, title: a.title, dek: a.dek || "" }, 6).catch(() => []);
     const seen = new Set(photos.map(x => x.url));
     for (const x of found) if (photos.length < 6 && !seen.has(x.url)) { photos.push(x); seen.add(x.url); }
   }
-  await env.DB.prepare("UPDATE avo_stories SET script=?, sex=?, voice=?, secs=?, images=?, status='ready' WHERE article_id=?")
+  await env.DB.prepare("UPDATE avo_stories SET script=?, sex=?, voice=?, secs=?, images=?, img_v=2, status='ready' WHERE article_id=?")
     .bind(JSON.stringify(s.lines), sex, JSON.stringify(keys), Math.round(bytes / 4000 * 10) / 10, JSON.stringify(photos), row.article_id).run();
 }
 
 // The minute cron: choose new stories, then prepare up to two.
+// Stories pictured before the news-only finder: their pictures are looked up again (two a minute,
+// newest first, only those still in rotation; hand-written ones keep the pictures they were given).
+async function repicture(env) {
+  const { results } = await env.DB.prepare("SELECT article_id, title FROM avo_stories WHERE status IN ('ready','off') AND img_v<2 AND origin='auto' AND published_at>=? ORDER BY published_at DESC LIMIT 2")
+    .bind(new Date(Date.now() - AVO_HOURS * 3600e3).toISOString()).all().catch(() => ({ results: [] }));
+  for (const r of results) {
+    const photos = await newsPhotos(env, { id: r.article_id, title: r.title, dek: "" }, 6).catch(() => []);
+    await env.DB.prepare("UPDATE avo_stories SET images=?, img_v=2 WHERE article_id=?").bind(JSON.stringify(photos), r.article_id).run();
+  }
+  return results.length;
+}
 export async function avoStep(env) {
   const added = await choose(env);
+  await repicture(env).catch(e => console.error("avo repicture", e?.message || e));
   const { results } = await env.DB.prepare("SELECT * FROM avo_stories WHERE status='new' ORDER BY score DESC, published_at DESC LIMIT 2").all();
   let prepared = 0;
   for (const row of results) {

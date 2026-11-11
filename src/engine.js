@@ -381,6 +381,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     wake();
     st.current?.slots.forEach(sl => { sl.setMuted?.(false); sl.play?.(); });
     startBed(st.current?.scene);
+    // A story on screen (AVO or the bulletin) is read from the moment the sound comes on.
+    if (st.current?.box?.isConnected) st.resumeVoice?.();
   };
   const firstTouch = () => { wake(); if (st.muted) unmute(); };
   // A player that starts muted on purpose (the home page's) waits for its own sound button.
@@ -757,7 +759,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   /* ---------- drawing a scene, with a transition ---------- */
   function drawScene(sc) {
     const old = st.current;
-    st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null;
+    st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null; st.resumeVoice = null;
     old?.slots.forEach(s => { if (s.shared) s.destroy(); });
     const box = document.createElement("div"); box.className = "tvp-scene";
     const slots = [];
@@ -962,16 +964,18 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       drawW(); const tw = setInterval(() => el.isConnected ? drawW() : clearInterval(tw), 250);
     } else if (g.kind === "avo") {   // the AVO Breaking Engine: each story 30 seconds, read over its pictures
       const list = (g.stories || []).filter(Boolean), at0 = sc.startAt || now();
-      const slidesOf = x => { const out = (x.images || []).slice(0, 6).map(i => ({ img: i })); for (let c = 0; out.length < 4; c++) out.push({ card: c }); return out; };
+      // Pictures are loaded in advance and shown only once they have really loaded (a picture
+      // that fails never shows as a black screen); the channel's text cards make up four.
+      const imgState = st.avoImg ||= new Map();
+      const preload = x => (x.images || []).forEach(i => { if (imgState.has(i.src)) return; imgState.set(i.src, "loading"); const im = new Image(); im.referrerPolicy = "no-referrer"; im.onload = () => imgState.set(i.src, im.naturalWidth >= 320 ? "ok" : "bad"); im.onerror = () => imgState.set(i.src, "bad"); im.src = i.src; });
+      list.forEach(preload);
+      const slidesOf = x => { const out = (x.images || []).filter(i => imgState.get(i.src) === "ok").slice(0, 6).map(i => ({ img: i })); for (let c = 0; out.length < 4; c++) out.push({ card: c }); return out; };
       const cardHTML = (x, c) => c % 3 === 0 ? `<div class="avo-card c0"><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span><b>${esc(x.title)}</b></div>`
         : c % 3 === 1 ? `<div class="avo-card c1"><i></i><b>${esc(x.lines?.[1] || x.lines?.[0] || x.title)}</b></div>`
         : `<div class="avo-card c2"><img src="${LOGO}" alt=""><b>${esc(x.title)}</b></div>`;
       const slideHTML = (x, sl) => sl.img ? `<div class="avo-slide"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"></div>` : `<div class="avo-slide">${cardHTML(x, sl.card)}</div>`;
-      // Each sentence on screen while it is read (its share of the reading by length).
-      const capAt = (x, e) => { const L = x.lines?.length ? x.lines : [x.title], span = Math.max(8, Math.min(AVO_SECS - 1, x.secs || AVO_SECS - 3)), tot = L.reduce((n, l) => n + l.length, 0) || 1; let acc = 0; for (const [i, l] of L.entries()) { acc += l.length / tot * span; if (e < acc) return i; } return L.length - 1; };
       const storyHTML = (x, k) => `<div class="avo${channel === "v" ? " v" : ""}"><div class="avo-pics"></div><i class="avo-shade"></i>
         <div class="avo-kick"><i class="lt-pulse"></i><b>এই মুহূর্তে</b><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span></div>
-        <div class="avo-cap"><span></span></div>
         <div class="avo-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>এই মুহূর্তে</small></span><span class="lt-text">${esc(x.title)}</span></div>
         <small class="avo-credit"></small>
         <div class="avo-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${AVO_SECS}s"></i>`).join("")}</div></div>`;
@@ -987,14 +991,14 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         play(0);
       };
       list.forEach(x => (x.voice || []).forEach(u => voiceBuf(u)));
-      let shownK = -1, shownS = -1, shownC = -1;
+      let shownK = -1, shownS = -1;
       const drawA = () => {
         if (!el.isConnected && st.current) return;
         const e = (now() - at0) / 1000, k = Math.min(list.length - 1, Math.max(0, Math.floor(e / AVO_SECS))), x = list[k]; if (!x) return;
         const into = e - k * AVO_SECS, slides = slidesOf(x), si = Math.min(slides.length - 1, Math.floor(into / (AVO_SECS / slides.length)));
         if (k !== shownK) {
-          const first = shownK < 0; shownK = k; shownS = -1; shownC = -1;
-          const paint = () => { el.innerHTML = storyHTML(x, k); speakAvo(x); drawA(); };
+          const first = shownK < 0; shownK = k; shownS = -1;
+          const paint = () => { el.innerHTML = storyHTML(x, k); speakAvo(x); st.resumeVoice = () => { if (el.isConnected) speakAvo(x); }; drawA(); };
           // Each story is logged: an airing from the broadcast output, a view from the app or site.
           const logKey = `${x.id}@${Math.round(at0 + k * AVO_SECS * 1000)}`;
           if ((mode === "app" || output) && !avoLogged.has(logKey)) { avoLogged.add(logKey); markAvoSeen(x.id); fetch("/api/tv/avo/played", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: x.id, ch: channel, key: output ? key : "" }), keepalive: true }).catch(() => {}); }
@@ -1010,8 +1014,6 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           [...pics.children].slice(0, -2).forEach(n => n.remove());
           const cr = slides[si].img?.credit || ""; box.querySelector(".avo-credit").textContent = cr;
         }
-        const ci = capAt(x, into);
-        if (ci !== shownC) { shownC = ci; const cap = box.querySelector(".avo-cap span"); const L = x.lines?.length ? x.lines : [x.title]; cap.textContent = L[ci] || ""; cap.classList.remove("in"); void cap.offsetWidth; cap.classList.add("in"); }
       };
       drawA(); const ta = setInterval(() => el.isConnected ? drawA() : clearInterval(ta), 250);
     } else if (g.kind === "bulletin") {   // two minutes from :00 and :30, the same for everyone
@@ -1061,7 +1063,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // story comes in.
       list.forEach(x => x.voice && voiceBuf(x.voice));
       const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = e < 5 ? -2 : e < intro || !list.length ? -1 : Math.max(0, plan.findLastIndex(p => e >= p.at)); if (k === shown) return; const first = shown === -9; shown = k;
-        const paint = () => { el.innerHTML = k === -2 ? identHTML() : k < 0 ? opening() : story(list[k], k); speak(k >= 0 ? list[k] : null); };
+        const paint = () => { el.innerHTML = k === -2 ? identHTML() : k < 0 ? opening() : story(list[k], k); speak(k >= 0 ? list[k] : null); st.resumeVoice = () => { if (el.isConnected && k >= 0) speak(list[k]); }; };
         if (first || !el.isConnected) return paint();
         // A quick red slash between stories.
         const w = document.createElement("div"); w.className = "bs-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
