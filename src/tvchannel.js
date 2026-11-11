@@ -2,6 +2,7 @@ import { readyVoices } from "./bulletinvoice.js";
 import { cleanCredit } from "./bulletinimg.js";
 import { avoForScreens } from "./avo.js";
 import { labelsOf } from "./labels.js";
+import { segmentsData, clockOf, SEG_NAMES } from "./segments.js";
 import { bnLine } from "./bnline.js";
 // Rashtrix TV, Phase 2: two channels, each on or off, each with its own secret output address
 // for OBS / vMix.
@@ -53,6 +54,11 @@ export async function saveTvSettings(env, ch, b) {
   if (b.lband !== undefined) s.lband = { on: !!b.lband?.on, text: clean(b.lband?.text, 160) };
   if (b.promosOn !== undefined) s.promosOn = !!b.promosOn;
   if (b.avoOn !== undefined) s.avoOn = !!b.avoOn;
+  // The programming clock (src/segments.js clockOf checks it), the sports score strip and the
+  // city desk's notice (শহরের খবর).
+  if (b.clock !== undefined && typeof b.clock === "object") s.clock = b.clock;
+  if (b.score !== undefined) s.score = { on: !!b.score?.on, text: clean(b.score?.text, 140) };
+  if (b.notice !== undefined) s.notice = { on: !!b.notice?.on, text: clean(b.notice?.text, 200) };
   if (b.otherSources !== undefined) s.otherSources = !!b.otherSources;
   if (b.promoEvery !== undefined) s.promoEvery = int(b.promoEvery, 1, 20, s.promoEvery);
   if (Array.isArray(b.ticker)) s.ticker = b.ticker.map(x => clean(x, 160)).filter(Boolean).slice(0, 20);
@@ -266,6 +272,9 @@ export async function tvState(env, ch) {
   // The newsreader's line for each story, when it is ready (src/bulletinvoice.js).
   const voices = await readyVoices(env, bulletin).catch(() => new Map());
   bulletin.forEach(b => { const v = voices.get(b); if (v) { b.voice = `/api/tv/voice/${v.key}.mp3`; b.secs = v.secs; } });
+  // The segments' material and the programming clock (src/segments.js).
+  const read = new Map(bulletin.filter(b => b.voice).map(b => [b.title, { voice: b.voice, secs: b.secs }]));
+  const segs = s.on ? await segmentsData(env, s, read, avo).catch(e => (console.error("segments", e?.message || e), null)) : null;
   const loop = buildLoop(s, videos, cards);
   const schedule = s.on ? scheduleAt(loop, s.epoch, Date.now(), 5400, { hold: s.hold, anchor: s.anchor, weather: ch === "h" }) : [];
   // Keep a point near now (and drop a hold that has played out), so the walk stays short.
@@ -290,7 +299,8 @@ export async function tvState(env, ch) {
     avoOn: s.avoOn !== false, avo: s.on ? avo : [],
     // Evergreen videos (explainers, features) marked in the control room: they fill the channel
     // when every fresh video has played within the hour, before anything repeats.
-    evergreen: s.on ? evergreen : []
+    evergreen: s.on ? evergreen : [],
+    segs, clock: clockOf(s), segNames: SEG_NAMES
   };
   memo.set(ch, { at: Date.now(), value });
   return value;

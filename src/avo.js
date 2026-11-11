@@ -123,8 +123,8 @@ async function prepare(env, row, sex) {
     const seen = new Set(photos.map(x => x.url));
     for (const x of found) if (photos.length < 6 && !seen.has(x.url)) { photos.push(x); seen.add(x.url); }
   }
-  await env.DB.prepare("UPDATE avo_stories SET script=?, sex=?, voice=?, secs=?, images=?, img_v=3, status='ready' WHERE article_id=?")
-    .bind(JSON.stringify(s.lines), sex, JSON.stringify(keys), Math.round(bytes / 4000 * 10) / 10, JSON.stringify(photos), row.article_id).run();
+  await env.DB.prepare("UPDATE avo_stories SET script=?, sex=?, voice=?, secs=?, images=?, img_v=3, prepared_at=?, status='ready' WHERE article_id=?")
+    .bind(JSON.stringify(s.lines), sex, JSON.stringify(keys), Math.round(bytes / 4000 * 10) / 10, JSON.stringify(photos), new Date().toISOString(), row.article_id).run();
 }
 
 // The minute cron: choose new stories, then prepare up to two.
@@ -139,8 +139,20 @@ async function repicture(env) {
   }
   return results.length;
 }
+// A story whose report was updated after its voice and pictures were made is made again (two a
+// run, at most once an hour each), and shows "নতুন তথ্য" on screen.
+async function refreshUpdated(env) {
+  const { results } = await env.DB.prepare(`SELECT v.article_id FROM avo_stories v JOIN articles a ON a.id=v.article_id
+    WHERE v.status='ready' AND v.origin='auto' AND v.published_at>=? AND a.updated_at IS NOT NULL
+      AND a.updated_at > COALESCE(v.prepared_at, v.published_at) AND (v.prepared_at IS NULL OR v.prepared_at < ?)
+      AND (julianday(a.updated_at) - julianday(a.published_at)) * 1440 > 10
+    ORDER BY a.updated_at DESC LIMIT 2`).bind(new Date(Date.now() - AVO_HOURS * 3600e3).toISOString(), new Date(Date.now() - 3600e3).toISOString()).all().catch(() => ({ results: [] }));
+  for (const r of results) await env.DB.prepare("UPDATE avo_stories SET status='new' WHERE article_id=?").bind(r.article_id).run();
+  return results.length;
+}
 export async function avoStep(env) {
   const added = await choose(env);
+  await refreshUpdated(env).catch(e => console.error("avo refresh", e?.message || e));
   await repicture(env).catch(e => console.error("avo repicture", e?.message || e));
   const { results } = await env.DB.prepare("SELECT * FROM avo_stories WHERE status='new' ORDER BY score DESC, published_at DESC LIMIT 2").all();
   let prepared = 0;
@@ -171,7 +183,8 @@ export function screenStory(r) {
   const j = (v, d) => { try { return JSON.parse(v || d); } catch { return JSON.parse(d); } };
   return { id: r.article_id, title: r.title, desk: r.desk, region: r.region, sex: r.sex, lines: j(r.script, "[]"),
     voice: j(r.voice, "[]").map(k => `/api/tv/voice/${k}.mp3`), secs: r.secs,
-    images: j(r.images, "[]").map((x, i) => ({ src: /^\/(media|brand)\//.test(x.url || "") ? x.url : `/api/tv/aimg/${encodeURIComponent(r.article_id)}/${i}`, credit: x.credit || "" })), at: r.published_at, origin: r.origin || "auto",
+    images: j(r.images, "[]").map((x, i) => ({ src: /^\/(media|brand)\//.test(x.url || "") ? x.url : `/api/tv/aimg/${encodeURIComponent(r.article_id)}/${i}`, credit: x.credit || "" })), at: r.published_at, origin: r.origin || "auto", score: r.score || 0,
+    upd: !!(r.prepared_at && r.created_at && Date.parse(r.prepared_at) - Date.parse(String(r.created_at).replace(" ", "T") + "Z") > 15 * 60e3),
     ...labelsOf(r.desk, `${r.title} ${j(r.script, "[]").join(" ")}`, (() => { try { return JSON.parse(r.labels || "null"); } catch { return null; } })()) };
 }
 

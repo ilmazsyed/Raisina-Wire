@@ -34,6 +34,7 @@ import m0032 from "../migrations/0032_avo.sql";
 import m0033 from "../migrations/0033_avo_manual.sql";
 import m0034 from "../migrations/0034_avo_pictures.sql";
 import m0035 from "../migrations/0035_tv_evergreen.sql";
+import m0036 from "../migrations/0036_avo_updates.sql";
 import { bulletinImages, bulletinImageRoute } from "./bulletinimg.js";
 import { prepareBulletinVoices, voiceRoute } from "./bulletinvoice.js";
 import { avoStep, avoImageRoute, avoPlayed, avoLog, avoFromBreaking, avoManualAdd, avoManualEdit, avoManualDelete } from "./avo.js";
@@ -99,7 +100,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031], ["0032_avo.sql", m0032], ["0033_avo_manual.sql", m0033], ["0034_avo_pictures.sql", m0034], ["0035_tv_evergreen.sql", m0035]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031], ["0032_avo.sql", m0032], ["0033_avo_manual.sql", m0033], ["0034_avo_pictures.sql", m0034], ["0035_tv_evergreen.sql", m0035], ["0036_avo_updates.sql", m0036]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
