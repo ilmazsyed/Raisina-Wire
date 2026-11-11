@@ -23,16 +23,17 @@ const LOGO = "/brand/logo.webp";
 
 // Slot rectangles (percent of the frame: x, y, w, h) for each layout and orientation.
 // On the horizontal channel, layouts with several pictures sit in the clear band between the
-// LIVE/time/weather block (top left) and the name strap and ad box (bottom), and stay left of the
-// logo where they reach its height: nothing on screen covers a picture. (Percent of the frame.)
-const SAFE = { top: 14.5, bottom: 71, logoBottom: 17.6, right: 90.5 };
+// LIVE/time/weather block and the logo (top; the logo is shown smaller on these screens) and the
+// name strap and ad box (bottom): nothing on screen covers a picture. (Percent of the frame.)
+const SAFE = { top: 14.5, bottom: 71 };
 function safeRects(layout) {
   const r = RECTS.h[layout] || RECTS.h.full;
   if (r.length < 2 || layout === "pip") return r;
   const minY = Math.min(...r.map(x => x[1])), maxY = Math.max(...r.map(x => x[1] + x[3])), maxX = Math.max(...r.map(x => x[0] + x[2]));
-  let s = Math.min(1, (SAFE.bottom - SAFE.top) / (maxY - minY));
+  const minX = Math.min(...r.map(x => x[0]));
+  // and keep the usual 40px margin from the frame's sides
+  let s = Math.min(1, (SAFE.bottom - SAFE.top) / (maxY - minY), (50 - 40 / 19.2) / Math.max(50 - minX, maxX - 50));
   let top = SAFE.top + ((SAFE.bottom - SAFE.top) - (maxY - minY) * s) / 2;
-  if (top < SAFE.logoBottom && 50 + (maxX - 50) * s > SAFE.right) { s = (SAFE.right - 50) / (maxX - 50); top = SAFE.top + ((SAFE.bottom - SAFE.top) - (maxY - minY) * s) / 2; }
   return r.map(([x, y, w, h]) => [50 + (x - 50) * s, top + (y - minY) * s, w * s, h * s]);
 }
 const RECTS = {
@@ -707,9 +708,19 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const box = document.createElement("div"); box.className = "tvp-scene";
     const slots = [];
     $(".tvp-standby").hidden = !sc?.standby; $(".tvp-off").hidden = !sc?.off;
+    stage.classList.remove("multi-src");
     if (sc && !sc.standby && !sc.off) {
       const offset = sc.startAt ? Math.max(0, (now() - sc.startAt) / 1000) : 0;
       const rects = channel === "h" ? safeRects(sc.layout) : RECTS[channel][sc.layout] || RECTS[channel].full;
+      // With several pictures on screen, the corner pieces line up with the pictures' outer edges:
+      // the time block and the name strap with the left edge, the logo and the ad box with the right.
+      const multi = channel === "h" && rects.length > 1 && sc.layout !== "pip" && (sc.sources || []).length > 1;
+      stage.classList.toggle("multi-src", multi);
+      if (multi) {
+        const used = rects.slice(0, sc.sources.length);
+        stage.style.setProperty("--pl", `${Math.min(...used.map(r => r[0])) * 19.2}px`);
+        stage.style.setProperty("--pr", `${1920 - Math.max(...used.map(r => r[0] + r[2])) * 19.2}px`);
+      }
       (sc.sources || []).slice(0, rects.length || 1).forEach((src, i) => {
         const r = rects[i] || rects[0]; if (!r) return;
         const el = document.createElement("div"); el.className = `tvs ${rects.length > 1 ? "multi" : ""}`;
