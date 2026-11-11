@@ -831,41 +831,43 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const fx = (n, d = 2) => n == null ? "–" : Number(n).toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d });
       const pair = (n, d = 2) => [fx(n, d), bnDigits(fx(n, d))];
       const up = x => (x?.change ?? 0) >= 0;
+      const pct = x => { const s = up(x) ? "+" : "−", p = fx(Math.abs(x?.pct ?? 0)); return [`${s}${p}%`, `${s}${bnDigits(p)}%`]; };
       const chg = x => { if (!x || x.change == null) return ["", ""]; const sgn = up(x) ? "+" : "−", c = fx(Math.abs(x.change)), p = fx(Math.abs(x.pct)); return [`${sgn}${c} (${sgn}${p}%)`, `${sgn}${bnDigits(c)} (${sgn}${bnDigits(p)}%)`]; };
+      const chip = (x, f = chg) => x?.change == null ? "" : `<div class="sg-chg ${up(x) ? "up" : "down"}"><i class="mk-arrow"></i>${flip(...f(x))}</div>`;
       const spark = arr => { if (!arr?.length) return ""; const lo = Math.min(...arr), hi = Math.max(...arr), w = 600, h = 120, d = arr.map((v, i) => `${i ? "L" : "M"}${(i / (arr.length - 1 || 1) * w).toFixed(1)},${(h - (hi === lo ? h / 2 : (v - lo) / (hi - lo) * h)).toFixed(1)}`).join(" "); return `<svg class="mk-spark" viewBox="-4 -4 ${w + 8} ${h + 8}" preserveAspectRatio="none"><path d="${d}"/></svg>`; };
-      const idx = (x, i) => x ? `<div class="mk-idx ${up(x) ? "up" : "down"}" style="--i:${i}"><div class="mk-name">${flip(esc(x.en), esc(x.bn), "mn")}</div><div class="mk-val">${flip(...pair(x.value))}</div><div class="mk-chg"><i class="mk-arrow"></i>${flip(...chg(x))}</div>${spark(x.spark)}</div>` : "";
-      const mover = (x, i) => `<div class="mk-mover ${up(x) ? "up" : "down"}" style="--i:${i}"><span class="mk-rank">${flip(String(i + 1), bnDigits(i + 1))}</span><span class="mk-co">${flip(esc(x.en), esc(x.bn), "mn")}</span><span class="mk-px">${flip(`₹${fx(x.value)}`, `₹${bnDigits(fx(x.value))}`)}</span><span class="mk-pc"><i class="mk-arrow"></i>${flip(`${up(x) ? "+" : "−"}${fx(Math.abs(x.pct))}%`, `${up(x) ? "+" : "−"}${bnDigits(fx(Math.abs(x.pct)))}%`)}</span></div>`;
+      const idx = (x, i) => x ? `<div class="sg-card mi ${up(x) ? "up" : "down"}" style="--i:${i}"><div class="sg-band"><div class="sg-name">${flip(esc(x.en), esc(x.bn), "mn")}</div></div><div class="sg-body"><div class="mi-val">${flip(...pair(x.value))}</div>${chip(x)}</div>${spark(x.spark)}</div>` : "";
+      const mover = (x, i) => `<div class="sg-mover ${up(x) ? "up" : "down"}" style="--i:${i}"><span class="mv-rank">${flip(String(i + 1), bnDigits(i + 1))}</span><span class="mv-co">${flip(esc(x.en), esc(x.bn), "mn")}</span><span class="mv-px">${flip(`₹${fx(x.value)}`, `₹${bnDigits(fx(x.value))}`)}</span>${chip(x, pct)}</div>`;
       // Commodities also in rupees, in Indian units (at the international rate, before Indian duties and taxes).
-      const inr = x => x?.inr ? `<div class="mk-inr">${flip(`≈ ₹${fx(x.inr, 0)} ${esc(x.inrUnitEn)}`, `≈ ₹${bnDigits(fx(x.inr, 0))} ${esc(x.inrUnitBn)}`)}</div>` : "";
+      const inr = x => x?.inr ? `<div class="mt-inr">${flip(`≈ ₹${fx(x.inr, 0)} ${esc(x.inrUnitEn)}`, `≈ ₹${bnDigits(fx(x.inr, 0))} ${esc(x.inrUnitBn)}`)}</div>` : "";
       // An animated picture for each commodity and currency: gold and silver bars catching the
       // light, an oil barrel with a falling drop, and a coin turning with the currency's sign.
       const bar = c => `<svg viewBox="0 0 160 120"><defs><linearGradient id="mk${c}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--hi)"/><stop offset="1" stop-color="var(--lo)"/></linearGradient></defs>${[[10, 70], [86, 70], [48, 26]].map(([x, y], j) => `<g style="--j:${j}"><path d="M${x + 10},${y} h44 l10,36 h-64z" fill="url(#mk${c})" stroke="var(--edge)" stroke-width="2"/><path d="M${x + 10},${y} h44 l-4,8 h-36z" fill="var(--top)" opacity=".7"/></g>`).join("")}</svg><i class="mk-shine"></i>`;
       const ICON = {
         gold: () => `<div class="mk-ico gold">${bar("g")}</div>`,
         silver: () => `<div class="mk-ico silver">${bar("s")}</div>`,
-        crude: () => `<div class="mk-ico crude"><svg viewBox="0 0 120 140"><rect x="22" y="14" width="76" height="104" rx="10" fill="#2b2b33" stroke="#6b6b78" stroke-width="3"/><rect x="18" y="40" width="84" height="8" rx="3" fill="#55555f"/><rect x="18" y="84" width="84" height="8" rx="3" fill="#55555f"/><rect x="34" y="56" width="52" height="20" rx="4" fill="var(--red)"/><text x="60" y="71" text-anchor="middle" font-family="Montserrat,sans-serif" font-weight="900" font-size="13" fill="#fff">OIL</text><circle cx="48" cy="20" r="5" fill="#18181d"/></svg><i class="mk-drop"></i><i class="mk-pool"></i></div>`,
+        crude: () => `<div class="mk-ico crude"><svg viewBox="0 0 120 140"><rect x="22" y="14" width="76" height="104" rx="10" fill="#2b2b33" stroke="#8a8a96" stroke-width="3"/><rect x="18" y="40" width="84" height="8" rx="3" fill="#55555f"/><rect x="18" y="84" width="84" height="8" rx="3" fill="#55555f"/><rect x="34" y="56" width="52" height="20" rx="4" fill="#D4A017"/><text x="60" y="71" text-anchor="middle" font-family="Montserrat,sans-serif" font-weight="900" font-size="13" fill="#1a0405">OIL</text><circle cx="48" cy="20" r="5" fill="#18181d"/></svg><i class="mk-drop"></i><i class="mk-pool"></i></div>`,
         usd: () => `<div class="mk-ico coin"><b>$</b></div>`,
         gbp: () => `<div class="mk-ico coin"><b>£</b></div>`,
         eur: () => `<div class="mk-ico coin"><b>€</b></div>`
       };
       const icon = x => { const k = Object.keys(ICON).find(k => M[k] === x); return k ? ICON[k]() : ""; };
-      const tile = (x, unit, i, d = 2) => x ? `<div class="mk-tile ${up(x) ? "up" : "down"}" style="--i:${i}">${icon(x)}<div class="mk-name">${flip(esc(x.en), esc(x.bn), "mn")}</div><div class="mk-val">${flip(`${unit[0]}${fx(x.value, d)}`, `${unit[1]}${bnDigits(fx(x.value, d))}`)}</div>${inr(x)}<div class="mk-chg"><i class="mk-arrow"></i>${flip(...chg(x))}</div></div>` : "";
-      const head = (en, bn) => `<div class="mk-head"><b data-no-tr>${en.toUpperCase()}</b><span>${bn}</span>${M.open ? "" : `<em>${flip("Last close", "শেষ দর")}</em>`}</div>`;
-      const opener = sub => `<div class="mk-open"><i class="mk-grid"></i><svg class="mk-line" viewBox="0 0 1920 400" preserveAspectRatio="none"><path d="M0,330 L180,300 L320,320 L470,240 L620,262 L760,180 L900,210 L1060,120 L1220,150 L1380,80 L1540,110 L1700,40 L1920,60"/></svg><div class="mk-open-in"><div class="wx-logo"><img src="${LOGO}" alt=""></div><b class="w1" data-no-tr>MARKET</b><b class="w2" data-no-tr>UPDATE</b><i class="wx-line"></i><span class="wx-bn">বাজারের খবর</span><small>${sub}</small></div></div>`;
+      const short = { "Crude oil (Brent)": ["Brent crude", "অপরিশোধিত তেল"] };
+      const tile = (x, unit, i, d = 2) => x ? `<div class="sg-card mt ${up(x) ? "up" : "down"}" style="--i:${i}"><div class="sg-band">${icon(x)}<div class="sg-name">${flip(esc(short[x.en]?.[0] || x.en), esc(x.bn), "mn")}</div></div><div class="sg-body"><div class="mt-val">${flip(`${unit[0]}${fx(x.value, d)}`, `${unit[1]}${bnDigits(fx(x.value, d))}`)}</div>${inr(x)}${chip(x)}</div></div>` : "";
+      const head = (en, bn) => segHead(en, bn, M.at, M.open ? ["LIVE", "লাইভ"] : ["LAST CLOSE", "শেষ দর"]);
       const screens = [
-        { d: 4, h: () => opener(M.open ? "লাইভ · LIVE" : "শেষ দর · LAST CLOSE") },
-        { d: 6, h: () => `<div class="mk-screen">${head("Indices", "সূচক")}<div class="mk-row two">${idx(M.nifty, 0)}${idx(M.sensex, 1)}</div></div>` },
-        ...(M.gainers?.length ? [{ d: 5, h: () => `<div class="mk-screen">${head("Top gainers · Nifty 50", "সবচেয়ে বেশি বেড়েছে")}<div class="mk-list up">${M.gainers.map(mover).join("")}</div></div>` }] : []),
-        ...(M.losers?.length ? [{ d: 5, h: () => `<div class="mk-screen">${head("Top losers · Nifty 50", "সবচেয়ে বেশি কমেছে")}<div class="mk-list down">${M.losers.map(mover).join("")}</div></div>` }] : []),
-        { d: 4, h: () => `<div class="mk-screen">${head("Commodities", "পণ্য")}<div class="mk-note">${flip("Rupee values at the international rate, before Indian duties and taxes", "টাকার দর আন্তর্জাতিক দামে, ভারতের শুল্ক ও কর ছাড়া", "mnote")}</div><div class="mk-row three">${tile(M.crude, ["$", "$"], 0)}${tile(M.gold, ["$", "$"], 1)}${tile(M.silver, ["$", "$"], 2)}</div></div>` },
-        { d: 4, h: () => `<div class="mk-screen">${head("Rupee", "টাকা")}<div class="mk-row three">${tile(M.usd, ["₹", "₹"], 0)}${tile(M.gbp, ["₹", "₹"], 1)}${tile(M.eur, ["₹", "₹"], 2)}</div></div>` },
-        { d: 3, h: () => opener("রাষ্ট্রিক্সের সঙ্গে থাকুন · Stay with Rashtrix") }
+        { d: 4, h: () => segOpen("MARKET", "বাজারের খবর", M.open ? "লাইভ · LIVE" : "শেষ দর · LAST CLOSE", `<svg class="mk-line" viewBox="0 0 1920 400" preserveAspectRatio="none"><path d="M0,330 L180,300 L320,320 L470,240 L620,262 L760,180 L900,210 L1060,120 L1220,150 L1380,80 L1540,110 L1700,40 L1920,60"/></svg>`) },
+        { d: 6, h: () => `<div class="sg-screen">${head("Indices", "সূচক")}<div class="sg-row n2">${idx(M.nifty, 0)}${idx(M.sensex, 1)}</div></div>` },
+        ...(M.gainers?.length ? [{ d: 5, h: () => `<div class="sg-screen">${head("Top gainers", "সবচেয়ে বেশি বেড়েছে")}<div class="sg-list">${M.gainers.map(mover).join("")}</div></div>` }] : []),
+        ...(M.losers?.length ? [{ d: 5, h: () => `<div class="sg-screen">${head("Top losers", "সবচেয়ে বেশি কমেছে")}<div class="sg-list">${M.losers.map(mover).join("")}</div></div>` }] : []),
+        { d: 4, h: () => `<div class="sg-screen">${head("Commodities", "পণ্য")}<div class="sg-row n3">${tile(M.crude, ["$", "$"], 0)}${tile(M.gold, ["$", "$"], 1)}${tile(M.silver, ["$", "$"], 2)}</div><div class="sg-note">${flip("Rupee values at the international rate, before Indian duties and taxes", "টাকার দর আন্তর্জাতিক দামে, ভারতের শুল্ক ও কর ছাড়া", "mnote")}</div></div>` },
+        { d: 4, h: () => `<div class="sg-screen">${head("Rupee", "টাকা")}<div class="sg-row n3">${tile(M.usd, ["₹", "₹"], 0)}${tile(M.gbp, ["₹", "₹"], 1)}${tile(M.eur, ["₹", "₹"], 2)}</div></div>` },
+        { d: 3, h: () => segOpen("MARKET", "বাজারের খবর", "রাষ্ট্রিক্সের সঙ্গে থাকুন · Stay with Rashtrix") }
       ];
       const sum = screens.reduce((n, x) => n + x.d, 0), scale = total / sum;
       let at = 0; screens.forEach(x => { x.d *= scale; x.at = at; at += x.d; });
       let shownM = -1;
       const drawM = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = Math.max(0, screens.findLastIndex(x => e >= x.at)); if (k === shownM) return; const first = shownM < 0; shownM = k;
-        const paint = () => { el.innerHTML = `<div class="mk${channel === "v" ? " v" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>${screens[k].h()}${k > 0 && k < screens.length - 1 ? segStrap("MARKET UPDATE", "বাজারের খবর", screens, k) : ""}</div>`; };
+        const paint = () => { el.innerHTML = `<div class="seg mk${channel === "v" ? " v" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>${screens[k].h()}${k > 0 && k < screens.length - 1 ? segStrap("MARKET UPDATE", "বাজারের খবর", screens, k) : ""}</div>`; };
         if (first || !el.isConnected) return paint();
         const w = document.createElement("div"); w.className = "bs-wipe mk-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
         stage.append(w); if (!st.muted) whoosh(st.audio);
@@ -884,18 +886,16 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const ZONE = { wb: ["WEST BENGAL", "পশ্চিমবঙ্গ"], in: ["INDIA", "দেশ"] };
       const day = new Date(sc.startAt || now()).toLocaleDateString("en-GB", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long" });
       const sky = k => `<div class="wx-sky k-${k}"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i></div>`;
-      const big = (sub) => `<div class="wx-open">${sky("sun")}<div class="wx-open-in"><div class="wx-logo"><img src="${LOGO}" alt=""></div><b class="w1" data-no-tr>WEATHER</b><b class="w2" data-no-tr>UPDATE</b><i class="wx-line"></i><span class="wx-bn">আবহাওয়ার খবর</span><small>${sub}</small></div></div>`;
-      const card = (p, i) => `<div class="wx-card k-${p.kind}" style="--i:${i}">${sky(p.kind)}
-        <div class="wx-name">${flip(esc(p.en), esc(p.bn), "wn")}</div>
-        <div class="wx-temp">${flip(`${p.temp}<sup>°C</sup>`, `${bnDigits(p.temp)}<sup>°সে</sup>`, "wt")}</div>
-        <div class="wx-kind">${flip(esc(p.kindEn), esc(p.kindBn), "wk")}</div>
-        <div class="wx-facts"><span>${flip(`H ${p.hi}° · L ${p.lo}°`, `সর্বোচ্চ ${bnDigits(p.hi)}° · সর্বনিম্ন ${bnDigits(p.lo)}°`, "wf")}</span><span>${flip(`Humidity ${p.hum}% · Wind ${p.wind} km/h`, `আর্দ্রতা ${bnDigits(p.hum)}% · হাওয়া ${bnDigits(p.wind)} কিমি`, "wf")}</span></div></div>`;
-      const screenHTML = x => x.t === "open" ? big(esc(day)) : x.t === "close" ? big("রাষ্ট্রিক্সের সঙ্গে থাকুন · Stay with Rashtrix")
-        : x.t === "sec" ? `<div class="wx-sec"><b data-no-tr>${ZONE[x.zone][0]}</b><span>${ZONE[x.zone][1]}</span><i></i></div>`
-        : `<div class="wx-cards n${x.c.length}"><div class="wx-head"><b data-no-tr>${ZONE[x.zone][0]}</b><span>${ZONE[x.zone][1]}</span></div><div class="wx-row">${x.c.map(card).join("")}</div></div>`;
+      const card = (p, i) => `<div class="sg-card wc" style="--i:${i}"><div class="sg-band k-${p.kind}">${sky(p.kind)}<div class="sg-name">${flip(esc(p.en), esc(p.bn), "wn")}</div></div>
+        <div class="sg-body"><div class="wc-temp">${flip(`${p.temp}<sup>°C</sup>`, `${bnDigits(p.temp)}<sup>°সে</sup>`, "wt")}</div>
+        <div class="wc-kind">${flip(esc(p.kindEn), esc(p.kindBn), "wk")}</div>
+        <div class="wc-facts"><span>${flip(`High ${p.hi}° · Low ${p.lo}°`, `সর্বোচ্চ ${bnDigits(p.hi)}° · সর্বনিম্ন ${bnDigits(p.lo)}°`, "wf")}</span><span>${flip(`Humidity ${p.hum}% · Wind ${p.wind} km/h`, `আর্দ্রতা ${bnDigits(p.hum)}% · হাওয়া ${bnDigits(p.wind)} কিমি`, "wf")}</span></div></div></div>`;
+      const screenHTML = x => x.t === "open" ? segOpen("WEATHER", "আবহাওয়ার খবর", esc(day), sky("sun")) : x.t === "close" ? segOpen("WEATHER", "আবহাওয়ার খবর", "রাষ্ট্রিক্সের সঙ্গে থাকুন · Stay with Rashtrix", sky("sun"))
+        : x.t === "sec" ? `<div class="sg-sec"><b data-no-tr>${ZONE[x.zone][0]}</b><span>${ZONE[x.zone][1]}</span><i></i></div>`
+        : `<div class="sg-screen">${segHead(ZONE[x.zone][0], ZONE[x.zone][1], st.tv?.weatherAt)}<div class="sg-row n${x.c.length}">${x.c.map(card).join("")}</div></div>`;
       let shownW = -1;
       const drawW = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = Math.max(0, screens.findLastIndex(x => e >= x.at)); if (k === shownW) return; const first = shownW < 0; shownW = k;
-        const paint = () => { el.innerHTML = `<div class="wx${channel === "v" ? " v" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>${screenHTML(screens[k])}${k > 0 && k < screens.length - 1 ? segStrap("WEATHER UPDATE", "আবহাওয়ার খবর", screens, k) : ""}</div>`; };
+        const paint = () => { el.innerHTML = `<div class="seg wx${channel === "v" ? " v" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>${screenHTML(screens[k])}${k > 0 && k < screens.length - 1 ? segStrap("WEATHER UPDATE", "আবহাওয়ার খবর", screens, k) : ""}</div>`; };
         if (first || !el.isConnected) return paint();
         const w = document.createElement("div"); w.className = "bs-wipe wx-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
         stage.append(w); if (!st.muted) whoosh(st.audio);
@@ -991,6 +991,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const bnDayDate = () => new Date().toLocaleDateString("bn-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long" });
   // The bulletin's bottom strap, shared by the weather and market updates so they read as the
   // same channel: the red label, the gold progress bars (one per screen) and the logo.
+  // The weather and market screens' shared pieces, in the channel's look: a heading (red chip,
+  // gold Bengali) with the time the figures were updated, and the big opening/closing card.
+  const updWords = at => { if (!at) return null; const d = new Date(at), o = { timeZone: "Asia/Kolkata" };
+    const t = d.toLocaleTimeString("en-GB", { ...o, hour: "2-digit", minute: "2-digit" }), en = d.toLocaleDateString("en-GB", { ...o, day: "numeric", month: "short" });
+    let bn = ""; try { bn = bnDigits(d.toLocaleDateString("bn-IN", { ...o, day: "numeric", month: "long" })); } catch { bn = bnDigits(en); }
+    return [`UPDATED ${t} IST · ${en.toUpperCase()}`, `আপডেট ${bnDigits(t)} · ${bn}`]; };
+  const segHead = (en, bn, at, state) => { const u = updWords(at);
+    return `<div class="sg-head"><div class="sg-title"><b data-no-tr>${esc(en.toUpperCase())}</b><span>${esc(bn)}</span></div>${u || state ? `<div class="sg-upd">${state ? `<em>${flip(state[0], state[1], "ss")}</em>` : ""}${u ? `<span><i></i>${flip(u[0], u[1], "su")}</span>` : ""}</div>` : ""}</div>`; };
+  const segOpen = (word, bn, sub, art = "") => `<div class="sg-open">${art}<div class="sg-open-in"><div class="sg-logo"><img src="${LOGO}" alt=""></div><b class="w1" data-no-tr>${word}</b><b class="w2" data-no-tr>UPDATE</b><i class="sg-line"></i><span class="sg-bn">${bn}</span><small>${sub}</small></div></div>`;
   const segStrap = (en, bn, screens, k) => `<div class="bs-strap seg-strap"><b data-no-tr>${en}</b><span>${bn}</span><div class="bs-steps">${screens.slice(1, -1).map((x, j) => `<i class="${j < k - 1 ? "done" : j === k - 1 ? "on" : ""}" style="--d:${x.d}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div>`;
   const flip = (a, b, cls) => `<span class="dt-flip ${cls}"><span class="ff a">${a}</span><span class="ff b">${b}</span></span>`;
   // One block at the top left: LIVE and the time on top; under it, a slim row of the date
