@@ -144,7 +144,10 @@ export function scheduleAt(loop, epoch, t = Date.now(), ahead = 5400, opts = {})
       if (at + len > t) out.push({ type: "bulletin", start: at, dur: len / 1000, sting: true });
       // The weather briefing straight after it (horizontal channel).
       if (wx && at + len + wx > t) out.push({ type: "weather", start: at + len, dur: wx / 1000, sting: true });
-      due = nextHalf(at); at += len + wx; continue;
+      // Then the 30-second market update.
+      const mk = wx ? 30e3 : 0;
+      if (mk && at + len + wx + mk > t) out.push({ type: "market", start: at + len + wx, dur: 30, sting: true });
+      due = nextHalf(at); at += len + wx + mk; continue;
     }
     const x = loop[i], next = at + x.dur * 1000;
     if (next > t) out.push({ ...x, start: at, in: 0 });

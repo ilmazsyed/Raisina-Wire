@@ -675,3 +675,54 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .wx-ico.k-clear{background:radial-gradient(circle at 35% 35%,#fffbe6,#e0d9b8 70%)}
 @keyframes wxrow{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .wx-head{justify-content:center}
+
+/* ---------- The market update ---------- */
+.mk{position:absolute;inset:0;overflow:hidden;color:#fff;background:radial-gradient(ellipse at 70% 20%,#123a2c 0%,#081a16 45%,#04090b 100%)}
+.mk:before{content:"";position:absolute;inset:0;background:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px) 0 0/100% 60px,linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px) 0 0/60px 100%;animation:mkgrid 6s linear infinite}
+@keyframes mkgrid{to{background-position:0 60px,60px 0}}
+.mk-open{position:absolute;inset:0;display:grid;place-items:center}
+.mk-line{position:absolute;left:0;right:0;bottom:120px;width:100%;height:400px;opacity:.5}
+.mk-line path{fill:none;stroke:#2ee59d;stroke-width:6;stroke-linejoin:round;stroke-dasharray:3000;stroke-dashoffset:3000;animation:mkdraw 2.4s .2s ease-out forwards;filter:drop-shadow(0 0 12px rgba(46,229,157,.6))}
+@keyframes mkdraw{to{stroke-dashoffset:0}}
+.mk-open-in{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px}
+.mk-open-in .w1,.mk-open-in .w2{font:900 150px/1 Montserrat,sans-serif;letter-spacing:.06em}
+.mk-open-in .w1{animation:nbl .7s .3s cubic-bezier(.2,.9,.2,1) both}
+.mk-open-in .w2{padding:4px 26px 10px;border-radius:10px;background:linear-gradient(90deg,#16a34a,#0d9488);animation:nbr .7s .4s cubic-bezier(.2,.9,.2,1) both}
+.mk-open-in .wx-line{background:linear-gradient(90deg,transparent,#2ee59d,transparent)}
+.mk-open-in small{font:700 34px "Hind Siliguri",Montserrat,sans-serif;color:rgba(255,255,255,.8);animation:nbup .6s 1.2s both}
+.mk-screen{position:absolute;inset:0;padding:110px 90px 150px;display:flex;flex-direction:column;gap:36px}
+.mk-head{display:flex;align-items:baseline;justify-content:center;gap:24px;animation:tvin .6s both}
+.mk-head b{font:900 46px Montserrat,sans-serif;letter-spacing:.1em}
+.mk-head span{font:700 36px "Hind Siliguri",sans-serif;color:#7cf5c4}
+.mk-head em{font:700 24px "Hind Siliguri",Montserrat,sans-serif;font-style:normal;padding:4px 14px;border-radius:999px;background:rgba(255,255,255,.12);color:#ffd76a}
+.mk-row{flex:1;display:grid;gap:34px}
+.mk-row.two{grid-template-columns:1fr 1fr}
+.mk-row.three{grid-template-columns:repeat(3,1fr)}
+.mk-idx,.mk-tile{position:relative;overflow:hidden;border-radius:30px;padding:34px 38px;display:flex;flex-direction:column;justify-content:center;gap:12px;background:linear-gradient(160deg,rgba(255,255,255,.1),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.14);box-shadow:0 26px 60px rgba(0,0,0,.45);animation:wxcard .7s calc(.15s * var(--i,0)) cubic-bezier(.2,.9,.2,1) both}
+.mk-idx.up,.mk-tile.up{box-shadow:0 26px 60px rgba(0,0,0,.45),inset 0 -6px 0 #16c784}
+.mk-idx.down,.mk-tile.down{box-shadow:0 26px 60px rgba(0,0,0,.45),inset 0 -6px 0 #ea3943}
+.mk-name{font:800 46px "Noto Serif Bengali",Montserrat,sans-serif}
+.mk-val{font:900 104px/1 Montserrat,sans-serif;letter-spacing:-.01em}
+.mk-tile .mk-val{font-size:78px}
+.mk-chg{display:flex;align-items:center;gap:12px;font:800 38px Montserrat,"Hind Siliguri",sans-serif}
+.up .mk-chg,.mk-mover.up .mk-pc{color:#2ee59d}
+.down .mk-chg,.mk-mover.down .mk-pc{color:#ff5c66}
+.mk-arrow{display:inline-block;width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent}
+.up .mk-arrow{border-bottom:22px solid currentColor;animation:mkup 1.2s ease-in-out infinite}
+.down .mk-arrow{border-top:22px solid currentColor;animation:mkdown 1.2s ease-in-out infinite}
+@keyframes mkup{50%{transform:translateY(-6px)}}
+@keyframes mkdown{50%{transform:translateY(6px)}}
+.mk-spark{position:absolute;left:0;right:0;bottom:16px;width:100%;height:150px;opacity:.55}
+.mk-spark path{fill:none;stroke-width:5;stroke-linejoin:round;stroke-dasharray:2500;stroke-dashoffset:2500;animation:mkdraw 2s .5s ease-out forwards}
+.up .mk-spark path{stroke:#2ee59d}.down .mk-spark path{stroke:#ff5c66}
+.mk-list{flex:1;display:flex;flex-direction:column;justify-content:center;gap:24px;padding:0 160px}
+.mk-mover{display:grid;grid-template-columns:90px 1fr 300px 260px;align-items:center;gap:24px;padding:26px 36px;border-radius:24px;background:linear-gradient(90deg,rgba(255,255,255,.1),rgba(255,255,255,.03));border-left:10px solid;animation:mkslide .6s calc(.15s * var(--i,0)) cubic-bezier(.2,.9,.2,1) both}
+.mk-mover.up{border-color:#16c784}.mk-mover.down{border-color:#ea3943}
+.mk-rank{font:900 54px Montserrat,"Hind Siliguri",sans-serif;color:rgba(255,255,255,.5)}
+.mk-co{font:800 52px "Noto Serif Bengali",Montserrat,sans-serif}
+.mk-px{font:700 42px Montserrat,"Hind Siliguri",sans-serif;color:rgba(255,255,255,.85)}
+.mk-pc{display:flex;align-items:center;gap:12px;font:900 48px Montserrat,"Hind Siliguri",sans-serif}
+.mk .dt-flip .ff{justify-content:flex-start}
+@keyframes mkslide{from{opacity:0;transform:translateX(-80px)}to{opacity:1;transform:none}}
+.mk-wipe i{background:#16a34a!important}
+.mk .mk-idx .mk-name,.mk .mk-idx .mk-val,.mk .mk-tile .mk-name,.mk .mk-tile .mk-val,.mk .mk-co{color:#fff;opacity:1}

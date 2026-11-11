@@ -84,6 +84,7 @@ const noise = ctx => { if (!noiseBuf || noiseBuf.sampleRate !== ctx.sampleRate) 
 //   upnext    – bright, rising, expectant (C major, 116 bpm, the filter opens as it runs)
 //   bulletin  – urgent timpani and strings ostinato with brass stabs (D minor, 140 bpm)
 //   weather   – airy and bright: soft pads, marimba-like plucks, a light shaker (F major, 100 bpm)
+//   market    – sleek and driving: a ticking hi-hat, a pulsing synth arpeggio, deep bass (E minor, 122 bpm)
 //   ident     – the channel's signature: a boom, a brass swell and a four-note bell motif
 //   stinger   – a rising swoosh into a deep hit and a metallic ring
 const busOf = ctx => {
@@ -139,6 +140,15 @@ const STYLES = {
       if (k % 2 === 0) v.osc("sine", ch[pl] * 2, at, 0.26, 0.09, 5000);                            // marimba-like pluck
       if (k === 6 || k === 14) v.osc("triangle", ch[pl] * 4, at, 0.18, 0.03, 7000);                 // sparkle
       if (k % 4 === 0) v.osc("sine", root, at, s16 * 3.5, 0.32, 300);                              // bass
+    } },
+  market: { bpm: 122, level: 1, roots: [41.2, 32.7, 49, 36.71], chords: [[164.8, 196, 246.9], [130.8, 164.8, 196], [196, 246.9, 293.7], [146.8, 185, 220]],
+    step(v, at, k, bar, ch, root, s16) {
+      if (k === 0 && bar % 2 === 0) { v.hiss(at, 1, 0.22, "highpass", 6000, 0.6); ch.forEach(f => v.osc("sawtooth", f, at, 1.2, 0.05, 1600, 0, 0.1)); }
+      if (k % 4 === 0) v.osc("sine", 150, at, 0.3, 0.9, 600, 45);                                   // kick
+      if (k === 4 || k === 12) v.hiss(at, 0.16, 0.42, "bandpass", 2200, 0.9);                        // clap
+      v.hiss(at, 0.025, k % 2 ? 0.07 : 0.12, "highpass", 10000);                                     // ticking hat
+      v.osc("square", ch[[0, 1, 2, 1][k % 4]] * 2, at, s16 * 0.7, 0.045, 2600);                    // arpeggio
+      if (k % 2 === 0) v.osc("sawtooth", root * 2, at, s16 * 1.4, 0.32, 380);                      // bass
     } },
   bulletin: { bpm: 140, roots: [73.42, 58.27, 65.41, 55], chords: [[293.7, 349.2, 440], [233.1, 293.7, 349.2], [261.6, 329.6, 392], [220, 277.2, 329.6]],
     step(v, at, k, bar, ch, root, s16) {
@@ -363,7 +373,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // Music under the headline flash, the "up next" card and the bulletin (faster for the bulletin).
   // Each kind of graphic has its own music; the channel ID plays its signature, and the bulletin
   // opens with the signature under its channel ID, then its own music.
-  const BEDS = { flash: { style: "headlines" }, upnext: { style: "upnext" }, bulletin: { style: "bulletin" }, weather: { style: "weather" } };
+  const BEDS = { flash: { style: "headlines" }, upnext: { style: "upnext" }, bulletin: { style: "bulletin" }, weather: { style: "weather" }, market: { style: "market" } };
   function startBed(sc) {
     const kind = sc?.graphic?.kind;
     if (!BEDS[kind] || st.muted || !st.audio || (mode !== "app" && !output) || st.bed) return;
@@ -561,6 +571,19 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     // Straight after each bulletin, the weather briefing: 90 seconds after the two-minute ones,
     // 60 after the 65-second ones (horizontal channel, when the weather has come in).
     const WX = channel === "h" && (st.tv?.weatherPlaces || []).length && (st.tv?.bulletin || []).length ? (BULLETIN_MS === 120e3 ? 90e3 : 60e3) : 0;
+    // Then the market update, 30 seconds (when its figures have come in).
+    const MK = WX && st.tv?.market?.nifty ? 30e3 : 0;
+    if (MK && t - slot >= BULLETIN_MS + WX && t - slot < BULLETIN_MS + WX + MK) {
+      const ms = slot + BULLETIN_MS + WX;
+      if (q.item?.type !== "market" || q.start !== ms) {
+        if (q.item?.type === "video") { const at = (q.item.in || 0) + ytPos(q.item.ytId); q.resume = at < q.item.dur - 8 ? { ...q.item, at, resumed: true } : null; }
+        else if (q.item?.type === "upnext") q.resume = q.item.video;
+        q.item = { type: "market", dur: MK / 1000, sting: true }; q.start = ms; q.n++;
+        q.seg = { ...q.item, start: ms, in: 0 };
+      }
+      st.preWant = null;
+      return q.seg;
+    }
     if (WX && t - slot >= BULLETIN_MS && t - slot < BULLETIN_MS + WX) {
       const ws = slot + BULLETIN_MS;
       if (q.item?.type !== "weather" || q.start !== ws) {
@@ -580,7 +603,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (!done) return q.seg;
     }
     if (q.restart && !["video", "upnext"].includes(q.item?.type)) { q.i = 0; q.restart = false; q.pending = (q.pending || []).filter(x => x.type !== "upnext"); }
-    if (["bulletin", "weather"].includes(q.item?.type) && q.pending?.length) q.pending = q.pending.filter(x => x.type !== "flash");
+    if (["bulletin", "weather", "market"].includes(q.item?.type) && q.pending?.length) q.pending = q.pending.filter(x => x.type !== "flash");
     const take = () => { const x = loop[q.i % loop.length]; q.i = (q.i + 1) % loop.length; return x; };
     let next;
     if (q.item?.type === "upnext") {
@@ -628,6 +651,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (seg.type === "ident") return { layout: "graphic", graphic: { kind: "ident" }, startAt: seg.start, dur: seg.dur, key: `c:ident:${seg.start}`, transition: { type: "mix", ms: 200 }, full: true };
     if (seg.type === "upnext") return { layout: "graphic", graphic: { kind: "upnext", video: seg.video }, startAt: seg.start, dur: seg.dur, key: `c:upnext:${seg.start}`, transition: { type: "mix", ms: 250 }, full: true };
     if (seg.type === "bulletin") return { layout: "graphic", graphic: { kind: "bulletin" }, startAt: seg.start, dur: seg.dur, key: `c:bulletin:${seg.start}`, transition, full: true };
+    if (seg.type === "market") return { layout: "graphic", graphic: { kind: "market" }, startAt: seg.start, dur: seg.dur, key: `c:market:${seg.start}`, transition, full: true };
     if (seg.type === "weather") return { layout: "graphic", graphic: { kind: "weather" }, startAt: seg.start, dur: seg.dur, key: `c:weather:${seg.start}`, transition, full: true };
     if (seg.type === "news") return { layout: "graphic", graphic: { kind: "news" }, startAt: seg.start, dur: seg.dur, key: `c:news:${seg.start}`, transition };
     if (seg.type === "promo") return { layout: "graphic", graphic: { kind: "promo", image: seg.image }, key: `c:promo:${seg.start}`, full: true };
@@ -708,7 +732,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     stage.classList.toggle("lband", sc?.layout === "lband");
     stage.classList.toggle("vid", !sc?.graphic && sc?.layout === "full" && (sc?.sources || []).length === 1);
     stage.classList.toggle("full-gfx", !!sc?.full || sc?.graphic?.kind === "promo" || sc?.graphic?.kind === "ads");
-    stage.classList.toggle("wx-on", sc?.graphic?.kind === "weather");
+    stage.classList.toggle("wx-on", ["weather", "market"].includes(sc?.graphic?.kind));
   }
 
   /* ---------- graphics ---------- */
@@ -781,6 +805,37 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (!st.muted && (mode === "app" || output)) riser(st.audio);
       const count = () => { if (!el.isConnected && st.current) return; const left = Math.max(1, Math.ceil(dur - (now() - (sc.startAt || now())) / 1000)); const b = el.querySelector(".un-count b"); if (b && b.textContent !== bnDigits(left)) b.textContent = bnDigits(left); };
       count(); const t = setInterval(() => el.isConnected ? count() : clearInterval(t), 250);
+    } else if (g.kind === "market") {   // 30 seconds after the weather: the markets
+      const M = st.tv?.market || {}, total = sc.dur || 30;
+      const fx = (n, d = 2) => n == null ? "–" : Number(n).toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d });
+      const pair = (n, d = 2) => [fx(n, d), bnDigits(fx(n, d))];
+      const up = x => (x?.change ?? 0) >= 0;
+      const chg = x => { if (!x || x.change == null) return ["", ""]; const sgn = up(x) ? "+" : "−", c = fx(Math.abs(x.change)), p = fx(Math.abs(x.pct)); return [`${sgn}${c} (${sgn}${p}%)`, `${sgn}${bnDigits(c)} (${sgn}${bnDigits(p)}%)`]; };
+      const spark = arr => { if (!arr?.length) return ""; const lo = Math.min(...arr), hi = Math.max(...arr), w = 600, h = 120, d = arr.map((v, i) => `${i ? "L" : "M"}${(i / (arr.length - 1 || 1) * w).toFixed(1)},${(h - (hi === lo ? h / 2 : (v - lo) / (hi - lo) * h)).toFixed(1)}`).join(" "); return `<svg class="mk-spark" viewBox="-4 -4 ${w + 8} ${h + 8}" preserveAspectRatio="none"><path d="${d}"/></svg>`; };
+      const idx = (x, i) => x ? `<div class="mk-idx ${up(x) ? "up" : "down"}" style="--i:${i}"><div class="mk-name">${flip(esc(x.en), esc(x.bn), "mn")}</div><div class="mk-val">${flip(...pair(x.value))}</div><div class="mk-chg"><i class="mk-arrow"></i>${flip(...chg(x))}</div>${spark(x.spark)}</div>` : "";
+      const mover = (x, i) => `<div class="mk-mover ${up(x) ? "up" : "down"}" style="--i:${i}"><span class="mk-rank">${flip(String(i + 1), bnDigits(i + 1))}</span><span class="mk-co">${flip(esc(x.en), esc(x.bn), "mn")}</span><span class="mk-px">${flip(`₹${fx(x.value)}`, `₹${bnDigits(fx(x.value))}`)}</span><span class="mk-pc"><i class="mk-arrow"></i>${flip(`${up(x) ? "+" : "−"}${fx(Math.abs(x.pct))}%`, `${up(x) ? "+" : "−"}${bnDigits(fx(Math.abs(x.pct)))}%`)}</span></div>`;
+      const tile = (x, unit, i, d = 2) => x ? `<div class="mk-tile ${up(x) ? "up" : "down"}" style="--i:${i}"><div class="mk-name">${flip(esc(x.en), esc(x.bn), "mn")}</div><div class="mk-val">${flip(`${unit[0]}${fx(x.value, d)}`, `${unit[1]}${bnDigits(fx(x.value, d))}`)}</div><div class="mk-chg"><i class="mk-arrow"></i>${flip(...chg(x))}</div></div>` : "";
+      const head = (en, bn) => `<div class="mk-head"><b data-no-tr>MARKET UPDATE</b><span>${bn} · ${en}</span>${M.open ? "" : `<em>${flip("Last close", "শেষ দর")}</em>`}</div>`;
+      const opener = sub => `<div class="mk-open"><i class="mk-grid"></i><svg class="mk-line" viewBox="0 0 1920 400" preserveAspectRatio="none"><path d="M0,330 L180,300 L320,320 L470,240 L620,262 L760,180 L900,210 L1060,120 L1220,150 L1380,80 L1540,110 L1700,40 L1920,60"/></svg><div class="mk-open-in"><div class="wx-logo"><img src="${LOGO}" alt=""></div><b class="w1" data-no-tr>MARKET</b><b class="w2" data-no-tr>UPDATE</b><i class="wx-line"></i><span class="wx-bn">বাজারের খবর</span><small>${sub}</small></div></div>`;
+      const screens = [
+        { d: 4, h: () => opener(M.open ? "লাইভ · LIVE" : "শেষ দর · LAST CLOSE") },
+        { d: 6, h: () => `<div class="mk-screen">${head("Indices", "সূচক")}<div class="mk-row two">${idx(M.nifty, 0)}${idx(M.sensex, 1)}</div></div>` },
+        ...(M.gainers?.length ? [{ d: 5, h: () => `<div class="mk-screen">${head("Top gainers · Nifty 50", "সবচেয়ে বেশি বেড়েছে")}<div class="mk-list up">${M.gainers.map(mover).join("")}</div></div>` }] : []),
+        ...(M.losers?.length ? [{ d: 5, h: () => `<div class="mk-screen">${head("Top losers · Nifty 50", "সবচেয়ে বেশি কমেছে")}<div class="mk-list down">${M.losers.map(mover).join("")}</div></div>` }] : []),
+        { d: 4, h: () => `<div class="mk-screen">${head("Commodities", "পণ্য")}<div class="mk-row three">${tile(M.crude, ["$", "$"], 0)}${tile(M.gold, ["$", "$"], 1)}${tile(M.silver, ["$", "$"], 2)}</div></div>` },
+        { d: 4, h: () => `<div class="mk-screen">${head("Rupee", "টাকা")}<div class="mk-row three">${tile(M.usd, ["₹", "₹"], 0)}${tile(M.gbp, ["₹", "₹"], 1)}${tile(M.eur, ["₹", "₹"], 2)}</div></div>` },
+        { d: 3, h: () => opener("রাষ্ট্রিক্সের সঙ্গে থাকুন · Stay with Rashtrix") }
+      ];
+      const sum = screens.reduce((n, x) => n + x.d, 0), scale = total / sum;
+      let at = 0; screens.forEach(x => { x.d *= scale; x.at = at; at += x.d; });
+      let shownM = -1;
+      const drawM = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = Math.max(0, screens.findLastIndex(x => e >= x.at)); if (k === shownM) return; const first = shownM < 0; shownM = k;
+        const paint = () => { el.innerHTML = `<div class="mk">${screens[k].h()}</div>`; };
+        if (first || !el.isConnected) return paint();
+        const w = document.createElement("div"); w.className = "bs-wipe mk-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
+        stage.append(w); if (!st.muted) whoosh(st.audio);
+        setTimeout(paint, 330); setTimeout(() => w.remove(), 900); };
+      drawM(); const tm = setInterval(() => el.isConnected ? drawM() : clearInterval(tm), 250);
     } else if (g.kind === "weather") {   // after each bulletin: the weather, West Bengal then India
       const P = st.tv?.weatherPlaces || [], total = sc.dur || 90, wb = P.filter(p => p.zone === "wb"), ind = P.filter(p => p.zone === "in");
       const chunk = (a, n) => a.reduce((o, x, i) => (i % n ? o[o.length - 1].push(x) : o.push([x]), o), []);
