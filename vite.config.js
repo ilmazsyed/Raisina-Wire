@@ -45,7 +45,8 @@ export default defineConfig({
         studio: resolve(import.meta.dirname, "studio.html"),
         guest: resolve(import.meta.dirname, "guest.html"),
         onair: resolve(import.meta.dirname, "onair.html"),
-        prompter: resolve(import.meta.dirname, "prompter.html")
+        prompter: resolve(import.meta.dirname, "prompter.html"),
+        avodesk: resolve(import.meta.dirname, "avodesk.html")
       }
     }
   }
