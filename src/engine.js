@@ -819,7 +819,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // Commodities also in rupees, in Indian units (at the international rate, before Indian duties and taxes).
       const inr = x => x?.inr ? `<div class="mk-inr">${flip(`≈ ₹${fx(x.inr, 0)} ${esc(x.inrUnitEn)}`, `≈ ₹${bnDigits(fx(x.inr, 0))} ${esc(x.inrUnitBn)}`)}</div>` : "";
       const tile = (x, unit, i, d = 2) => x ? `<div class="mk-tile ${up(x) ? "up" : "down"}" style="--i:${i}"><div class="mk-name">${flip(esc(x.en), esc(x.bn), "mn")}</div><div class="mk-val">${flip(`${unit[0]}${fx(x.value, d)}`, `${unit[1]}${bnDigits(fx(x.value, d))}`)}</div>${inr(x)}<div class="mk-chg"><i class="mk-arrow"></i>${flip(...chg(x))}</div></div>` : "";
-      const head = (en, bn) => `<div class="mk-head"><b data-no-tr>MARKET UPDATE</b><span>${bn} · ${en}</span>${M.open ? "" : `<em>${flip("Last close", "শেষ দর")}</em>`}</div>`;
+      const head = (en, bn) => `<div class="mk-head"><b data-no-tr>${en.toUpperCase()}</b><span>${bn}</span>${M.open ? "" : `<em>${flip("Last close", "শেষ দর")}</em>`}</div>`;
       const opener = sub => `<div class="mk-open"><i class="mk-grid"></i><svg class="mk-line" viewBox="0 0 1920 400" preserveAspectRatio="none"><path d="M0,330 L180,300 L320,320 L470,240 L620,262 L760,180 L900,210 L1060,120 L1220,150 L1380,80 L1540,110 L1700,40 L1920,60"/></svg><div class="mk-open-in"><div class="wx-logo"><img src="${LOGO}" alt=""></div><b class="w1" data-no-tr>MARKET</b><b class="w2" data-no-tr>UPDATE</b><i class="wx-line"></i><span class="wx-bn">বাজারের খবর</span><small>${sub}</small></div></div>`;
       const screens = [
         { d: 4, h: () => opener(M.open ? "লাইভ · LIVE" : "শেষ দর · LAST CLOSE") },
@@ -834,7 +834,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       let at = 0; screens.forEach(x => { x.d *= scale; x.at = at; at += x.d; });
       let shownM = -1;
       const drawM = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = Math.max(0, screens.findLastIndex(x => e >= x.at)); if (k === shownM) return; const first = shownM < 0; shownM = k;
-        const paint = () => { el.innerHTML = `<div class="mk">${screens[k].h()}</div>`; };
+        const paint = () => { el.innerHTML = `<div class="mk${channel === "v" ? " v" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>${screens[k].h()}${k > 0 && k < screens.length - 1 ? segStrap("MARKET UPDATE", "বাজারের খবর", screens, k) : ""}</div>`; };
         if (first || !el.isConnected) return paint();
         const w = document.createElement("div"); w.className = "bs-wipe mk-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
         stage.append(w); if (!st.muted) whoosh(st.audio);
@@ -861,10 +861,10 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         <div class="wx-facts"><span>${flip(`H ${p.hi}° · L ${p.lo}°`, `সর্বোচ্চ ${bnDigits(p.hi)}° · সর্বনিম্ন ${bnDigits(p.lo)}°`, "wf")}</span><span>${flip(`Humidity ${p.hum}% · Wind ${p.wind} km/h`, `আর্দ্রতা ${bnDigits(p.hum)}% · হাওয়া ${bnDigits(p.wind)} কিমি`, "wf")}</span></div></div>`;
       const screenHTML = x => x.t === "open" ? big(esc(day)) : x.t === "close" ? big("রাষ্ট্রিক্সের সঙ্গে থাকুন · Stay with Rashtrix")
         : x.t === "sec" ? `<div class="wx-sec"><b data-no-tr>${ZONE[x.zone][0]}</b><span>${ZONE[x.zone][1]}</span><i></i></div>`
-        : `<div class="wx-cards n${x.c.length}"><div class="wx-head"><b data-no-tr>WEATHER UPDATE</b><span>${ZONE[x.zone][1]} · ${ZONE[x.zone][0]}</span></div><div class="wx-row">${x.c.map(card).join("")}</div></div>`;
+        : `<div class="wx-cards n${x.c.length}"><div class="wx-head"><b data-no-tr>${ZONE[x.zone][0]}</b><span>${ZONE[x.zone][1]}</span></div><div class="wx-row">${x.c.map(card).join("")}</div></div>`;
       let shownW = -1;
       const drawW = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = Math.max(0, screens.findLastIndex(x => e >= x.at)); if (k === shownW) return; const first = shownW < 0; shownW = k;
-        const paint = () => { el.innerHTML = `<div class="wx${channel === "v" ? " v" : ""}">${screenHTML(screens[k])}</div>`; };
+        const paint = () => { el.innerHTML = `<div class="wx${channel === "v" ? " v" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>${screenHTML(screens[k])}${k > 0 && k < screens.length - 1 ? segStrap("WEATHER UPDATE", "আবহাওয়ার খবর", screens, k) : ""}</div>`; };
         if (first || !el.isConnected) return paint();
         const w = document.createElement("div"); w.className = "bs-wipe wx-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
         stage.append(w); if (!st.muted) whoosh(st.audio);
@@ -958,6 +958,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // redrawn when the minute changes, which starts the ten-second cycle afresh on the minute.
   const enTime = () => new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
   const bnDayDate = () => new Date().toLocaleDateString("bn-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long" });
+  // The bulletin's bottom strap, shared by the weather and market updates so they read as the
+  // same channel: the red label, the gold progress bars (one per screen) and the logo.
+  const segStrap = (en, bn, screens, k) => `<div class="bs-strap seg-strap"><b data-no-tr>${en}</b><span>${bn}</span><div class="bs-steps">${screens.slice(1, -1).map((x, j) => `<i class="${j < k - 1 ? "done" : j === k - 1 ? "on" : ""}" style="--d:${x.d}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div>`;
   const flip = (a, b, cls) => `<span class="dt-flip ${cls}"><span class="ff a">${a}</span><span class="ff b">${b}</span></span>`;
   // One block at the top left: LIVE and the time on top; under it, a slim row of the date
   // (flipping between English and Bengali) and the Bengali calendar date, the same width.

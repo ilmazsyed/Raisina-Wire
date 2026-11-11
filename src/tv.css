@@ -758,3 +758,52 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tvp-h .tv-l3{bottom:126px}
 .tvp-h .tvp-gfx .tv-adslot>.tv-ad{bottom:126px}
 .tvp-h.lb-auto .tv-mkt{display:none}
+
+/* ---------- Weather and market updates in the channel's look ----------
+   Each keeps its own colour (night-sky blue for the weather, the trading floor's dark for the
+   markets) but wears the channel's marks: the bulletin's pinstripes and red glow, red label
+   chips, gold rules, the red-and-dark slash between screens and the bulletin's bottom strap. */
+.wx{background:linear-gradient(135deg,#06142a 0%,#0b2546 55%,#1a1030 100%)}
+.wx .bs-glow,.mk .bs-glow{z-index:0}
+.wx .bs-glow{background:radial-gradient(circle,rgba(224,16,16,.22),transparent 65%)}
+.mk{background:linear-gradient(135deg,#0d0b12 0%,#140809 55%,#220405 100%)}
+.mk:before{z-index:0;background:linear-gradient(rgba(212,160,23,.05) 1px,transparent 1px) 0 0/100% 60px,linear-gradient(90deg,rgba(212,160,23,.05) 1px,transparent 1px) 0 0/60px 100%}
+/* openers: the bulletin's red word block and gold line */
+.wx-open-in .w2,.mk-open-in .w2{background:var(--red);box-shadow:0 18px 40px rgba(170,4,4,.45)}
+.wx-line,.mk-open-in .wx-line,.wx-sec i{background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+.wx-logo{box-shadow:0 0 0 4px var(--gold),0 20px 50px rgba(0,0,0,.4)}
+.mk-line path{stroke:var(--gold);filter:drop-shadow(0 0 12px rgba(212,160,23,.5))}
+.wx-sec span{color:var(--gold)}
+.wx-sec b{text-shadow:0 10px 40px rgba(0,0,0,.4)}
+/* screen headings: a red chip and gold Bengali, on a gold rule */
+.wx-head,.mk-head{position:relative;align-items:center;justify-content:center;gap:22px;padding-bottom:16px;border-bottom:2px solid var(--gold)}
+.wx-head b,.mk-head b{padding:8px 20px;background:var(--red);border-radius:8px;font:900 34px Montserrat,sans-serif;letter-spacing:.1em;color:#fff}
+.wx-head span,.mk-head span{font:800 40px "Noto Serif Bengali","Hind Siliguri",sans-serif;color:var(--gold)}
+.mk-head em{margin-left:6px}
+/* cards and tiles: the bulletin picture's corners and a gold rim */
+.wx-card{border-radius:22px;box-shadow:0 26px 60px rgba(0,0,0,.45),0 0 0 2px rgba(212,160,23,.55)}
+.mk-idx,.mk-tile{border-radius:22px;border-color:rgba(212,160,23,.35);background:linear-gradient(160deg,rgba(255,255,255,.09),rgba(255,255,255,.025))}
+.mk-mover{border-radius:18px}
+.mk-rank{color:var(--gold)}
+.mk-inr{color:var(--gold)}
+/* room for the strap */
+.wx-cards{padding:96px 80px 170px}
+.mk-screen{padding:110px 90px 170px}
+.seg-strap{z-index:3;animation:nbup .5s .1s cubic-bezier(.2,.9,.2,1) both}
+.seg-strap span{font-family:"Noto Serif Bengali","Hind Siliguri",sans-serif}
+/* the transition: the channel's red slash, with a thin band in the segment's own colour */
+.wx-wipe i,.mk-wipe i{background:unset}
+.wx-wipe i:nth-child(1),.mk-wipe i:nth-child(1){display:block;width:12%;left:-6%;animation-delay:0s}
+.wx-wipe i:nth-child(1){background:#2f7fd6!important}
+.mk-wipe i:nth-child(1){background:var(--gold)!important}
+.wx-wipe i:nth-child(2),.mk-wipe i:nth-child(2){background:var(--red)!important}
+.wx-wipe i:nth-child(3),.mk-wipe i:nth-child(3){background:#120203!important}
+
+/* The market ticker in the channel's colours: a red label with a gold edge on deep maroon. */
+.tv-mkt{background:linear-gradient(180deg,#1c0506,#120203);border-top:2px solid var(--gold)}
+.mkt-label{background:var(--red);color:#fff;box-shadow:inset -3px 0 0 var(--gold)}
+.mkt-i{border-right-color:rgba(212,160,23,.22)}
+.mkt-i b{color:#fff}
+.mkt-i em{color:rgba(255,255,255,.82)}
+.mkt-i.up i{border-bottom-color:#3ddc84}.mkt-i.up small{color:#3ddc84}
+.mkt-i.down i{border-top-color:#ff6b6b}.mkt-i.down small{color:#ff6b6b}
