@@ -162,7 +162,7 @@ export async function promos(env, all = false) {
 // - at the top of every hour and at every half hour, a two-minute bulletin of the latest
 //   stories with their details, and at :15 and :45 a 65-second one. The loop stops for it and
 //   carries on where it stopped.
-export const FLASH_SECONDS = 10;
+export const FLASH_SECONDS = 8;   // the full-screen headlines: quick
 export const QUARTER = 900e3;
 export const bulletinMs = due => (Math.round(due / 60e3) % 30 === 0 ? 120e3 : 65e3);
 const hash = str => { let h = 2166136261; for (const c of String(str)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
