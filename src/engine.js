@@ -327,6 +327,10 @@ const noCaptions = p => { try { p.unloadModule?.("captions"); p.unloadModule?.("
 /* ---------- The engine ---------- */
 // mode: "program" (follow the channel), "scene" (draw a given scene: PCR preview), "app" (program
 // in the app, muted until tapped). key: an output key (outputs) – sends heartbeats.
+// A viewer's running order outlives its player: when a page redraws and mounts the player afresh
+// (the Watch page draws once from its cache, then again with fresh data), the new player carries
+// on with the same block at the same moment instead of choosing again and jumping.
+const RUNNING = {};
 export function mountTV(host, { channel = "h", output = false, mode, key = "", scene: fixedScene = null, guestToken = "", onState, muted, tapUnmute = true } = {}) {
   mode ||= output ? "program" : "app";
   const [W, H] = SIZE[channel];
@@ -376,6 +380,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const ro = new ResizeObserver(scale); ro.observe(fit); scale();
 
   const st = { tv: null, ctl: null, queue: [], skew: 0, alive: true, muted: muted ?? (mode === "app" ? false : !output), audio: null, current: null, shownBreaking: "", flash: 0, stalledSince: 0, playing: false, ws: null, dumpUntil: 0, pkgTimer: null };
+  const keepOrder = mode === "app" && !output && !fixedScene;
+  if (keepOrder && RUNNING[channel] && Date.now() - RUNNING[channel].at < 120e3) st.seq = RUNNING[channel].seq;
   const now = () => Date.now() + st.skew;
   const auth = key ? { ch: channel, key } : guestToken ? { t: guestToken } : mode === "app" ? { viewer: 1 } : {};
 
@@ -585,10 +591,16 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const bulletinMs = slot => (slot / 60e3) % 30 === 0 ? 120e3 : 65e3;   // :00 and :30 two minutes; :15 and :45 sixty-five seconds
   const upnext = v => ({ type: "upnext", video: v, dur: UPNEXT, sting: false });
   // AVO stories: how often this viewer (or this output) has seen each, kept on the device.
-  const AVO_SECS = 30, AVO_MIN = 4, AVO_MAX = 6, AVO_EVERY = 3, AVO_REPEAT = 4;
+  // Each AVO story stays on screen exactly as long as its reading (plus a breath either side);
+  // a story with no recording yet gets the time it takes to read its lines at news pace.
+  const avoLen = x => { const v = Number(x?.secs) || 0; if (v > 0) return Math.max(8, Math.round((v + 0.15 * Math.max(0, (x.voice?.length || 1) - 1) + 2) * 10) / 10);
+    const n = (x?.lines || []).join(" ").length || String(x?.title || "").length; return Math.max(10, Math.min(40, Math.round(n / 14))); };
+  const avoTotal = L => L.reduce((n, x) => n + avoLen(x), 0);
+  const AVO_MIN = 4, AVO_MAX = 6, AVO_EVERY = 3, AVO_REPEAT = 4;
   const avoSeen = (() => { try { return JSON.parse(localStorage.getItem(`rw-avo-seen-${channel}`) || "{}"); } catch { return {}; } })();
   const markAvoSeen = id => { avoSeen[id] = (avoSeen[id] || 0) + 1; try { const keep = Object.fromEntries(Object.entries(avoSeen).slice(-80)); localStorage.setItem(`rw-avo-seen-${channel}`, JSON.stringify(keep)); } catch { /* private mode */ } };
-  const avoLogged = new Set();   // each story of a block is logged once, however often it is redrawn
+  // Each story of a block is logged once, however often it is redrawn (or its player remounted).
+  const avoLogged = keepOrder ? (RUNNING[`log-${channel}`] ||= new Set()) : new Set();
   const avoPool = () => (st.tv?.avoOn === false ? [] : st.tv?.avo || []).filter(x => (avoSeen[x.id] || 0) < AVO_REPEAT);
   // Due: when the channel opens (nothing played yet) and after every three videos, when the item
   // on air is done and nothing else (a resumed video, the "up next" card) is waiting.
@@ -678,8 +690,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const block = avoBlock();
       if (block.length) {
         q.sinceAvo = 0; q.n++;
-        q.item = { type: "avo", dur: block.length * AVO_SECS, stories: block }; q.start = t;
-        q.seg = { type: "avo", stories: block, dur: block.length * AVO_SECS, start: t, in: 0, sting: true, n: q.n };
+        q.item = { type: "avo", dur: avoTotal(block), stories: block }; q.start = t;
+        q.seg = { type: "avo", stories: block, dur: avoTotal(block), start: t, in: 0, sting: true, n: q.n };
         const after = loop.slice(q.i).concat(loop.slice(0, q.i)).find(x => x.type === "video");
         st.preWant = after ? { id: after.ytId, at: 0 } : null;
         return q.seg;
@@ -977,10 +989,20 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       drawW(); const tw = setInterval(() => el.isConnected ? drawW() : clearInterval(tw), 250);
     } else if (g.kind === "avo") {   // the AVO Breaking Engine: each story 30 seconds, read over its pictures
       const list = (g.stories || []).filter(Boolean), at0 = sc.startAt || now();
+      const lens = list.map(avoLen), starts = lens.map((_, i) => lens.slice(0, i).reduce((a, b) => a + b, 0));
       // Pictures are loaded in advance and shown only once they have really loaded (a picture
       // that fails never shows as a black screen); the channel's text cards make up four.
       const imgState = st.avoImg ||= new Map();
-      const preload = x => (x.images || []).forEach(i => { if (imgState.has(i.src)) return; imgState.set(i.src, "loading"); const im = new Image(); im.referrerPolicy = "no-referrer"; im.onload = () => imgState.set(i.src, im.naturalWidth >= 320 ? "ok" : "bad"); im.onerror = () => imgState.set(i.src, "bad"); im.src = i.src; });
+      // A publication's logo or house card (a mark on a plain background) is never shown: a news
+      // photograph has many colours; such a card is mostly one flat colour with few others.
+      const logoCard = im => { try {
+        const c = document.createElement("canvas"); c.width = 48; c.height = 27; const g = c.getContext("2d", { willReadFrequently: true });
+        g.drawImage(im, 0, 0, 48, 27); const d = g.getImageData(0, 0, 48, 27).data, bins = new Map(), n = d.length / 4;
+        for (let j = 0; j < d.length; j += 4) { const q = (d[j] >> 6) * 16 + (d[j + 1] >> 6) * 4 + (d[j + 2] >> 6); bins.set(q, (bins.get(q) || 0) + 1); }
+        const shares = [...bins.values()].map(v => v / n).sort((a, b) => b - a), used = shares.filter(v => v > 0.01).length;
+        return shares[0] > 0.72 || (shares[0] > 0.45 && used <= 4);
+      } catch { return false; } };
+      const preload = x => (x.images || []).forEach(i => { if (imgState.has(i.src)) return; imgState.set(i.src, "loading"); const im = new Image(); im.referrerPolicy = "no-referrer"; im.onload = () => imgState.set(i.src, im.naturalWidth >= 320 && !logoCard(im) ? "ok" : "bad"); im.onerror = () => imgState.set(i.src, "bad"); im.src = i.src; });
       list.forEach(preload);
       // The slides of a story: its photographs, and to keep it lively (and to make up four when
       // photos are few) the channel's animated cards: BREAKING NEWS, a Bengali infographic with a
@@ -1027,7 +1049,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         <div class="avo-kick"><i class="lt-pulse"></i><b>এই মুহূর্তে</b><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span></div>
         <div class="avo-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>এই মুহূর্তে</small></span><span class="lt-text">${esc(x.title)}</span></div>
         <small class="avo-credit"></small>
-        <div class="avo-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${AVO_SECS}s"></i>`).join("")}</div></div>`;
+        <div class="avo-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${lens[j]}s"></i>`).join("")}</div></div>`;
       // The newsreader: the story's recordings one after the other, through the music's sound engine.
       const speakAvo = x => {
         st.voice?.pause(); st.voice = null;
@@ -1043,32 +1065,45 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       let shownK = -1, shownS = -1;
       const drawA = () => {
         if (!el.isConnected && st.current) return;
-        const e = (now() - at0) / 1000, k = Math.min(list.length - 1, Math.max(0, Math.floor(e / AVO_SECS))), x = list[k]; if (!x) return;
-        const into = e - k * AVO_SECS, slides = slidesOf(x), si = Math.min(slides.length - 1, Math.floor(into / (AVO_SECS / slides.length)));
+        const e = (now() - at0) / 1000; let k = 0; while (k < list.length - 1 && e >= starts[k + 1]) k++;
+        const x = list[k]; if (!x) return;
+        // A story's slide times are fixed by its length (each slide at least four and a half
+        // seconds); a slide still to come takes a picture that finishes loading meanwhile, and a slide
+        // on screen never changes.
+        const nS = Math.max(2, Math.min(7, Math.floor(lens[k] / 4.5))), slides = slidesOf(x).slice(0, nS);
+        while (slides.length < nS) slides.push({ brk: 2 + slides.length });
+        const into = e - starts[k], si = Math.min(slides.length - 1, Math.max(0, Math.floor(into / (lens[k] / slides.length))));
         if (k !== shownK) {
           const first = shownK < 0; shownK = k; shownS = -1;
           // A fresh frame always gets its first slide (a slide drawn into the old frame during the
           // wipe must not count, or the new story stays black until its second slide).
           const paint = () => { el.innerHTML = storyHTML(x, k); shownS = -1; speakAvo(x); st.resumeVoice = () => { if (el.isConnected) speakAvo(x); }; drawA(); };
           // Each story is logged: an airing from the broadcast output, a view from the app or site.
-          const logKey = `${x.id}@${Math.round(at0 + k * AVO_SECS * 1000)}`;
+          const logKey = `${x.id}@${Math.round(at0 + starts[k] * 1000)}`;
           if ((mode === "app" || output) && !avoLogged.has(logKey)) { avoLogged.add(logKey); markAvoSeen(x.id); fetch("/api/tv/avo/played", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: x.id, ch: channel, key: output ? key : "" }), keepalive: true }).catch(() => {}); }
-          if (first || !el.isConnected) return paint();
-          const w = document.createElement("div"); w.className = "bs-wipe wx-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
-          stage.append(w); if (!st.muted) whoosh(st.audio);
-          setTimeout(paint, 330); setTimeout(() => w.remove(), 900); return;
+          const box0 = el.querySelector(".avo");
+          if (first || !el.isConnected || !box0) return paint();
+          // The next story comes in without a cut: the এই মুহূর্তে tag, the NEWS UPDATE strip and the
+          // progress stay on screen; the strip's headline changes, and its picture comes in under the
+          // stinger with a whoosh.
+          box0.dataset.k = k;
+          const kick = box0.querySelector(".avo-kick span"); if (kick) kick.textContent = DESK_BN[x.desk] || x.desk || "খবর";
+          const lt = box0.querySelector(".avo-l3 .lt-text"); if (lt) { lt.textContent = x.title; lt.classList.remove("swap"); void lt.offsetWidth; lt.classList.add("swap"); }
+          box0.querySelectorAll(".avo-steps i").forEach((n, j) => { n.className = j < k ? "done" : j === k ? "on" : ""; });
+          if (!st.muted) whoosh(st.audio);
+          speakAvo(x); st.resumeVoice = () => { if (el.isConnected) speakAvo(x); };
         }
         const box = el.querySelector(".avo"); if (!box || box.dataset.k !== String(k)) return;
         if (si !== shownS) {
-          const firstSlide = shownS < 0; shownS = si; const pics = box.querySelector(".avo-pics"), sl = slides[si];
+          const firstSlide = !box.querySelector(".avo-pics > .avo-slide"); shownS = si; const pics = box.querySelector(".avo-pics"), sl = slides[si];
           const put = () => {
-            pics.insertAdjacentHTML("beforeend", slideHTML(x, sl).replace(/class="avo-slide([^"]*)"/, `class="avo-slide$1" style="--d:${(AVO_SECS / slides.length + 1.5).toFixed(1)}s"`));
-            [...pics.children].slice(0, -1).forEach(n => n.remove());
+            pics.insertAdjacentHTML("beforeend", slideHTML(x, sl).replace(/class="avo-slide([^"]*)"/, `class="avo-slide$1" style="--d:${(lens[k] / slides.length + 1.5).toFixed(1)}s"`));
+            [...pics.querySelectorAll(":scope > .avo-slide")].slice(0, -1).forEach(n => n.remove());
             countUp(pics);
             box.querySelector(".avo-credit").textContent = sl.img?.credit || (sl.brk ? bgOf(x)?.credit || "" : "");
           };
           if (firstSlide) put();
-          else { const w = document.createElement("div"); w.className = "avo-sting"; w.innerHTML = "<i></i><i></i><i></i>"; box.append(w); setTimeout(put, 300); setTimeout(() => w.remove(), 800); }
+          else { const w = document.createElement("div"); w.className = "avo-sting"; w.innerHTML = "<i></i><i></i><i></i>"; pics.append(w); setTimeout(put, 300); setTimeout(() => w.remove(), 800); }
         }
       };
       drawA(); const ta = setInterval(() => el.isConnected ? drawA() : clearInterval(ta), 250);
@@ -1365,7 +1400,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   loadTv().then(tick); connect(); poll();
   const timers = [setInterval(loadTv, 15000), setInterval(tick, 500), setInterval(() => { st.flash++; }, 8000), setInterval(poll, 5000), setInterval(heartbeat, 5000)];
   return {
-    destroy() { st.alive = false; st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null; try { st.audio?.close(); } catch { /* closed */ } document.removeEventListener("fullscreenchange", fsChange); document.removeEventListener("webkitfullscreenchange", fsChange); document.documentElement.classList.remove("tvp-fs-lock"); ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
+    destroy() { if (keepOrder && st.seq) RUNNING[channel] = { seq: st.seq, at: Date.now() }; st.alive = false; st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null; try { st.audio?.close(); } catch { /* closed */ } document.removeEventListener("fullscreenchange", fsChange); document.removeEventListener("webkitfullscreenchange", fsChange); document.documentElement.classList.remove("tvp-fs-lock"); ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
     unmute, setScene(sc) { fixedScene = sc; tick(); }, get state() { return st.ctl; }
   };
 }

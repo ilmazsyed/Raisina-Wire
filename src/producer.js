@@ -65,7 +65,7 @@ async function avoDialog() {
     $$("[data-avoadd]", d).forEach(b => b.onclick = async () => {
       if (!S.rd) return toast("Open a rundown first.");
       const x = L.stories.find(y => y.id === b.dataset.avoadd), story = { id: x.id, title: x.title, desk: x.desk, region: x.region, sex: x.sex, lines: x.lines, voice: x.voice, secs: x.secs, images: x.images, at: x.at };
-      try { await api(`/api/admin/rundowns/${S.rd.id}/items`, { method: "POST", body: { type: "avo", title: x.title.slice(0, 200), duration: 30, data: { story, avoId: x.id } } }); b.textContent = "Added"; b.disabled = true; openRundown(S.rd.id); } catch (e) { fail(e); }
+      try { await api(`/api/admin/rundowns/${S.rd.id}/items`, { method: "POST", body: { type: "avo", title: x.title.slice(0, 200), duration: Math.ceil(x.secs > 0 ? Math.max(8, x.secs + 2) : 20), data: { story, avoId: x.id } } }); b.textContent = "Added"; b.disabled = true; openRundown(S.rd.id); } catch (e) { fail(e); }
     });
   } catch (e) { $("#al", d).innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
 }
