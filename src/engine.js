@@ -99,6 +99,8 @@ const noise = ctx => { if (!noiseBuf || noiseBuf.sampleRate !== ctx.sampleRate) 
 //   bulletin  – urgent timpani and strings ostinato with brass stabs (D minor, 140 bpm)
 //   weather   – airy and bright: soft pads, marimba-like plucks, a light shaker (F major, 100 bpm)
 //   market    – sleek and driving: a ticking hi-hat, a pulsing synth arpeggio, deep bass (E minor, 122 bpm)
+//   avo       – a calm newsroom underscore under the AVO stories: a soft pad, a low heartbeat
+//               pulse, a ticking clock and a sparse bell, kept low under the reading (D minor, 96 bpm)
 //   ident     – the channel's signature: a boom, a brass swell and a four-note bell motif
 //   stinger   – a rising swoosh into a deep hit and a metallic ring
 const busOf = ctx => {
@@ -163,6 +165,17 @@ const STYLES = {
       v.hiss(at, 0.025, k % 2 ? 0.07 : 0.12, "highpass", 10000);                                     // ticking hat
       v.osc("square", ch[[0, 1, 2, 1][k % 4]] * 2, at, s16 * 0.7, 0.045, 2600);                    // arpeggio
       if (k % 2 === 0) v.osc("sawtooth", root * 2, at, s16 * 1.4, 0.32, 380);                      // bass
+    } },
+  avo: { bpm: 96, level: 0.8, roots: [73.42, 58.27, 87.31, 65.41], chords: [[293.7, 349.2, 440], [233.1, 293.7, 349.2], [261.6, 349.2, 440], [261.6, 329.6, 392]],
+    step(v, at, k, bar, ch, root, s16) {
+      if (k === 0) ch.forEach(f => v.osc("triangle", f, at, s16 * 16, 0.045, 1300, 0, 0.8));          // soft pad
+      if (k === 0 && bar % 4 === 0) v.hiss(at, 2.2, 0.08, "highpass", 6000, 0.5);                     // gentle swell
+      if (k === 0 || k === 8) v.osc("sine", 96, at, 0.4, 0.42, 500, 44);                             // muted kick
+      if (k % 4 === 0) v.osc("sine", root, at, s16 * 3, 0.26, 280);                                  // heartbeat bass
+      if (k % 2 === 0) v.hiss(at, 0.02, k % 4 === 0 ? 0.07 : 0.045, "highpass", 9000);               // ticking clock
+      if (k === 4 || k === 12) v.hiss(at, 0.05, 0.05, "bandpass", 3800, 2);                          // soft tick accent
+      if (k % 4 === 2) v.osc("sine", ch[0] * 2, at, 0.16, 0.03, 2000);                               // newsroom pulse
+      if (bar % 2 === 1 && (k === 0 || k === 10)) v.osc("sine", ch[k === 0 ? 2 : 1] * 2, at, 1.4, 0.045, 6000); // sparse bell
     } },
   bulletin: { bpm: 140, roots: [73.42, 58.27, 65.41, 55], chords: [[293.7, 349.2, 440], [233.1, 293.7, 349.2], [261.6, 329.6, 392], [220, 277.2, 329.6]],
     step(v, at, k, bar, ch, root, s16) {
@@ -391,7 +404,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // Music under the headline flash, the "up next" card and the bulletin (faster for the bulletin).
   // Each kind of graphic has its own music; the channel ID plays its signature, and the bulletin
   // opens with the signature under its channel ID, then its own music.
-  const BEDS = { flash: { style: "headlines" }, upnext: { style: "upnext" }, bulletin: { style: "bulletin" }, weather: { style: "weather" }, market: { style: "market" }, avo: { style: "bulletin", duck: 0.6 } };
+  const BEDS = { flash: { style: "headlines" }, upnext: { style: "upnext" }, bulletin: { style: "bulletin" }, weather: { style: "weather" }, market: { style: "market" }, avo: { style: "avo", duck: 0.7 } };
   function startBed(sc) {
     const kind = sc?.graphic?.kind;
     if (!BEDS[kind] || st.muted || !st.audio || (mode !== "app" && !output) || st.bed) return;
