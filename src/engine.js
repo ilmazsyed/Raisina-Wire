@@ -491,34 +491,23 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (!y?.ready || st.ytOwner !== token) return;
       try {
         y.ended = false;
-        if (y.pre === src.id) { y.pre = null; y.preloading = false; y.player.seekTo(start, true); st.muted ? y.player.mute() : y.player.unMute(); y.player.playVideo(); }
+        if (y.pre === src.id) { y.pre = null; y.preloading = false; let at = 0; try { at = y.player.getCurrentTime() || 0; } catch { /* none */ } if (Math.abs(at - start) > 1.5) y.player.seekTo(start, true); st.muted ? y.player.mute() : y.player.unMute(); y.player.playVideo(); }
         else { y.pre = null; y.player.loadVideoById({ videoId: src.id, startSeconds: start }); st.muted ? y.player.mute() : y.player.unMute(); }
       } catch { /* none */ }
       checkStart();
     };
     // Not playing after a moment: try again muted (allowed nearly everywhere), then ask for a tap.
     const checkStart = () => {
+      setTimeout(() => { const y = st.yt; if (!st.alive || st.ytOwner !== token || !y?.ready || [1, 3].includes(y.state)) return; try { y.player.playVideo(); } catch { /* none */ } }, 700);
       setTimeout(() => { const y = st.yt; if (!st.alive || st.ytOwner !== token || !y?.ready || [1, 3].includes(y.state)) return; if (!st.muted) { soundOff(); try { y.player.mute(); y.player.playVideo(); } catch { /* none */ } } }, 1800);
       setTimeout(() => { const y = st.yt; if (st.alive && st.ytOwner === token && y && ![1, 3].includes(y.state)) needTap(true); }, 4500);
     };
+    st.ytLoad = load;
     loadYT().then(YT => {
       if (!YT || !st.alive || st.ytOwner !== token) return;
-      if (st.yt) return load();
-      st.yt = { state: -1, since: Date.now(), ready: false };
-      st.yt.player = new YT.Player(layer.querySelector(".tvs-yt"), { width: "100%", height: "100%", videoId: src.id,
-        playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, cc_load_policy: 0, playsinline: 1, fs: 0, autoplay: 1, mute: st.muted ? 1 : 0, start, origin: location.origin },
-        events: {
-          onReady: e => { st.yt.ready = true; st.muted ? e.target.mute() : e.target.unMute(); if (st.ytOwner === token) { e.target.playVideo(); checkStart(); } else st.ytLoad?.(); },
-          onStateChange: e => {
-            st.yt.state = e.data; st.yt.since = Date.now();
-            // A video loaded in advance waits, paused and buffering, until its turn.
-            if (st.yt.preloading && !st.ytOwner) { if (e.data === 1) { e.target.pauseVideo(); st.yt.preloading = false; } return; }
-            if (e.data === 0) st.yt.ended = true; ytMaskState(layer, e.data, e.data === 1 && !!st.ytPoster?.querySelector(".tvs-poster")); if (e.data === 1) { liftPoster(st.ytPoster); needTap(false); noCaptions(e.target); }
-          },
-          onError: () => { st.yt.state = 0; st.yt.ended = true; }
-        } });
+      if (st.yt) return load();   // made already (possibly early, with this very video loading)
+      makeYT(YT, src.id, start, false);
     });
-    st.ytLoad = load;
     return {
       el, src,
       destroy() { if (st.ytOwner !== token) return; st.ytOwner = null; st.nowYt = null; showLike(); layer.hidden = true; try { st.yt?.player?.pauseVideo(); } catch { /* none */ } needTap(false); },
@@ -528,9 +517,35 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       playing: () => st.yt?.state === 1, shared: true
     };
   }
+  // The one YouTube player of the visit. It is made early when it can be: while the channel opens
+  // on its own graphics (AVO stories, a segment), the player is made hidden and muted with the
+  // first video loading in it, so the first video plays the moment its turn comes instead of
+  // waiting for YouTube's player to be built and the video to buffer (four or five seconds).
+  function makeYT(YT, id, start, early) {
+    const layer = $(".tvp-ytlayer");
+    st.yt = { state: -1, since: Date.now(), ready: false, pre: early ? id : null, preloading: early };
+    if (early) layer.classList.add("pre");
+    st.yt.player = new YT.Player(layer.querySelector(".tvs-yt"), { width: "100%", height: "100%", videoId: id,
+      playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, cc_load_policy: 0, playsinline: 1, fs: 0, autoplay: 1, mute: early || st.muted ? 1 : 0, start, origin: location.origin },
+      events: {
+        onReady: e => {
+          st.yt.ready = true;
+          if (st.ytOwner) { st.muted ? e.target.mute() : e.target.unMute(); st.ytLoad?.(); }   // its turn came while it was being made
+          else { e.target.mute(); e.target.playVideo(); }   // early: start buffering (it pauses on its first frame)
+        },
+        onStateChange: e => {
+          st.yt.state = e.data; st.yt.since = Date.now();
+          // A video loaded in advance waits, paused and buffered, until its turn.
+          if (st.yt.preloading && !st.ytOwner) { if (e.data === 1) { e.target.pauseVideo(); st.yt.preloading = false; } return; }
+          if (e.data === 0) st.yt.ended = true; ytMaskState(layer, e.data, e.data === 1 && !!st.ytPoster?.querySelector(".tvs-poster")); if (e.data === 1) { liftPoster(st.ytPoster); needTap(false); noCaptions(e.target); }
+        },
+        onError: () => { st.yt.state = 0; st.yt.ended = true; }
+      } });
+  }
   // The next video is loaded into the one player while the flash or the "up next" card is on
   // (the player is invisible then), so it plays the moment its turn comes, without a wait.
   function preloadYT(want) {
+    if (want && !st.yt && !st.ytOwner && !st.ytMaking) { st.ytMaking = true; loadYT().then(YT => { st.ytMaking = false; if (YT && st.alive && !st.yt && !st.ytOwner) makeYT(YT, want.id, Math.floor(want.at || 0), true); }); return; }
     const y = st.yt;
     if (!want || !y?.ready || st.ytOwner || y.pre === want.id) return;
     y.pre = want.id; y.preloading = true;
@@ -826,6 +841,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (pd) {
       q.n++; q.item = { type: "poll", dur: pd.dur }; q.start = t;
       q.seg = { type: "poll", id: pd.id, res: pd.res, dur: pd.dur, start: t, in: 0, sting: true, n: q.n };
+      const after = loop.slice(q.i).concat(loop.slice(0, q.i)).find(x => x.type === "video");
+      st.preWant = after ? { id: after.ytId, at: 0 } : null;
       return q.seg;
     }
     // A segment whose slot has come (src/segments.js), when the item on air is done.
@@ -1166,22 +1183,22 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const count = n => { const to = Number(n.dataset.to), dec = n.dataset.dec === "1", t0 = performance.now(); const step = t => { if (!n.isConnected) return; const p = Math.min(1, (t - t0) / 1300), e = 1 - Math.pow(1 - p, 3); n.textContent = bnDigits((dec ? (to * e).toFixed(1) : Math.round(to * e)).toLocaleString("en-IN")); if (p < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
       const tIST = v => { try { return bnDigits(new Date(Date.parse(v) + 5.5 * 3600e3).toISOString().slice(11, 16)); } catch { return ""; } };
       const itemHTML = (x, i) => {
-        if (x.lead) { const L = x.lead, im = (L.images || [])[0]; return `<div class="sg-item sg-lead">${im ? `<div class="sg-lead-img"><img src="${esc(im.src)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')"></div>` : ""}<i class="s1"></i><i class="s2"></i><div class="sg-lead-in"><span class="brk-tag">${L.upd ? "নতুন তথ্য" : "এই ঘণ্টার বড় খবর"}</span><small>${esc(DESK_BN[L.d] || L.d || "খবর")}</small><b>${esc(L.t)}</b></div></div>`; }
-        if (x.map) return `<div class="sg-item sg-map"><span class="sg-lbl">কোথায়</span><div class="sg-mapbox"><svg viewBox="0 0 1600 760" preserveAspectRatio="xMidYMid meet"></svg></div></div>`;
-        if (x.quote) return `<div class="sg-item sg-quote"><b class="q">“</b><p>${esc(x.quote)}</p><small>— প্রতিবেদন থেকে</small></div>`;
-        if (x.timeline) return `<div class="sg-item sg-tl"><span class="sg-lbl">ঘটনাক্রম</span><ol>${x.timeline.map((r, j) => `<li style="--i:${j}"><em>${tIST(r.at)}</em><span>${esc(r.t)}</span></li>`).join("")}<li class="now" style="--i:${x.timeline.length}"><em>এখন</em><span>${esc(x.title)}</span></li></ol></div>`;
-        if (x.pts) return `<div class="sg-item sg-pts"><span class="sg-lbl">মূল তথ্য</span><ol>${x.pts.map((t, j) => `<li style="--i:${j}"><i>${bnDigits(j + 1)}</i><span>${esc(t)}</span></li>`).join("")}</ol></div>`;
-        if (x.photo) return `<div class="sg-item sg-photo"><img src="${esc(x.photo.src)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')"><b>${esc(x.title)}</b>${x.photo.credit ? `<small>${esc(x.photo.credit)}</small>` : ""}</div>`;
-        if (x.wx) return `<div class="sg-item sg-wx"><span class="sg-lbl">আবহাওয়া</span><div class="sg-wxl">${x.wx.map(w => `<div><b>${esc(w.bn || w.en)}</b><em>${bnDigits(Math.round(w.temp))}°</em><small>${esc(w.kindBn || "")}</small></div>`).join("")}</div></div>`;
-        if (x.notice) return `<div class="sg-item sg-notice"><span class="sg-lbl">ডেস্কের বার্তা</span><p>${esc(x.notice)}</p></div>`;
-        if (name === "numbers") return `<div class="sg-item sg-fig"><span class="sg-lbl">${esc(DESK_BN[x.d] || x.d || "খবর")}</span><div class="fig"><b class="num" data-to="${x.n}" data-dec="${x.dec ? 1 : 0}">০</b><em>${esc(x.unit)}</em></div><p>${esc(x.line)}</p></div>`;
-        if (name === "onthisday") return `<div class="sg-item sg-otd"><b class="sg-year">${bnDigits(x.y)}</b><p>${esc(x.text)}</p></div>`;
-        return `<div class="sg-item${x.img ? " has-img" : ""}"><div class="sg-num">${bnDigits(i + 1)}</div><div class="sg-body"><span class="sg-lbl">${esc(DESK_BN[x.d] || x.d || "খবর")}</span><h2>${esc(x.t)}</h2>${x.line && x.line !== x.t ? `<p>${esc(x.line)}</p>` : ""}</div>${x.img ? `<div class="sg-img"><img src="${esc(x.img)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')"></div>` : ""}</div>`;
+        if (x.lead) { const L = x.lead, im = (L.images || [])[0]; return `<div class="sx-item sx-lead">${im ? `<div class="sx-lead-img"><img src="${esc(im.src)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')"></div>` : ""}<i class="s1"></i><i class="s2"></i><div class="sx-lead-in"><span class="brk-tag">${L.upd ? "নতুন তথ্য" : "এই ঘণ্টার বড় খবর"}</span><small>${esc(DESK_BN[L.d] || L.d || "খবর")}</small><b>${esc(L.t)}</b></div></div>`; }
+        if (x.map) return `<div class="sx-item sx-map"><span class="sx-lbl">কোথায়</span><div class="sx-mapbox"><svg viewBox="0 0 1600 760" preserveAspectRatio="xMidYMid meet"></svg></div></div>`;
+        if (x.quote) return `<div class="sx-item sx-quote"><b class="q">“</b><p>${esc(x.quote)}</p><small>— প্রতিবেদন থেকে</small></div>`;
+        if (x.timeline) return `<div class="sx-item sx-tl"><span class="sx-lbl">ঘটনাক্রম</span><ol>${x.timeline.map((r, j) => `<li style="--i:${j}"><em>${tIST(r.at)}</em><span>${esc(r.t)}</span></li>`).join("")}<li class="now" style="--i:${x.timeline.length}"><em>এখন</em><span>${esc(x.title)}</span></li></ol></div>`;
+        if (x.pts) return `<div class="sx-item sx-pts"><span class="sx-lbl">মূল তথ্য</span><ol>${x.pts.map((t, j) => `<li style="--i:${j}"><i>${bnDigits(j + 1)}</i><span>${esc(t)}</span></li>`).join("")}</ol></div>`;
+        if (x.photo) return `<div class="sx-item sx-photo"><img src="${esc(x.photo.src)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')"><b>${esc(x.title)}</b>${x.photo.credit ? `<small>${esc(x.photo.credit)}</small>` : ""}</div>`;
+        if (x.wx) return `<div class="sx-item sx-wx"><span class="sx-lbl">আবহাওয়া</span><div class="sx-wxl">${x.wx.map(w => `<div><b>${esc(w.bn || w.en)}</b><em>${bnDigits(Math.round(w.temp))}°</em><small>${esc(w.kindBn || "")}</small></div>`).join("")}</div></div>`;
+        if (x.notice) return `<div class="sx-item sx-notice"><span class="sx-lbl">ডেস্কের বার্তা</span><p>${esc(x.notice)}</p></div>`;
+        if (name === "numbers") return `<div class="sx-item sx-fig"><span class="sx-lbl">${esc(DESK_BN[x.d] || x.d || "খবর")}</span><div class="fig"><b class="num" data-to="${x.n}" data-dec="${x.dec ? 1 : 0}">০</b><em>${esc(x.unit)}</em></div><p>${esc(x.line)}</p></div>`;
+        if (name === "onthisday") return `<div class="sx-item sx-otd"><b class="sx-year">${bnDigits(x.y)}</b><p>${esc(x.text)}</p></div>`;
+        return `<div class="sx-item${x.img ? " has-img" : ""}"><div class="sx-num">${bnDigits(i + 1)}</div><div class="sx-body"><span class="sx-lbl">${esc(DESK_BN[x.d] || x.d || "খবর")}</span><h2>${esc(x.t)}</h2>${x.line && x.line !== x.t ? `<p>${esc(x.line)}</p>` : ""}</div>${x.img ? `<div class="sx-img"><img src="${esc(x.img)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')"></div>` : ""}</div>`;
       };
-      const score = name === "sports" && st.tv?.segs?.score ? `<div class="sg-score"><span>স্কোর</span><b>${esc(st.tv.segs.score)}</b></div>` : "";
-      el.innerHTML = `<div class="sg sg-${esc(name)}${v}"><i class="sg-bg"></i><div class="sg-stage"></div>
-        <div class="sg-title"><small>রাষ্ট্রিক্স ২৪×৭</small><b>${esc(title)}</b><span>${esc(kick)}</span><i></i></div>${score}
-        <div class="sg-strap"><b>${esc(title)}</b><div class="sg-steps">${items.map((x, j) => `<i style="--d:${x.d0}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div></div>`;
+      const score = name === "sports" && st.tv?.segs?.score ? `<div class="sx-score"><span>স্কোর</span><b>${esc(st.tv.segs.score)}</b></div>` : "";
+      el.innerHTML = `<div class="sx sx-${esc(name)}${v}"><i class="sx-bg"></i><div class="sx-stage"></div>
+        <div class="sx-title"><small>রাষ্ট্রিক্স ২৪×৭</small><b>${esc(title)}</b><span>${esc(kick)}</span><i></i></div>${score}
+        <div class="sx-strap"><b>${esc(title)}</b><div class="sx-steps">${items.map((x, j) => `<i style="--d:${x.d0}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div></div>`;
       let shownI = -1, tok = {};
       // An item's line (or, for the story of the hour, its recordings one after the other).
       const say = x => { tok.off = true; try { tok.src?.stop(); } catch { /* done */ } tok = {}; const me = tok, list = x.lead ? x.lead.voice || [] : x.voice ? [x.voice] : [];
@@ -1204,15 +1221,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       };
       const drawS = () => {
         if (!el.isConnected && st.current) { tok.off = true; try { tok.src?.stop(); } catch { /* done */ } return; }
-        const e = (now() - (sc.startAt || now())) / 1000, box = el.querySelector(".sg"); if (!box) return;
+        const e = (now() - (sc.startAt || now())) / 1000, box = el.querySelector(".sx"); if (!box) return;
         if (e >= head - 0.6) box.classList.add("on");
         let i = -1; for (let j = 0; j < starts.length; j++) if (e >= starts[j]) i = j;
         if (i <= shownI) return;   // forward only: a clock correction never steps back
         if (i >= 0) box.classList.add("on");
-        shownI = i; const stage = box.querySelector(".sg-stage");
+        shownI = i; const stage = box.querySelector(".sx-stage");
         stage.insertAdjacentHTML("beforeend", itemHTML(items[i], i));
         [...stage.children].slice(0, -1).forEach(n => { n.classList.add("out"); setTimeout(() => n.remove(), 700); });
-        box.querySelectorAll(".sg-steps i").forEach((n, j) => { n.className = j < i ? "done" : j === i ? "on" : ""; });
+        box.querySelectorAll(".sx-steps i").forEach((n, j) => { n.className = j < i ? "done" : j === i ? "on" : ""; });
         stage.querySelectorAll(".num[data-to]").forEach(n => { if (!n.dataset.go) { n.dataset.go = 1; count(n); } });
         if (items[i].map) { const svg = stage.lastElementChild?.querySelector("svg"); if (svg) drawMap(svg, items[i].map); }
         say(items[i]);
@@ -1422,7 +1439,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         ? `<div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${lines.map(t => `<p>${esc(t)}</p>`).join("")}</div><div class="lb-bottom"><b>${esc(g.text || lines[0] || "")}</b><div class="tv-adslot"></div></div>`
         : `<div class="lbv-bottom"><b>${esc(g.text || lines[0] || "")}</b>${lines.slice(0, 3).map(t => `<p>${esc(t)}</p>`).join("")}</div>`;
     } else if (g.kind === "results") el.innerHTML = resultsHTML(g.id, true);
-    else if (g.kind === "poll") el.innerHTML = g.res === undefined ? pollHTML(g.id, true) : `<div class="poll-auto${channel === "v" ? " v" : ""}"><i class="sg-bg"></i><div class="poll-head">${g.res ? "জনমতের ফলাফল" : "জনমত · রাষ্ট্রিক্স অ্যাপে ভোট দিন"}</div>${pollHTML(g.id, true)}</div>`;
+    else if (g.kind === "poll") el.innerHTML = g.res === undefined ? pollHTML(g.id, true) : `<div class="poll-auto${channel === "v" ? " v" : ""}"><i class="sx-bg"></i><div class="poll-head">${g.res ? "জনমতের ফলাফল" : "জনমত · রাষ্ট্রিক্স অ্যাপে ভোট দিন"}</div>${pollHTML(g.id, true)}</div>`;
     return el;
   }
   function resultsHTML(id, full) {
