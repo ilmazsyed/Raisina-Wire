@@ -576,53 +576,6 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 @keyframes gxbar{to{transform:scaleX(1)}}
 @keyframes gxword{to{clip-path:inset(0 0 0 0)}}
 
-/* ---------- The weather briefing ---------- */
-.wx{position:absolute;inset:0;overflow:hidden;color:#fff;background:linear-gradient(160deg,#071a33 0%,#0b2b52 45%,#123e6e 100%)}
-.wx-open{position:absolute;inset:0;display:grid;place-items:center}
-.wx-open .wx-sky{position:absolute;inset:0;opacity:.55}
-.wx-open-in{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px}
-.wx-logo{padding:12px 18px;background:#fff;border-radius:18px;box-shadow:0 20px 50px rgba(0,0,0,.4);animation:nblogo .7s cubic-bezier(.2,1.5,.4,1) both}
-.wx-logo img{height:110px;display:block}
-.wx-open-in .w1,.wx-open-in .w2{font:900 150px/1 Montserrat,sans-serif;letter-spacing:.06em}
-.wx-open-in .w1{animation:nbl .7s .3s cubic-bezier(.2,.9,.2,1) both}
-.wx-open-in .w2{padding:4px 26px 10px;border-radius:10px;background:linear-gradient(90deg,#f5a623,#f76b1c);animation:nbr .7s .4s cubic-bezier(.2,.9,.2,1) both}
-.wx-line{display:block;width:1100px;height:5px;background:linear-gradient(90deg,transparent,#ffd76a,transparent);transform:scaleX(0);animation:nbline .9s .8s ease both}
-.wx-bn{font:800 66px "Noto Serif Bengali",serif;animation:nbup .6s 1s both}
-.wx-open-in small{font:700 34px "Hind Siliguri",Montserrat,sans-serif;color:rgba(255,255,255,.8);animation:nbup .6s 1.2s both}
-.wx-sec{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
-.wx-sec b{font:900 140px/1 Montserrat,sans-serif;letter-spacing:.08em;clip-path:inset(0 100% 0 0);animation:gxword .7s .1s cubic-bezier(.7,0,.2,1) both}
-.wx-sec span{font:800 80px "Noto Serif Bengali",serif;color:#ffd76a;animation:nbup .6s .4s both}
-.wx-sec i{width:900px;height:5px;background:linear-gradient(90deg,transparent,#ffd76a,transparent);transform:scaleX(0);animation:nbline .8s .3s ease both}
-.wx-cards{position:absolute;inset:0;padding:96px 80px 150px;display:flex;flex-direction:column;gap:30px}
-.wx-head{display:flex;align-items:baseline;gap:24px;animation:tvin .6s both}
-.wx-head b{font:900 46px Montserrat,sans-serif;letter-spacing:.1em}
-.wx-head span{font:700 36px "Hind Siliguri",sans-serif;color:#ffd76a}
-.wx-row{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:30px}
-.wx-cards.n2 .wx-row{grid-template-columns:repeat(2,1fr);padding:0 180px}
-.wx-cards.n1 .wx-row{grid-template-columns:1fr;padding:0 520px}
-.wx-card{position:relative;overflow:hidden;border-radius:30px;padding:28px 30px;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;
-  box-shadow:0 26px 60px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.18);animation:wxcard .7s calc(.12s * var(--i,0)) cubic-bezier(.2,.9,.2,1) both}
-.wx-card>*:not(.wx-sky){position:relative;z-index:2}
-.wx-card .wx-sky{position:absolute;inset:0;z-index:1}
-.wx-card:after{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,transparent 30%,rgba(0,0,0,.55));pointer-events:none}
-.wx-name{font:800 44px "Noto Serif Bengali",Montserrat,sans-serif}
-.wx-temp{font:900 130px/1 Montserrat,sans-serif}
-.wx-temp sup{font-size:50px;vertical-align:top;margin-left:4px}
-.wx-kind{font:700 36px "Hind Siliguri",Montserrat,sans-serif;color:#ffe9a8}
-.wx-facts{display:flex;flex-direction:column;gap:4px;font:600 24px "Hind Siliguri",Montserrat,sans-serif;color:rgba(255,255,255,.88)}
-.wx .dt-flip .ff{justify-content:flex-start}
-@keyframes wxcard{from{opacity:0;transform:translateY(60px) scale(.94)}to{opacity:1;transform:none}}
-.wx-wipe i{background:#f5a623!important}
-/* card colours by weather */
-.wx-card.k-sun{background:linear-gradient(160deg,#f7b733,#fc4a1a)}
-.wx-card.k-heat{background:linear-gradient(160deg,#ff512f,#dd2476)}
-.wx-card.k-cloud{background:linear-gradient(160deg,#5b7a99,#2c3e50)}
-.wx-card.k-rain{background:linear-gradient(160deg,#3a6186,#14213d)}
-.wx-card.k-storm{background:linear-gradient(160deg,#2b2d5c,#0a0b1e)}
-.wx-card.k-wind{background:linear-gradient(160deg,#1e9e9a,#0d4b5c)}
-.wx-card.k-fog{background:linear-gradient(160deg,#8e9eab,#4b5966)}
-.wx-card.k-clear{background:linear-gradient(160deg,#1a2a6c,#0b1030)}
-
 /* ---------- Weather animations (pure CSS) ---------- */
 .wx-sky{pointer-events:none;overflow:hidden}
 .wx-sky i{position:absolute;display:block}
@@ -633,9 +586,9 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 /* clouds: soft blobs drifting */
 .wx-sky.k-cloud .a,.wx-sky.k-cloud .b,.wx-sky.k-rain .a,.wx-sky.k-storm .a,.wx-sky.k-rain .b,.wx-sky.k-storm .b{top:6%;width:60%;height:34%;border-radius:999px;background:radial-gradient(ellipse at 50% 60%,rgba(255,255,255,.75),rgba(255,255,255,.15) 60%,transparent 70%);filter:blur(4px);animation:wxdrift 9s ease-in-out infinite alternate}
 .wx-sky.k-cloud .b,.wx-sky.k-rain .b,.wx-sky.k-storm .b{left:35%;top:16%;width:55%;opacity:.7;animation-duration:12s;animation-direction:alternate-reverse}
-.wx-sky.k-rain .a,.wx-sky.k-rain .b,.wx-sky.k-storm .a,.wx-sky.k-storm .b{background:radial-gradient(ellipse at 50% 60%,rgba(200,215,235,.7),rgba(120,140,170,.25) 60%,transparent 70%)}
+.wx-sky.k-rain .a,.wx-sky.k-rain .b,.wx-sky.k-storm .a,.wx-sky.k-storm .b{background:radial-gradient(ellipse at 50% 60%,rgba(255,255,255,.72),rgba(230,220,220,.28) 60%,transparent 70%)}
 /* rain: falling streaks */
-.wx-sky.k-rain .c,.wx-sky.k-storm .c{inset:0;background:repeating-linear-gradient(105deg,transparent 0 22px,rgba(190,220,255,.55) 22px 24px,transparent 24px 46px);background-size:100% 160px;animation:wxrain .45s linear infinite;-webkit-mask-image:linear-gradient(180deg,transparent 20%,#000 45%);mask-image:linear-gradient(180deg,transparent 20%,#000 45%)}
+.wx-sky.k-rain .c,.wx-sky.k-storm .c{inset:0;background:repeating-linear-gradient(105deg,transparent 0 22px,rgba(255,255,255,.6) 22px 24px,transparent 24px 46px);background-size:100% 160px;animation:wxrain .45s linear infinite;-webkit-mask-image:linear-gradient(180deg,transparent 20%,#000 45%);mask-image:linear-gradient(180deg,transparent 20%,#000 45%)}
 /* storm: lightning flashes */
 .wx-sky.k-storm .d{inset:0;background:rgba(220,230,255,.9);opacity:0;animation:wxflash 4.5s infinite}
 /* wind: streaks sweeping across */
@@ -667,65 +620,13 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .wx-ico{flex:0 0 auto;width:20px;height:20px;border-radius:50%;position:relative}
 .wx-ico.k-sun,.wx-ico.k-heat{background:radial-gradient(circle,#ffe36b 40%,#ffb000 70%);box-shadow:0 0 10px #ffc83d;animation:wxpulse 2.4s ease-in-out infinite}
 .wx-ico.k-heat{background:radial-gradient(circle,#ffd36b 35%,#ff5a1f 70%)}
-.wx-ico.k-cloud,.wx-ico.k-fog{border-radius:10px;width:24px;height:14px;background:#cfd8e3;margin-top:4px}
-.wx-ico.k-rain,.wx-ico.k-storm{border-radius:10px;width:24px;height:14px;background:#9fb3c8;margin-top:-4px}
-.wx-ico.k-rain:after,.wx-ico.k-storm:after{content:"";position:absolute;left:4px;right:4px;top:15px;height:8px;background:repeating-linear-gradient(105deg,transparent 0 3px,#8fd0ff 3px 5px);animation:wxrain .5s linear infinite;background-size:100% 16px}
+.wx-ico.k-cloud,.wx-ico.k-fog{border-radius:10px;width:24px;height:14px;background:#ece6e6;margin-top:4px}
+.wx-ico.k-rain,.wx-ico.k-storm{border-radius:10px;width:24px;height:14px;background:#d9d1d1;margin-top:-4px}
+.wx-ico.k-rain:after,.wx-ico.k-storm:after{content:"";position:absolute;left:4px;right:4px;top:15px;height:8px;background:repeating-linear-gradient(105deg,transparent 0 3px,#fff 3px 5px);animation:wxrain .5s linear infinite;background-size:100% 16px}
 .wx-ico.k-storm{background:#6f7ea8}
-.wx-ico.k-wind{border-radius:2px;height:3px;width:22px;background:#bfe;box-shadow:0 -6px 0 #bfe,0 6px 0 #9dd}
+.wx-ico.k-wind{border-radius:2px;height:3px;width:22px;background:#fff;box-shadow:0 -6px 0 #f1e6c8,0 6px 0 #e6d9b0}
 .wx-ico.k-clear{background:radial-gradient(circle at 35% 35%,#fffbe6,#e0d9b8 70%)}
 @keyframes wxrow{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
-.wx-head{justify-content:center}
-
-/* ---------- The market update ---------- */
-.mk{position:absolute;inset:0;overflow:hidden;color:#fff;background:radial-gradient(ellipse at 70% 20%,#123a2c 0%,#081a16 45%,#04090b 100%)}
-.mk:before{content:"";position:absolute;inset:0;background:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px) 0 0/100% 60px,linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px) 0 0/60px 100%;animation:mkgrid 6s linear infinite}
-@keyframes mkgrid{to{background-position:0 60px,60px 0}}
-.mk-open{position:absolute;inset:0;display:grid;place-items:center}
-.mk-line{position:absolute;left:0;right:0;bottom:120px;width:100%;height:400px;opacity:.5}
-.mk-line path{fill:none;stroke:#2ee59d;stroke-width:6;stroke-linejoin:round;stroke-dasharray:3000;stroke-dashoffset:3000;animation:mkdraw 2.4s .2s ease-out forwards;filter:drop-shadow(0 0 12px rgba(46,229,157,.6))}
-@keyframes mkdraw{to{stroke-dashoffset:0}}
-.mk-open-in{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px}
-.mk-open-in .w1,.mk-open-in .w2{font:900 150px/1 Montserrat,sans-serif;letter-spacing:.06em}
-.mk-open-in .w1{animation:nbl .7s .3s cubic-bezier(.2,.9,.2,1) both}
-.mk-open-in .w2{padding:4px 26px 10px;border-radius:10px;background:linear-gradient(90deg,#16a34a,#0d9488);animation:nbr .7s .4s cubic-bezier(.2,.9,.2,1) both}
-.mk-open-in .wx-line{background:linear-gradient(90deg,transparent,#2ee59d,transparent)}
-.mk-open-in small{font:700 34px "Hind Siliguri",Montserrat,sans-serif;color:rgba(255,255,255,.8);animation:nbup .6s 1.2s both}
-.mk-screen{position:absolute;inset:0;padding:110px 90px 150px;display:flex;flex-direction:column;gap:36px}
-.mk-head{display:flex;align-items:baseline;justify-content:center;gap:24px;animation:tvin .6s both}
-.mk-head b{font:900 46px Montserrat,sans-serif;letter-spacing:.1em}
-.mk-head span{font:700 36px "Hind Siliguri",sans-serif;color:#7cf5c4}
-.mk-head em{font:700 24px "Hind Siliguri",Montserrat,sans-serif;font-style:normal;padding:4px 14px;border-radius:999px;background:rgba(255,255,255,.12);color:#ffd76a}
-.mk-row{flex:1;display:grid;gap:34px}
-.mk-row.two{grid-template-columns:1fr 1fr}
-.mk-row.three{grid-template-columns:repeat(3,1fr)}
-.mk-idx,.mk-tile{position:relative;overflow:hidden;border-radius:30px;padding:34px 38px;display:flex;flex-direction:column;justify-content:center;gap:12px;background:linear-gradient(160deg,rgba(255,255,255,.1),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.14);box-shadow:0 26px 60px rgba(0,0,0,.45);animation:wxcard .7s calc(.15s * var(--i,0)) cubic-bezier(.2,.9,.2,1) both}
-.mk-idx.up,.mk-tile.up{box-shadow:0 26px 60px rgba(0,0,0,.45),inset 0 -6px 0 #16c784}
-.mk-idx.down,.mk-tile.down{box-shadow:0 26px 60px rgba(0,0,0,.45),inset 0 -6px 0 #ea3943}
-.mk-name{font:800 46px "Noto Serif Bengali",Montserrat,sans-serif}
-.mk-val{font:900 104px/1 Montserrat,sans-serif;letter-spacing:-.01em}
-.mk-tile .mk-val{font-size:78px}
-.mk-chg{display:flex;align-items:center;gap:12px;font:800 38px Montserrat,"Hind Siliguri",sans-serif}
-.up .mk-chg,.mk-mover.up .mk-pc{color:#2ee59d}
-.down .mk-chg,.mk-mover.down .mk-pc{color:#ff5c66}
-.mk-arrow{display:inline-block;width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent}
-.up .mk-arrow{border-bottom:22px solid currentColor;animation:mkup 1.2s ease-in-out infinite}
-.down .mk-arrow{border-top:22px solid currentColor;animation:mkdown 1.2s ease-in-out infinite}
-@keyframes mkup{50%{transform:translateY(-6px)}}
-@keyframes mkdown{50%{transform:translateY(6px)}}
-.mk-spark{position:absolute;left:0;right:0;bottom:16px;width:100%;height:150px;opacity:.55}
-.mk-spark path{fill:none;stroke-width:5;stroke-linejoin:round;stroke-dasharray:2500;stroke-dashoffset:2500;animation:mkdraw 2s .5s ease-out forwards}
-.up .mk-spark path{stroke:#2ee59d}.down .mk-spark path{stroke:#ff5c66}
-.mk-list{flex:1;display:flex;flex-direction:column;justify-content:center;gap:24px;padding:0 160px}
-.mk-mover{display:grid;grid-template-columns:90px 1fr 300px 260px;align-items:center;gap:24px;padding:26px 36px;border-radius:24px;background:linear-gradient(90deg,rgba(255,255,255,.1),rgba(255,255,255,.03));border-left:10px solid;animation:mkslide .6s calc(.15s * var(--i,0)) cubic-bezier(.2,.9,.2,1) both}
-.mk-mover.up{border-color:#16c784}.mk-mover.down{border-color:#ea3943}
-.mk-rank{font:900 54px Montserrat,"Hind Siliguri",sans-serif;color:rgba(255,255,255,.5)}
-.mk-co{font:800 52px "Noto Serif Bengali",Montserrat,sans-serif}
-.mk-px{font:700 42px Montserrat,"Hind Siliguri",sans-serif;color:rgba(255,255,255,.85)}
-.mk-pc{display:flex;align-items:center;gap:12px;font:900 48px Montserrat,"Hind Siliguri",sans-serif}
-.mk .dt-flip .ff{justify-content:flex-start}
-@keyframes mkslide{from{opacity:0;transform:translateX(-80px)}to{opacity:1;transform:none}}
-.mk-wipe i{background:#16a34a!important}
-.mk .mk-idx .mk-name,.mk .mk-idx .mk-val,.mk .mk-tile .mk-name,.mk .mk-tile .mk-val,.mk .mk-co{color:#fff;opacity:1}
 
 /* The channel's logo: always on top, on every scene. */
 .tv-bug-fixed{position:absolute;z-index:40;pointer-events:none}
@@ -733,11 +634,6 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tvp-v .tv-bug-fixed{left:40px;top:40px;padding:8px 10px;background:#fff;border-radius:12px;box-shadow:0 0 0 3px var(--gold),0 12px 26px rgba(0,0,0,.25)}
 .tvp-v .tv-bug-fixed img{display:block;height:110px;width:auto}
 .tvp-v:has(.vj-logo) .tv-bug-fixed{display:none}
-/* Market: rupee values under the dollar price. */
-.mk-inr{font:800 40px Montserrat,"Hind Siliguri",sans-serif;color:#ffd76a}
-.mk-note{text-align:center;margin-top:-22px;font:600 22px "Hind Siliguri",Montserrat,sans-serif;color:rgba(255,255,255,.6)}
-.mk-note .dt-flip .ff{justify-content:center}
-
 /* ---------- The market ticker: a slim strip just above the headline ticker ---------- */
 .tv-mkt{position:absolute;left:0;right:0;bottom:72px;height:40px;z-index:6;display:flex;align-items:stretch;background:linear-gradient(180deg,rgba(8,12,18,.92),rgba(4,7,11,.94));border-top:1px solid rgba(212,160,23,.35);box-shadow:0 -6px 20px rgba(0,0,0,.25);color:#fff;overflow:hidden;animation:tvin .5s both}
 .tv-mkt[hidden]{display:none}
@@ -759,59 +655,17 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tvp-h .tvp-gfx .tv-adslot>.tv-ad{bottom:126px}
 .tvp-h.lb-auto .tv-mkt{display:none}
 
-/* ---------- Weather and market updates in the channel's look ----------
-   Each keeps its own colour (night-sky blue for the weather, the trading floor's dark for the
-   markets) but wears the channel's marks: the bulletin's pinstripes and red glow, red label
-   chips, gold rules, the red-and-dark slash between screens and the bulletin's bottom strap. */
-.wx{background:linear-gradient(135deg,#06142a 0%,#0b2546 55%,#1a1030 100%)}
-.wx .bs-glow,.mk .bs-glow{z-index:0}
-.wx .bs-glow{background:radial-gradient(circle,rgba(224,16,16,.22),transparent 65%)}
-.mk{background:linear-gradient(135deg,#0d0b12 0%,#140809 55%,#220405 100%)}
-.mk:before{z-index:0;background:linear-gradient(rgba(212,160,23,.05) 1px,transparent 1px) 0 0/100% 60px,linear-gradient(90deg,rgba(212,160,23,.05) 1px,transparent 1px) 0 0/60px 100%}
-/* openers: the bulletin's red word block and gold line */
-.wx-open-in .w2,.mk-open-in .w2{background:var(--red);box-shadow:0 18px 40px rgba(170,4,4,.45)}
-.wx-line,.mk-open-in .wx-line,.wx-sec i{background:linear-gradient(90deg,transparent,var(--gold),transparent)}
-.wx-logo{box-shadow:0 0 0 4px var(--gold),0 20px 50px rgba(0,0,0,.4)}
-.mk-line path{stroke:var(--gold);filter:drop-shadow(0 0 12px rgba(212,160,23,.5))}
-.wx-sec span{color:var(--gold)}
-.wx-sec b{text-shadow:0 10px 40px rgba(0,0,0,.4)}
-/* screen headings: a red chip and gold Bengali, on a gold rule */
-.wx-head,.mk-head{position:relative;align-items:center;justify-content:center;gap:22px;padding-bottom:16px;border-bottom:2px solid var(--gold)}
-.wx-head b,.mk-head b{padding:8px 20px;background:var(--red);border-radius:8px;font:900 34px Montserrat,sans-serif;letter-spacing:.1em;color:#fff}
-.wx-head span,.mk-head span{font:800 40px "Noto Serif Bengali","Hind Siliguri",sans-serif;color:var(--gold)}
-.mk-head em{margin-left:6px}
-/* cards and tiles: the bulletin picture's corners and a gold rim */
-.wx-card{border-radius:22px;box-shadow:0 26px 60px rgba(0,0,0,.45),0 0 0 2px rgba(212,160,23,.55)}
-.mk-idx,.mk-tile{border-radius:22px;border-color:rgba(212,160,23,.35);background:linear-gradient(160deg,rgba(255,255,255,.09),rgba(255,255,255,.025))}
-.mk-mover{border-radius:18px}
-.mk-rank{color:var(--gold)}
-.mk-inr{color:var(--gold)}
-/* room for the strap */
-.wx-cards{padding:96px 80px 170px}
-.mk-screen{padding:110px 90px 170px}
-.seg-strap{z-index:3;animation:nbup .5s .1s cubic-bezier(.2,.9,.2,1) both}
-.seg-strap span{font-family:"Noto Serif Bengali","Hind Siliguri",sans-serif}
-/* the transition: the channel's red slash, with a thin band in the segment's own colour */
-.wx-wipe i,.mk-wipe i{background:unset}
-.wx-wipe i:nth-child(1),.mk-wipe i:nth-child(1){display:block;width:12%;left:-6%;animation-delay:0s}
-.wx-wipe i:nth-child(1){background:#2f7fd6!important}
-.mk-wipe i:nth-child(1){background:var(--gold)!important}
-.wx-wipe i:nth-child(2),.mk-wipe i:nth-child(2){background:var(--red)!important}
-.wx-wipe i:nth-child(3),.mk-wipe i:nth-child(3){background:#120203!important}
-
 /* The market ticker in the channel's colours: a red label with a gold edge on deep maroon. */
 .tv-mkt{background:linear-gradient(180deg,#1c0506,#120203);border-top:2px solid var(--gold)}
 .mkt-label{background:var(--red);color:#fff;box-shadow:inset -3px 0 0 var(--gold)}
 .mkt-i{border-right-color:rgba(212,160,23,.22)}
 .mkt-i b{color:#fff}
 .mkt-i em{color:rgba(255,255,255,.82)}
-.mkt-i.up i{border-bottom-color:#3ddc84}.mkt-i.up small{color:#3ddc84}
+.mkt-i.up i{border-bottom-color:#f2c14e}.mkt-i.up small{color:#f2c14e}
 .mkt-i.down i{border-top-color:#ff6b6b}.mkt-i.down small{color:#ff6b6b}
 
 /* Market: animated pictures on the commodity and currency tiles */
-.mk-tile{justify-content:flex-end}
 .mk-ico{position:absolute;right:30px;top:26px;width:170px;height:130px;z-index:0;animation:mkico .8s calc(.15s + .12s * var(--i,0)) cubic-bezier(.2,1.4,.4,1) both}
-.mk-tile>*:not(.mk-ico){position:relative;z-index:1}
 @keyframes mkico{from{opacity:0;transform:translateY(-30px) scale(.6)}to{opacity:1;transform:none}}
 .mk-ico svg{width:100%;height:100%;overflow:visible}
 .mk-ico.gold{--hi:#ffe27a;--lo:#c8901a;--edge:#8a5d0b;--top:#fff3b8;filter:drop-shadow(0 10px 18px rgba(212,160,23,.45))}
@@ -852,3 +706,115 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tvp-h.multi-src .tv-l3{max-width:calc(1920px - var(--pl) - var(--pr) - 264px)}
 .tvp-h.multi-src .tv-bug-fixed{transform:scale(.75);transform-origin:100% 0}
 .tvp-h .tv-bug-fixed{transition:right .5s cubic-bezier(.2,.9,.2,1),transform .5s cubic-bezier(.2,.9,.2,1)}
+
+/* ==========================================================================
+   Weather and market updates, in the channel's look (deep red, white cards, gold).
+   Sized for phones: the smallest type is 28px on the 1920-wide frame.
+   Rises are gold, falls are red; no green or blue anywhere.
+   ========================================================================== */
+.seg{position:absolute;inset:0;overflow:hidden;color:#fff;
+  background:radial-gradient(ellipse at 85% -10%,rgba(200,16,20,.55),transparent 55%),linear-gradient(135deg,#120203 0%,#2a0405 50%,#4a0507 100%)}
+.seg .bs-glow{z-index:0}
+/* heading: red chip and gold Bengali, with when the figures were updated */
+.sg-head{position:absolute;left:420px;right:220px;top:26px;z-index:2;display:flex;flex-direction:column;align-items:center;gap:12px;animation:tvin .6s both}
+.sg-title{display:flex;align-items:center;gap:22px}
+.sg-title b{padding:8px 26px;border-radius:10px;background:var(--red);box-shadow:0 0 0 2px rgba(212,160,23,.8),0 14px 30px rgba(0,0,0,.4);font:900 46px/1.1 Montserrat,sans-serif;letter-spacing:.08em}
+.sg-title span{font:800 58px/1.15 "Noto Serif Bengali","Hind Siliguri",serif;color:#f2c14e;text-shadow:0 6px 20px rgba(0,0,0,.4)}
+.sg-upd{display:flex;align-items:center;gap:14px}
+.sg-upd>em{font-style:normal;padding:6px 18px;border-radius:999px;background:#f2c14e;color:#1a0405;font:900 26px Montserrat,"Hind Siliguri",sans-serif;letter-spacing:.06em}
+.sg-upd>span{display:flex;align-items:center;gap:12px;padding:6px 20px;border-radius:999px;background:rgba(255,255,255,.1);border:1px solid rgba(212,160,23,.6);font:700 28px Montserrat,"Hind Siliguri",sans-serif;letter-spacing:.03em}
+.sg-upd span>i{width:14px;height:14px;border-radius:50%;background:#ff3b3b;box-shadow:0 0 0 0 rgba(255,59,59,.7);animation:sgdot 1.6s ease-out infinite}
+@keyframes sgdot{70%{box-shadow:0 0 0 12px rgba(255,59,59,0)}100%{box-shadow:0 0 0 0 rgba(255,59,59,0)}}
+.seg .dt-flip.su .ff.b,.seg .dt-flip.ss .ff.b{font-family:"Hind Siliguri",sans-serif;letter-spacing:0}
+/* cards */
+.sg-row{position:absolute;left:80px;right:80px;top:196px;bottom:140px;display:grid;gap:40px;z-index:1}
+.sg-row.n3{grid-template-columns:repeat(3,1fr)}
+.sg-row.n2{grid-template-columns:repeat(2,1fr);left:160px;right:160px}
+.sg-row.n1{grid-template-columns:1fr;left:640px;right:640px}
+.sg-card,.sg-card.up,.sg-card.down,.sg-mover.up,.sg-mover.down{color:#1a0405}
+.sg-card{position:relative;overflow:hidden;display:flex;flex-direction:column;min-width:0;background:#fff;color:#1a0405;border-radius:26px;
+  box-shadow:0 30px 60px rgba(0,0,0,.5),0 0 0 3px rgba(212,160,23,.65);animation:sgcard .7s calc(.12s * var(--i,0)) cubic-bezier(.2,.9,.2,1) both}
+@keyframes sgcard{from{opacity:0;transform:translateY(70px) scale(.94)}to{opacity:1;transform:none}}
+.sg-band{position:relative;flex:none;height:270px;overflow:hidden;display:flex;align-items:flex-end;padding:0 30px 22px;background:linear-gradient(160deg,#c80a0c 0%,#8a0508 55%,#4a0204 100%)}
+.sg-band:after{content:"";position:absolute;left:0;right:0;bottom:0;height:6px;background:linear-gradient(90deg,#D4A017,#ffe08a,#D4A017)}
+.sg-band.k-clear,.sg-band.k-storm{background:linear-gradient(160deg,#5a0306 0%,#2a0204 60%,#120102 100%)}
+.sg-band.k-cloud,.sg-band.k-fog,.sg-band.k-rain{background:linear-gradient(160deg,#9a2a2c 0%,#5e0a0c 60%,#330305 100%)}
+.sg-band.k-heat{background:linear-gradient(160deg,#e0400c 0%,#a80608 55%,#5a0204 100%)}
+.sg-band .wx-sky{position:absolute;inset:0;z-index:0}
+.sg-name{position:relative;z-index:2;min-width:0;font:800 62px/1.15 "Noto Serif Bengali",Montserrat,serif;color:#fff;text-shadow:0 4px 18px rgba(0,0,0,.45)}
+.sg-body{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:20px 30px 26px}
+.seg .sg-card .dt-flip .ff{justify-content:flex-start}
+/* weather card */
+.wc-temp{font:900 168px/1 Montserrat,sans-serif;letter-spacing:-.02em;color:#1a0405}
+.wc-temp sup{font-size:60px;vertical-align:top;margin-left:6px;color:var(--red)}
+.wc-kind{font:700 52px/1.2 "Hind Siliguri",Montserrat,sans-serif;color:var(--red)}
+.wc-facts{display:flex;flex-direction:column;gap:2px;font:600 32px/1.35 "Hind Siliguri",Montserrat,sans-serif;color:#4a3434}
+/* the change: a gold chip for a rise, a red chip for a fall */
+.sg-chg{align-self:flex-start;display:inline-flex;align-items:center;gap:12px;padding:6px 22px;border-radius:999px;font:800 40px Montserrat,"Hind Siliguri",sans-serif}
+.sg-chg.up{background:#D4A017;color:#1a0f00}
+.sg-chg.down{background:var(--red);color:#fff}
+.mk-arrow{display:inline-block;width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent}
+.up .mk-arrow{border-bottom:20px solid currentColor;animation:mkup 1.2s ease-in-out infinite}
+.down .mk-arrow{border-top:20px solid currentColor;animation:mkdown 1.2s ease-in-out infinite}
+@keyframes mkup{50%{transform:translateY(-5px)}}
+@keyframes mkdown{50%{transform:translateY(5px)}}
+/* market: index cards with the day's line */
+.mi .sg-band{height:150px}
+.mi .sg-body{flex:none;padding-top:26px;gap:16px}
+.mi-val{font:900 140px/1 Montserrat,sans-serif;letter-spacing:-.02em}
+.mi .sg-chg{font-size:50px}
+.mk-spark{position:absolute;left:0;right:0;bottom:0;width:100%;height:210px}
+.mk-spark path{fill:none;stroke-width:7;stroke-linejoin:round;stroke-dasharray:2500;stroke-dashoffset:2500;animation:mkdraw 2s .5s ease-out forwards}
+.up .mk-spark path{stroke:#D4A017}.down .mk-spark path{stroke:var(--red)}
+@keyframes mkdraw{to{stroke-dashoffset:0}}
+/* market: gainers and losers */
+.sg-list{position:absolute;left:160px;right:160px;top:200px;bottom:150px;z-index:1;display:flex;flex-direction:column;justify-content:center;gap:28px}
+.sg-mover{display:grid;grid-template-columns:120px 1fr auto auto;align-items:center;gap:34px;padding:22px 34px;border-radius:22px;background:#fff;color:#1a0405;
+  box-shadow:0 22px 46px rgba(0,0,0,.45),0 0 0 3px rgba(212,160,23,.55);border-left:14px solid var(--red);animation:mkslide .6s calc(.12s * var(--i)) cubic-bezier(.2,.9,.2,1) both}
+.sg-mover.up{border-left-color:#D4A017}
+.mv-rank{display:grid;place-items:center;width:110px;height:110px;border-radius:18px;background:var(--red);color:#fff;font:900 66px Montserrat,"Hind Siliguri",sans-serif}
+.mv-co{min-width:0;font:800 70px/1.15 "Noto Serif Bengali",Montserrat,serif}
+.mv-px{font:700 54px Montserrat,"Hind Siliguri",sans-serif;color:#4a3434}
+.sg-mover .sg-chg{font-size:54px}
+.sg-mover .dt-flip .ff{justify-content:flex-start}
+@keyframes mkslide{from{opacity:0;transform:translateX(-90px)}to{opacity:1;transform:none}}
+/* market: commodity and currency tiles (the animated picture sits in the red band) */
+.mt .sg-band{height:250px}
+.mt .sg-name{font-size:56px}
+.mt-val{font:900 88px/1 Montserrat,sans-serif;letter-spacing:-.02em;white-space:nowrap}
+.mt-inr{font:800 38px Montserrat,"Hind Siliguri",sans-serif;color:#8a6200;white-space:nowrap}
+.sg-note{position:absolute;left:80px;right:80px;bottom:124px;z-index:1;text-align:center;font:600 28px "Hind Siliguri",Montserrat,sans-serif;color:#f6dc92}
+.sg-note .dt-flip .ff{justify-content:center}
+.sg-screen:has(.sg-note) .sg-row{bottom:178px}
+/* opening and closing cards */
+.sg-open{position:absolute;inset:0;display:grid;place-items:center}
+.sg-open .wx-sky{position:absolute;inset:0;opacity:.5}
+.sg-open .mk-line{position:absolute;left:0;right:0;bottom:120px;width:100%;height:400px;opacity:.5}
+.sg-open .mk-line path{fill:none;stroke:#D4A017;stroke-width:6;stroke-linejoin:round;stroke-dasharray:3000;stroke-dashoffset:3000;animation:mkdraw 2.4s .2s ease-out forwards;filter:drop-shadow(0 0 12px rgba(212,160,23,.5))}
+.sg-open-in{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:10px}
+.sg-logo{padding:12px 18px;background:#fff;border-radius:18px;box-shadow:0 0 0 4px var(--gold),0 20px 50px rgba(0,0,0,.45);animation:nblogo .7s cubic-bezier(.2,1.5,.4,1) both}
+.sg-logo img{display:block;height:120px}
+.sg-open-in .w1,.sg-open-in .w2{font:900 160px/1 Montserrat,sans-serif;letter-spacing:.06em}
+.sg-open-in .w1{animation:nbl .7s .3s cubic-bezier(.2,.9,.2,1) both}
+.sg-open-in .w2{padding:4px 30px 10px;border-radius:12px;background:var(--red);box-shadow:0 0 0 3px rgba(212,160,23,.8),0 18px 40px rgba(170,4,4,.45);animation:nbr .7s .4s cubic-bezier(.2,.9,.2,1) both}
+.sg-line,.sg-sec i{display:block;width:1100px;height:5px;background:linear-gradient(90deg,transparent,var(--gold),transparent);transform:scaleX(0);animation:nbline .9s .8s ease both}
+.sg-bn{font:800 78px "Noto Serif Bengali",serif;color:#f2c14e;animation:nbup .6s 1s both}
+.sg-open-in small{font:700 42px "Hind Siliguri",Montserrat,sans-serif;color:rgba(255,255,255,.88);animation:nbup .6s 1.2s both}
+/* section cards: WEST BENGAL / INDIA */
+.sg-sec{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.sg-sec b{font:900 160px/1 Montserrat,sans-serif;letter-spacing:.08em;text-shadow:0 10px 40px rgba(0,0,0,.4);clip-path:inset(0 100% 0 0);animation:gxword .7s .1s cubic-bezier(.7,0,.2,1) both}
+.sg-sec span{font:800 100px "Noto Serif Bengali",serif;color:#f2c14e;animation:nbup .6s .4s both}
+.sg-sec i{animation-delay:.3s}
+/* the bottom strap and the transitions */
+.seg-strap{z-index:3;animation:nbup .5s .1s cubic-bezier(.2,.9,.2,1) both}
+.seg-strap span{font-family:"Noto Serif Bengali","Hind Siliguri",sans-serif}
+.wx-wipe i,.mk-wipe i{background:unset}
+.wx-wipe i:nth-child(1),.mk-wipe i:nth-child(1){display:block;width:12%;left:-6%;animation-delay:0s}
+.wx-wipe i:nth-child(1){background:#D4A017!important}
+.mk-wipe i:nth-child(1){background:#fff!important}
+.wx-wipe i:nth-child(2),.mk-wipe i:nth-child(2){background:var(--red)!important}
+.wx-wipe i:nth-child(3),.mk-wipe i:nth-child(3){background:#120203!important}
+
+/* A YouTube upload that isn't exactly 16:9 comes with black bars; the picture is zoomed a little
+   (like a TV's overscan) so it always fills the frame. */
+.tvs-ytwrap .tvs-yt{transform:scale(1.08);transform-origin:50% 50%}

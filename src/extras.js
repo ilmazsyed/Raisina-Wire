@@ -112,6 +112,7 @@ export async function tvExtras(env) {
     bangabda: bangabda().text,
     weather: w?.line || "",
     weatherPlaces: brief?.places || [],
+    weatherAt: brief?.at || null,
     market: market || null,
     polls: polls.map(p => { const options = parse(p.options, []); return { id: p.id, question: p.question, options, status: p.status, counts: options.map((_, i) => counts.find(c => c.poll_id === p.id && c.choice === i)?.n || 0) }; }),
     // During the blackout nothing but the board's title leaves the server.
