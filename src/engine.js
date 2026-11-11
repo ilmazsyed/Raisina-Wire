@@ -984,8 +984,10 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     box.hidden = !(on && M?.nifty);
     if (box.hidden) return;
     const f = (n, d = 2) => Number(n).toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d });
-    const item = (name, value, pct, pre = "") => value == null ? "" : `<span class="mkt-i ${pct >= 0 ? "up" : "down"}"><b>${esc(name)}</b><em>${pre}${f(value)}</em><i></i><small>${pct >= 0 ? "+" : "−"}${f(Math.abs(pct ?? 0))}%</small></span>`;
-    const x = k => M[k] ? item(M[k].en === "Crude oil (Brent)" ? "Brent" : M[k].en, M[k].value, M[k].pct, ["usd", "gbp", "eur"].includes(k) ? "₹" : ["crude", "gold", "silver"].includes(k) ? "$" : "") : "";
+    const item = (name, value, pct, pre = "", d = 2, unit = "") => value == null ? "" : `<span class="mkt-i ${pct >= 0 ? "up" : "down"}"><b>${esc(name)}</b><em>${pre}${f(value, d)}${unit ? `<u>${esc(unit)}</u>` : ""}</em><i></i><small>${pct >= 0 ? "+" : "−"}${f(Math.abs(pct ?? 0))}%</small></span>`;
+    const name = k => ({ crude: "Brent", usd: "USD/INR", gbp: "GBP/INR", eur: "EUR/INR" })[k] || M[k].en;
+    // Crude, gold and silver in rupees (Indian units) when the rupee rate is in; else in dollars.
+    const x = k => !M[k] ? "" : M[k].inr != null ? item(name(k), M[k].inr, M[k].pct, "₹", 0, M[k].inrUnitEn?.replace("per ", "/")) : item(name(k), M[k].value, M[k].pct, ["usd", "gbp", "eur"].includes(k) ? "₹" : ["crude", "gold", "silver"].includes(k) ? "$" : "");
     const rows = [x("nifty"), x("sensex"), ...(M.all || []).map(([n, v, p]) => item(n, v, p, "₹")), x("crude"), x("gold"), x("silver"), x("usd"), x("gbp"), x("eur")].filter(Boolean);
     const html = rows.join("");
     if (box.__html === html) return;

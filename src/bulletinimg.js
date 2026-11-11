@@ -1,6 +1,7 @@
 // Pictures for the TV bulletin. For each story in it: first the lead photo of the news reports
-// the story was written from (their og:image), credited to that publication ("ছবি: সৌজন্যে …");
-// failing that, a photograph from Wikimedia Commons under a free licence, found by English search
+// the story was written from (their og:image), credited to that publication ("ছবি: সৌজন্যে …"),
+// never from a television channel (their pictures are thumbnails with logos and text);
+// failing that, a photograph under a free licence from Wikimedia Commons (or Openverse), found by English search
 // terms the wire desk's model suggests, credited with its author and licence. Every picture
 // carries its credit on screen in small type. A story with nothing suitable is shown without one.
 // Runs in the minute cron, a few stories at a time; each story is looked up once (again after
@@ -35,6 +36,23 @@ async function commons(query) {
   return null;
 }
 
+// Openverse (Flickr and other open collections): free-licence photographs, landscape and large.
+async function openverse(query) {
+  const u = new URL("https://api.openverse.org/v1/images/");
+  Object.entries({ q: query, license: "by,by-sa,cc0,pdm", aspect_ratio: "wide", size: "large", mature: "false", page_size: "10" }).forEach(([k, v]) => u.searchParams.set(k, v));
+  const r = await fetch(u, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(10000) });
+  if (!r.ok) return null;
+  const words = query.toLowerCase().split(/\s+/).filter(w => w.length >= 4);
+  for (const it of (await r.json()).results || []) {
+    if (!it.url || (it.width && it.width < 800) || (it.height && it.height < 450) || THUMB.test(it.url)) continue;
+    const about = `${it.title || ""} ${(it.tags || []).map(t => t.name).join(" ")}`.toLowerCase();
+    if (words.length && !words.some(w => about.includes(w))) continue;
+    const lic = /^(cc0|pdm)$/i.test(it.license) ? "" : `, CC ${String(it.license).toUpperCase()} ${it.license_version || ""}`.trimEnd();
+    const where = it.source ? it.source[0].toUpperCase() + it.source.slice(1) : "Openverse";
+    return { url: it.url, page: it.foreign_landing_url || "", credit: `ছবি: ${String(it.creator || "Unknown").slice(0, 60)}${lic} · ${where}` };
+  }
+  return null;
+}
 
 // A publication's name for the credit, from the wire feed's internal label ("ABP ANANDA DIST" →
 // "ABP Ananda"): section words dropped, capitals eased (short acronyms kept).
@@ -45,6 +63,14 @@ export function pubName(label) {
   return n;
 }
 export const cleanCredit = c => String(c || "").replace(/^(ছবি: সৌজন্যে )(.+)$/, (_, a, b) => a + pubName(b));
+
+// Television channels (and publishers that print text on their share pictures) are never used:
+// their pictures are video thumbnails carrying the channel's logo, captions and graphics. Their
+// stories get a clean photograph from Commons instead.
+const BROADCAST = /abp|ananda\b|zee|24\s*ghanta|news\s*18|tv\s*9|republic|kolkata\s*tv|ndtv|aaj\s*tak|india\s*today|times\s*now|cnn|wion|mirror\s*now|news\s*nation|calcutta\s*news|hindustan\s*times|\bht\b|jagran|amar\s*ujala|news\s*24|oneindia|youtube/i;
+const BROADCAST_HOST = /(^|\.)(abplive|abpananda|abpnews|zeenews|zee24ghanta|zeebiz|news18|tv9bangla|tv9hindi|tv9telugu|republicworld|kolkatatv|ndtv|aajtak|indiatoday|timesnownews|wionews|hindustantimes|livehindustan|jagran|amarujala|news24online|oneindia|youtube|ytimg)\./i;
+const THUMB = /thumb|ytimg|video|youtube|watermark|share[-_]?card|og[-_]?image|social[-_]?share/i;
+export const broadcaster = (name, url) => { try { if (BROADCAST_HOST.test(new URL(url).hostname + ".")) return true; } catch { /* name only */ } return BROADCAST.test(String(name || "")); };
 
 // The lead photo of a web page: og:image, else twitter:image.
 const BROWSER_UA = "Mozilla/5.0 (compatible; RashtrixTV/1.0; +https://rashtrix.ilmazsyed.workers.dev)";
@@ -57,12 +83,13 @@ async function pagePhoto(url) {
   let img = meta("og:image") || meta("og:image:url") || meta("twitter:image") || meta("twitter:image:src");
   img = img.replace(/&amp;/g, "&").trim();
   if (!img) return "";
-  try { const u = new URL(img, r.url || url); return /^https?:$/.test(u.protocol) && !/logo|placeholder|default[-_]?(og|share)|favicon/i.test(u.pathname) ? u.href : ""; } catch { return ""; }
+  try { const u = new URL(img, r.url || url); return /^https?:$/.test(u.protocol) && !/logo|placeholder|default[-_]?(og|share)|favicon/i.test(u.pathname) && !THUMB.test(u.href) && !BROADCAST_HOST.test(u.hostname + ".") ? u.href : ""; } catch { return ""; }
 }
 // The reports a wire story was written from (kept internally), newest first.
 async function sourcePhoto(env, articleId) {
   const { results } = await env.DB.prepare(`SELECT i.url, i.source_name FROM wire_jobs j JOIN wire_items i ON i.job_id=j.id WHERE j.article_id=? ORDER BY i.published_at DESC LIMIT 4`).bind(articleId).all().catch(() => ({ results: [] }));
   for (const it of results) {
+    if (broadcaster(it.source_name, it.url)) continue;
     const url = await pagePhoto(it.url).catch(() => "");
     if (url) return { url, page: it.url, credit: `ছবি: সৌজন্যে ${pubName(it.source_name)}` };
   }
@@ -70,6 +97,10 @@ async function sourcePhoto(env, articleId) {
 }
 
 export async function bulletinImages(env, n = 3) {
+  // Pictures already taken from a television channel are dropped and looked up again.
+  const { results: old } = await env.DB.prepare("SELECT article_id, credit, page, url FROM bulletin_images WHERE query='source' AND url<>''").all().catch(() => ({ results: [] }));
+  const redo = old.filter(r => broadcaster(r.credit.replace(/^ছবি: সৌজন্যে /, ""), r.page) || THUMB.test(r.url) || BROADCAST_HOST.test((() => { try { return new URL(r.url).hostname + "."; } catch { return ""; } })()));
+  if (redo.length) await env.DB.batch(redo.map(r => env.DB.prepare("UPDATE bulletin_images SET url='', credit='', query='', checked_at='2000-01-01T00:00:00Z' WHERE article_id=?").bind(r.article_id)));
   const { results: stories } = await env.DB.prepare(`SELECT a.id, a.title, a.dek FROM articles a LEFT JOIN bulletin_images b ON b.article_id=a.id
     WHERE a.status='published' AND a.lang='bn' AND a.pulled_at IS NULL AND a.kind IN ('rewrite','brief') AND a.published_at>=?
       AND (b.article_id IS NULL OR (b.url='' AND b.checked_at<?))
@@ -85,7 +116,7 @@ export async function bulletinImages(env, n = 3) {
   let found = 0;
   for (const s of stories) {
     let hit = hits.get(s.id) || null, used = hit ? "source" : "";
-    if (!hit) for (const q of terms[s.id] || []) { hit = await commons(q).catch(() => null); used = q; if (hit) break; }
+    if (!hit) for (const q of terms[s.id] || []) { hit = await commons(q).catch(() => null) || await openverse(q).catch(() => null); used = q; if (hit) break; }
     if (hit) found++;
     stmts.push(env.DB.prepare("INSERT INTO bulletin_images (article_id,url,credit,page,query,checked_at) VALUES (?,?,?,?,?,?) ON CONFLICT(article_id) DO UPDATE SET url=excluded.url,credit=excluded.credit,page=excluded.page,query=excluded.query,checked_at=excluded.checked_at")
       .bind(s.id, hit?.url || "", hit?.credit || "", hit?.page || "", used, at));
