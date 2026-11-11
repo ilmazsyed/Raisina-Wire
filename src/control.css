@@ -175,3 +175,21 @@ dialog::backdrop { background: #000a; }
 .ap-switch.on{border-color:#1f9d55;background:#0f2a1c;color:#fff}
 .ap-switch.on i{background:#22c55e}
 .ap-switch.on i:after{transform:translateX(24px)}
+
+/* AVO Story Desk */
+.ad-wrap{display:grid;grid-template-columns:minmax(340px,520px) 1fr;gap:16px;padding:16px;align-items:start}
+@media (max-width:980px){.ad-wrap{grid-template-columns:1fr}}
+.ad-form{display:flex;flex-direction:column;gap:12px;position:sticky;top:12px}
+.ad-form label{display:flex;flex-direction:column;gap:4px}
+.ad-form textarea{font-size:16px;line-height:1.5}
+.ad-pics{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin:8px 0}
+.ad-pic{display:flex;flex-direction:column;gap:4px;padding:6px;border:1px solid var(--line);border-radius:10px}
+.ad-pic img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px}
+.ad-pic input{font-size:12px}
+.ad-stories{display:flex;flex-direction:column;gap:10px}
+.ad-story{display:flex;gap:12px;padding:10px;border:1px solid var(--line);border-radius:12px}
+.ad-thumbs{flex:none;display:grid;grid-template-columns:repeat(2,70px);gap:4px;align-content:start}
+.ad-thumbs img{width:70px;height:40px;object-fit:cover;border-radius:4px}
+.ad-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.ad-preview{width:min(92vw,960px);padding:12px;border-radius:14px}
+.ad-screen{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden}

@@ -25,7 +25,7 @@ export const istNow = () => new Date(Date.now() + 5.5 * 3600e3);
 export const istClock = (t = Date.now(), sec = true) => new Date(t).toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", ...(sec ? { second: "2-digit" } : {}) });
 export const istDay = (t = Date.now()) => new Date(t + 5.5 * 3600e3).toISOString().slice(0, 10);
 
-const PAGES = [["/producer.html", "Producer"], ["/pcr.html", "PCR"], ["/studio.html", "Studio"], ["/onair.html", "On-air desk"], ["/prompter.html", "Prompter"], ["/admin.html", "Control room"]];
+const PAGES = [["/producer.html", "Producer"], ["/avodesk.html", "AVO desk"], ["/pcr.html", "PCR"], ["/studio.html", "Studio"], ["/onair.html", "On-air desk"], ["/prompter.html", "Prompter"], ["/admin.html", "Control room"]];
 // Draws the header and checks the person is staff. Returns the user, or null (with a message).
 export async function shell(title, { staff = true } = {}) {
   await initUiLang();
