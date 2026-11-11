@@ -17,6 +17,7 @@
 import { readLine, voiceKey, tvVoice, voiceRate, voiceBudget, chargeVoice } from "./bulletinvoice.js";
 import { synthesize, sha256, ttsEnabled } from "./tts.js";
 import { newsPhotos } from "./bulletinimg.js";
+import { labelsOf } from "./labels.js";
 
 export const AVO_DAILY = 45, AVO_HOURS = 6, AVO_MAX_AIRED = 4, AVO_SECONDS = 30;
 const QUOTA = { bengal: 27, india: 9, neighbours: 7, world: 2 };
@@ -170,7 +171,8 @@ export function screenStory(r) {
   const j = (v, d) => { try { return JSON.parse(v || d); } catch { return JSON.parse(d); } };
   return { id: r.article_id, title: r.title, desk: r.desk, region: r.region, sex: r.sex, lines: j(r.script, "[]"),
     voice: j(r.voice, "[]").map(k => `/api/tv/voice/${k}.mp3`), secs: r.secs,
-    images: j(r.images, "[]").map((x, i) => ({ src: /^\/(media|brand)\//.test(x.url || "") ? x.url : `/api/tv/aimg/${encodeURIComponent(r.article_id)}/${i}`, credit: x.credit || "" })), at: r.published_at, origin: r.origin || "auto" };
+    images: j(r.images, "[]").map((x, i) => ({ src: /^\/(media|brand)\//.test(x.url || "") ? x.url : `/api/tv/aimg/${encodeURIComponent(r.article_id)}/${i}`, credit: x.credit || "" })), at: r.published_at, origin: r.origin || "auto",
+    ...labelsOf(r.desk, `${r.title} ${j(r.script, "[]").join(" ")}`, (() => { try { return JSON.parse(r.labels || "null"); } catch { return null; } })()) };
 }
 
 // GET /api/tv/aimg/<id>/<n>: one of a story's pictures, fetched once and cached at the edge.
@@ -206,7 +208,7 @@ export async function avoLog(env) {
   const by = new Map(); plays.forEach(p => { if (!by.has(p.article_id)) by.set(p.article_id, []); by.get(p.article_id).push({ ch: p.channel, at: p.at }); });
   const day = istDay(), today = results.filter(r => r.day === day && (r.origin || "auto") === "auto");
   const count = Object.fromEntries(Object.keys(QUOTA).map(k => [k, today.filter(r => r.region === k).length]));
-  return { quota: QUOTA, today: count, daily: AVO_DAILY, stories: results.map(r => ({ ...screenStory(r), status: r.status, origin: r.origin || "auto", createdBy: r.created_by || "", findMore: !!r.find_more, given: r.origin === "manual" ? (() => { try { return JSON.parse(r.images || "[]"); } catch { return []; } })() : [], score: r.score, aired: r.aired, views: r.views, lastAired: r.last_aired, createdAt: r.created_at, nImages: (() => { try { return JSON.parse(r.images || "[]").length; } catch { return 0; } })(), plays: by.get(r.article_id) || [], inRotation: r.status === "ready" && Date.parse(r.published_at) >= Date.now() - AVO_HOURS * 3600e3 && r.aired < AVO_MAX_AIRED })) };
+  return { quota: QUOTA, today: count, daily: AVO_DAILY, stories: results.map(r => ({ ...screenStory(r), labelsSet: (() => { try { return JSON.parse(r.labels || "null"); } catch { return null; } })(), status: r.status, origin: r.origin || "auto", createdBy: r.created_by || "", findMore: !!r.find_more, given: r.origin === "manual" ? (() => { try { return JSON.parse(r.images || "[]"); } catch { return []; } })() : [], score: r.score, aired: r.aired, views: r.views, lastAired: r.last_aired, createdAt: r.created_at, nImages: (() => { try { return JSON.parse(r.images || "[]").length; } catch { return 0; } })(), plays: by.get(r.article_id) || [], inRotation: r.status === "ready" && Date.parse(r.published_at) >= Date.now() - AVO_HOURS * 3600e3 && r.aired < AVO_MAX_AIRED })) };
 }
 
 // The AVO Story Desk (control room): a story written by hand. Headline, a brief to be read (up to
@@ -237,6 +239,13 @@ export async function avoManualAdd(env, b, by) {
 export async function avoManualEdit(env, id, b) {
   const row = await env.DB.prepare("SELECT origin FROM avo_stories WHERE article_id=?").bind(id).first();
   if (!row) throw new Error("No such story.");
+  // Any story can be relabelled (desk and weight for the running order's variety rules).
+  if (b.labels !== undefined && Object.keys(b).length === 1) {
+    const DK = ["kolkata", "bengal", "india", "bangladesh", "world", "sports", "business", "other"], W = ["heavy", "mid", "light"];
+    const l = b.labels && typeof b.labels === "object" ? { ...(DK.includes(b.labels.dk) ? { dk: b.labels.dk } : {}), ...(W.includes(b.labels.weight) ? { weight: b.labels.weight } : {}) } : {};
+    await env.DB.prepare("UPDATE avo_stories SET labels=? WHERE article_id=?").bind(Object.keys(l).length ? JSON.stringify(l) : null, id).run();
+    return { ok: true };
+  }
   // Any story can be taken out of rotation, or put back.
   if (b.off !== undefined && Object.keys(b).length === 1) {
     await env.DB.prepare(`UPDATE avo_stories SET status=? WHERE article_id=? AND status IN ('ready','off')`).bind(b.off ? "off" : "ready", id).run();

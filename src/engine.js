@@ -331,6 +331,19 @@ const noCaptions = p => { try { p.unloadModule?.("captions"); p.unloadModule?.("
 // ("Running order" is the channel's automatic schedule, not a headline).
 const INTERNAL_LABELS = /^(running order|continuity|program|preview|standby|slate)$/i;
 const airLabel = sc => { const l = String(sc?.label || "").trim(); return !l || INTERNAL_LABELS.test(l) || sc?.sources?.[0]?.kind === "continuity" ? "" : l; };
+// The running order's variety rules: never two stories from the same desk in a row (so Bengal,
+// India and the world take turns), and a light story after every two heavy ones. The first `keep`
+// items (the lead) stay where they are; each next item is the first that fits, else the nearest.
+export function vary(list, keep = 1) {
+  const out = list.slice(0, keep), rest = list.slice(keep);
+  while (rest.length) {
+    const a = out[out.length - 1], b = out[out.length - 2], two = a?.weight === "heavy" && b?.weight === "heavy";
+    const fits = [x => (!a || !a.dk || x.dk !== a.dk) && (!two || x.weight !== "heavy"), x => !two || x.weight !== "heavy", x => !a || !a.dk || x.dk !== a.dk];
+    let i = -1; for (const f of fits) { i = rest.findIndex(f); if (i >= 0) break; }
+    out.push(rest.splice(Math.max(0, i), 1)[0]);
+  }
+  return out;
+}
 // A viewer's running order outlives its player: when a page redraws and mounts the player afresh
 // (the Watch page draws once from its cache, then again with fresh data), the new player carries
 // on with the same block at the same moment instead of choosing again and jumping.
@@ -605,9 +618,11 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const avoLen = x => { const v = Number(x?.secs) || 0; if (v > 0) return Math.max(8, Math.round((v + 0.15 * Math.max(0, (x.voice?.length || 1) - 1) + 2) * 10) / 10);
     const n = (x?.lines || []).join(" ").length || String(x?.title || "").length; return Math.max(10, Math.min(40, Math.round(n / 14))); };
   const avoTotal = L => L.reduce((n, x) => n + avoLen(x), 0);
-  const AVO_MIN = 4, AVO_MAX = 6, AVO_EVERY = 3, AVO_REPEAT = 4;
+  const AVO_MIN = 4, AVO_EVERY = 3, AVO_REPEAT = 4, AVO_GAP = 15 * 60e3;
   const avoSeen = (() => { try { return JSON.parse(localStorage.getItem(`rw-avo-seen-${channel}`) || "{}"); } catch { return {}; } })();
-  const markAvoSeen = id => { avoSeen[id] = (avoSeen[id] || 0) + 1; try { const keep = Object.fromEntries(Object.entries(avoSeen).slice(-80)); localStorage.setItem(`rw-avo-seen-${channel}`, JSON.stringify(keep)); } catch { /* private mode */ } };
+  // When this viewer last saw each story: a story does not come back within fifteen minutes.
+  const avoLast = (() => { try { return JSON.parse(localStorage.getItem(`rw-avo-last-${channel}`) || "{}"); } catch { return {}; } })();
+  const markAvoSeen = id => { avoSeen[id] = (avoSeen[id] || 0) + 1; avoLast[id] = Date.now(); try { const keep = Object.fromEntries(Object.entries(avoSeen).slice(-80)); localStorage.setItem(`rw-avo-seen-${channel}`, JSON.stringify(keep)); localStorage.setItem(`rw-avo-last-${channel}`, JSON.stringify(Object.fromEntries(Object.entries(avoLast).slice(-80)))); } catch { /* private mode */ } };
   // Each story of a block is logged once, however often it is redrawn (or its player remounted).
   const avoLogged = keepOrder ? (RUNNING[`log-${channel}`] ||= new Set()) : new Set();
   // Stories this viewer has seen fewer than four times; when every story has been seen that often
@@ -616,11 +631,49 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const avoPool = () => { const all = st.tv?.avoOn === false ? [] : st.tv?.avo || [], fresh = all.filter(x => (avoSeen[x.id] || 0) < AVO_REPEAT); return fresh.length >= Math.min(AVO_MIN, all.length) ? fresh : all; };
   // Due: when the channel opens (nothing played yet) and after every three videos, when the item
   // on air is done and nothing else (a resumed video, the "up next" card) is waiting.
-  const avoDue = q => !q.resume && !(q.pending || []).length && q.item?.type !== "upnext" && q.item?.type !== "avo" && (q.sinceAvo === undefined || q.sinceAvo >= AVO_EVERY) && avoPool().length > 0;
+  const avoDue = q => !q.resume && !(q.pending || []).length && q.item?.type !== "upnext" && q.item?.type !== "avo" && (q.sinceAvo === undefined || q.sinceAvo >= AVO_EVERY) && avoBlock().length > 0;
+  // A block is two or three stories (three when the pool is large), rotating through the pool:
+  // only stories this viewer has not seen in the last fifteen minutes, least seen first, then the
+  // newest, in the variety order. Fewer than two such stories: no AVO block this time (a thin
+  // pool means fewer blocks, never repeats).
   function avoBlock() {
-    const pool = avoPool().slice().sort((a, b) => (avoSeen[a.id] || 0) - (avoSeen[b.id] || 0) || String(b.at || "").localeCompare(String(a.at || "")));
-    const n = Math.min(AVO_MAX, pool.length);
-    return pool.slice(0, Math.max(Math.min(AVO_MIN, pool.length), n)).sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
+    const all = avoPool(), t = Date.now(), size = all.length >= 9 ? 3 : 2;
+    const ok = all.filter(x => !(t - (avoLast[x.id] || 0) < AVO_GAP)).sort((a, b) => (avoSeen[a.id] || 0) - (avoSeen[b.id] || 0) || String(b.at || "").localeCompare(String(a.at || "")));
+    if (ok.length < 2) return [];
+    return vary(ok.slice(0, size + 2), 1).slice(0, size);
+  }
+
+  // When this viewer last saw each video: a video does not come back within the hour. When every
+  // fresh video has played that recently, an evergreen video (marked in the control room) fills in;
+  // only when none is left does the one played longest ago come back.
+  const VIDEO_GAP = 60 * 60e3;
+  const vidLast = (() => { try { return JSON.parse(localStorage.getItem(`rw-vid-last-${channel}`) || "{}"); } catch { return {}; } })();
+  const markVid = id => { vidLast[id] = Date.now(); try { localStorage.setItem(`rw-vid-last-${channel}`, JSON.stringify(Object.fromEntries(Object.entries(vidLast).slice(-150)))); } catch { /* private mode */ } };
+  const recent = id => Date.now() - (vidLast[id] || 0) < VIDEO_GAP;
+  function freshVideo(q, loop, x) {
+    if (!recent(x.ytId)) return x;
+    for (let j = 1; j < loop.length; j++) { const y = loop[(q.i + j) % loop.length]; if (y.type === "video" && !recent(y.ytId)) { q.i = (q.i + j) % loop.length; return y; } }
+    const eg = (st.tv?.evergreen || []).filter(v => !recent(v.ytId)).sort((a, b) => (vidLast[a.ytId] || 0) - (vidLast[b.ytId] || 0))[0];
+    if (eg) return { ...eg, eg: true };
+    let best = q.i % loop.length;
+    loop.forEach((y, k) => { if (y.type === "video" && (vidLast[y.ytId] || 0) < (vidLast[loop[best].ytId] || Infinity)) best = k; });
+    q.i = best; return loop[best];
+  }
+  // The bulletin's stories, the same for everyone at that moment: stories published since the last
+  // bulletin lead (marked নতুন), then stories updated since (নতুন তথ্য), then the rest, newest first.
+  // The quick bulletins at :15 and :45 read four the bulletin before did not. Then the variety
+  // order, the lead staying first.
+  function bulletinPick(slot, short, depth = 0) {
+    const L = st.tv?.bulletin || []; if (!L.length) return [];
+    const since = slot - QUARTER, ts = v => Date.parse(v || "") || 0;
+    const rank = b => ts(b.at) >= since ? 0 : b.upd && ts(b.upd) >= since ? 1 : 2;
+    let pool = L.map((b, i) => ({ b, i })).sort((x, y) => rank(x.b) - rank(y.b) || x.i - y.i).map(x => ({ ...x.b, tag: rank(x.b) === 0 ? "নতুন" : rank(x.b) === 1 ? "নতুন তথ্য" : "" }));
+    if (short && depth === 0) {
+      const before = new Set(bulletinPick(since, bulletinMs(since) !== 120e3, 1).map(b => b.title));
+      const unread = pool.filter(b => !before.has(b.title));
+      if (unread.length >= 3) pool = unread.concat(pool.filter(b => before.has(b.title)));
+    }
+    return vary(pool.slice(0, short ? 4 : 7), 1);
   }
   function localSeg() {
     const loop = st.tv?.loop || []; if (!loop.length) return null;
@@ -715,8 +768,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     let next;
     if (q.item?.type === "upnext") {
       const v = q.item.video;
-      next = { type: "video", ytId: v.ytId, title: v.title, line: v.line, dur: v.dur, in: v.at || 0 };
-      if (!v.resumed) take();
+      next = { type: "video", ytId: v.ytId, title: v.title, line: v.line, dur: v.dur, in: v.at || 0, resumed: !!v.resumed, eg: !!v.eg };
+      if (!v.resumed && !v.eg) take();
     } else if (q.resume) { next = upnext(q.resume); q.resume = null; }
     else if (q.pending?.length) next = q.pending.shift();
     else {
@@ -724,15 +777,20 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // The horizontal channel places its own headline cards (below); no flash straight after
       // the bulletin on either channel.
       while (x.type === "flash" && (channel === "h" || q.item?.type === "bulletin") && loop.some(y => y.type === "video")) { take(); x = loop[q.i % loop.length]; }
+      if (x.type === "video") x = freshVideo(q, loop, x);
       if (x.type === "video" && q.item?.type === "video") {
         // Between two videos (always after the stinger): on the horizontal channel the channel ID
         // after every second video, and the headlines after three videos, then two, then three…;
         // then the "up next" card.
         const gap = [];
         if (channel === "h") {
-          q.vids = (q.vids || 0) + 1; q.since = (q.since || 0) + 1; q.gapN ||= 3;
-          if (q.vids % 2 === 0) gap.push({ type: "ident", dur: 5, sting: false });
-          if (q.since >= q.gapN) { gap.push({ type: "flash", dur: 8, sting: true, n: q.n }); q.since = 0; q.gapN = q.gapN === 3 ? 2 : 3; }
+          // A varied beat: the channel ID after two videos, then three, then two…; the headlines
+          // after three, then two…; when both fall due together the headlines go first and the
+          // channel ID waits a video, so the gaps between videos keep changing.
+          q.vids = (q.vids || 0) + 1; q.since = (q.since || 0) + 1; q.sinceId = (q.sinceId || 0) + 1; q.gapN ||= 3; q.idN ||= 2;
+          const flashDue = q.since >= q.gapN;
+          if (flashDue) { gap.push({ type: "flash", dur: 8, sting: true, n: q.n }); q.since = 0; q.gapN = q.gapN === 3 ? 2 : 3; }
+          else if (q.sinceId >= q.idN) { gap.push({ type: "ident", dur: 5, sting: false }); q.sinceId = 0; q.idN = q.idN === 2 ? 3 : 2; }
         } else gap.push({ type: "flash", dur: 8, sting: true, n: q.n });
         gap.push(upnext({ ...x, at: 0 }));
         next = gap.shift(); q.pending = gap;
@@ -741,7 +799,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       else next = take();
     }
     q.n++; q.item = next; q.start = t;
-    if (next.type === "video" && !next.resumed) q.sinceAvo = (q.sinceAvo ?? 3) + 1;
+    if (next.type === "video" && !next.resumed) { q.sinceAvo = (q.sinceAvo ?? 3) + 1; markVid(next.ytId); }
     q.seg = { ...next, start: t, in: next.in || 0, n: next.n ?? q.n };
     // While a flash or the "up next" card is on, the video after it is loaded in advance.
     const up = next.type === "upnext" ? next : (q.pending || []).find(x => x.type === "upnext");
@@ -899,7 +957,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (br?.text) el.innerHTML = channel === "h" ? `<div class="tv-breaking static"><div class="br-slash"></div><div class="br-in"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(br.text)}</b><img src="${LOGO}" alt=""></div><div class="br-bar"></div></div>` : vJacket(`<div class="br-v"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(br.text)}</b></div>`, "এইমাত্র পাওয়া খবর");
       else {
         const Hs = st.tv?.headlines || [], per = channel === "h" ? 6 : 4, from = Hs.length > per ? (g.n * per) % Hs.length : 0;
-        const pick = [...Hs.slice(from), ...Hs.slice(0, from)].slice(0, per);
+        const pick = vary([...Hs.slice(from), ...Hs.slice(0, from)].slice(0, per));
         // The horizontal screen fills its width: six headlines in two columns of cards, each with
         // its desk, under a full-width head.
         el.innerHTML = channel === "h"
@@ -1132,7 +1190,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // The two-minute bulletins carry up to seven stories; the 65-second ones at :15 and :45, four.
       // Each story stays on screen as long as the newsreader takes to read it (when its line is
       // ready); as many stories as fit, the spare seconds shared out among them.
-      const total = sc.dur || 120, short = total < 100, all = (st.tv?.bulletin || []).slice(0, short ? 4 : 7), intro = 12;
+      const total = sc.dur || 120, short = total < 100, all = bulletinPick(Math.floor((sc.startAt || now()) / QUARTER) * QUARTER, short), intro = 12;
       const even = all.length ? (total - intro) / all.length : total, plan = [];
       { let t = intro;
         for (const x of all) { const d = x.secs ? Math.max(8, x.secs + 1) : even; if (plan.length && t + d > total - 0.5) break; plan.push({ x, at: t, d }); t += d; }
@@ -1147,7 +1205,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // A story with a photo (free-licence, from Wikimedia Commons) shows it wiping in beside the
       // text, slowly zooming, with its credit in small type.
       const story = (x, k) => `<div class="bs${channel === "v" ? " v" : ""}${x.image ? " has-img" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>${x.image ? `<div class="bs-img" style="--d:${plan[k]?.d || per}s"><img src="${esc(x.image)}" alt="" referrerpolicy="no-referrer"></div>${x.credit ? `<small class="bs-credit">${esc(x.credit)}</small>` : ""}` : ""}
-        <div class="bs-side"><em>${bnDigits(k + 1)}</em><small>/ ${bnDigits(list.length)}</small><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span></div>
+        <div class="bs-side"><em>${bnDigits(k + 1)}</em><small>/ ${bnDigits(list.length)}</small><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span>${x.tag ? `<b class="bs-new">${esc(x.tag)}</b>` : ""}</div>
         <div class="bs-main"><h2>${String(x.title || "").split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</h2><p>${esc(x.text || "")}</p></div>
         <div class="bs-strap"><b data-no-tr>NEWS BULLETIN</b><span>${esc(when)}</span><div class="bs-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${plan[j]?.d || per}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div></div>`;
       let shown = -9;
@@ -1384,6 +1442,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     // Outputs apply realtime changes after the broadcast delay.
     while (st.queue.length && st.queue[0].at <= Date.now()) { st.ctl = st.queue.shift().state; onState?.(st.ctl); }
     let sc = resolve();
+    // The running-order simulator (scripts/playout-sim.mjs) records each item put on air.
+    if (window.__rwPlayout && st.seq?.seg && st.seq.seg !== st.lastSeg) { const g = st.lastSeg = st.seq.seg; window.__rwPlayout.push({ type: g.type, start: g.start, dur: g.dur, title: g.title || "", yt: g.ytId || "", eg: !!g.eg, resumed: !!g.resumed, stories: (g.stories || []).map(x => ({ id: x.id, dk: x.dk, weight: x.weight })) }); }
+    if (window.__rwScenes && sc?.key !== st.current?.key) window.__rwScenes.push({ at: now(), key: sc?.key || "", seg: st.seq?.seg?.type || "", item: st.seq?.item?.type || "" });
     if (sc?.key !== st.current?.key) drawScene(sc);
     if (mode === "app") preloadYT(st.preWant);
     const b = st.ctl?.breaking || st.tv?.breaking;

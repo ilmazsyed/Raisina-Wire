@@ -1,6 +1,7 @@
 import { readyVoices } from "./bulletinvoice.js";
 import { cleanCredit } from "./bulletinimg.js";
 import { avoForScreens } from "./avo.js";
+import { labelsOf } from "./labels.js";
 import { bnLine } from "./bnline.js";
 // Rashtrix TV, Phase 2: two channels, each on or off, each with its own secret output address
 // for OBS / vMix.
@@ -118,6 +119,14 @@ async function playable(env, ch, s = {}) {
   return freshOnly(list);
 }
 
+// Evergreen videos of this channel's shape (any age), for the running order's gap filling.
+async function evergreens(env, ch) {
+  const { results } = await env.DB.prepare(`SELECT i.yt_id AS ytId, i.title, i.duration AS dur, i.thumb, i.headline, i.description FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
+    WHERE i.evergreen=1 AND i.vertical=? AND i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0 ORDER BY i.published_at DESC LIMIT 40`).bind(ch === "v" ? 1 : 0).all();
+  const seen = new Set();
+  return results.filter(v => !seen.has(v.ytId) && seen.add(v.ytId)).map(v => ({ type: "video", ytId: v.ytId, title: v.title, line: (v.headline || "").trim() || bnLine(v.title, v.description), dur: v.dur, thumb: v.thumb, eg: true }));
+}
+
 /* ---------- Scheduled cut-ins (control room > Scheduler) ---------- */
 // Each active cut-in's coming times (India time) as moments, from an hour ago to a day ahead,
 // with the videos to play; the screens put them on air (src/engine.js), after any bulletin,
@@ -223,7 +232,7 @@ export function scheduleAt(loop, epoch, t = Date.now(), ahead = 5400, opts = {})
 // briefs) from the last twelve hours, newest first. Older stories never go on air.
 const FRESH_HOURS = 12;
 async function wireStories(env, limit = 20) {
-  const pick = hours => env.DB.prepare(`SELECT id, title, category, kind, body FROM articles WHERE status='published' AND lang='bn' AND pulled_at IS NULL
+  const pick = hours => env.DB.prepare(`SELECT id, title, category, kind, body, published_at, updated_at FROM articles WHERE status='published' AND lang='bn' AND pulled_at IS NULL
     AND kind IN ('rewrite','brief') AND published_at>=? ORDER BY published_at DESC LIMIT ?`).bind(new Date(Date.now() - hours * 3600e3).toISOString(), limit).all().then(r => r.results).catch(() => []);
   // A quiet night: look back a day rather than show an empty screen, never further.
   const fresh = await pick(FRESH_HOURS);
@@ -238,16 +247,22 @@ export async function tvState(env, ch) {
   const hit = memo.get(ch);
   if (hit && Date.now() - hit.at < 4000) return hit.value;
   const s = await tvSettings(env, ch);
-  const [videos, cards, live, stories, cuts, avo] = await Promise.all([
+  const [videos, cards, live, stories, cuts, avo, evergreen] = await Promise.all([
     playable(env, ch, s), ch === "v" ? promos(env) : [],
     env.DB.prepare("SELECT CASE WHEN live_video<>'' THEN live_video ELSE yt_id END AS ytId, title FROM tv_sources WHERE channel=? AND kind='live' AND active=1 AND on_air=1 AND live_now=1 LIMIT 1").bind(ch).first(),
-    wireStories(env), cutinsOnAir(env, ch).catch(() => []), s.avoOn === false ? [] : avoForScreens(env).catch(() => [])
+    wireStories(env), cutinsOnAir(env, ch).catch(() => []), s.avoOn === false ? [] : avoForScreens(env).catch(() => []),
+    evergreens(env, ch).catch(() => [])
   ]);
-  const headlines = stories.map(a => ({ text: a.title, desk: a.category, kind: a.kind }));
+  // Each story carries its labels (src/labels.js): desk and weight, for the running order's variety rules.
+  const lab = a => labelsOf(a.category, `${a.title} ${String(a.body || "").slice(0, 400)}`);
+  const headlines = stories.map(a => ({ text: a.title, desk: a.category, kind: a.kind, ...lab(a) }));
   // Each bulletin story's picture and its credit (src/bulletinimg.js), when one was found.
-  const top = stories.slice(0, 8), pics = new Map();
+  // Twelve in the bulletin pool: the :00 and :30 bulletins lead with the newest, the :15 and :45
+  // ones read four the last bulletin did not (src/engine.js).
+  const top = stories.slice(0, 12), pics = new Map();
   if (top.length) (await env.DB.prepare(`SELECT article_id, url, credit FROM bulletin_images WHERE url<>'' AND article_id IN (${top.map(() => "?").join(",")})`).bind(...top.map(r => r.id)).all().catch(() => ({ results: [] }))).results.forEach(r => pics.set(r.article_id, r));
-  const bulletin = top.map(r => ({ title: r.title, desk: r.category, kind: r.kind, text: firstWords(r.body), image: pics.has(r.id) ? `/api/tv/bimg/${encodeURIComponent(r.id)}?v=${encodeURIComponent(pics.get(r.id).url.length + (pics.get(r.id).url.split("/").pop() || "").slice(-12))}` : "", credit: cleanCredit(pics.get(r.id)?.credit) }));
+  const updated = r => r.updated_at && Date.parse(r.updated_at) - Date.parse(r.published_at) > 10 * 60e3 ? r.updated_at : "";
+  const bulletin = top.map(r => ({ title: r.title, desk: r.category, kind: r.kind, at: r.published_at, upd: updated(r), ...lab(r), text: firstWords(r.body), image: pics.has(r.id) ? `/api/tv/bimg/${encodeURIComponent(r.id)}?v=${encodeURIComponent(pics.get(r.id).url.length + (pics.get(r.id).url.split("/").pop() || "").slice(-12))}` : "", credit: cleanCredit(pics.get(r.id)?.credit) }));
   // The newsreader's line for each story, when it is ready (src/bulletinvoice.js).
   const voices = await readyVoices(env, bulletin).catch(() => new Map());
   bulletin.forEach(b => { const v = voices.get(b); if (v) { b.voice = `/api/tv/voice/${v.key}.mp3`; b.secs = v.secs; } });
@@ -272,7 +287,10 @@ export async function tvState(env, ch) {
     // Scheduled cut-ins (the control room's Scheduler): at each time, these videos go on air.
     cutins: s.on ? cuts : [],
     // The AVO engine's stories in rotation (src/avo.js); empty when the control room turns it off.
-    avoOn: s.avoOn !== false, avo: s.on ? avo : []
+    avoOn: s.avoOn !== false, avo: s.on ? avo : [],
+    // Evergreen videos (explainers, features) marked in the control room: they fill the channel
+    // when every fresh video has played within the hour, before anything repeats.
+    evergreen: s.on ? evergreen : []
   };
   memo.set(ch, { at: Date.now(), value });
   return value;
