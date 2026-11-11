@@ -45,9 +45,9 @@ await p.unrouteAll({ behavior: "ignoreErrors" });
 await b.close();
 
 const clock = t => new Date(t + IST).toISOString().slice(11, 19);
-const NAME = { video: "VIDEO", avo: "AVO", upnext: "Up next", flash: "HEADLINES", ident: "Channel ID", bulletin: "BULLETIN", weather: "WEATHER", market: "MARKET" };
+const NAME = { seg: "SEGMENT", poll: "POLL", video: "VIDEO", avo: "AVO", upnext: "Up next", flash: "HEADLINES", ident: "Channel ID", bulletin: "BULLETIN", weather: "WEATHER", market: "MARKET" };
 for (const x of log) {
-  const what = x.type === "avo" ? x.stories.map(s => `${String(s.id).slice(-6)} ${s.dk || "?"}/${s.weight || "?"}`).join(", ") : x.title.slice(0, 60);
+  const what = x.type === "seg" ? `${x.name} (${x.items} items)` : x.type === "poll" ? "poll" : x.type === "avo" ? x.stories.map(s => `${String(s.id).slice(-6)} ${s.dk || "?"}/${s.weight || "?"}`).join(", ") : x.title.slice(0, 60);
   console.log(`${clock(x.start)}  ${String(Math.round(x.dur)).padStart(4)} s  ${(NAME[x.type] || x.type).padEnd(10)} ${x.eg ? "[evergreen] " : ""}${what}`);
 }
 // The checks.
