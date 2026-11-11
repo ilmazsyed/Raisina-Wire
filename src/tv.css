@@ -844,3 +844,11 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tvp-h .tvp-gfx .tv-adslot>.tv-ad .pt-in img{width:74px;height:74px}
 .tvp-h .tvp-gfx .tv-adslot>.tv-ad .pt-word{font-size:24px}
 .tvp-h .tvp-gfx .tv-adslot>.tv-ad .pt-in small{font-size:11px}
+
+/* Multi-picture screens: the corner pieces line up with the pictures' outer edges. */
+.tvp-h .tv-dt,.tvp-h .tv-bug-fixed,.tvp-h .tv-l3,.tvp-h .tvp-gfx .tv-adslot>.tv-ad{transition:left .5s cubic-bezier(.2,.9,.2,1),right .5s cubic-bezier(.2,.9,.2,1),opacity .3s}
+.tvp-h.multi-src .tv-dt,.tvp-h.multi-src .tv-l3{left:var(--pl)}
+.tvp-h.multi-src .tv-bug-fixed,.tvp-h.multi-src .tvp-gfx .tv-adslot>.tv-ad{right:var(--pr)}
+.tvp-h.multi-src .tv-l3{max-width:calc(1920px - var(--pl) - var(--pr) - 264px)}
+.tvp-h.multi-src .tv-bug-fixed{transform:scale(.75);transform-origin:100% 0}
+.tvp-h .tv-bug-fixed{transition:right .5s cubic-bezier(.2,.9,.2,1),transform .5s cubic-bezier(.2,.9,.2,1)}
