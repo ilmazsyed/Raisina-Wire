@@ -308,6 +308,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       ${mode === "app" ? `<div class="tvp-ytlayer" hidden><div class="tvs-ytwrap"><div class="tvs-yt"></div></div><div class="tvp-shield"></div></div>` : ""}
       <div class="tvp-stage"></div>
       <div class="tvp-lbl"></div><div class="tvp-gfx"></div><div class="tvp-ovl"></div>
+      <div class="tv-bug tv-bug-fixed"><img src="${LOGO}" alt=""></div>
       <div class="tvp-standby" hidden><img src="${LOGO}" alt=""><b>অনুষ্ঠান একটু পরেই</b><small>আমাদের সঙ্গে থাকুন</small></div>
       <div class="tvp-off" hidden><img src="${LOGO}" alt=""><b>শিগগির ফিরছি</b></div>
     </div>${mode === "app" ? `<button class="tvp-fs-exit" type="button" aria-label="Exit full screen">✕</button>` : ""}</div>${mode === "app" ? `<button class="tvp-sound" type="button" hidden>🔇 শব্দ চালু করতে ট্যাপ করুন</button><span class="tvp-taphint" hidden>▶ ভিডিওতে একবার ট্যাপ করুন</span>
@@ -814,7 +815,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const spark = arr => { if (!arr?.length) return ""; const lo = Math.min(...arr), hi = Math.max(...arr), w = 600, h = 120, d = arr.map((v, i) => `${i ? "L" : "M"}${(i / (arr.length - 1 || 1) * w).toFixed(1)},${(h - (hi === lo ? h / 2 : (v - lo) / (hi - lo) * h)).toFixed(1)}`).join(" "); return `<svg class="mk-spark" viewBox="-4 -4 ${w + 8} ${h + 8}" preserveAspectRatio="none"><path d="${d}"/></svg>`; };
       const idx = (x, i) => x ? `<div class="mk-idx ${up(x) ? "up" : "down"}" style="--i:${i}"><div class="mk-name">${flip(esc(x.en), esc(x.bn), "mn")}</div><div class="mk-val">${flip(...pair(x.value))}</div><div class="mk-chg"><i class="mk-arrow"></i>${flip(...chg(x))}</div>${spark(x.spark)}</div>` : "";
       const mover = (x, i) => `<div class="mk-mover ${up(x) ? "up" : "down"}" style="--i:${i}"><span class="mk-rank">${flip(String(i + 1), bnDigits(i + 1))}</span><span class="mk-co">${flip(esc(x.en), esc(x.bn), "mn")}</span><span class="mk-px">${flip(`₹${fx(x.value)}`, `₹${bnDigits(fx(x.value))}`)}</span><span class="mk-pc"><i class="mk-arrow"></i>${flip(`${up(x) ? "+" : "−"}${fx(Math.abs(x.pct))}%`, `${up(x) ? "+" : "−"}${bnDigits(fx(Math.abs(x.pct)))}%`)}</span></div>`;
-      const tile = (x, unit, i, d = 2) => x ? `<div class="mk-tile ${up(x) ? "up" : "down"}" style="--i:${i}"><div class="mk-name">${flip(esc(x.en), esc(x.bn), "mn")}</div><div class="mk-val">${flip(`${unit[0]}${fx(x.value, d)}`, `${unit[1]}${bnDigits(fx(x.value, d))}`)}</div><div class="mk-chg"><i class="mk-arrow"></i>${flip(...chg(x))}</div></div>` : "";
+      // Commodities also in rupees, in Indian units (at the international rate, before Indian duties and taxes).
+      const inr = x => x?.inr ? `<div class="mk-inr">${flip(`≈ ₹${fx(x.inr, 0)} ${esc(x.inrUnitEn)}`, `≈ ₹${bnDigits(fx(x.inr, 0))} ${esc(x.inrUnitBn)}`)}</div>` : "";
+      const tile = (x, unit, i, d = 2) => x ? `<div class="mk-tile ${up(x) ? "up" : "down"}" style="--i:${i}"><div class="mk-name">${flip(esc(x.en), esc(x.bn), "mn")}</div><div class="mk-val">${flip(`${unit[0]}${fx(x.value, d)}`, `${unit[1]}${bnDigits(fx(x.value, d))}`)}</div>${inr(x)}<div class="mk-chg"><i class="mk-arrow"></i>${flip(...chg(x))}</div></div>` : "";
       const head = (en, bn) => `<div class="mk-head"><b data-no-tr>MARKET UPDATE</b><span>${bn} · ${en}</span>${M.open ? "" : `<em>${flip("Last close", "শেষ দর")}</em>`}</div>`;
       const opener = sub => `<div class="mk-open"><i class="mk-grid"></i><svg class="mk-line" viewBox="0 0 1920 400" preserveAspectRatio="none"><path d="M0,330 L180,300 L320,320 L470,240 L620,262 L760,180 L900,210 L1060,120 L1220,150 L1380,80 L1540,110 L1700,40 L1920,60"/></svg><div class="mk-open-in"><div class="wx-logo"><img src="${LOGO}" alt=""></div><b class="w1" data-no-tr>MARKET</b><b class="w2" data-no-tr>UPDATE</b><i class="wx-line"></i><span class="wx-bn">বাজারের খবর</span><small>${sub}</small></div></div>`;
       const screens = [
@@ -822,7 +825,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         { d: 6, h: () => `<div class="mk-screen">${head("Indices", "সূচক")}<div class="mk-row two">${idx(M.nifty, 0)}${idx(M.sensex, 1)}</div></div>` },
         ...(M.gainers?.length ? [{ d: 5, h: () => `<div class="mk-screen">${head("Top gainers · Nifty 50", "সবচেয়ে বেশি বেড়েছে")}<div class="mk-list up">${M.gainers.map(mover).join("")}</div></div>` }] : []),
         ...(M.losers?.length ? [{ d: 5, h: () => `<div class="mk-screen">${head("Top losers · Nifty 50", "সবচেয়ে বেশি কমেছে")}<div class="mk-list down">${M.losers.map(mover).join("")}</div></div>` }] : []),
-        { d: 4, h: () => `<div class="mk-screen">${head("Commodities", "পণ্য")}<div class="mk-row three">${tile(M.crude, ["$", "$"], 0)}${tile(M.gold, ["$", "$"], 1)}${tile(M.silver, ["$", "$"], 2)}</div></div>` },
+        { d: 4, h: () => `<div class="mk-screen">${head("Commodities", "পণ্য")}<div class="mk-note">${flip("Rupee values at the international rate, before Indian duties and taxes", "টাকার দর আন্তর্জাতিক দামে, ভারতের শুল্ক ও কর ছাড়া", "mnote")}</div><div class="mk-row three">${tile(M.crude, ["$", "$"], 0)}${tile(M.gold, ["$", "$"], 1)}${tile(M.silver, ["$", "$"], 2)}</div></div>` },
         { d: 4, h: () => `<div class="mk-screen">${head("Rupee", "টাকা")}<div class="mk-row three">${tile(M.usd, ["₹", "₹"], 0)}${tile(M.gbp, ["₹", "₹"], 1)}${tile(M.eur, ["₹", "₹"], 2)}</div></div>` },
         { d: 3, h: () => opener("রাষ্ট্রিক্সের সঙ্গে থাকুন · Stay with Rashtrix") }
       ];
@@ -979,6 +982,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     let gfx = "", ovl = "";
     const c = st.ctl || {}, L = c.layers || { bug: true, live: true, clock: true, lower: true, ticker: true, ad: true, weather: true }, s = st.tv || {};
     const sc = st.current?.scene, fullGfx = stage.classList.contains("full-gfx");
+    // The channel's logo stays on screen throughout: videos, graphics, bulletins, the weather and
+    // market updates, intro cards and breaking news (the control room can still turn it off).
+    { const bug = $(".tv-bug-fixed"); if (bug) bug.hidden = L.bug === false; }
     if (!sc || sc.off || sc.standby || mode === "scene" && !sc.sources?.length && !sc.graphic) { put(".tvp-gfx", ""); put(".tvp-ovl", ""); return; }
     // Full-screen graphics (the bulletin, promos): LIVE and the clock stay on screen.
     if (fullGfx && channel === "h") { put(".tvp-gfx", dtBar(L, s)); put(".tvp-ovl", ""); return; }
@@ -988,7 +994,6 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const strap = c.lower && L.lower ? c.lower : sc.lower && L.lower ? sc.lower : null;
     if (channel === "h") {
       gfx = `
-        ${L.bug ? `<div class="tv-bug"><img src="${LOGO}" alt=""></div>` : ""}
         ${dtBar(L, s)}
         ${!lband && L.lower && (strap || isVideo) ? `<div class="tv-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>এই মুহূর্তে</small></span><span class="lt-text">${strap ? `${esc(strap.name)}${strap.title ? `<small>${esc(strap.title)}</small>` : ""}` : esc(s.lowerThird || sc.label || "")}</span></div>` : ""}
         ${!lband && L.ad && isVideo ? `<div class="tv-adslot"></div>` : ""}
