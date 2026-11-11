@@ -22,10 +22,23 @@ const SIZE = { h: [1920, 1080], v: [1080, 1920] };
 const LOGO = "/brand/logo.webp";
 
 // Slot rectangles (percent of the frame: x, y, w, h) for each layout and orientation.
+// On the horizontal channel, layouts with several pictures sit in the clear band between the
+// LIVE/time/weather block (top left) and the name strap and ad box (bottom), and stay left of the
+// logo where they reach its height: nothing on screen covers a picture. (Percent of the frame.)
+const SAFE = { top: 14.5, bottom: 71, logoBottom: 17.6, right: 90.5 };
+function safeRects(layout) {
+  const r = RECTS.h[layout] || RECTS.h.full;
+  if (r.length < 2 || layout === "pip") return r;
+  const minY = Math.min(...r.map(x => x[1])), maxY = Math.max(...r.map(x => x[1] + x[3])), maxX = Math.max(...r.map(x => x[0] + x[2]));
+  let s = Math.min(1, (SAFE.bottom - SAFE.top) / (maxY - minY));
+  let top = SAFE.top + ((SAFE.bottom - SAFE.top) - (maxY - minY) * s) / 2;
+  if (top < SAFE.logoBottom && 50 + (maxX - 50) * s > SAFE.right) { s = (SAFE.right - 50) / (maxX - 50); top = SAFE.top + ((SAFE.bottom - SAFE.top) - (maxY - minY) * s) / 2; }
+  return r.map(([x, y, w, h]) => [50 + (x - 50) * s, top + (y - minY) * s, w * s, h * s]);
+}
 const RECTS = {
   h: {
     full: [[0, 0, 100, 100]], lband: [[25, 0, 75, 75]], graphic: [],
-    pip: [[0, 0, 100, 100], [66, 50, 30, 30]],
+    pip: [[0, 0, 100, 100], [64, 38, 28, 28]],
     "2up": [[2, 12, 47.5, 66], [50.5, 12, 47.5, 66]],
     "1big2": [[2, 8, 62, 74], [66, 8, 32, 36], [66, 46, 32, 36]],
     "3eq": [[1.5, 18, 31.5, 54], [34.25, 18, 31.5, 54], [67, 18, 31.5, 54]],
@@ -696,7 +709,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     $(".tvp-standby").hidden = !sc?.standby; $(".tvp-off").hidden = !sc?.off;
     if (sc && !sc.standby && !sc.off) {
       const offset = sc.startAt ? Math.max(0, (now() - sc.startAt) / 1000) : 0;
-      const rects = RECTS[channel][sc.layout] || RECTS[channel].full;
+      const rects = channel === "h" ? safeRects(sc.layout) : RECTS[channel][sc.layout] || RECTS[channel].full;
       (sc.sources || []).slice(0, rects.length || 1).forEach((src, i) => {
         const r = rects[i] || rects[0]; if (!r) return;
         const el = document.createElement("div"); el.className = `tvs ${rects.length > 1 ? "multi" : ""}`;

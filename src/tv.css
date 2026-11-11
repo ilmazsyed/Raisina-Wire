@@ -833,3 +833,14 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
   text-shadow:0 2px 0 rgba(255,255,255,.5);animation:mkcoin 4s 1s ease-in-out infinite}
 @keyframes mkcoin{0%,60%{transform:rotateY(0)}80%{transform:rotateY(180deg) scaleX(.9)}100%{transform:rotateY(360deg)}}
 .mk-ico.coin:after{content:"";position:absolute;left:20%;right:20%;bottom:-16px;height:10px;border-radius:50%;background:rgba(0,0,0,.35);filter:blur(4px)}
+
+/* Nothing overlaps: the time block and the logo sit a little higher, the ad box is smaller, and
+   pictures in multi-picture layouts stay in the clear band between them (see SAFE in engine.js). */
+.tvp-h .tv-dt{top:20px}
+.tvp-h .tv-bug-fixed,.tvp-h .tv-bug{top:20px}
+.tvp-h .tv-ad,.tvp-h .tvp-gfx .tv-adslot>.tv-ad{width:240px;height:172px;padding:10px 14px}
+.tvp-h .tvp-gfx .tv-adslot>.tv-ad b{font-size:28px}
+.tvp-h .tvp-gfx .tv-adslot>.tv-ad small{font-size:12px;letter-spacing:.3px}
+.tvp-h .tvp-gfx .tv-adslot>.tv-ad .pt-in img{width:74px;height:74px}
+.tvp-h .tvp-gfx .tv-adslot>.tv-ad .pt-word{font-size:24px}
+.tvp-h .tvp-gfx .tv-adslot>.tv-ad .pt-in small{font-size:11px}
