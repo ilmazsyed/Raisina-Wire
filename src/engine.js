@@ -144,7 +144,7 @@ const STYLES = {
       const bell = [0, 1, 2, 1, 0, 2, 1, 2][k % 8];
       v.osc("sine", ch[bell] * 4, at, 0.35, 0.07, 6000); v.osc("triangle", ch[bell] * 8, at, 0.12, 0.02, 8000);
     } },
-  weather: { bpm: 100, level: 0.95, roots: [87.31, 58.27, 65.41, 73.42], chords: [[349.2, 440, 523.3], [233.1, 293.7, 349.2], [261.6, 329.6, 392], [293.7, 349.2, 440]],
+  weather: { bpm: 116, level: 0.95, roots: [87.31, 58.27, 65.41, 73.42], chords: [[349.2, 440, 523.3], [233.1, 293.7, 349.2], [261.6, 329.6, 392], [293.7, 349.2, 440]],
     step(v, at, k, bar, ch, root, s16) {
       if (k === 0) ch.forEach(f => v.osc("triangle", f, at, s16 * 16, 0.05, 1800, 0, 0.4));          // pad
       if (k === 0 || k === 10) v.osc("sine", 110, at, 0.35, 0.55, 500, 48);                        // soft kick
@@ -584,11 +584,11 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       st.preWant = null;
       return q.seg;
     }
-    // Straight after each bulletin, the weather briefing: 90 seconds after the two-minute ones,
-    // 60 after the 65-second ones (horizontal channel, when the weather has come in).
-    const WX = channel === "h" && (st.tv?.weatherPlaces || []).length && (st.tv?.bulletin || []).length ? (BULLETIN_MS === 120e3 ? 90e3 : 60e3) : 0;
-    // Then the market update, 30 seconds (when its figures have come in).
-    const MK = WX && st.tv?.market?.nifty ? 30e3 : 0;
+    // Straight after each bulletin, the weather briefing: 45 seconds after the two-minute ones,
+    // 30 after the 65-second ones (horizontal channel, when the weather has come in).
+    const WX = channel === "h" && (st.tv?.weatherPlaces || []).length && (st.tv?.bulletin || []).length ? (BULLETIN_MS === 120e3 ? 45e3 : 30e3) : 0;
+    // Then the market update, 20 seconds (when its figures have come in).
+    const MK = WX && st.tv?.market?.nifty ? 20e3 : 0;
     if (MK && t - slot >= BULLETIN_MS + WX && t - slot < BULLETIN_MS + WX + MK) {
       const ms = slot + BULLETIN_MS + WX;
       if (q.item?.type !== "market" || q.start !== ms) {
@@ -730,15 +730,17 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (sc.graphic) box.append(graphic(sc));
     }
     startBed(sc);
-    stage.querySelector(".tvp-stage").append(box);
     const leftVideo = old?.scene?.sources?.some(x => x.kind === "yt") && !old?.scene?.graphic;
     const t = !old ? { type: "cut", ms: 0 } : leftVideo ? { type: "stinger", ms: 1200 } : (sc?.transition || st.ctl?.transition || { type: "mix", ms: 600 });
     const finish = () => { old?.box.remove(); old?.slots.forEach(s => { if (!s.shared) s.destroy(); }); };
     // Into a video from a card (up next, headlines): the card stays on screen, on top, until the
-    // video is really playing, then fades into it, so no one watches a still while it loads.
+    // video is really playing, then fades into it, so no one watches a still while it loads. The
+    // video goes in underneath the card; the card itself is never moved (moving it restarted its
+    // animation, so the "up next" card played twice).
     const intoVideo = old && !leftVideo && mode !== "scene" && !sc?.graphic && (sc?.sources || []).some(x => x.kind === "yt") && slots[0]?.playing;
+    const holder = stage.querySelector(".tvp-stage");
+    if (intoVideo && old.box.parentNode === holder) holder.insertBefore(box, old.box); else holder.append(box);
     if (intoVideo) {
-      old.box.parentNode?.appendChild(old.box);
       const t0 = Date.now(), iv = setInterval(() => {
         if (!(slots[0].playing() || Date.now() - t0 > 4000 || !st.alive || st.current?.box !== box)) return;
         clearInterval(iv); old.box.style.animation = "tvmixout .45s ease both"; setTimeout(finish, 450);
@@ -827,7 +829,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const count = () => { if (!el.isConnected && st.current) return; const left = Math.max(1, Math.ceil(dur - (now() - (sc.startAt || now())) / 1000)); const b = el.querySelector(".un-count b"); if (b && b.textContent !== bnDigits(left)) b.textContent = bnDigits(left); };
       count(); const t = setInterval(() => el.isConnected ? count() : clearInterval(t), 250);
     } else if (g.kind === "market") {   // 30 seconds after the weather: the markets
-      const M = st.tv?.market || {}, total = sc.dur || 30;
+      const M = st.tv?.market || {}, total = sc.dur || 20;
       const fx = (n, d = 2) => n == null ? "–" : Number(n).toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d });
       const pair = (n, d = 2) => [fx(n, d), bnDigits(fx(n, d))];
       const up = x => (x?.change ?? 0) >= 0;
@@ -855,13 +857,13 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const tile = (x, unit, i, d = 2) => x ? `<div class="sg-card mt ${up(x) ? "up" : "down"}" style="--i:${i}"><div class="sg-band">${icon(x)}<div class="sg-name">${flip(esc(short[x.en]?.[0] || x.en), esc(x.bn), "mn")}</div></div><div class="sg-body"><div class="mt-val">${flip(`${unit[0]}${fx(x.value, d)}`, `${unit[1]}${bnDigits(fx(x.value, d))}`)}</div>${inr(x)}${chip(x)}</div></div>` : "";
       const head = (en, bn) => segHead(en, bn, M.at, M.open ? ["LIVE", "লাইভ"] : ["LAST CLOSE", "শেষ দর"]);
       const screens = [
-        { d: 4, h: () => segOpen("MARKET", "বাজারের খবর", M.open ? "লাইভ · LIVE" : "শেষ দর · LAST CLOSE", `<svg class="mk-line" viewBox="0 0 1920 400" preserveAspectRatio="none"><path d="M0,330 L180,300 L320,320 L470,240 L620,262 L760,180 L900,210 L1060,120 L1220,150 L1380,80 L1540,110 L1700,40 L1920,60"/></svg>`) },
-        { d: 6, h: () => `<div class="sg-screen">${head("Indices", "সূচক")}<div class="sg-row n2">${idx(M.nifty, 0)}${idx(M.sensex, 1)}</div></div>` },
-        ...(M.gainers?.length ? [{ d: 5, h: () => `<div class="sg-screen">${head("Top gainers", "সবচেয়ে বেশি বেড়েছে")}<div class="sg-list">${M.gainers.map(mover).join("")}</div></div>` }] : []),
-        ...(M.losers?.length ? [{ d: 5, h: () => `<div class="sg-screen">${head("Top losers", "সবচেয়ে বেশি কমেছে")}<div class="sg-list">${M.losers.map(mover).join("")}</div></div>` }] : []),
-        { d: 4, h: () => `<div class="sg-screen">${head("Commodities", "পণ্য")}<div class="sg-row n3">${tile(M.crude, ["$", "$"], 0)}${tile(M.gold, ["$", "$"], 1)}${tile(M.silver, ["$", "$"], 2)}</div><div class="sg-note">${flip("Rupee values at the international rate, before Indian duties and taxes", "টাকার দর আন্তর্জাতিক দামে, ভারতের শুল্ক ও কর ছাড়া", "mnote")}</div></div>` },
-        { d: 4, h: () => `<div class="sg-screen">${head("Rupee", "টাকা")}<div class="sg-row n3">${tile(M.usd, ["₹", "₹"], 0)}${tile(M.gbp, ["₹", "₹"], 1)}${tile(M.eur, ["₹", "₹"], 2)}</div></div>` },
-        { d: 3, h: () => segOpen("MARKET", "বাজারের খবর", "রাষ্ট্রিক্সের সঙ্গে থাকুন · Stay with Rashtrix") }
+        { d: 2.5, h: () => segOpen("MARKET", "বাজারের খবর", M.open ? "লাইভ · LIVE" : "শেষ দর · LAST CLOSE", `<svg class="mk-line" viewBox="0 0 1920 400" preserveAspectRatio="none"><path d="M0,330 L180,300 L320,320 L470,240 L620,262 L760,180 L900,210 L1060,120 L1220,150 L1380,80 L1540,110 L1700,40 L1920,60"/></svg>`) },
+        { d: 4, h: () => `<div class="sg-screen">${head("Indices", "সূচক")}<div class="sg-row n2">${idx(M.nifty, 0)}${idx(M.sensex, 1)}</div></div>` },
+        ...(M.gainers?.length ? [{ d: 3.5, h: () => `<div class="sg-screen">${head("Top gainers", "সবচেয়ে বেশি বেড়েছে")}<div class="sg-list">${M.gainers.map(mover).join("")}</div></div>` }] : []),
+        ...(M.losers?.length ? [{ d: 3.5, h: () => `<div class="sg-screen">${head("Top losers", "সবচেয়ে বেশি কমেছে")}<div class="sg-list">${M.losers.map(mover).join("")}</div></div>` }] : []),
+        { d: 3.5, h: () => `<div class="sg-screen">${head("Commodities", "পণ্য")}<div class="sg-row n3">${tile(M.crude, ["$", "$"], 0)}${tile(M.gold, ["$", "$"], 1)}${tile(M.silver, ["$", "$"], 2)}</div><div class="sg-note">${flip("Rupee values at the international rate, before Indian duties and taxes", "টাকার দর আন্তর্জাতিক দামে, ভারতের শুল্ক ও কর ছাড়া", "mnote")}</div></div>` },
+        { d: 3, h: () => `<div class="sg-screen">${head("Rupee", "টাকা")}<div class="sg-row n3">${tile(M.usd, ["₹", "₹"], 0)}${tile(M.gbp, ["₹", "₹"], 1)}${tile(M.eur, ["₹", "₹"], 2)}</div></div>` },
+        { d: 2, h: () => segOpen("MARKET", "বাজারের খবর", "রাষ্ট্রিক্সের সঙ্গে থাকুন · Stay with Rashtrix") }
       ];
       const sum = screens.reduce((n, x) => n + x.d, 0), scale = total / sum;
       let at = 0; screens.forEach(x => { x.d *= scale; x.at = at; at += x.d; });
@@ -874,14 +876,17 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         setTimeout(paint, 330); setTimeout(() => w.remove(), 900); };
       drawM(); const tm = setInterval(() => el.isConnected ? drawM() : clearInterval(tm), 250);
     } else if (g.kind === "weather") {   // after each bulletin: the weather, West Bengal then India
-      const P = st.tv?.weatherPlaces || [], total = sc.dur || 90, wb = P.filter(p => p.zone === "wb"), ind = P.filter(p => p.zone === "in");
+      const P = st.tv?.weatherPlaces || [], total = sc.dur || 45, wb = P.filter(p => p.zone === "wb"), ind = P.filter(p => p.zone === "in");
       const chunk = (a, n) => a.reduce((o, x, i) => (i % n ? o[o.length - 1].push(x) : o.push([x]), o), []);
-      const screens = [{ t: "open", d: 6 }];
-      const cardScreens = [...(wb.length ? [{ t: "sec", zone: "wb" }, ...chunk(wb, 3).map(c => ({ t: "cards", zone: "wb", c }))] : []), ...(ind.length ? [{ t: "sec", zone: "in" }, ...chunk(ind, 3).map(c => ({ t: "cards", zone: "in", c }))] : [])];
+      // Fast-paced: a short opening, a quick section card (not in the 30-second version), the
+      // cities three at a time sharing what is left, and a short close.
+      const short = total < 40, open = short ? 2.5 : 3, close = short ? 2 : 2.5, secD = short ? 0 : 1.5;
+      const screens = [{ t: "open", d: open }];
+      const cardScreens = [...(wb.length ? [...(secD ? [{ t: "sec", zone: "wb" }] : []), ...chunk(wb, 3).map(c => ({ t: "cards", zone: "wb", c }))] : []), ...(ind.length ? [...(secD ? [{ t: "sec", zone: "in" }] : []), ...chunk(ind, 3).map(c => ({ t: "cards", zone: "in", c }))] : [])];
       const nCards = cardScreens.filter(x => x.t === "cards").length, nSec = cardScreens.length - nCards;
-      const per = Math.max(5, (total - 6 - 5 - nSec * 3) / Math.max(1, nCards));
-      cardScreens.forEach(x => screens.push({ ...x, d: x.t === "sec" ? 3 : per }));
-      screens.push({ t: "close", d: 5 });
+      const per = Math.max(3, (total - open - close - nSec * secD) / Math.max(1, nCards));
+      cardScreens.forEach(x => screens.push({ ...x, d: x.t === "sec" ? secD : per }));
+      screens.push({ t: "close", d: close });
       let at = 0; screens.forEach(x => { x.at = at; at += x.d; });
       const ZONE = { wb: ["WEST BENGAL", "পশ্চিমবঙ্গ"], in: ["INDIA", "দেশ"] };
       const day = new Date(sc.startAt || now()).toLocaleDateString("en-GB", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long" });
