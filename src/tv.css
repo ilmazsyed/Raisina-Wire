@@ -966,3 +966,16 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .avo-brk{background:linear-gradient(120deg,#b3121c,#5a0a10)}
 .avo-brk .bg{opacity:0;transition:opacity .5s}
 .avo-brk .bg.ok{opacity:1}
+/* AVO: the BREAKING card's photo fills only the open side, centred on its subject; no running strip.
+   The key points card lays out from the top, below the এই মুহূর্তে tag, and never spills upward. */
+.avo-brk .bg{left:40%;width:60%;object-position:50% 35%;filter:grayscale(.25) brightness(.8)}
+.avo.v .avo-brk .bg{left:0;width:100%;top:45%;height:55%}
+.avo-brk .bar{display:none}
+.avo-info{justify-content:flex-start;padding:270px 160px 250px;gap:22px;overflow:hidden}
+.avo-info.fact{justify-content:center}
+.avo-info.pts ol{gap:18px}
+.avo-info.pts li{padding:16px 26px}
+.avo-info.pts li i{width:70px;height:70px;font-size:42px}
+.avo-info.pts li span{font-size:42px;line-height:1.32}
+.avo.v .avo-info{padding:420px 60px 640px}
+.avo.v .avo-info.pts li span{font-size:40px}
