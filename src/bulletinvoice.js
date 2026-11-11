@@ -78,3 +78,40 @@ export async function voiceRoute(env, key) {
   if (!row) return new Response("Not found", { status: 404 });
   return new Response(new Uint8Array(row.data), { headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=31536000, immutable" } });
 }
+
+// The voice-over links between segments ("আপনি দেখছেন রাষ্ট্রিক্স…"): fixed lines, recorded once in
+// the newsreader's voice and kept (a few hundred characters in all), played over each segment's
+// title card and the weather and market updates (src/engine.js).
+export const LINKS = {
+  "seg:kolkata10": "আপনি দেখছেন রাষ্ট্রিক্স টোয়েন্টি ফোর সেভেন। এবার কলকাতা দশ, শহর ও রাজ্যের দশ খবর।",
+  "seg:city": "শহরের খবরে এবার আবহাওয়া আর যাতায়াতের হালহকিকত।",
+  "seg:bangladesh": "এবার চোখ রাখা যাক পড়শি দেশ বাংলাদেশে।",
+  "seg:world": "এক মিনিটে দেখে নিন দুনিয়ার বড় খবর।",
+  "seg:numbers": "সংখ্যায় আজ। দিনের খবর, অঙ্কের হিসেবে।",
+  "seg:sports": "আপনি দেখছেন রাষ্ট্রিক্স টোয়েন্টি ফোর সেভেন। এবার খেলার খবর।",
+  "seg:onthisday": "আজকের দিনে, ইতিহাসের পাতা থেকে।",
+  "seg:soth": "এই ঘণ্টার সবচেয়ে বড় খবর, বিস্তারিত।",
+  weather: "এবার আবহাওয়ার খবর।",
+  market: "এক নজরে বাজারের হাল।"
+};
+const linkKey = async (env, id) => (await sha256(`${tvVoice(env, "f")}|link|${rate(env)}|${LINKS[id]}`)).slice(0, 40);
+export async function prepareLinks(env) {
+  if (!ttsEnabled(env)) return { done: 0 };
+  const ids = Object.keys(LINKS), keys = await Promise.all(ids.map(id => linkKey(env, id)));
+  const have = new Set((await env.DB.prepare(`SELECT key FROM tts_audio WHERE key IN (${keys.map(() => "?").join(",")})`).bind(...keys).all()).results.map(r => r.key));
+  let done = 0, chars = 0;
+  for (const [i, id] of ids.entries()) {
+    if (have.has(keys[i]) || done >= 4) continue;
+    const audio = await synthesize(env, LINKS[id], tvVoice(env, "f"), "bn-IN", rate(env));
+    await env.DB.prepare("INSERT OR REPLACE INTO tts_audio (key,voice,chars,data) VALUES (?,?,?,?)").bind(keys[i], tvVoice(env, "f"), LINKS[id].length, audio.buffer).run();
+    done++; chars += LINKS[id].length;
+  }
+  if (chars) await chargeVoice(env, chars);
+  return { done, chars };
+}
+// The links that are ready: id → the recording's address.
+export async function readyLinks(env) {
+  const ids = Object.keys(LINKS), keys = await Promise.all(ids.map(id => linkKey(env, id)));
+  const have = new Set((await env.DB.prepare(`SELECT key FROM tts_audio WHERE key IN (${keys.map(() => "?").join(",")})`).bind(...keys).all().catch(() => ({ results: [] }))).results.map(r => r.key));
+  return Object.fromEntries(ids.map((id, i) => [id, have.has(keys[i]) ? `/api/tv/voice/${keys[i]}.mp3` : ""]).filter(([, u]) => u));
+}

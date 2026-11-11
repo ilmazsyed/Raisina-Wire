@@ -1085,3 +1085,49 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .sg.v .sg-lead .s2{background:linear-gradient(160deg,transparent 60%,#D4A017 60% 61.2%,transparent 61.2%)}
 .sg.v .sg-lead-in{left:56px;right:56px;width:auto;top:400px;bottom:auto}
 .sg.v .sg-photo b{left:56px;right:56px;bottom:340px}
+/* ---------- Cues over videos: countdown to the bulletin, "এরপর" teases ---------- */
+.tvp-cd{position:absolute;left:40px;top:122px;z-index:6;display:flex;align-items:center;gap:10px;padding:8px 18px 8px 12px;border-radius:999px;background:rgba(10,2,3,.82);border:2px solid rgba(212,160,23,.7);color:#fff;font:800 26px "Hind Siliguri",sans-serif;animation:unslide .5s cubic-bezier(.2,.9,.2,1) both}
+.tvp-cd .lt-pulse{position:static;width:12px;height:12px}
+.tvp-tease{position:absolute;right:56px;bottom:318px;z-index:6;display:flex;align-items:stretch;border-radius:12px;overflow:hidden;box-shadow:0 14px 34px rgba(0,0,0,.45);animation:tvin .6s cubic-bezier(.2,.8,.2,1) both}
+.tvp-tease span{display:flex;align-items:center;padding:10px 18px;background:#c8100f;color:#fff;font:800 28px "Hind Siliguri",sans-serif}
+.tvp-tease b{display:flex;align-items:center;padding:10px 24px;background:#fff;color:#111;font:800 34px "Hind Siliguri",sans-serif;border-bottom:4px solid #D4A017}
+.tvp.lb-auto .tvp-tease,.tvp.lb-auto .tvp-cd{opacity:0;transition:opacity .3s}
+.tvp-v .tvp-cd{left:44px;top:250px}
+.tvp-v .tvp-tease{right:44px;bottom:470px}
+/* ---------- Channel ID versions ---------- */
+.cid-art{position:absolute!important;inset:0;width:100%;height:100%;z-index:0!important;pointer-events:none}
+.cid-v1{background:linear-gradient(180deg,#05010a 0%,#2a0207 55%,#5a0a10 100%)}
+.cid-art.sky{animation:cidrise 1.4s cubic-bezier(.2,.9,.2,1) both}
+@keyframes cidrise{from{transform:translateY(80px);opacity:0}}
+.cid-v2{background:radial-gradient(ellipse at 50% 30%,#6a0608 0%,#250103 60%,#070203 100%)}
+.cid-art.river path{animation:cidwave 4s linear infinite}
+.cid-art.river .w2{animation-duration:5.5s}.cid-art.river .w3{animation-duration:7s}
+@keyframes cidwave{to{transform:translateX(-480px)}}
+.cid-v3{background:radial-gradient(ellipse at 50% 60%,#5a0507 0%,#1e0103 60%,#070203 100%)}
+.cid-art.map circle{animation:cidpop .4s calc(var(--i)*12ms) ease-out both}
+.cid-art.map .kol{animation:cidkol 1.4s .6s ease-in-out infinite}
+@keyframes cidpop{from{opacity:0;transform:scale(0)}}
+@keyframes cidkol{50%{opacity:.35}}
+.cid-v4{background:linear-gradient(135deg,#120203,#5a0a10)}
+.cid-art.lines line{stroke-dasharray:1600;stroke-dashoffset:1600;animation:cidline 1.2s calc(var(--i)*60ms) cubic-bezier(.2,.9,.2,1) forwards}
+@keyframes cidline{to{stroke-dashoffset:0}}
+.cid-v1 .cid-ring,.cid-v2 .cid-ring,.cid-v3 .cid-ring,.cid-v4 .cid-ring{opacity:.35}
+.cid-art.map .pulse{transform-origin:960px 440px;animation:cidpulse 2.4s calc(var(--i)*.8s) ease-out infinite;opacity:0}
+@keyframes cidpulse{0%{transform:scale(.6);opacity:.8}100%{transform:scale(3.2);opacity:0}}
+/* ---------- Audience on air: poll heading, poll bar and comment box over videos ---------- */
+.poll-head{position:absolute;left:0;right:0;top:150px;z-index:3;text-align:center;font:900 64px "Hind Siliguri",sans-serif;color:#f2c14e;text-shadow:0 6px 24px rgba(0,0,0,.5);animation:nupop .5s .2s cubic-bezier(.2,1.5,.4,1) both}
+.tvp-cm{position:absolute;right:56px;top:150px;z-index:6;width:620px;animation:tvin .6s cubic-bezier(.2,.8,.2,1) both}
+.tvp-cm .poll-bar{position:static;width:auto}
+.cm-one{display:flex;flex-direction:column;gap:8px;padding:16px 22px;border-radius:14px;background:rgba(255,255,255,.96);color:#111;border-left:8px solid #c8100f;box-shadow:0 14px 34px rgba(0,0,0,.4)}
+.cm-one span{align-self:flex-start;padding:4px 12px;border-radius:8px;background:#c8100f;color:#fff;font:800 22px "Hind Siliguri",sans-serif}
+.cm-one p{margin:0;font:600 32px/1.35 "Hind Siliguri",sans-serif;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.cm-one p b{margin-right:10px;color:#c8100f}
+.cm-one small{font:600 20px "Hind Siliguri",sans-serif;color:#666}
+.tvp.lb-auto .tvp-cm{opacity:0;transition:opacity .3s}
+.tvp-v .tvp-cm{right:44px;left:44px;width:auto;top:300px}
+.poll-auto{position:absolute;inset:0;overflow:hidden}
+.poll-auto .poll-head{top:170px}
+.poll-auto .poll-full{inset:280px 160px 200px;box-shadow:0 0 0 4px rgba(212,160,23,.8),0 30px 70px rgba(0,0,0,.45)}
+.poll-auto.v .poll-full{inset:440px 50px 560px}
+.poll-auto.v .poll-head{top:320px;font-size:52px}
+.tvp-cm{top:230px}

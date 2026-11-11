@@ -357,7 +357,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       <div class="tvp-bg"><i class="dots"></i><i class="arc a1"></i><i class="arc a2"></i><i class="sheen"></i></div>
       ${mode === "app" ? `<div class="tvp-ytlayer" hidden><div class="tvs-ytwrap"><div class="tvs-yt"></div></div><div class="tvp-shield"></div></div>` : ""}
       <div class="tvp-stage"></div>
-      <div class="tvp-lbl"></div><div class="tvp-gfx"></div><div class="tvp-ovl"></div>
+      <div class="tvp-lbl"></div><div class="tvp-gfx"></div><div class="tvp-ovl"></div><div class="tvp-cd" hidden></div><div class="tvp-tease" hidden></div><div class="tvp-cm" hidden></div>
       <div class="tv-bug tv-bug-fixed"><img src="${LOGO}" alt=""></div>
       <div class="tv-mkt" hidden><span class="mkt-label" data-no-tr>MARKETS</span><div class="mkt-track"></div></div>
       <div class="tvp-standby" hidden><img src="${LOGO}" alt=""><b>অনুষ্ঠান একটু পরেই</b><small>আমাদের সঙ্গে থাকুন</small></div>
@@ -687,7 +687,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if ((x.lines || []).length >= 3) items.push({ pts: x.lines.slice(1, 4), d0: 9 });
       for (const im of (x.images || []).slice(1, 3)) items.push({ photo: im, title: x.t, d0: 6 });
       if (items.length < 3) return null;
-      return { name, items: items.map(i => ({ ...i })), dur: 4 + items.reduce((a, b) => a + b.d0, 0) };
+      const head = st.tv?.links?.["seg:soth"] ? 5.5 : 4;
+      return { name, head, items: items.map(i => ({ ...i })), dur: head + items.reduce((a, b) => a + b.d0, 0) };
     }
     if (name === "city") {
       const wx = (st.tv?.weatherPlaces || []).filter(w => w.zone === "wb").slice(0, 4);
@@ -700,8 +701,22 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const need = { kolkata10: 4, numbers: 2, onthisday: 1 }[name] ?? 2;
       if (items.length < need) return null;
     }
-    const secs = items.map(x => x.secs ? Math.max(6, Math.min(14, x.secs + 1.2)) : SEG_ITEM[name] || 9);
-    return { name, items: items.map((x, i) => ({ ...x, d0: secs[i] })), dur: 4 + secs.reduce((a, b) => a + b, 0) };
+    const secs = items.map(x => x.secs ? Math.max(6, Math.min(14, x.secs + 1.2)) : SEG_ITEM[name] || 9), head = st.tv?.links?.[`seg:${name}`] ? 5.5 : 4;
+    return { name, head, items: items.map((x, i) => ({ ...x, d0: secs[i] })), dur: head + secs.reduce((a, b) => a + b, 0) };
+  }
+  // The audience on air: the open poll (the newest) full screen at :20 and :50, its bar over the
+  // videos for the next eight minutes, and its result at :28 and :58 (within six minutes of each).
+  const openPoll = () => (st.tv?.polls || []).find(p => p.status === "open" && p.options?.length >= 2);
+  function pollDue(t, q) {
+    const p = openPoll(); if (!p || q.resume || (q.pending || []).length || q.item?.type === "upnext" || q.item?.type === "poll") return null;
+    const half = Math.floor(t / 1800e3) * 1800e3; q.segDone ||= [];
+    for (const [m, res] of [[20, false], [28, true]]) {
+      const at = half + m * 60e3;
+      if (t < at || t >= at + 6 * 60e3 || q.segDone.includes(at)) continue;
+      q.segDone = [...q.segDone.slice(-8), at];
+      return { id: p.id, res, dur: res ? 10 : 12 };
+    }
+    return null;
   }
   function segDue(t, q) {
     if (!st.tv?.segs || q.resume || (q.pending || []).length || q.item?.type === "upnext" || q.item?.type === "seg") return null;
@@ -806,11 +821,18 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         : age >= it.dur * 1000;
       if (!done) return q.seg;
     }
+    // A poll or its result whose time has come, when the item on air is done.
+    const pd = pollDue(t, q);
+    if (pd) {
+      q.n++; q.item = { type: "poll", dur: pd.dur }; q.start = t;
+      q.seg = { type: "poll", id: pd.id, res: pd.res, dur: pd.dur, start: t, in: 0, sting: true, n: q.n };
+      return q.seg;
+    }
     // A segment whose slot has come (src/segments.js), when the item on air is done.
     const sd = segDue(t, q);
     if (sd) {
       q.n++; q.item = { type: "seg", dur: sd.dur }; q.start = t;
-      q.seg = { type: "seg", name: sd.name, items: sd.items, dur: sd.dur, start: t, in: 0, sting: true, n: q.n };
+      q.seg = { type: "seg", name: sd.name, head: sd.head, items: sd.items, dur: sd.dur, start: t, in: 0, sting: true, n: q.n };
       const after = loop.slice(q.i).concat(loop.slice(0, q.i)).find(x => x.type === "video");
       st.preWant = after ? { id: after.ytId, at: 0 } : null;
       return q.seg;
@@ -879,7 +901,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const seg = continuitySeg(); if (!seg) return { layout: "graphic", graphic: { kind: "headlines" }, key: "c:none" };
     const transition = seg.sting ? { type: "stinger", ms: 1200 } : { type: "mix", ms: 500 };
     if (seg.type === "video") return { layout: "full", sources: [{ kind: "yt", id: seg.ytId, in: seg.in || 0, title: seg.line || seg.title }], label: seg.line || seg.title, startAt: seg.start, key: `c:${seg.ytId}:${seg.start}`, transition };
-    if (seg.type === "seg") return { layout: "graphic", graphic: { kind: "seg", name: seg.name, items: seg.items }, startAt: seg.start, dur: seg.dur, key: `c:seg:${seg.start}`, transition, full: true };
+    if (seg.type === "poll") return { layout: "graphic", graphic: { kind: "poll", id: seg.id, res: seg.res }, startAt: seg.start, dur: seg.dur, key: `c:poll:${seg.start}`, transition, full: true };
+    if (seg.type === "seg") return { layout: "graphic", graphic: { kind: "seg", name: seg.name, head: seg.head || 4, items: seg.items }, startAt: seg.start, dur: seg.dur, key: `c:seg:${seg.start}`, transition, full: true };
     if (seg.type === "flash") return { layout: "graphic", graphic: { kind: "flash", n: seg.n || 0 }, startAt: seg.start, dur: seg.dur, key: `c:flash:${seg.start}`, transition };
     if (seg.type === "ident") return { layout: "graphic", graphic: { kind: "ident" }, startAt: seg.start, dur: seg.dur, key: `c:ident:${seg.start}`, transition: { type: "mix", ms: 200 }, full: true };
     if (seg.type === "upnext") return { layout: "graphic", graphic: { kind: "upnext", video: seg.video }, startAt: seg.start, dur: seg.dur, key: `c:upnext:${seg.start}`, transition: { type: "mix", ms: 250 }, full: true };
@@ -1006,9 +1029,18 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     return sets.slice(0, st.tv?.sets || 3);
   }
   const setHTML = (name, label, items, step) => `<div class="nu-set"><div class="nu-head"><span>${esc(name)}</span><b>${esc(label)}</b><i style="--d:${step}s"></i></div><ol>${items.map((h, n) => `<li style="--n:${n}"><em>${bnDigits(n + 1)}</em><span>${esc(h)}</span></li>`).join("")}</ol></div>`;
-  const identHTML = () => `<div class="cid${channel === "v" ? " v" : ""}"><i class="cid-beam b1"></i><i class="cid-beam b2"></i><i class="cid-ring"></i><i class="cid-ring r2"></i><i class="cid-ring r3"></i>
+  // The channel ID in five versions, in turn: the classic beams, the city at night (Howrah
+  // Bridge), the river, the map of Bengal, and motion lines. The full logo in every one.
+  const CID_ART = [
+    "",
+    `<svg class="cid-art sky" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMax slice"><path d="M0 1080V860h120v-60h60v60h80v-120h50v120h90v-80h70v80h60V700h40v160h100v-90h60v90h70v-40h40v40" fill="#1a0204"/><g stroke="#f2c14e" stroke-width="7" fill="none" opacity=".8" transform="translate(480 545) scale(.5)"><path d="M760 980V560M1160 980V560M700 600h520M760 600l-300 380M1160 600l300 380M760 700l-220 280M1160 700l220 280M760 600q200 220 400 0"/></g><path d="M1300 1080V820h90v-60h60v60h110V720h50v100h90v-50h80v310z" fill="#1a0204"/><rect y="980" width="1920" height="100" fill="#0e0102"/></svg>`,
+    `<svg class="cid-art river" viewBox="0 0 1920 1080" preserveAspectRatio="none"><g fill="none" stroke-width="5"><path class="w1" d="M-200 820q240-60 480 0t480 0 480 0 480 0 480 0" stroke="rgba(242,193,78,.6)"/><path class="w2" d="M-200 900q240-60 480 0t480 0 480 0 480 0 480 0" stroke="rgba(255,255,255,.35)"/><path class="w3" d="M-200 980q240-60 480 0t480 0 480 0 480 0 480 0" stroke="rgba(242,193,78,.4)"/></g></svg>`,
+    `<svg class="cid-art map" viewBox="0 0 1920 1080"><g stroke="rgba(242,193,78,.14)" stroke-width="2">${Array.from({ length: 13 }, (_, i) => `<line x1="${i * 160}" y1="0" x2="${i * 160}" y2="1080"/>`).join("")}${Array.from({ length: 8 }, (_, i) => `<line x1="0" y1="${i * 160}" x2="1920" y2="${i * 160}"/>`).join("")}</g><g fill="none" stroke="#f2c14e" stroke-width="4">${[0, 1, 2].map(k => `<circle class="pulse" cx="960" cy="440" r="140" style="--i:${k}"/>`).join("")}</g></svg>`,
+    `<svg class="cid-art lines" viewBox="0 0 1920 1080" preserveAspectRatio="none"><g stroke-width="10" stroke-linecap="round">${Array.from({ length: 14 }, (_, i) => `<line x1="${-400 + i * 160}" y1="1180" x2="${400 + i * 160}" y2="-100" stroke="${i % 3 ? "rgba(255,255,255,.12)" : "rgba(242,193,78,.5)"}" style="--i:${i}"/>`).join("")}</g></svg>`
+  ];
+  const identHTML = () => { const n = (st.cidN = ((st.cidN ?? Math.floor(Math.random() * 5)) + 1) % 5); return `<div class="cid cid-v${n}${channel === "v" ? " v" : ""}">${CID_ART[n]}<i class="cid-beam b1"></i><i class="cid-beam b2"></i><i class="cid-ring"></i><i class="cid-ring r2"></i><i class="cid-ring r3"></i>
     <div class="cid-logo"><img src="${LOGO}" alt="Rashtrix 24x7 News"><i class="cid-shine"></i></div>
-    <div class="cid-tag">দেশ প্রথম । বলিদান পরম ধর্ম</div><i class="cid-line"></i><div class="cid-sub" data-no-tr>LIVE · 24×7 · KOLKATA</div></div>`;
+    <div class="cid-tag">দেশ প্রথম । বলিদান পরম ধর্ম</div><i class="cid-line"></i><div class="cid-sub" data-no-tr>LIVE · 24×7 · KOLKATA</div></div>`; };
   function graphic(sc) {
     const g = sc.graphic, el = document.createElement("div"); el.className = "tvp-pkg";
     const wrapV = (inner, band) => channel === "v" ? vJacket(inner, band) : inner;
@@ -1047,7 +1079,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (!st.muted && (mode === "app" || output)) riser(st.audio);
       const count = () => { if (!el.isConnected && st.current) return; const left = Math.max(1, Math.ceil(dur - (now() - (sc.startAt || now())) / 1000)); const b = el.querySelector(".un-count b"); if (b && b.textContent !== bnDigits(left)) b.textContent = bnDigits(left); };
       count(); const t = setInterval(() => el.isConnected ? count() : clearInterval(t), 250);
-    } else if (g.kind === "market") {   // 30 seconds after the weather: the markets
+    } else if (g.kind === "market") {
+      playLink("market", el);   // 30 seconds after the weather: the markets
       const M = st.tv?.market || {}, total = sc.dur || 20;
       const fx = (n, d = 2) => n == null ? "–" : Number(n).toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d });
       const pair = (n, d = 2) => [fx(n, d), bnDigits(fx(n, d))];
@@ -1094,7 +1127,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         stage.append(w); if (!st.muted) whoosh(st.audio);
         setTimeout(paint, 330); setTimeout(() => w.remove(), 900); };
       drawM(); const tm = setInterval(() => el.isConnected ? drawM() : clearInterval(tm), 250);
-    } else if (g.kind === "weather") {   // after each bulletin: the weather, West Bengal then India
+    } else if (g.kind === "weather") {
+      playLink("weather", el);   // after each bulletin: the weather, West Bengal then India
       const P = st.tv?.weatherPlaces || [], total = sc.dur || 45, wb = P.filter(p => p.zone === "wb"), ind = P.filter(p => p.zone === "in");
       const chunk = (a, n) => a.reduce((o, x, i) => (i % n ? o[o.length - 1].push(x) : o.push([x]), o), []);
       // Fast-paced: a short opening, a quick section card (not in the 30-second version), the
@@ -1127,7 +1161,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       drawW(); const tw = setInterval(() => el.isConnected ? drawW() : clearInterval(tw), 250);
     } else if (g.kind === "seg") {   // a segment (src/segments.js): a title card, then its items one by one
       const NAMES = st.tv?.segNames || {}, name = g.name, title = NAMES[name] || "", items = g.items || [], v = channel === "v" ? " v" : "";
-      const starts = []; { let a = 4; for (const x of items) { starts.push(a); a += x.d0; } }
+      const head = g.head || 4, starts = []; { let a = head; for (const x of items) { starts.push(a); a += x.d0; } }
       const kick = { kolkata10: "শহর ও রাজ্যের দশ খবর", world: "দুনিয়ার বড় খবর", bangladesh: "পড়শি দেশের খবর", sports: "মাঠের খবর", numbers: "আজকের খবরের অঙ্ক", onthisday: "ইতিহাসের পাতা থেকে", city: "আবহাওয়া, যাতায়াত, শহর", soth: "বিস্তারিত" }[name] || "";
       const count = n => { const to = Number(n.dataset.to), dec = n.dataset.dec === "1", t0 = performance.now(); const step = t => { if (!n.isConnected) return; const p = Math.min(1, (t - t0) / 1300), e = 1 - Math.pow(1 - p, 3); n.textContent = bnDigits((dec ? (to * e).toFixed(1) : Math.round(to * e)).toLocaleString("en-IN")); if (p < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
       const tIST = v => { try { return bnDigits(new Date(Date.parse(v) + 5.5 * 3600e3).toISOString().slice(11, 16)); } catch { return ""; } };
@@ -1171,7 +1205,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const drawS = () => {
         if (!el.isConnected && st.current) { tok.off = true; try { tok.src?.stop(); } catch { /* done */ } return; }
         const e = (now() - (sc.startAt || now())) / 1000, box = el.querySelector(".sg"); if (!box) return;
-        if (e >= 3.4) box.classList.add("on");
+        if (e >= head - 0.6) box.classList.add("on");
         let i = -1; for (let j = 0; j < starts.length; j++) if (e >= starts[j]) i = j;
         if (i <= shownI) return;   // forward only: a clock correction never steps back
         if (i >= 0) box.classList.add("on");
@@ -1184,6 +1218,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         say(items[i]);
       };
       drawS(); const tS = setInterval(() => el.isConnected ? drawS() : (clearInterval(tS), drawS()), 250);
+      if ((now() - (sc.startAt || now())) / 1000 < 2) playLink(`seg:${name}`, el);
       st.resumeVoice = () => { if (el.isConnected && shownI >= 0) say(items[shownI]); };
     } else if (g.kind === "avo") {   // the AVO Breaking Engine: each story 30 seconds, read over its pictures
       const list = (g.stories || []).filter(Boolean), at0 = sc.startAt || now();
@@ -1387,7 +1422,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         ? `<div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${lines.map(t => `<p>${esc(t)}</p>`).join("")}</div><div class="lb-bottom"><b>${esc(g.text || lines[0] || "")}</b><div class="tv-adslot"></div></div>`
         : `<div class="lbv-bottom"><b>${esc(g.text || lines[0] || "")}</b>${lines.slice(0, 3).map(t => `<p>${esc(t)}</p>`).join("")}</div>`;
     } else if (g.kind === "results") el.innerHTML = resultsHTML(g.id, true);
-    else if (g.kind === "poll") el.innerHTML = pollHTML(g.id, true);
+    else if (g.kind === "poll") el.innerHTML = g.res === undefined ? pollHTML(g.id, true) : `<div class="poll-auto${channel === "v" ? " v" : ""}"><i class="sg-bg"></i><div class="poll-head">${g.res ? "জনমতের ফলাফল" : "জনমত · রাষ্ট্রিক্স অ্যাপে ভোট দিন"}</div>${pollHTML(g.id, true)}</div>`;
     return el;
   }
   function resultsHTML(id, full) {
@@ -1415,6 +1450,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // same channel: the red label, the gold progress bars (one per screen) and the logo.
   // The newsreader's readings, decoded once for the sound engine (and kept for the bulletin).
   const voiceCache = new Map();
+  // A voice-over link (src/bulletinvoice.js LINKS) over a title card or an update's opening.
+  const playLink = (id, box) => { const url = st.tv?.links?.[id]; if (!url || st.muted || !st.audio) return; setTimeout(() => voiceBuf(url).then(buf => { if (!buf || st.muted || (box && !box.isConnected)) return; const src = st.audio.createBufferSource(), gn = st.audio.createGain(); gn.gain.value = 1.2; src.buffer = buf; src.connect(gn).connect(st.audio.destination); src.start(); }), 600); };
   const voiceBuf = url => { if (!st.audio) return Promise.resolve(null);
     if (!voiceCache.has(url)) { if (voiceCache.size > 24) voiceCache.delete(voiceCache.keys().next().value);
       voiceCache.set(url, fetch(url).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status)).then(b => new Promise((ok, no) => st.audio.decodeAudioData(b, ok, no))).catch(() => { voiceCache.delete(url); return null; })); }
@@ -1470,6 +1507,49 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const html = adBox(sponsorAd()), turned = st.lastAd !== undefined && st.lastAd !== html;
     stage.querySelectorAll(".tv-adslot").forEach(s => { if (s.__html === html) return; s.innerHTML = html; s.__html = html; if (turned) s.firstElementChild?.classList.add("enter"); });
     st.lastAd = html;
+  }
+  // Cues over a video: the countdown to the next bulletin (its last five minutes), and a tease of
+  // what comes next — the bulletin in its last minute, a segment whose slot has come, or the AVO
+  // stories when they are due after this video (its last twenty-five seconds).
+  function segPeek(t, q) {
+    const half = Math.floor(t / 1800e3) * 1800e3, dp = daypart(t); if (!dp || !st.tv?.segs) return null;
+    for (const k of ["a", "b"]) {
+      const at = half + SLOT_MIN[k] * 60e3;
+      if (t < at - 90e3 || t >= at + 6 * 60e3 || (q.segDone || []).includes(at)) continue;
+      const list = dp[k] || [], r = Math.floor(t / 1800e3) % Math.max(1, list.length);
+      for (const name of [...list.slice(r), ...list.slice(0, r), ...SEG_FALLBACK]) if (segBuild(name)) return { at, name };
+    }
+    return null;
+  }
+  function drawCues() {
+    const cd = $(".tvp-cd"), te = $(".tvp-tease"); if (!cd || !te) return;
+    const q = st.seq, t = now(), onVideo = (mode === "app" || output) && q?.item?.type === "video" && !st.ctl?.breaking && !st.current?.scene?.graphic && !stage.querySelector(".tvp-scene + .tvp-scene");
+    let cdText = "", tease = null;
+    if (onVideo && (st.tv?.bulletin || []).length) {
+      const toQ = (Math.floor(t / QUARTER) * QUARTER + QUARTER - t) / 1000;
+      const left = (q.start + ((q.item.dur || 0) - (q.item.in || 0)) * 1000 - t) / 1000;
+      if (toQ <= 300 && toQ > 60) cdText = `পরের বুলেটিন ${bnDigits(Math.ceil(toQ / 60))} মিনিটে`;
+      if (toQ <= 60) tease = { k: "আসছে", b: "খবরের বুলেটিন" };
+      else {
+        const sp = segPeek(t, q), NAMES = st.tv?.segNames || {};
+        if (sp && (t >= sp.at || sp.at - t <= 90e3)) tease = { k: "একটু পরেই", b: NAMES[sp.name] || "" };
+        else if (left > 0 && left <= 25 && (q.sinceAvo ?? 0) + 1 > avoEvery() - 1 && avoBlock().length) tease = { k: "এরপর", b: "এই মুহূর্তের বড় খবর" };
+      }
+    }
+    // The poll bar over videos for eight minutes after the poll has been on screen.
+    const pb = $(".tvp-cm");
+    if (pb) {
+      const p = openPoll(), half = Math.floor(t / 1800e3) * 1800e3, inVote = p && (q?.segDone || []).includes(half + 20 * 60e3) && t < half + 28 * 60e3;
+      const cms = st.tv?.comments || [], showCm = !inVote && onVideo && cms.length && (q.n % 2 === 0);
+      const into = q ? (t - q.start) / 1000 : 0;
+      let html = "";
+      if (onVideo && inVote) html = pollHTML(p.id, false);
+      else if (showCm && into >= 15 && into < 47) { const c = cms[Math.floor(into / 8 + q.n) % cms.length]; html = `<div class="cm-one"><span>দর্শকের কথা</span><p><b>${esc(c.author)}</b>${esc(c.text)}</p><small>${c.platform === "youtube" ? "ইউটিউব" : c.platform === "facebook" ? "ফেসবুক" : "রাষ্ট্রিক্স অ্যাপ"}</small></div>`; }
+      if (pb.dataset.h !== html) { pb.dataset.h = html; pb.hidden = !html; pb.innerHTML = html; }
+    }
+    if (cd.dataset.t !== cdText) { cd.dataset.t = cdText; cd.hidden = !cdText; cd.innerHTML = cdText ? `<i class="lt-pulse"></i>${esc(cdText)}` : ""; }
+    const key = tease ? `${tease.k}|${tease.b}` : "";
+    if (te.dataset.t !== key) { te.dataset.t = key; te.hidden = !tease; te.innerHTML = tease ? `<span>${esc(tease.k)}</span><b>${esc(tease.b)}</b>` : ""; }
   }
   function drawJacket() {
     let gfx = "", ovl = "";
@@ -1576,7 +1656,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (mode === "app") preloadYT(st.preWant);
     const b = st.ctl?.breaking || st.tv?.breaking;
     if (mode !== "scene" && b && st.shownBreaking !== b.at && now() - Date.parse(b.at) < 90e3) { st.shownBreaking = b.at; showBreaking(b); }
-    drawJacket(); fillAds(); fillWx();
+    drawJacket(); fillAds(); fillWx(); drawCues();
     // Health: a source that has not moved for ten seconds is reported (outputs only).
     const stalled = st.current?.slots.some(s => s.stalled());
     st.stalledSince = stalled ? st.stalledSince || Date.now() : 0;

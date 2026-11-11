@@ -33,6 +33,8 @@ await p.route(/youtube\.com|ytimg|googlevideo/, r => r.abort());
 // (Fetched by the page itself, so it goes through whatever network the browser has.)
 await p.route(/\/api\/tv\/[hv]$/, async r => { const j = JSON.parse(await p.evaluate(u => fetch(`${u}?sim=1`).then(x => x.text()), r.request().url())); j.serverTime = await p.evaluate(() => Date.now()); return r.fulfill({ json: j }); });
 await p.route(/\/api\/ws\//, r => r.abort());
+// The control room's live connection carries the real clock: closed, so the simulated time holds.
+if (p.routeWebSocket) await p.routeWebSocket(/\/api\/ws\//, ws => ws.close());
 // The control room's state, as now, with its clock moved too (else the player takes the real clock).
 await p.route(/\/api\/ctl\/[hv]\/state$/, async r => { const j = JSON.parse(await p.evaluate(u => fetch(`${u}?sim=1`).then(x => x.text()), r.request().url())); j.serverTime = await p.evaluate(() => Date.now()); return r.fulfill({ json: j }); });
 await p.goto(`${SITE}/watch`, { waitUntil: "domcontentloaded" });
@@ -45,9 +47,9 @@ await p.unrouteAll({ behavior: "ignoreErrors" });
 await b.close();
 
 const clock = t => new Date(t + IST).toISOString().slice(11, 19);
-const NAME = { video: "VIDEO", avo: "AVO", upnext: "Up next", flash: "HEADLINES", ident: "Channel ID", bulletin: "BULLETIN", weather: "WEATHER", market: "MARKET" };
+const NAME = { seg: "SEGMENT", poll: "POLL", video: "VIDEO", avo: "AVO", upnext: "Up next", flash: "HEADLINES", ident: "Channel ID", bulletin: "BULLETIN", weather: "WEATHER", market: "MARKET" };
 for (const x of log) {
-  const what = x.type === "avo" ? x.stories.map(s => `${String(s.id).slice(-6)} ${s.dk || "?"}/${s.weight || "?"}`).join(", ") : x.title.slice(0, 60);
+  const what = x.type === "seg" ? `${x.name} (${x.items} items)` : x.type === "poll" ? "poll" : x.type === "avo" ? x.stories.map(s => `${String(s.id).slice(-6)} ${s.dk || "?"}/${s.weight || "?"}`).join(", ") : x.title.slice(0, 60);
   console.log(`${clock(x.start)}  ${String(Math.round(x.dur)).padStart(4)} s  ${(NAME[x.type] || x.type).padEnd(10)} ${x.eg ? "[evergreen] " : ""}${what}`);
 }
 // The checks.
