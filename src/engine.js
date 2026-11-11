@@ -1076,6 +1076,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       };
       list.forEach(x => (x.voice || []).forEach(u => voiceBuf(u)));
       let shownK = -1, shownS = -1;
+      const slideN = new Map();
       const drawA = () => {
         if (!el.isConnected && st.current) return;
         const e = (now() - at0) / 1000; let k = 0; while (k < list.length - 1 && e >= starts[k + 1]) k++;
@@ -1083,9 +1084,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         // A story's slide times are fixed by its length (each slide at least four and a half
         // seconds); a slide still to come takes a picture that finishes loading meanwhile, and a slide
         // on screen never changes.
-        const nS = Math.max(2, Math.min(7, Math.floor(lens[k] / 4.5))), slides = slidesOf(x).slice(0, nS);
+        // A story with few pictures has fewer, longer slides rather than the BREAKING card again; the
+        // count is fixed when the story goes on screen, so the slide times never shift under it.
+        const real = slidesOf(x).filter((sl, i) => !(sl.brk && i > 0));
+        const into = e - starts[k], cap = Math.max(2, Math.min(7, Math.floor(lens[k] / 4.5))), want = Math.max(2, Math.min(cap, real.length));
+        // A picture that finishes loading may add a slide, only when that leaves the slide on screen as it is.
+        if (!slideN.has(k) || (want > slideN.get(k) && (shownS < 0 || Math.floor(into / (lens[k] / want)) === shownS))) slideN.set(k, want);
+        const nS = slideN.get(k), slides = real.slice(0, nS);
         while (slides.length < nS) slides.push({ brk: 2 + slides.length });
-        const into = e - starts[k], si = Math.min(slides.length - 1, Math.max(0, Math.floor(into / (lens[k] / slides.length))));
+        const si = Math.min(slides.length - 1, Math.max(0, Math.floor(into / (lens[k] / slides.length))));
         if (k !== shownK) {
           const first = shownK < 0; shownK = k; shownS = -1;
           // A fresh frame always gets its first slide (a slide drawn into the old frame during the
