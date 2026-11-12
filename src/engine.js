@@ -490,19 +490,22 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const y = st.yt;
       if (!y?.ready || st.ytOwner !== token) return;
       // A record of this start (sent once it plays, or after ten seconds).
-      if (mode === "app" && !st.ytDiag) { st.ytDiag = { t0: Date.now(), pre: y.pre === src.id, preState: y.state, muted: !!st.muted, seq: [] }; setTimeout(() => sendDiag(), 10000); }
+      if (mode === "app" && !st.ytDiag) { st.ytDiag = { t0: Date.now(), preAgo: y.preAt ? Date.now() - y.preAt : -1, rolled: y.rolling === src.id, pre: y.pre === src.id, preState: y.state, muted: !!st.muted, seq: [] }; setTimeout(() => sendDiag(), 8000); }
       try {
         y.ended = false;
-        if (y.pre === src.id) { y.pre = null; y.preloading = false; y.rolling = null; let at = 0; try { at = y.player.getCurrentTime() || 0; } catch { /* none */ } if (Math.abs(at - start) > 0.6) y.player.seekTo(start, true); st.muted ? y.player.mute() : y.player.unMute(); y.player.playVideo(); }
+        if (y.pre === src.id) { y.pre = null; y.preloading = false; y.rolling = null; let at = 0; try { at = y.player.getCurrentTime() || 0; } catch { /* none */ } if (Math.abs(at - start) > 0.6) y.player.seekTo(start, true); st.muted ? y.player.mute() : (y.player.unMute(), diagMark(91)); y.player.playVideo(); }
         else { y.pre = null; y.player.loadVideoById({ videoId: src.id, startSeconds: start }); st.muted ? y.player.mute() : y.player.unMute(); }
       } catch { /* none */ }
       checkStart();
     };
     // Not playing after a moment: try again muted (allowed nearly everywhere), then ask for a tap.
     const checkStart = () => {
-      setTimeout(() => { const y = st.yt; if (!st.alive || st.ytOwner !== token || !y?.ready || [1, 3].includes(y.state)) return; try { y.player.playVideo(); } catch { /* none */ } }, 700);
-      setTimeout(() => { const y = st.yt; if (!st.alive || st.ytOwner !== token || !y?.ready || [1, 3].includes(y.state)) return; if (!st.muted) { soundOff(); try { y.player.mute(); y.player.playVideo(); } catch { /* none */ } } }, 1800);
-      setTimeout(() => { const y = st.yt; if (st.alive && st.ytOwner === token && y && ![1, 3].includes(y.state)) needTap(true); }, 4500);
+      // Not moving after 0.6 s (a phone that will not start a video with sound without a tap in it):
+      // it goes on silently at once, with the "tap for sound" button, rather than holding the
+      // picture; later, a nudge, then a request to tap.
+      setTimeout(() => { const y = st.yt; if (!st.alive || st.ytOwner !== token || !y?.ready || [1, 3].includes(y.state)) return; diagMark(92); try { if (!st.muted) { soundOff(); y.player.mute(); } y.player.playVideo(); } catch { /* none */ } }, 600);
+      setTimeout(() => { const y = st.yt; if (!st.alive || st.ytOwner !== token || !y?.ready || [1, 3].includes(y.state)) return; diagMark(93); try { y.player.mute(); y.player.playVideo(); } catch { /* none */ } }, 1800);
+      setTimeout(() => { const y = st.yt; if (st.alive && st.ytOwner === token && y && ![1, 3].includes(y.state)) { diagMark(94); needTap(true); } }, 4000);
     };
     st.ytLoad = load;
     loadYT().then(YT => {
@@ -537,9 +540,10 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         },
         onStateChange: e => {
           st.yt.state = e.data; st.yt.since = Date.now();
-          if (st.ytDiag) { st.ytDiag.seq.push([Date.now() - st.ytDiag.t0, e.data]); if (e.data === 1 && st.ytOwner) sendDiag(); }
+          if (st.ytDiag) st.ytDiag.seq.push([Date.now() - st.ytDiag.t0, e.data]);
           // A video loaded in advance waits, paused and buffered, until its turn.
           if (st.yt.preloading && !st.ytOwner) { if (e.data === 1) { e.target.pauseVideo(); st.yt.preloading = false; } return; }
+          if (e.data === 2 && st.ytOwner && !st.muted && st.ytDiag && Date.now() - st.ytDiag.t0 < 6000) { diagMark(95); soundOff(); try { e.target.mute(); e.target.playVideo(); } catch { /* none */ } }
           if (e.data === 0) st.yt.ended = true; ytMaskState(layer, e.data, e.data === 1 && !!st.ytPoster?.querySelector(".tvs-poster")); if (e.data === 1) { liftPoster(st.ytPoster); needTap(false); noCaptions(e.target); }
         },
         onError: () => { st.yt.state = 0; st.yt.ended = true; }
@@ -558,17 +562,18 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     y.rolling = y.pre; y.preloading = false;
     try { y.player.mute(); y.player.playVideo(); } catch { /* none */ }
   }
+  const diagMark = m => { const d = st.ytDiag; if (d && !d.sent) d.seq.push([Date.now() - d.t0, m]); };
   function sendDiag(extra = {}) {
     const d = st.ytDiag; if (!d || d.sent) return; d.sent = true; st.ytDiag = null;
     const ua = navigator.userAgent, plat = /iPhone|iPad|iPod/.test(ua) ? "ios" : /Android/.test(ua) ? "android" : /Mac/.test(ua) ? "mac" : /Windows/.test(ua) ? "windows" : "other";
-    const body = JSON.stringify({ plat, ch: channel, pre: d.pre, preState: d.preState, muted: d.muted, seq: d.seq, card: st.lastCardMs || 0, timeout: !!st.lastCardTimeout, ...extra });
+    const body = JSON.stringify({ plat, ch: channel, pre: d.pre, preState: d.preState, preAgo: d.preAgo, rolled: d.rolled, muted: d.muted, seq: d.seq, card: st.lastCardMs || 0, timeout: !!st.lastCardTimeout, ...extra });
     try { navigator.sendBeacon ? navigator.sendBeacon("/api/tv/diag", new Blob([body], { type: "application/json" })) : fetch("/api/tv/diag", { method: "POST", headers: { "content-type": "application/json" }, body, keepalive: true }); } catch { /* none */ }
   }
   function preloadYT(want) {
     if (want && !st.yt && !st.ytOwner && !st.ytMaking) { st.ytMaking = true; loadYT().then(YT => { st.ytMaking = false; if (YT && st.alive && !st.yt && !st.ytOwner) makeYT(YT, want.id, Math.floor(want.at || 0), true); }); return; }
     const y = st.yt;
     if (!want || !y?.ready || st.ytOwner || y.pre === want.id) return;
-    y.pre = want.id; y.preloading = true;
+    y.pre = want.id; y.preloading = true; y.preAt = Date.now();
     $(".tvp-ytlayer")?.classList.add("pre");
     try { y.player.mute(); y.player.loadVideoById({ videoId: want.id, startSeconds: Math.floor(want.at || 0) }); } catch { y.pre = null; y.preloading = false; }
   }
