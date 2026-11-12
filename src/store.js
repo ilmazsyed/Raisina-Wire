@@ -1,13 +1,16 @@
 // Stories as stored in D1, shared by the API (worker.js) and the HTML pages (seo.js).
 import { WRITERS, DEFAULT_WRITER, writer } from "./writers.js";
 
-export const ARTICLE_COLS = "id,slug,kind,title,dek,topic,category,status,image_url,hero_url,hero_caption,video_url,source_url,published_at,updated_at,writer,tags,alert_state,text_hash,lang,origin,corrected_at,correction_note,pulled_at,length(body) AS body_length";
+export const ARTICLE_COLS = "id,slug,kind,title,dek,topic,category,status,image_url,hero_url,hero_caption,video_url,source_url,published_at,updated_at,writer,tags,alert_state,text_hash,lang,origin,corrected_at,correction_note,pulled_at,hidden_langs,length(body) AS body_length";
 // Every kind of story (the desk's articles, wire rewrites and briefs) lives at /article/<slug>.
 export const storyPath = row => `/article/${encodeURIComponent(row.slug)}`;
 // Wire rewrites and briefs carry no photos: they show a branded text card instead.
 export const isWireKind = kind => kind === "rewrite" || kind === "brief";
 export const readMinutes = chars => Math.max(2, Math.round((chars || 0) / 1300));
 
+
+// Whether a story is shown in a language's edition (the owner can hide it in one language).
+export const shownIn = (a, lang) => !!a && !(a.hiddenLangs || []).includes(lang);
 
 export function toArticle(row, { body = false } = {}) {
   const w = writer(row.writer), wire = isWireKind(row.kind);
@@ -18,6 +21,7 @@ export function toArticle(row, { body = false } = {}) {
     image: wire ? "" : row.image_url || row.hero_url || "",
     lang: row.lang || "bn", origin: row.origin || "desk", correctedAt: row.corrected_at || "", correctionNote: row.correction_note || "",
     sourceUrl: row.source_url || "", publishedAt: row.published_at, updatedAt: row.updated_at,
+    hiddenLangs: String(row.hidden_langs || "").split(",").filter(Boolean),
     writer: w.key, author: w.name, status: row.status, tags: splitTags(row.tags), alertState: row.alert_state || "", textHash: row.text_hash || "",
     scheduled: row.status === "published" && !!row.published_at && row.published_at > new Date().toISOString(),
     bodyLength: row.body_length ?? (row.body || "").length, readMinutes: readMinutes(row.body_length ?? (row.body || "").length)

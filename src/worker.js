@@ -35,6 +35,7 @@ import m0033 from "../migrations/0033_avo_manual.sql";
 import m0034 from "../migrations/0034_avo_pictures.sql";
 import m0035 from "../migrations/0035_tv_evergreen.sql";
 import m0036 from "../migrations/0036_avo_updates.sql";
+import m0037 from "../migrations/0037_hidden_langs.sql";
 import { bulletinImages, bulletinImageRoute } from "./bulletinimg.js";
 import { prepareBulletinVoices, prepareLinks, voiceRoute } from "./bulletinvoice.js";
 import { avoStep, avoImageRoute, avoPlayed, avoLog, avoFromBreaking, avoManualAdd, avoManualEdit, avoManualDelete } from "./avo.js";
@@ -52,7 +53,7 @@ import { parseYouTubeRef, refreshSources, refreshSource, playlistTitle, ytUsage,
 import { setGuestWriters, isBuiltIn } from "./writers.js";
 import { recordEvent, audienceReport, countPush } from "./audience.js";
 import { handleTts } from "./tts.js";
-import { ARTICLE_COLS, toArticle, listPublished, getBySlug, splitTags, tagSlug, isPublic, textHash, WRITERS, DEFAULT_WRITER } from "./store.js";
+import { ARTICLE_COLS, toArticle, listPublished, getBySlug, splitTags, tagSlug, isPublic, textHash, WRITERS, DEFAULT_WRITER, shownIn } from "./store.js";
 import { LANGS, PAGE_LANGS, isLang, localiseArticles, localisePage, PAGES, pageVer } from "./translate.js";
 import { mtReady, translateFields, translateBody } from "./mt.js";
 import { vapidKeys, createAlert, drainAlerts } from "./push.js";
@@ -100,7 +101,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031], ["0032_avo.sql", m0032], ["0033_avo_manual.sql", m0033], ["0034_avo_pictures.sql", m0034], ["0035_tv_evergreen.sql", m0035], ["0036_avo_updates.sql", m0036]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031], ["0032_avo.sql", m0032], ["0033_avo_manual.sql", m0033], ["0034_avo_pictures.sql", m0034], ["0035_tv_evergreen.sql", m0035], ["0036_avo_updates.sql", m0036], ["0037_hidden_langs.sql", m0037]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -342,7 +343,7 @@ async function mtWarm(env) {
       await mtLive(env, lang, c, ups.results);
     }
     }
-    const list = (await localiseArticles(env, lang, await listPublished(env, { limit: 40 }))).filter(a => a.original !== lang && a.lang === a.original);
+    const list = (await localiseArticles(env, lang, (await listPublished(env, { limit: 40 })).filter(a => shownIn(a, lang)))).filter(a => a.original !== lang && a.lang === a.original);
     const at = (Math.floor(Date.now() / 300e3) * 3) % Math.max(list.length, 1);
     for (const a of list.slice(at, at + 3)) { const full = await getBySlug(env, a.slug); if (full) await mtArticles(env, lang, [{ ...full, original: full.lang || "bn", lang: full.lang || "bn" }]); }
   }
@@ -737,7 +738,7 @@ async function api(request, env, ctx) {
     const w = url.searchParams.get("writer");
     const list = await listPublished(env, { writerKey: WRITERS.some(x => x.key === w) ? w : null, tag: url.searchParams.get("tag"), limit: 300 });
     const lang = reqLang(url);
-    const out = await localiseArticles(env, lang, list);
+    const out = await localiseArticles(env, lang, list.filter(a => shownIn(a, lang)));
     // Stories without a version in the reader's language: readers get what is already machine-
     // translated at once; the rest is translated in the background and switches on the next refresh.
     {
@@ -757,14 +758,17 @@ async function api(request, env, ctx) {
     if (!a) return err("Article not found.", 404);
     if (!isPublic(a) && !isStaff(await currentUser(request, env))) return err("Article not found.", 404);
     const lang = reqLang(url);
+    const hiddenHere = !shownIn(a, lang);
+    if (hiddenHere && !isOwner(env, await currentUser(request, env))) return err("Article not found.", 404);
     const [localised] = await localiseArticles(env, lang, [a]);
+    if (hiddenHere) localised.hiddenHere = true;
     let article = localised;
     // Languages this story can be read in, and its public corrections.
     const { results: have } = await env.DB.prepare("SELECT lang FROM translations WHERE kind='article' AND ref=? AND title<>''").bind(a.id).all();
     localised.versions = [...new Set([a.lang, ...have.map(r => r.lang)])];
     const { results: fixes } = await env.DB.prepare("SELECT note,created_at AS at FROM corrections WHERE article_id=? AND action='correct' AND public=1 AND note<>'' ORDER BY created_at DESC LIMIT 10").bind(a.id).all();
     localised.corrections = fixes;
-    if (localised.original !== lang && localised.lang === localised.original && mtReady(env)) {
+    if (!hiddenHere && localised.original !== lang && localised.lang === localised.original && mtReady(env)) {
       // A few seconds to translate a story nobody has opened in this language yet; if it takes
       // longer the English is shown (marked) and the translation finishes in the background.
       const copy = { ...localised }, job = mtArticles(env, lang, [copy]);
@@ -947,7 +951,16 @@ async function api(request, env, ctx) {
     const ok = (out = {}) => { clearTvCache(); return json({ ok: true, ...out }, 200, { "cache-control": "no-store" }); };
     if (request.method === "GET" && !action) {
       return json({ story: { id: c.id, slug: c.slug, kind: c.kind, title: c.title, dek: c.dek || "", body: c.body || "", category: c.category, status: c.status, pulled: !!c.pulled_at,
-        lang: c.lang, image: c.image_url || c.hero_url || "", wire: ["rewrite", "brief"].includes(c.kind), alertState: c.alert_state || "", publishedAt: c.published_at, correctedAt: c.corrected_at || "" } }, 200, { "cache-control": "no-store" });
+        lang: c.lang, image: c.image_url || c.hero_url || "", wire: ["rewrite", "brief"].includes(c.kind), alertState: c.alert_state || "", publishedAt: c.published_at, correctedAt: c.corrected_at || "",
+        hiddenLangs: String(c.hidden_langs || "").split(",").filter(Boolean) } }, 200, { "cache-control": "no-store" });
+    }
+    // Earlier versions: the text as it was before each edit, correction, roll-back, pull or delete.
+    if (request.method === "GET" && action === "versions") {
+      const { results } = await env.DB.prepare("SELECT id, action, note, before_title AS title, substr(before_body,1,240) AS preview, created_at AS at FROM corrections WHERE article_id=? AND before_body<>'' ORDER BY created_at DESC, rowid DESC LIMIT 30").bind(c.id).all();
+      // Only versions that differ from the text now, the newest of each.
+      const seen = new Set([`${c.title}\u0000${String(c.body || "").slice(0, 240)}`]), out = [];
+      for (const r of results) { const k = `${r.title}\u0000${r.preview}`; if (!seen.has(k)) { seen.add(k); out.push(r); } }
+      return json({ versions: out }, 200, { "cache-control": "no-store" });
     }
     if (request.method !== "POST") return err("Not available.", 405);
     const b = await request.json().catch(() => ({})), at = new Date().toISOString();
@@ -974,6 +987,31 @@ async function api(request, env, ctx) {
       await env.DB.prepare("DELETE FROM avo_stories WHERE article_id=? AND origin='auto'").bind(c.id).run().catch(() => {});
       await audit(env, user, "owner.edit", "article", c.id, { title, note });
       return ok();
+    }
+    if (action === "rollback") {
+      // Back to an earlier text (headline and body). The text now is kept as a version too, so a
+      // roll-back can itself be undone. TV reads the restored text.
+      const v = await env.DB.prepare("SELECT before_title, before_body FROM corrections WHERE id=? AND article_id=?").bind(String(b.version || ""), c.id).first();
+      if (!v || !v.before_body) return err("That version was not found.");
+      const text = { title: v.before_title, dek: c.dek, topic: c.topic, tags: c.tags, body: v.before_body, hero_caption: c.hero_caption };
+      await env.DB.batch([
+        env.DB.prepare("UPDATE articles SET title=?,body=?,text_hash=?,updated_at=? WHERE id=?").bind(v.before_title, v.before_body, await textHash(text), at, c.id),
+        env.DB.prepare("DELETE FROM translations WHERE kind='article' AND ref=? AND model IN ('gemini','indictrans2')").bind(c.id),
+        log("rollback")
+      ]);
+      await env.DB.prepare("DELETE FROM avo_stories WHERE article_id=? AND origin='auto'").bind(c.id).run().catch(() => {});
+      await audit(env, user, "owner.rollback", "article", c.id, { version: b.version, title: v.before_title });
+      return ok();
+    }
+    if (action === "lang") {
+      // Hide the story in one language's edition, or show it there again. Its own language stays.
+      const l = String(b.lang || "");
+      if (!LANGS.includes(l) || l === (c.lang || "bn")) return err("That language cannot be changed for this story.");
+      const set = new Set(String(c.hidden_langs || "").split(",").filter(Boolean));
+      b.hide ? set.add(l) : set.delete(l);
+      await env.DB.prepare("UPDATE articles SET hidden_langs=?, updated_at=? WHERE id=?").bind([...set].join(","), at, c.id).run();
+      await audit(env, user, b.hide ? "owner.hide-lang" : "owner.show-lang", "article", c.id, { lang: l, title: c.title });
+      return ok({ hiddenLangs: [...set] });
     }
     if (action === "pull") {
       await env.DB.batch([env.DB.prepare("UPDATE articles SET status='archived', pulled_at=?, updated_at=? WHERE id=?").bind(at, at, c.id), log("pull")]);

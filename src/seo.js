@@ -4,7 +4,7 @@
 // a Google News sitemap, robots.txt and an RSS feed.
 // Bengali pages live at the bare addresses; English under /en/, Hindi under /hi/.
 import { ABOUT, LEGAL, LEGAL_ORDER, LEGAL_UPDATED } from "./legal.js";
-import { listPublished, getBySlug, textBlocks, isPublic, tagSlug, WRITERS, writer } from "./store.js";
+import { listPublished, getBySlug, textBlocks, isPublic, tagSlug, WRITERS, writer, shownIn } from "./store.js";
 import { LANGS, PAGE_LANGS, localiseArticles, articleTranslations, localisePage } from "./translate.js";
 import { DESKS } from "./feeds.js";
 
@@ -79,7 +79,7 @@ async function pageFor(path, url, env, o, lang) {
   const site = SITE[lang];
 
   if (!section) {
-    const stories = await localiseArticles(env, lang, await listPublished(env, { limit: 40 })), t = HOME[lang];
+    const stories = await localiseArticles(env, lang, (await listPublished(env, { limit: 40 })).filter(a => shownIn(a, lang))), t = HOME[lang];
     return { title: t.title, description: t.description, alternates: LANGS,
       ld: [{ "@context": "https://schema.org", "@graph": [organization(o),
         { "@type": "WebSite", "@id": `${o}${prefixed(lang, "/")}#website`, url: o + prefixed(lang, "/"), name: site, description: t.description, inLanguage: LOCALES[lang], publisher: { "@id": `${o}/#organization` },
@@ -92,10 +92,10 @@ async function pageFor(path, url, env, o, lang) {
 
   if ((section === "article" || section === "edition") && arg) {
     let a = await getBySlug(env, arg);
-    if (!isPublic(a)) return { status: 404, title: `404 · ${site}`, description: "", noindex: true, body: `<h1>404</h1><p><a href="${prefixed(lang, "/")}">${esc(site)}</a></p>` };
+    if (!isPublic(a) || !shownIn(a, lang)) return { status: 404, title: `404 · ${site}`, description: "", noindex: true, body: `<h1>404</h1><p><a href="${prefixed(lang, "/")}">${esc(site)}</a></p>` };
     if (a.href !== path) return { redirect: prefixed(lang, a.href) };
     const versions = [a.lang];
-    for (const l of LANGS) if (l !== a.lang && (await articleTranslations(env, l, [a])).size) versions.push(l);
+    for (const l of LANGS) if (l !== a.lang && shownIn(a, l) && (await articleTranslations(env, l, [a])).size) versions.push(l);
     [a] = await localiseArticles(env, lang, [a]);
     // No version in this language: the page points search engines at the original.
     if (a.lang !== lang) return { canonicalPath: prefixed(a.lang, a.href), alternates: [], title: `${a.title} · ${site}`, description: clip(a.dek || a.title, 160), contentLang: LOCALES[a.lang], body: `<article><h1>${esc(a.title)}</h1>${a.dek ? `<p class="ssr-dek">${esc(a.dek)}</p>` : ""}${blocksHTML(textBlocks(a.body))}</article>` };
@@ -125,7 +125,7 @@ async function pageFor(path, url, env, o, lang) {
   if (section === "desk" && arg) {
     const desk = DESKS.find(d => DESK_SLUGS[d] === arg);
     if (!desk) return { status: 404, title: `404 · ${site}`, description: "", noindex: true, body: "<h1>404</h1>" };
-    const stories = (await localiseArticles(env, lang, await listPublished(env, { limit: 300 }))).filter(s => s.category === desk).slice(0, 60);
+    const stories = (await localiseArticles(env, lang, (await listPublished(env, { limit: 300 })).filter(a => shownIn(a, lang)))).filter(s => s.category === desk).slice(0, 60);
     const name = DESK_NAMES[lang][desk];
     const BN_OF = { Kolkata: "কলকাতার", "West Bengal": "পশ্চিমবঙ্গের", India: "ভারতের", "Probashi Bangali": "প্রবাসী বাঙালির", World: "বিশ্বের", Entertainment: "বিনোদনের", Sports: "খেলার", Lifestyle: "জীবনধারার" };
     const title = { bn: `${BN_OF[desk]} খবর · ${site}`, en: `${name} news · ${site}`, hi: `${name} समाचार · ${site}` }[lang];
@@ -136,7 +136,7 @@ async function pageFor(path, url, env, o, lang) {
   }
 
   if (section === "live" || section === "briefs") {
-    const stories = (await localiseArticles(env, lang, await listPublished(env, { limit: 120 }))).filter(s => section === "briefs" ? s.kind === "brief" : true).slice(0, 60);
+    const stories = (await localiseArticles(env, lang, (await listPublished(env, { limit: 120 })).filter(a => shownIn(a, lang)))).filter(s => section === "briefs" ? s.kind === "brief" : true).slice(0, 60);
     const title = section === "briefs" ? { bn: "সংক্ষেপে: ১০০ শব্দে খবর", en: "Briefs: the news in 100 words", hi: "संक्षेप में: 100 शब्दों में खबर" }[lang] : { bn: "সর্বশেষ খবর", en: "Latest news", hi: "ताज़ा खबरें" }[lang];
     return { title: `${title} · ${site}`, alternates: LANGS, description: HOME[lang].description, body: `<h1>${esc(title)}</h1>${storyList(stories, lang)}` };
   }
@@ -144,14 +144,14 @@ async function pageFor(path, url, env, o, lang) {
   if (section === "tag" && arg) {
     const t = (await allTags(env)).find(x => x.slug === arg);
     if (!t) return { status: 404, title: `404 · ${site}`, description: "", noindex: true, body: "<h1>404</h1>" };
-    const stories = await localiseArticles(env, lang, await listPublished(env, { tag: t.name, limit: 200 }));
+    const stories = await localiseArticles(env, lang, (await listPublished(env, { tag: t.name, limit: 200 })).filter(a => shownIn(a, lang)));
     return { title: `${t.name} · ${site}`, alternates: LANGS, description: clip(stories.slice(0, 3).map(x => x.title).join("; "), 160), body: `<h1>${esc(t.name)}</h1>${storyList(stories, lang)}` };
   }
 
   if (section === "author" && arg) {
     const w = WRITERS.find(x => x.key === arg);
     if (!w) return { status: 404, title: `404 · ${site}`, description: "", noindex: true, body: "<h1>404</h1>" };
-    const stories = await localiseArticles(env, lang, await listPublished(env, { writerKey: w.key, limit: 200 }));
+    const stories = await localiseArticles(env, lang, (await listPublished(env, { writerKey: w.key, limit: 200 })).filter(a => shownIn(a, lang)));
     return { title: `${w.name} · ${site}`, alternates: LANGS, description: clip(w.bio, 160), type: "profile",
       ld: [{ "@context": "https://schema.org", "@graph": [{ "@type": "ProfilePage", url: `${o}${prefixed(lang, `/author/${w.key}`)}`, mainEntity: personLd(o, w) }, organization(o)] }],
       body: `<h1>${esc(w.name)}</h1><p>${esc(w.role)}</p><p>${esc(w.bio)}</p>${storyList(stories, lang)}` };
@@ -269,7 +269,7 @@ export async function sitemap(request, env, ensureSchema) {
     ...LEGAL_ORDER.flatMap(([k]) => [[`/${k}`, LEGAL_UPDATED, "yearly", "0.2", null, ["bn", "en"], `/${k}`], [`/en/${k}`, LEGAL_UPDATED, "yearly", "0.2", null, ["bn", "en"], `/${k}`]]),
     ...WRITERS.map(w => [`/author/${w.key}`, newest, "weekly", "0.5", null, null, `/author/${w.key}`]),
     ...(await allTags(env)).map(t => [`/tag/${t.slug}`, newest, "weekly", "0.4", null, null, `/tag/${t.slug}`]),
-    ...stories.flatMap(s => { const langs = [s.lang, ...LANGS.filter(l => l !== s.lang && tr[l].has(s.id))]; return langs.map(l => [prefixed(l, s.href), s.updatedAt || s.publishedAt, "monthly", "0.8", s, langs, s.href]); }),
+    ...stories.flatMap(s => { const langs = [s.lang, ...LANGS.filter(l => l !== s.lang && tr[l].has(s.id) && shownIn(s, l))]; return langs.map(l => [prefixed(l, s.href), s.updatedAt || s.publishedAt, "monthly", "0.8", s, langs, s.href]); }),
     ...cover.map(c => [`/coverage/${encodeURIComponent(c.slug)}`, c.updated_at, "hourly", "0.6", null, null, ""]),
     ...posts.map(p => [`/discussion/${encodeURIComponent(p.id)}`, p.created_at, "weekly", "0.3", null, null, ""])
   ];
@@ -284,7 +284,7 @@ export async function newsSitemap(request, env, ensureSchema) {
   await ensureSchema(env);
   const stories = await listPublished(env, { since: new Date(Date.now() - 2 * 864e5).toISOString(), limit: 1000 });
   const all = [];
-  for (const l of LANGS) all.push(...(await localiseArticles(env, l, stories)).filter(s => s.lang === l && s.publishedAt));
+  for (const l of LANGS) all.push(...(await localiseArticles(env, l, stories.filter(a => shownIn(a, l)))).filter(s => s.lang === l && s.publishedAt));
   return xmlResponse(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
 ${all.map(s => `<url><loc>${xml(o + prefixed(s.lang, s.href))}</loc><news:news><news:publication><news:name>${xml(SITE[s.lang])}</news:name><news:language>${s.lang}</news:language></news:publication><news:publication_date>${xml(s.publishedAt)}</news:publication_date><news:title>${xml(s.title)}</news:title></news:news></url>`).join("\n")}
 </urlset>`);
@@ -310,7 +310,7 @@ export async function feed(request, env, ensureSchema) {
   const o = origin(request, env);
   await ensureSchema(env);
   const lang = ["en", "hi"].includes(new URL(request.url).searchParams.get("lang")) ? new URL(request.url).searchParams.get("lang") : DEFAULT;
-  const stories = (await localiseArticles(env, lang, await listPublished(env, { limit: 50 })));
+  const stories = (await localiseArticles(env, lang, (await listPublished(env, { limit: 50 })).filter(a => shownIn(a, lang))));
   return xmlResponse(`<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/">
 <channel><title>${xml(SITE[lang])}</title><link>${o}${prefixed(lang, "/")}</link><description>${xml(HOME[lang].description)}</description><language>${LOCALES[lang].toLowerCase()}</language>
 <atom:link href="${o}/feed.xml${lang === DEFAULT ? "" : `?lang=${lang}`}" rel="self" type="application/rss+xml"/><image><url>${o}/icon-192.png</url><title>${xml(SITE[lang])}</title><link>${o}/</link></image>
