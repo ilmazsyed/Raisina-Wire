@@ -220,7 +220,7 @@ const pathWords = u => { try { const x = new URL(u); return decodeURIComponent(x
 // The lead photo of a page, with what the page says about it.
 async function pageMeta(url) {
   const r = await fetch(url, { headers: { "user-agent": BROWSER_UA, accept: "text/html" }, redirect: "follow", signal: AbortSignal.timeout(8000) });
-  if (!r.ok || !/html/i.test(r.headers.get("content-type") || "")) return null;
+  if (!r.ok || !/html/i.test(r.headers.get("content-type") || "")) return { failed: true };
   const html = (await r.text()).slice(0, 300000), dec = s => String(s || "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
   const meta = name => dec(html.match(new RegExp(`<meta[^>]+(?:property|name|itemprop)=["']${name}["'][^>]*content=["']([^"']*)["']`, "i"))?.[1]
     || html.match(new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]*(?:property|name|itemprop)=["']${name}["']`, "i"))?.[1] || "");
@@ -309,14 +309,16 @@ export async function checkedPhotos(env, story, want = 6) {
     for (const h of hits) {
       if (tried.has(h.url) || broadcaster(h.source, h.url) || Math.max(sharedKeys(h.title, story.title), en ? sharedKeys(h.title, en) : 0) < 2) continue;
       const pub = Date.parse(h.date || ""); if (pub && Math.abs(pub - storyAt) > 36 * 3600e3) continue;
-      tried.add(h.url); cands.push({ page: h.url, expect: h.title, credit: `ছবি: সৌজন্যে ${h.source || "সংবাদমাধ্যম"}`, own: false });
+      const same = (en ? sharedKeys(h.title, en) : 0) >= 3 && (!pub || Math.abs(pub - storyAt) <= 24 * 3600e3);
+      tried.add(h.url); cands.push({ page: h.url, expect: h.title, credit: `ছবি: সৌজন্যে ${h.source || "সংবাদমাধ্যম"}`, own: false, same });
       if (cands.length >= 10) break;
     }
   }
-  let ownKept = 0;
+  let ownKept = 0, failed = 0;
   for (const c of cands) {
     if (photos.length >= want) break;
-    const m = await pageMeta(c.page).catch(() => null);
+    const m = await pageMeta(c.page).catch(() => ({ failed: true }));
+    if (m?.failed) { failed++; log.push({ page: c.page, ok: false, why: "the page could not be read (tried again later)" }); continue; }
     if (!m?.img || seen.has(m.img)) { if (m?.img) continue; log.push({ page: c.page, ok: false, why: "no photo on the page" }); continue; }
     seen.add(m.img);
     const known = await env.DB.prepare("SELECT ok, why, ai FROM photo_checks WHERE url=?").bind(m.img).first().catch(() => null);
@@ -332,7 +334,10 @@ export async function checkedPhotos(env, story, want = 6) {
       }
     }
     if (v.ok && !c.own && !v.ai) v = { ok: false, why: "another outlet's photo needs the image model" };
-    if (v.ok && !c.own && v.ai && !v.sure) v = { ok: false, why: "another outlet's photo: the image model was not sure it shows this story", ai: true };
+    // Another outlet's photo: the model sure it shows this story, or its report plainly the same
+    // story (its headline and ours share three key words, within a day) and the model not objecting.
+    if (v.ok && !c.own && v.ai && !v.sure && !c.same) v = { ok: false, why: "another outlet's photo: the image model was not sure it shows this story", ai: true };
+    if (v.ok && !c.own && v.ai && !v.sure && c.same) v = { ...v, why: "another outlet's report of the same story (its headline matches; a real photograph)" };
     if (v.ok && c.own && !v.ai && ownKept >= 2) v = { ok: false, why: "two rule-checked photos at most" };
     log.push({ url: m.img, page: c.page, ok: v.ok, why: v.why });
     if (v.ok) { photos.push({ url: m.img, page: c.page, credit: c.credit }); if (c.own) ownKept++; }
@@ -344,9 +349,15 @@ export async function checkedPhotos(env, story, want = 6) {
       let w = bad ? { ok: false, why: bad } : null;
       if (!w) { const k = await env.DB.prepare("SELECT ok, why, ai FROM photo_checks WHERE url=?").bind(extra).first().catch(() => null); w = k ? { ok: !!k.ok, why: k.why, ai: !!k.ai } : await visionCheck(env, extra, about); if (w && !k) await remember(env, extra, w); }
       if (!w) continue;   // the model could not be asked: not used
+      // (pictures in a report can belong to its "read also" boxes: unless the model is sure, the
+      // picture's file name must name the story)
+      if (w.ok && !w.sure && !(w.why === "checked by the image model")) {
+        const file = decodeURIComponent((() => { try { return new URL(extra).pathname.split("/").pop(); } catch { return ""; } })()).replace(/\.[a-z0-9]+$/i, "").replace(/[-_.]+/g, " ");
+        if (sharedKeys(file, `${about} ${decodeURIComponent((() => { try { return new URL(c.page).pathname; } catch { return ""; } })()).replace(/[-_/]+/g, " ")}`) < 1) w = { ok: false, why: "a picture in the report not shown to be about this story" };
+      }
       log.push({ url: extra, page: c.page, ok: w.ok, why: w.ok ? `another photo in the same report: ${w.why}` : w.why });
       if (w.ok) photos.push({ url: extra, page: c.page, credit: c.credit });
     }
   }
-  return { photos, log };
+  return { photos, log, failed };
 }
