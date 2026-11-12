@@ -295,6 +295,9 @@ async function recordLoginFailure(env, keys) {
 const clearLoginFailures = (env, keys) => Promise.all(keys.map(([key]) => env.DB.prepare("DELETE FROM login_attempts WHERE key=?").bind(key).run()));
 // Built-in admin: ADMIN_EMAIL is a plain var, ADMIN_PASSWORD a Worker secret (never in the repo).
 function adminEmail(env) { return String(env.ADMIN_EMAIL || "").trim().toLowerCase(); }
+// The owner: the administrator account of ADMIN_EMAIL only (not other admins or editors). Only the
+// owner gets the story tools inside the reader app (/api/owner/…).
+function isOwner(env, user) { return !!user && user.role === "admin" && !!adminEmail(env) && String(user.email || "").trim().toLowerCase() === adminEmail(env); }
 async function isAdminLogin(env, email, password) {
   if (!env.ADMIN_PASSWORD || !adminEmail(env) || email !== adminEmail(env)) return false;
   return (await sha256(password)) === (await sha256(env.ADMIN_PASSWORD));
@@ -491,7 +494,7 @@ async function api(request, env, ctx) {
     const token = b64(crypto.getRandomValues(new Uint8Array(32))).replace(/[+/=]/g, c => ({"+":"-","/":"_","=":""}[c]));
     const tokenHash = await sha256(token), expires = Math.floor(Date.now()/1000) + 60*60*24*14;
     await env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)").bind(tokenHash,row.id,expires).run();
-    return json({ ok:true, user:{ id:row.id,email:row.email,displayName:row.display_name,role:row.role } }, 200, { "set-cookie":cookie("rw_session",token,60*60*24*14), "cache-control":"no-store" });
+    return json({ ok:true, user:{ id:row.id,email:row.email,displayName:row.display_name,role:row.role,owner:isOwner(env,row) } }, 200, { "set-cookie":cookie("rw_session",token,60*60*24*14), "cache-control":"no-store" });
   }
 
   if (url.pathname === "/api/auth/logout" && request.method === "POST") {
@@ -502,7 +505,7 @@ async function api(request, env, ctx) {
 
   if (url.pathname === "/api/auth/me" && request.method === "GET") {
     const user = await currentUser(request,env);
-    return json({ user: user ? { id:user.id,email:user.email,displayName:user.display_name,role:user.role } : null },200,{ "cache-control":"no-store" });
+    return json({ user: user ? { id:user.id,email:user.email,displayName:user.display_name,role:user.role,owner:isOwner(env,user) } : null },200,{ "cache-control":"no-store" });
   }
 
   // The language of the control-room and studio screens, remembered per person.
@@ -927,6 +930,104 @@ async function api(request, env, ctx) {
     const firstPublish = c.status !== "published" || c.alert_state === "pending";
     const alert = wantsAlert(b.notify) && status === "published" && firstPublish && c.alert_state !== "sent" ? await storyAlert(env, ctx, user, { id, slug: c.slug, title, status, kind: c.kind, published_at: publishedAt }) : "";
     return json({ok:true,slug:c.slug,alert},200,{"cache-control":"no-store"});
+  }
+
+  // ---- The owner's story tools inside the reader app (src/main.js ownerMenu). Owner only; every
+  // action goes into the audit log, and edits, pulls and deletes keep the text as it was before
+  // (corrections table). A story pulled, deleted or edited also leaves TV at once: its AVO story,
+  // its bulletin pictures, a breaking card with its headline; an edited story is read again with
+  // the new text (its AVO story is made afresh; the bulletin's line is recorded from the new text).
+  const ownMatch = url.pathname.match(/^\/api\/owner\/stories\/([^/]+)(?:\/([a-z-]+))?$/);
+  if (ownMatch) {
+    const user = await currentUser(request, env);
+    if (!isOwner(env, user)) return err("Not available.", 403);
+    const [, id, action] = ownMatch.map(x => x && decodeURIComponent(x));
+    const c = await env.DB.prepare("SELECT * FROM articles WHERE id=? OR slug=?").bind(id, id).first();
+    if (!c) return err("Story not found.", 404);
+    const ok = (out = {}) => { clearTvCache(); return json({ ok: true, ...out }, 200, { "cache-control": "no-store" }); };
+    if (request.method === "GET" && !action) {
+      return json({ story: { id: c.id, slug: c.slug, kind: c.kind, title: c.title, dek: c.dek || "", body: c.body || "", category: c.category, status: c.status, pulled: !!c.pulled_at,
+        lang: c.lang, image: c.image_url || c.hero_url || "", wire: ["rewrite", "brief"].includes(c.kind), alertState: c.alert_state || "", publishedAt: c.published_at, correctedAt: c.corrected_at || "" } }, 200, { "cache-control": "no-store" });
+    }
+    if (request.method !== "POST") return err("Not available.", 405);
+    const b = await request.json().catch(() => ({})), at = new Date().toISOString();
+    const log = (act, note = "", pub = 0) => env.DB.prepare("INSERT INTO corrections (id,article_id,action,note,public,before_title,before_body,actor_id) VALUES (?,?,?,?,?,?,?,?)").bind(randomId(), c.id, act, note, pub, c.title, c.body, user.id);
+    // Off TV: the AVO story out of rotation, the bulletin's pictures gone, a breaking card with
+    // this headline cleared.
+    const offTv = async (avoStmt) => {
+      await env.DB.batch([avoStmt, env.DB.prepare("DELETE FROM bulletin_images WHERE article_id=?").bind(c.id)]).catch(() => {});
+      for (const ch of CHANNELS) { const s = await tvSettings(env, ch).catch(() => null); if (s?.breaking?.text && s.breaking.text === String(c.title).slice(0, 160)) await setBreaking(env, ch, { clear: true }).catch(() => {}); }
+    };
+    if (action === "edit") {
+      const title = String(b.title ?? c.title).replace(/\s+/g, " ").trim().slice(0, 180), dek = String(b.dek ?? c.dek ?? "").trim().slice(0, 400), body = String(b.body ?? c.body).slice(0, 100000);
+      const category = DESKS.includes(b.category) ? b.category : c.category, note = String(b.note || "").trim().slice(0, 500), pub = note ? 1 : 0;
+      if (title.length < 8 || !body.trim()) return err("A story needs a headline and text.");
+      const text = { title, dek, topic: c.topic, tags: c.tags, body, hero_caption: c.hero_caption };
+      await env.DB.batch([
+        env.DB.prepare("UPDATE articles SET title=?,dek=?,body=?,category=?,text_hash=?,updated_at=?,corrected_at=CASE WHEN ?=1 THEN ? ELSE corrected_at END,correction_note=CASE WHEN ?=1 THEN ? ELSE correction_note END WHERE id=?")
+          .bind(title, dek, body, category, await textHash(text), at, pub, at, pub, note, c.id),
+        // Machine versions in other languages no longer match the text: they are written again.
+        env.DB.prepare("DELETE FROM translations WHERE kind='article' AND ref=? AND model IN ('gemini','indictrans2')").bind(c.id),
+        log(pub ? "correct" : "edit", note, pub)
+      ]);
+      // TV reads the new text: an automatic AVO story is made afresh from it.
+      await env.DB.prepare("DELETE FROM avo_stories WHERE article_id=? AND origin='auto'").bind(c.id).run().catch(() => {});
+      await audit(env, user, "owner.edit", "article", c.id, { title, note });
+      return ok();
+    }
+    if (action === "pull") {
+      await env.DB.batch([env.DB.prepare("UPDATE articles SET status='archived', pulled_at=?, updated_at=? WHERE id=?").bind(at, at, c.id), log("pull")]);
+      await offTv(env.DB.prepare("UPDATE avo_stories SET status='pulled' WHERE article_id=?").bind(c.id));
+      await audit(env, user, "owner.pull", "article", c.id, { title: c.title });
+      return ok();
+    }
+    if (action === "restore") {
+      await env.DB.batch([env.DB.prepare("UPDATE articles SET status='published', pulled_at=NULL, published_at=COALESCE(published_at,?), updated_at=? WHERE id=?").bind(at, at, c.id), log("restore"),
+        env.DB.prepare("UPDATE avo_stories SET status='new', voice='[]' WHERE article_id=? AND status='pulled'").bind(c.id)]);
+      await audit(env, user, "owner.restore", "article", c.id, { title: c.title });
+      return ok();
+    }
+    if (action === "delete") {
+      // For good: the story and everything made from it. The text stays in the corrections log
+      // (and the audit log) as a record; the wire's record of the reports it came from stays, so
+      // the same story is not written again.
+      if (b.confirm !== "DELETE") return err("Confirm the delete.");
+      await env.DB.batch([log("delete"),
+        env.DB.prepare("DELETE FROM translations WHERE kind='article' AND ref=?").bind(c.id),
+        env.DB.prepare("DELETE FROM story_views WHERE slug=?").bind(c.slug),
+        env.DB.prepare("DELETE FROM saved_items WHERE href=?").bind(`/article/${c.slug}`),
+        env.DB.prepare("DELETE FROM articles WHERE id=?").bind(c.id)]);
+      await offTv(env.DB.prepare("DELETE FROM avo_stories WHERE article_id=?").bind(c.id));
+      await audit(env, user, "owner.delete", "article", c.id, { title: c.title, slug: c.slug });
+      return ok();
+    }
+    if (action === "no-pictures") {
+      // The story's pictures off the site, the AVO story and the bulletin (they show the channel's
+      // text cards instead).
+      await env.DB.batch([env.DB.prepare("UPDATE articles SET image_url='', hero_url='', hero_caption='', updated_at=? WHERE id=?").bind(at, c.id),
+        env.DB.prepare("UPDATE avo_stories SET images='[]' WHERE article_id=?").bind(c.id), env.DB.prepare("DELETE FROM bulletin_images WHERE article_id=?").bind(c.id)]);
+      await audit(env, user, "owner.no-pictures", "article", c.id, { title: c.title });
+      return ok();
+    }
+    if (action === "top") {
+      if (c.status !== "published" || c.pulled_at) return err("Only a published story can go to the top.");
+      await env.DB.prepare("UPDATE articles SET published_at=?, updated_at=? WHERE id=?").bind(at, at, c.id).run();
+      await audit(env, user, "owner.top", "article", c.id, { title: c.title, was: c.published_at });
+      return ok();
+    }
+    if (action === "breaking") {
+      if (c.status !== "published" || c.pulled_at) return err("Only a published story can go on TV.");
+      for (const ch of CHANNELS) await setBreaking(env, ch, { text: c.title, seconds: 20, music: true });
+      await audit(env, user, "owner.breaking", "article", c.id, { title: c.title });
+      return ok();
+    }
+    if (action === "alert") {
+      if (c.alert_state === "sent") return err("An alert for this story has already gone out.");
+      const r = await storyAlert(env, ctx, user, c);
+      await audit(env, user, "owner.alert", "article", c.id, { title: c.title, r });
+      return ok({ alert: r });
+    }
+    return err("Not available.", 404);
   }
 
   // ---- Corrections: pull a story in one tap, put it back, or correct it with a public note.

@@ -1957,3 +1957,24 @@ html.standalone,html.standalone body{overscroll-behavior-y:none}
   .utility .icon-btn.lang-btn{height:32px;padding:0 8px}
   .live-tv-btn{height:30px;padding:0 8px}
 }
+
+/* The owner's story tools (src/main.js): the pen button on a story page, the pulled-story banner,
+   and the sheet of actions. */
+.own-fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:60;width:56px;height:56px;border:0;border-radius:50%;display:grid;place-items:center;background:#c8100f;color:#fff;box-shadow:0 10px 26px rgba(0,0,0,.28),0 0 0 3px rgba(212,160,23,.85);cursor:pointer}
+.own-fab:active{transform:scale(.94)}
+.own-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px;padding:12px 16px;border-radius:14px;background:#fff4d6;border:1px solid #e3b94a;color:#5a3d00;font-weight:600}
+.own-sheet{width:min(440px,calc(100vw - 20px));padding:0;border:0;border-radius:22px;background:#fff;color:#111;box-shadow:0 30px 80px rgba(0,0,0,.35)}
+.own-sheet::backdrop{background:rgba(10,4,6,.5)}
+.own-head{padding:18px 20px 12px;border-bottom:1px solid #eee}
+.own-head .kicker{display:block;color:#c8100f}
+.own-head b{display:block;margin-top:6px;font:600 17px/1.4 "Noto Serif Bengali",serif;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.own-acts{display:flex;flex-direction:column;padding:6px 0}
+.own-act{display:block;width:100%;padding:14px 20px;border:0;background:none;text-align:left;font:600 16px var(--sans);color:inherit;cursor:pointer}
+.own-act:hover{background:#f6f2ea}
+.own-act.off{opacity:.45;cursor:default}
+.own-act.warn{color:#9a5b00}
+.own-act.danger{color:#c8100f}
+.own-cancel{display:block;width:100%;padding:14px;border:0;border-top:1px solid #eee;background:none;font:700 15px var(--sans);color:#555;cursor:pointer;border-radius:0 0 22px 22px}
+[data-theme="dark"] .own-sheet{background:#1b1416;color:#f2ede6}
+[data-theme="dark"] .own-head,[data-theme="dark"] .own-cancel{border-color:#2c2326}
+[data-theme="dark"] .own-act:hover{background:#2a2023}

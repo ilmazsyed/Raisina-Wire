@@ -380,6 +380,7 @@ async function route({ restoreY = null } = {}) {
   hideNewPill();
   if (restoreY === null) jump(0);
   document.title = DEFAULT_TITLE;
+  document.getElementById("ownFab")?.remove();
   renderNav(r);
   $("#langPop").innerHTML = languageLinks(); $("#langFoot").innerHTML = languageLinks(); $("#langMenu").open = false; // same page, other language
   const view = views[r.page] || viewNotFound;
@@ -689,6 +690,7 @@ async function viewStory(r) {
     ${list.filter(x => x.slug !== a.slug && x.category === a.category).slice(0, 6).map(x => `<a class="aside-link" href="${edHref(x)}"><span class="thumb">${pic(x)}</span><span><b>${esc(x.title)}</b><span class="meta" style="display:block;margin-top:5px;font-size:10px">${ago(x.publishedAt)}</span></span></a>`).join("")}
   </div></aside></div></div>`;
   countView(a);
+  ownerStory(a);
 }
 // When the story is shown in a language other than the one it was written in, or isn't
 // available in the reader's language yet.
@@ -1225,6 +1227,97 @@ async function onAction(e) {
   if (a === "theme") toggleTheme();
   if (a === "discuss") { if (!state.user) { openAuth("register"); toast("Create a free account to start a discussion."); } else openDiscussionDialog(el.dataset.title ? `On “${el.dataset.title}”` : ""); }
 }
+
+/* ---------- The owner's story tools ---------- */
+// Only the owner (the ADMIN_EMAIL administrator; the server says so in /api/auth/me) sees these,
+// inside the reader app: a pen button on a story page, and a long-press (or right-click) on any
+// story in a list. Everyone else sees the app as usual; the server refuses anyone else.
+const isOwner = () => !!state.user?.owner;
+const ownSlug = href => { const m = String(href || "").match(/\/article\/([^/?#]+)/); return m ? decodeURIComponent(m[1]) : ""; };
+const ICON_PEN = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>`;
+const ownerAPI = (slug, action, body = {}) => apiJSON(`/api/owner/stories/${encodeURIComponent(slug)}/${action}`, body);
+async function ownerGet(slug) {
+  const r = await fetch(`/api/owner/stories/${encodeURIComponent(slug)}`, { cache: "no-store" });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || "Something went wrong. Try again.");
+  return d.story;
+}
+// After a change: the lists and the story page drawn again with the server's stories.
+async function ownerRefresh(slug, { gone = false } = {}) {
+  await loadArticles({ apply: true });
+  const r = parseRoute();
+  if (r.page === "article" && decodeURIComponent(r.arg || "") === slug) { if (gone) navigate("/"); else viewStory(r); }
+}
+function ownerStory(a) {
+  state.ownStory = a;
+  document.getElementById("ownFab")?.remove(); document.getElementById("ownBanner")?.remove();
+  if (!isOwner()) return;
+  document.body.insertAdjacentHTML("beforeend", `<button class="own-fab" id="ownFab" type="button" aria-label="${esc(tr("Story tools"))}">${ICON_PEN}</button>`);
+  document.getElementById("ownFab").addEventListener("click", () => ownerMenu(a.slug));
+  if (a.status !== "published") {
+    $(".reader-article")?.insertAdjacentHTML("afterbegin", `<div class="own-banner" id="ownBanner"><span>${esc(tr("This story is pulled. Only you can see it."))}</span><button type="button" class="btn btn-dark btn-sm">${esc(tr("Put it back"))}</button></div>`);
+    $("#ownBanner button")?.addEventListener("click", () => ownerDo(a.slug, "restore"));
+  }
+}
+// The pen button belongs to a story page only.
+async function ownerMenu(slug) {
+  let x;
+  try { x = await ownerGet(slug); } catch (e) { toast(tr(e.message)); return; }
+  document.getElementById("ownSheet")?.remove();
+  const live = x.status === "published" && !x.pulled;
+  const btn = (act, label, cls = "") => `<button type="button" class="own-act ${cls}" data-own="${act}">${esc(tr(label))}</button>`;
+  document.body.insertAdjacentHTML("beforeend", `<dialog class="own-sheet" id="ownSheet"><div class="own-head"><span class="kicker">${esc(tr("Story tools"))}</span><b data-no-tr lang="${esc(x.lang || "bn")}">${esc(x.title)}</b></div>
+    <div class="own-acts">${btn("edit", "Edit story")}${btn("no-pictures", "Remove pictures")}${live ? btn("top", "Move to the top") + btn("breaking", "Breaking on TV") + btn("alert", x.alertState === "sent" ? "Alert sent" : "Send alert", x.alertState === "sent" ? "off" : "") : ""}${live ? btn("pull", "Pull the story", "warn") : btn("restore", "Put it back")}${btn("delete", "Delete for good", "danger")}</div>
+    <button type="button" class="own-cancel" data-own="close">${esc(tr("Cancel"))}</button></dialog>`);
+  const dlg = document.getElementById("ownSheet");
+  dlg.addEventListener("click", e => {
+    const b = e.target.closest("[data-own]");
+    if (e.target === dlg || b?.dataset.own === "close") { dlg.close(); return; }
+    if (!b || b.classList.contains("off")) return;
+    dlg.close();
+    if (b.dataset.own === "edit") ownerEdit(x); else ownerDo(x.slug, b.dataset.own);
+  });
+  dlg.addEventListener("close", () => dlg.remove());
+  dlg.showModal();
+}
+const OWN_ASK = { pull: "Pull this story from the site and TV?", delete: "Delete this story for good? It cannot be undone.", "no-pictures": "Remove this story's pictures from the site and TV?",
+  breaking: "Put it on TV as breaking news?", alert: "Send a push alert for this story to every subscriber?" };
+const OWN_DONE = { pull: "Story pulled from the site and TV.", restore: "The story is back.", delete: "Story deleted.", "no-pictures": "Pictures removed.", top: "Moved to the top.", breaking: "On TV as breaking news.", alert: "Alert sent." };
+async function ownerDo(slug, action) {
+  if (OWN_ASK[action] && !confirm(tr(OWN_ASK[action]))) return;
+  try { await ownerAPI(slug, action, action === "delete" ? { confirm: "DELETE" } : {}); }
+  catch (e) { toast(tr(e.message)); return; }
+  toast(tr(OWN_DONE[action] || "Saved."));
+  ownerRefresh(slug, { gone: action === "delete" });
+}
+function ownerEdit(x) {
+  openFormDialog({ kicker: tr("Story tools"), title: tr("Edit story"), submitLabel: tr("Save changes"), fields: [
+    { name: "title", label: tr("Headline"), value: x.title, required: true, minlength: 8, maxlength: 180 },
+    { name: "dek", label: tr("Summary"), type: "textarea", rows: 2, value: x.dek, maxlength: 400 },
+    { name: "category", label: tr("Section"), type: "select", value: x.category, options: DESKS.map(d => [d, tr(d)]) },
+    { name: "body", label: tr("Text"), type: "textarea", rows: 14, value: x.body, required: true, maxlength: 100000 },
+    { name: "note", label: tr("Correction note for readers"), hint: tr("Leave empty to fix quietly."), maxlength: 500 }
+  ], onSubmit: async v => { await ownerAPI(x.slug, "edit", v); toast(tr("Saved. TV reads the new text.")); ownerRefresh(x.slug); } });
+  // The text is in the story's own language (Bengali for the wire), whatever the page's language.
+  $$("#formDialogFields input, #formDialogFields textarea").forEach(n => { n.setAttribute("data-no-tr", ""); n.lang = x.lang || "bn"; });
+}
+// Long-press (phones) or right-click (computers) on any story in a list opens the tools.
+function ownerInit() {
+  let timer = 0, fired = false;
+  const sel = 'a[href*="/article/"]';
+  const open = a => { const slug = ownSlug(a.getAttribute("href")); if (slug && isOwner()) { fired = true; navigator.vibrate?.(15); ownerMenu(slug); } };
+  document.addEventListener("contextmenu", e => { const a = e.target.closest(sel); if (!a || !isOwner()) return; e.preventDefault(); if (!fired) open(a); setTimeout(() => { fired = false; }, 500); });
+  document.addEventListener("touchstart", e => { const a = e.target.closest(sel); if (!a || !isOwner()) return; fired = false; clearTimeout(timer); timer = setTimeout(() => open(a), 600); }, { passive: true });
+  const cancel = () => clearTimeout(timer);
+  document.addEventListener("touchmove", cancel, { passive: true });
+  document.addEventListener("touchend", cancel, { passive: true });
+  // The tap that ends a long-press does not open the story.
+  document.addEventListener("click", e => { if (fired && e.target.closest(sel)) { e.preventDefault(); e.stopPropagation(); fired = false; } }, true);
+}
+// Once, the first time the owner opens the app: how to reach the tools.
+function ownerHint() {
+  if (isOwner() && parseRoute().page === "article" && state.ownStory && !document.getElementById("ownFab")) ownerStory(state.ownStory);
+  if (!isOwner() || store.get("rw-own-hint", 0)) return; store.set("rw-own-hint", Date.now()); setTimeout(() => toast(tr("Long-press any story for your story tools.")), 1500); }
 
 /* ---------- Ticker, clock, live coverage ---------- */
 function renderClocks() {
@@ -2226,7 +2319,8 @@ let articlesReady, userReady;
 function boot() {
 articlesReady = loadArticles();
 // The session is checked once at start; pages that depend on it wait for the answer.
-userReady = fetch("/api/auth/me").then(r => r.json()).then(async d => { state.user = d.user || null; if (state.user) await loadTopics(); }).catch(() => {});
+userReady = fetch("/api/auth/me").then(r => r.json()).then(async d => { state.user = d.user || null; if (state.user) await loadTopics(); ownerHint(); }).catch(() => {});
+ownerInit();
 renderShell();
 startTranslator(document.body); // draws the interface in Bengali or Hindi
 trackVisit();
