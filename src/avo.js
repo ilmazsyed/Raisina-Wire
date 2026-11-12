@@ -137,20 +137,23 @@ async function repicture(env) {
   // Once: the image model's first verdicts (asked about the Bengali headline, which it cannot read)
   // are dropped, and every story is judged again.
   const ver = await env.DB.prepare("SELECT value FROM settings WHERE key='avo:img_rules'").first().catch(() => null);
-  if (ver?.value !== "2" && ver?.value !== "3") {
+  if (!["2", "3", "4"].includes(ver?.value)) {
     await env.DB.batch([env.DB.prepare("DELETE FROM photo_checks WHERE ai=1"), env.DB.prepare("UPDATE bulletin_images SET url='', credit='', query='', checked_at='2000-01-01T00:00:00Z'")]).catch(() => {});
   }
   // (3: the reports' other photos and the English search: every story is looked at again; the
   // model's verdicts so far stand.)
-  if (ver?.value !== "3") {
+  if (ver?.value !== "4") {
     await env.DB.batch([env.DB.prepare("UPDATE avo_stories SET img_v=3 WHERE img_v=4 AND origin='auto'"),
-      env.DB.prepare("INSERT INTO settings (key,value) VALUES ('avo:img_rules','3') ON CONFLICT(key) DO UPDATE SET value='3'")]).catch(() => {});
+      env.DB.prepare("INSERT INTO settings (key,value) VALUES ('avo:img_rules','4') ON CONFLICT(key) DO UPDATE SET value='4'")]).catch(() => {});
   }
-  const { results } = await env.DB.prepare("SELECT article_id, title, published_at FROM avo_stories WHERE status IN ('ready','off') AND img_v<4 AND origin='auto' AND published_at>=? ORDER BY published_at DESC LIMIT 3")
+  const { results } = await env.DB.prepare("SELECT article_id, title, published_at, images, json_array_length(images) AS n FROM avo_stories WHERE status IN ('ready','off') AND img_v<4 AND origin='auto' AND published_at>=? ORDER BY published_at DESC LIMIT 3")
     .bind(new Date(Date.now() - 24 * 3600e3).toISOString()).all().catch(() => ({ results: [] }));
   for (const r of results) {
-    const { photos, log } = await checkedPhotos(env, { id: r.article_id, title: r.title, at: r.published_at }, 6).catch(() => ({ photos: [], log: [] }));
-    await env.DB.prepare("UPDATE avo_stories SET images=?, img_log=?, img_v=4 WHERE article_id=?").bind(JSON.stringify(photos), JSON.stringify(log.slice(0, 12)), r.article_id).run();
+    const got = await checkedPhotos(env, { id: r.article_id, title: r.title, at: r.published_at }, 6).catch(() => ({ photos: [], log: [], failed: 1 }));
+    let { photos } = got;
+    // A page that could not be read this time: the photos the story already had (judged before) stay.
+    if (got.failed && photos.length < (r.n || 0)) { try { photos = JSON.parse(r.images || "[]"); } catch { /* none */ } }
+    await env.DB.prepare("UPDATE avo_stories SET images=?, img_log=?, img_v=4 WHERE article_id=?").bind(JSON.stringify(photos), JSON.stringify(got.log.slice(0, 12)), r.article_id).run();
   }
   return results.length;
 }
@@ -198,7 +201,9 @@ export function screenStory(r) {
   const j = (v, d) => { try { return JSON.parse(v || d); } catch { return JSON.parse(d); } };
   return { id: r.article_id, title: r.title, desk: r.desk, region: r.region, sex: r.sex, lines: j(r.script, "[]"),
     voice: j(r.voice, "[]").map(k => `/api/tv/voice/${k}.mp3`), secs: r.secs,
-    images: (r.origin !== "manual" && (r.img_v || 0) < 4 ? [] : j(r.images, "[]")).map((x, i) => ({ src: /^\/(media|brand)\//.test(x.url || "") ? x.url : `/api/tv/aimg/${encodeURIComponent(r.article_id)}/${i}`, credit: x.credit || "" })), at: r.published_at, origin: r.origin || "auto", score: r.score || 0,
+    // (a story never yet judged under the picture rules shows none; one waiting to be judged again
+    // keeps the photos it was given)
+    images: (r.origin !== "manual" && (r.img_v || 0) < 4 && !j(r.img_log, "[]").length ? [] : j(r.images, "[]")).map((x, i) => ({ src: /^\/(media|brand)\//.test(x.url || "") ? x.url : `/api/tv/aimg/${encodeURIComponent(r.article_id)}/${i}`, credit: x.credit || "" })), at: r.published_at, origin: r.origin || "auto", score: r.score || 0,
     places: placesIn(`${r.title} ${j(r.script, "[]").slice(0, 2).join(" ")}`), topic: topicOf(`${r.title} ${j(r.script, "[]").slice(0, 2).join(" ")}`),
     imgLog: j(r.img_log, "[]"),
     upd: !!(r.prepared_at && r.created_at && Date.parse(r.prepared_at) - Date.parse(String(r.created_at).replace(" ", "T") + "Z") > 15 * 60e3),
