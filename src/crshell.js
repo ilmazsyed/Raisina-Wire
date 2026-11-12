@@ -32,7 +32,7 @@ export async function shell(title, { staff = true } = {}) {
   await initUiLang();
   const head = document.createElement("header");
   head.className = "cr-head";
-  head.innerHTML = `<a class="cr-brand" href="/admin.html"><img src="/brand/logo-xs.webp" alt="Rashtrix 24×7 News" width="24" height="34"></a><h1>${esc(title)}</h1>
+  head.innerHTML = `<a class="cr-brand cx-brand" href="/admin.html" aria-label="Control room · Calibrex"><img src="/partners/calibrex-mark.svg" alt="" width="26" height="26"><span class="cx-word">CALIBRE<span>X</span></span></a><h1>${esc(title)}</h1>
     <nav class="cr-nav">${PAGES.map(([h, n]) => `<a href="${h}"${location.pathname === h ? ' aria-current="page"' : ""}>${n}</a>`).join("")}</nav>
     <span class="spacer"></span><span class="cr-clock" data-no-tr></span>`;
   head.append(langSwitch());

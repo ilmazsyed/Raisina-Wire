@@ -279,3 +279,11 @@ td .row-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 input[type=checkbox],input[type=radio]{width:20px;height:20px;min-height:0!important;padding:0;margin:0;border-radius:4px;accent-color:#c8100f;flex:none;vertical-align:middle}
 @media(max-width:760px){input[type=checkbox],input[type=radio]{width:22px;height:22px}}
 .sidebar .side-label:not(:first-child){margin-top:16px}
+
+/* The control room carries the Calibrex logo (the mark and the wordmark), not the channel's. */
+.cx-brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none}
+.cx-brand img{display:block;height:28px;width:28px}
+.cx-brand .cx-word{font:400 15px Michroma,Manrope,sans-serif;letter-spacing:2.4px;white-space:nowrap}
+.cx-brand .cx-word span{color:#e8741a}
+.cx-brand .cx-word{color:#0f1422}
+@media(max-width:760px){.cx-brand .cx-word{display:none}}
