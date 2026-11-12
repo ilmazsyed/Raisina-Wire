@@ -1472,7 +1472,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // A story with fewer than two verified photos (src/bulletinimg.js) is told in motion
       // graphics: its headline with the story's icon, the map of its places, its figure counting up,
       // its sentences lighting up as they are read (and its one photo, if it has one).
-      const graphic = x => (x.images || []).length < 2;
+      const graphic = x => !(x.images || []).length;
       const gSlides = x => {
         const P = (x.images || []).filter(i => imgState.get(i.src) === "ok"), f = factOf(x), out = [{ brk: 1 }];
         if (P[0]) out.push({ img: P[0] });

@@ -454,8 +454,14 @@ function viewHome() {
   if (!all.length && !(state.coverageAll || []).length) { $("#view").innerHTML = `<div class="wrap home"><section id="liveBanner" class="band-tight" hidden></section>${articlesSettled ? `<div class="empty" style="margin-top:30px">No stories yet.</div>` : `<div class="skeleton" style="height:420px;margin-top:20px"></div>`}</div>`; renderLiveBanner(); return; }
   // The top-stories column keeps the desk's own stories (with photos); the carousel beside it
   // carries only live coverage and the wire (renderLeadCarousel).
-  const used = new Set(all.filter(isWire).slice(0, 7).map(a => a.id));
-  const side = all.filter(a => !isWire(a)).slice(0, 4); side.forEach(a => used.add(a.id));
+  // প্রধান খবর: the desk's own stories of the last day first, then the wire's most important of the
+  // last six hours in the channel's order (West Bengal politics, Kolkata's, India's, then West
+  // Bengal, Kolkata, India, the world…), five in all. The swipe cards beside it never repeat them.
+  const ageH = a => (Date.now() - (Date.parse(a.publishedAt) || 0)) / 3600e3;
+  const side = [...all.filter(a => !isWire(a) && ageH(a) < 24).slice(0, 3),
+    ...all.filter(a => isWire(a) && ageH(a) < 6).sort((x, y) => (x.pri ?? 10) - (y.pri ?? 10) || (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0))].slice(0, 5);
+  if (side.length < 5) side.push(...all.filter(a => !side.includes(a)).slice(0, 5 - side.length));
+  const used = new Set(side.map(a => a.id));
   $("#view").innerHTML = `
   <div class="wrap home">
     <section id="liveBanner" class="band-tight" aria-label="Live coverage" hidden></section>
@@ -476,17 +482,18 @@ function viewHome() {
     <section id="videoBand" class="band band-explainers" aria-labelledby="videoBandTitle" hidden></section>
     ${joinBand()}
   </div>`;
-  renderLeadCarousel(); mountHomeTV(); renderRail(); renderHomeDesks(used); renderBriefBand(); renderCommunity(); renderLiveBanner(); renderHomeMedia();
+  renderLeadCarousel(used); mountHomeTV(); renderRail(); renderHomeDesks(new Set([...used, ...all.filter(isWire).filter(a => !used.has(a.id)).slice(0, 7).map(a => a.id)])); renderBriefBand(); renderCommunity(); renderLiveBanner(); renderHomeMedia();
 }
 // The swipe cards at the top: seven compact text cards, no photos. Running live coverage comes
 // first, headed by its newest update; then the wire's own reports and briefs, newest first.
-function renderLeadCarousel() {
+function renderLeadCarousel(skip = state.leadSkip || new Set()) {
+  state.leadSkip = skip;
   const host = $("#leadCarousel"); if (!host) return;
   const live = (state.coverageAll || []).filter(d => d?.item).map(d => {
     const u = d.updates?.[0];
     return { live: true, href: withLang(`/coverage/${encodeURIComponent(d.item.slug)}`), title: u ? (u.title || firstLine(u.body)) : d.item.title, cov: d.item.title, at: u?.createdAt || d.item.startedAt };
   });
-  const wire = stories().filter(isWire).sort((x, y) => (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0))
+  const wire = stories().filter(isWire).filter(e => !skip.has(e.id)).sort((x, y) => (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0))
     .map(e => ({ href: edHref(e), title: e.title, dek: e.dek, desk: e.category, kind: kindLabel(e), at: e.publishedAt }));
   const cards = [...live, ...wire].slice(0, 7);
   host.hidden = !cards.length;

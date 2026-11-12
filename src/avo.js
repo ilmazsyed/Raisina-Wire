@@ -137,14 +137,15 @@ async function repicture(env) {
   // Once: the image model's first verdicts (asked about the Bengali headline, which it cannot read)
   // are dropped, and every story is judged again.
   const ver = await env.DB.prepare("SELECT value FROM settings WHERE key='avo:img_rules'").first().catch(() => null);
-  if (!["2", "3", "4"].includes(ver?.value)) {
+  if (!["2", "3", "4", "5"].includes(ver?.value)) {
     await env.DB.batch([env.DB.prepare("DELETE FROM photo_checks WHERE ai=1"), env.DB.prepare("UPDATE bulletin_images SET url='', credit='', query='', checked_at='2000-01-01T00:00:00Z'")]).catch(() => {});
   }
   // (3: the reports' other photos and the English search: every story is looked at again; the
   // model's verdicts so far stand.)
-  if (ver?.value !== "4") {
-    await env.DB.batch([env.DB.prepare("UPDATE avo_stories SET img_v=3 WHERE img_v=4 AND origin='auto'"),
-      env.DB.prepare("INSERT INTO settings (key,value) VALUES ('avo:img_rules','4') ON CONFLICT(key) DO UPDATE SET value='4'")]).catch(() => {});
+  if (ver?.value !== "5") {
+    // (5: stories without a photo are looked at again for a file photo of their subject)
+    await env.DB.batch([env.DB.prepare("UPDATE avo_stories SET img_v=3 WHERE img_v=4 AND origin='auto' AND json_array_length(images)=0"),
+      env.DB.prepare("INSERT INTO settings (key,value) VALUES ('avo:img_rules','5') ON CONFLICT(key) DO UPDATE SET value='5'")]).catch(() => {});
   }
   const { results } = await env.DB.prepare("SELECT article_id, title, published_at, images, json_array_length(images) AS n FROM avo_stories WHERE status IN ('ready','off') AND img_v<4 AND origin='auto' AND published_at>=? ORDER BY published_at DESC LIMIT 3")
     .bind(new Date(Date.now() - 24 * 3600e3).toISOString()).all().catch(() => ({ results: [] }));

@@ -1,4 +1,5 @@
 import { cached, categorize, DESKS } from "./feeds.js";
+import { bulletinRank } from "./labels.js";
 import { runWireDesk, wireDeskReport, saveWireSettings, wireSettings, fetchSources, groupItems, writeJob, quota, videoHeadlines, refileSubjects } from "./wiredesk.js";
 import { syncWixFeed, backfillWix, wixStatus, restartWixBackfill } from "./wix.js";
 import m0001 from "../migrations/0001_init.sql";
@@ -740,6 +741,8 @@ async function api(request, env, ctx) {
     const list = await listPublished(env, { writerKey: WRITERS.some(x => x.key === w) ? w : null, tag: url.searchParams.get("tag"), limit: 300 });
     const lang = reqLang(url);
     const out = await localiseArticles(env, lang, list.filter(a => shownIn(a, lang)));
+    // Each story's place in the channel's order (src/labels.js bulletinRank), for প্রধান খবর.
+    out.forEach(a => { a.pri = bulletinRank(a.category, `${a.title} ${a.dek || ""}`); });
     // Stories without a version in the reader's language: readers get what is already machine-
     // translated at once; the rest is translated in the background and switches on the next refresh.
     {
