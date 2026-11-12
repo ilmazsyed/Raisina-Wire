@@ -1074,8 +1074,8 @@ async function api(request, env, ctx) {
     if (request.method === "POST") {
       const b = await request.json().catch(() => null);
       if (b && typeof b === "object") {
-        const clean = { at: new Date().toISOString(), plat: String(b.plat || "").slice(0, 12), ch: b.ch === "v" ? "v" : "h", pre: !!b.pre, preState: Number(b.preState) || 0, muted: !!b.muted, card: Math.round(Number(b.card) || 0), timeout: !!b.timeout,
-          seq: (Array.isArray(b.seq) ? b.seq : []).slice(0, 20).map(x => [Math.round(Number(x?.[0]) || 0), Number(x?.[1]) || 0]) };
+        const clean = { at: new Date().toISOString(), plat: String(b.plat || "").slice(0, 12), ch: b.ch === "v" ? "v" : "h", pre: !!b.pre, preState: Number(b.preState) || 0, preAgo: Math.round(Number(b.preAgo) || 0), rolled: !!b.rolled, muted: !!b.muted, card: Math.round(Number(b.card) || 0), timeout: !!b.timeout,
+          seq: (Array.isArray(b.seq) ? b.seq : []).slice(0, 40).map(x => [Math.round(Number(x?.[0]) || 0), Number(x?.[1]) || 0]) };
         const row = await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(KEY).first().catch(() => null);
         let list = []; try { list = JSON.parse(row?.value || "[]"); } catch { /* fresh */ }
         list = [clean, ...list].slice(0, 60);
