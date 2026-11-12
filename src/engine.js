@@ -1464,12 +1464,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // its sentences lighting up as they are read (and its one photo, if it has one).
       const graphic = x => (x.images || []).length < 2;
       const gSlides = x => {
-        const P = (x.images || []).filter(i => imgState.get(i.src) === "ok"), f = factOf(x), out = [{ brk: 1 }, { g: "head" }];
+        const P = (x.images || []).filter(i => imgState.get(i.src) === "ok"), f = factOf(x), out = [{ brk: 1 }];
         if (P[0]) out.push({ img: P[0] });
+        out.push({ g: "head" });
         if ((x.places || []).length) out.push({ g: "map" });
         if (f) out.push({ g: "stat", f });
         // (the sentence with the figure is already on the figure's slide)
         (x.lines || []).slice(1).filter(l => !(f && l.startsWith(f.line.replace(/…$/, "")))).forEach((l, i) => out.push({ g: i % 2 ? "split" : "type", l, n: i + 2 }));
+        // The one photo once more, in red with the headline, before the last beat.
+        if (P[0] && out.length >= 5) out.splice(out.length - 1, 0, { img: P[0], fx: "duo" });
         return out;
       };
       const slidesOf = x => {
