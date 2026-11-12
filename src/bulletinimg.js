@@ -259,14 +259,23 @@ async function visionCheck(env, url, about) {
   const buf = new Uint8Array(await r.arrayBuffer());
   if (buf.length < 15000) return { ok: false, why: "too small" };
   if (buf.length > 3e6) return null;
-  const prompt = `A TV news channel wants to show this image with the story: "${about}". Answer exactly in this form: PHOTO=yes or no; MATCH=yes or no or unsure. PHOTO=yes only for a real photograph (no=graphic, map, chart, logo, poster, screenshot, collage or picture with large text on it). MATCH=yes only if the photograph plausibly shows this event, its place or its people.`;
+  const prompt = `A TV news channel wants to show this image with the story: "${about}". Answer exactly in this form: PHOTO=yes or no; MATCH=yes or no or unsure. PHOTO=yes if it is mainly a photograph of a real scene, people, place or object (a small logo, watermark or caption on it is fine); PHOTO=no for a graphic, map, chart, poster, screenshot, collage or a card made mostly of text. MATCH=yes if the photograph plausibly shows this event, its place, its people or its subject; MATCH=no if it clearly shows something else.`;
   let out = "";
   try { out = String((await env.AI.run(VISION, { image: [...buf], prompt, max_tokens: 40 }))?.description || ""); } catch { return null; }
-  const photo = /PHOTO\s*=\s*yes/i.test(out), match = /MATCH\s*=\s*yes/i.test(out);
+  const photo = /PHOTO\s*=\s*yes/i.test(out), match = /MATCH\s*=\s*yes/i.test(out), mismatch = /MATCH\s*=\s*no/i.test(out);
   if (!/PHOTO\s*=/i.test(out)) return null;   // an answer the model did not give in the form asked: not trusted either way
-  return { ok: photo && match, why: !photo ? "the image model saw a graphic, not a photograph" : !match ? "the image model did not see this story in it" : "checked by the image model", ai: true };
+  // `match` (yes), `mismatch` (no) or neither (unsure): the caller decides by where the photo is from.
+  return { ok: photo && !mismatch, sure: photo && match, why: !photo ? "the image model saw a graphic, not a photograph" : mismatch ? "the image model saw something else in it" : match ? "checked by the image model" : "a photograph from the story's own report (the image model was unsure of the subject)", ai: true };
 }
 const remember = (env, url, v) => env.DB.prepare("INSERT INTO photo_checks (url,ok,why,ai,at) VALUES (?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(url) DO UPDATE SET ok=excluded.ok,why=excluded.why,ai=excluded.ai,at=excluded.at").bind(url, v.ok ? 1 : 0, v.why.slice(0, 120), v.ai ? 1 : 0).run().catch(() => {});
+// The story's headline in English for the image model (it does not read Bengali): the site's English
+// version, else a translation made now (kept with the site's translations' model, free allowance).
+async function englishTitle(env, story) {
+  const t = await env.DB.prepare("SELECT title FROM translations WHERE kind='article' AND ref=? AND lang='en' AND title<>''").bind(story.id).first().catch(() => null);
+  if (t?.title) return t.title;
+  if (!env.AI || !story.title) return "";
+  try { return String((await env.AI.run("@cf/meta/m2m100-1.2b", { text: story.title, source_lang: "bn", target_lang: "en" }))?.translated_text || ""); } catch { return ""; }
+}
 // The story's own reports that agree with the rest of their group (a report sharing no key words
 // with any other in the group is set aside), with their titles, newest first.
 async function ownReports(env, id) {
@@ -277,7 +286,7 @@ async function ownReports(env, id) {
 export async function checkedPhotos(env, story, want = 6) {
   const storyAt = Date.parse(story.at || "") || Date.now(), photos = [], log = [], seen = new Set();
   const own = await ownReports(env, story.id);
-  const about = [story.title, ...own.map(r => r.title).filter(t => /[a-z]{3}/i.test(t)).slice(0, 2)].join(" / ").slice(0, 400);
+  const about = (await englishTitle(env, story) || [story.title, ...own.map(r => r.title).filter(t => /[a-z]{3}/i.test(t)).slice(0, 2)].join(" / ")).slice(0, 400);
   const cands = [];
   for (const it of own) if (!broadcaster(it.source_name, it.url)) cands.push({ page: it.url, expect: it.title, credit: `ছবি: সৌজন্যে ${pubName(it.source_name)}`, own: true });
   // Other outlets' reports on the same story (only while the image model can check them).
@@ -285,7 +294,7 @@ export async function checkedPhotos(env, story, want = 6) {
   if (aiOn && story.title) {
     const tried = new Set(cands.map(c => c.page));
     for (const h of await newsSearch(story.title).catch(() => [])) {
-      if (tried.has(h.url) || broadcaster(h.source, h.url) || sharedKeys(h.title, story.title) < 3) continue;
+      if (tried.has(h.url) || broadcaster(h.source, h.url) || sharedKeys(h.title, story.title) < 2) continue;
       const pub = Date.parse(h.date || ""); if (pub && Math.abs(pub - storyAt) > 36 * 3600e3) continue;
       tried.add(h.url); cands.push({ page: h.url, expect: h.title, credit: `ছবি: সৌজন্যে ${h.source || "সংবাদমাধ্যম"}`, own: false });
       if (cands.length >= 10) break;
@@ -298,7 +307,7 @@ export async function checkedPhotos(env, story, want = 6) {
     if (!m?.img || seen.has(m.img)) { if (m?.img) continue; log.push({ page: c.page, ok: false, why: "no photo on the page" }); continue; }
     seen.add(m.img);
     const known = await env.DB.prepare("SELECT ok, why, ai FROM photo_checks WHERE url=?").bind(m.img).first().catch(() => null);
-    let v = known ? { ok: !!known.ok, why: known.why, ai: !!known.ai } : null;
+    let v = known ? { ok: !!known.ok, sure: !!known.ok && known.why === "checked by the image model", why: known.why, ai: !!known.ai } : null;
     if (!v) {
       const bad = await pageRules(m, { expect: c.expect, storyAt });
       if (bad) v = { ok: false, why: bad };
@@ -310,6 +319,7 @@ export async function checkedPhotos(env, story, want = 6) {
       }
     }
     if (v.ok && !c.own && !v.ai) v = { ok: false, why: "another outlet's photo needs the image model" };
+    if (v.ok && !c.own && v.ai && !v.sure) v = { ok: false, why: "another outlet's photo: the image model was not sure it shows this story", ai: true };
     if (v.ok && c.own && !v.ai && ownKept >= 2) v = { ok: false, why: "two rule-checked photos at most" };
     log.push({ url: m.img, page: c.page, ok: v.ok, why: v.why });
     if (v.ok) { photos.push({ url: m.img, page: c.page, credit: c.credit }); if (c.own) ownKept++; }
