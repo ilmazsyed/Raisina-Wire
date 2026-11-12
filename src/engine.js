@@ -1079,6 +1079,10 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   function resolve() { return forApp(resolveRaw()); }
   function resolveRaw() {
     const c = st.ctl;
+    if (mode === "scene" && fixedScene?.graphic?.kind === "seg" && !fixedScene.graphic.items) {
+      const b = st.tv ? segBuild(fixedScene.graphic.name) : null; if (!b) return null;
+      fixedScene = { ...fixedScene, startAt: Date.now() + (st.skew || 0), dur: b.dur, graphic: { ...fixedScene.graphic, head: b.head, items: b.items } };
+    }
     if (mode === "scene") return fixedScene ? { ...fixedScene, key: JSON.stringify(fixedScene) } : null;
     if (st.tv && !st.tv.on && !(c && (c.mode === "manual" || c.rundown))) return { off: true, key: "off" };
     if (now() < st.dumpUntil || c?.standby?.on) return { standby: true, key: "standby" };
@@ -1595,7 +1599,6 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         const step = t => { if (!n.isConnected) return; const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3), v = to * e; n.textContent = bnDigits((dec ? v.toFixed(1) : Math.round(v)).toLocaleString("en-IN")); if (p < 1) requestAnimationFrame(step); };
         requestAnimationFrame(step); });
       const storyHTML = (x, k) => x.ex ? `<div class="avo ex${channel === "v" ? " v" : ""}" data-k="${k}" data-ex="1"><div class="avo-pics"></div>
-        <div class="ex-tag"><img src="${LOGO}" alt=""><b>খবরের ভেতরে</b><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span></div>
         <div class="ex-cap"><span class="lt-text">${esc(x.title)}</span></div><small class="avo-credit"></small>
         <div class="avo-steps ex-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${lens[j]}s"></i>`).join("")}</div></div>`
         : `<div class="avo${channel === "v" ? " v" : ""}" data-k="${k}"><div class="avo-pics"></div><i class="avo-shade"></i>
@@ -1647,7 +1650,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           // progress stay on screen; the strip's headline changes, and its picture comes in under the
           // stinger with a whoosh.
           box0.dataset.k = k;
-          const kick = box0.querySelector(".avo-kick span, .ex-tag span"); if (kick) kick.textContent = DESK_BN[x.desk] || x.desk || "খবর";
+          const kick = box0.querySelector(".avo-kick span"); if (kick) kick.textContent = DESK_BN[x.desk] || x.desk || "খবর";
           const lt = box0.querySelector(".avo-l3 .lt-text, .ex-cap .lt-text"); if (lt) { lt.textContent = x.title; lt.classList.remove("swap"); void lt.offsetWidth; lt.classList.add("swap"); }
           box0.querySelectorAll(".avo-steps i").forEach((n, j) => { n.className = j < k ? "done" : j === k ? "on" : ""; });
           if (!st.muted) whoosh(st.audio);
@@ -1683,14 +1686,14 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // The two-minute bulletins carry up to seven stories; the 65-second ones at :15 and :45, four.
       // Each story stays on screen as long as the newsreader takes to read it (when its line is
       // ready); as many stories as fit, the spare seconds shared out among them.
-      const total = sc.dur || 120, short = total < 100, all = bulletinPick(Math.floor((sc.startAt || now()) / QUARTER) * QUARTER, short), intro = 12;
+      const total = sc.dur || 120, short = total < 100, all = bulletinPick(Math.floor((sc.playAt || sc.startAt || now()) / QUARTER) * QUARTER, short), intro = 12;
       const even = all.length ? (total - intro) / all.length : total, plan = [];
       { let t = intro;
         for (const x of all) { const d = x.secs ? Math.max(8, x.secs + 1) : even; if (plan.length && t + d > total - 0.5) break; plan.push({ x, at: t, d }); t += d; }
         const spare = Math.max(0, total - t) / Math.max(1, plan.length); let a = intro;
         plan.forEach(p => { p.d += spare; p.at = a; a += p.d; }); }
       const list = plan.map(p => p.x), per = plan[0]?.d || even;
-      const at = new Date(sc.startAt || now()), when = slotWords(at), day = bnDate(at);
+      const at = new Date(sc.playAt || sc.startAt || now()), when = slotWords(at), day = bnDate(at);
       const opening = () => `<div class="nb${channel === "v" ? " v" : ""}"><i class="nb-ray"></i><i class="nb-ray r2"></i><i class="nb-ring"></i><i class="nb-ring b"></i>
         <div class="nb-logo"><img src="${LOGO}" alt="রাষ্ট্রিক্স"></div>
         <div class="nb-word" data-no-tr><b class="w1">NEWS</b><b class="w2">BULLETIN</b></div><i class="nb-line"></i>
@@ -2082,6 +2085,6 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const timers = [setInterval(loadTv, 15000), setInterval(tick, 500), setInterval(() => { st.flash++; }, 8000), setInterval(poll, 5000), setInterval(heartbeat, 5000)];
   return {
     destroy() { if (keepOrder && st.seq) RUNNING[channel] = { seq: st.seq, tv: st.tv, ctl: st.ctl, skew: st.skew, at: Date.now() }; st.alive = false; st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null; try { st.audio?.close(); } catch { /* closed */ } document.removeEventListener("fullscreenchange", fsChange); document.removeEventListener("webkitfullscreenchange", fsChange); document.documentElement.classList.remove("tvp-fs-lock"); ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
-    unmute, setScene(sc) { fixedScene = sc; tick(); }, get state() { return st.ctl; }
+    unmute, setScene(sc) { fixedScene = sc; tick(); }, get state() { return st.ctl; }, sceneDur: () => fixedScene?.graphic?.items || fixedScene?.graphic?.kind !== "seg" ? fixedScene?.dur || 0 : 0
   };
 }

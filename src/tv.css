@@ -1434,11 +1434,7 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .ex-line{max-width:1480px}
 .ex-n{display:inline-block;margin-bottom:24px;padding:4px 14px;background:var(--exr);color:#fff;font:700 30px "DM Mono",monospace;letter-spacing:.08em;animation:exfade .4s both}
 .ex-line p{margin:0;font:700 82px/1.4 "Noto Serif Bengali",serif}
-/* the frame: tag (full logo), the headline in a caption pill, a thin red progress line */
-.ex-tag{position:absolute;left:40px;top:172px;z-index:3;display:flex;align-items:center;gap:14px;padding:8px 20px 8px 10px;border-radius:10px;background:#fffdf8;box-shadow:0 6px 18px rgba(60,40,20,.18);animation:exfade .5s .2s both}
-.ex-tag img{height:46px;width:auto}
-.ex-tag b{font:800 30px "Hind Siliguri",sans-serif;color:var(--exr)}
-.ex-tag span{padding:2px 12px;border-radius:6px;background:var(--ink);color:#fff;font:700 24px "Hind Siliguri",sans-serif}
+/* the frame: the headline in a caption pill, a thin red progress line */
 .ex-cap{position:absolute;left:0;right:0;bottom:96px;z-index:3;display:flex;justify-content:center;pointer-events:none}
 .ex-cap .lt-text{max-width:1500px;padding:12px 30px;border-radius:12px;background:rgba(23,17,15,.9);color:#fff;font:600 38px/1.35 "Hind Siliguri",sans-serif;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ex-cap .lt-text.swap{animation:exfade .5s both}
@@ -1465,7 +1461,6 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .avo.ex.v .ex-paper blockquote{font-size:60px}
 .avo.ex.v .ex-line p{font-size:76px}
 .avo.ex.v .ex-fullt{left:60px;right:60px;bottom:520px}
-.avo.ex.v .ex-tag{top:300px;left:44px}
 .avo.ex.v .ex-cap{bottom:220px;padding:0 40px}
 .avo.ex.v .ex-cap .lt-text{white-space:normal;font-size:40px}
 .avo.ex.v .avo-credit{bottom:330px}
