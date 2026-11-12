@@ -1142,3 +1142,6 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tvp-cd{top:154px}
 /* Vertical channel: the logo sits top right, clear of the headline band at top left. */
 .tvp-v .tv-bug-fixed{left:auto;right:40px;top:40px}
+/* Vertical channel: with the logo at top right, the LIVE clock of full-screen graphics sits just
+   to its left, never under it. */
+.tvp-v .tv-liveclock{right:190px;top:52px}
