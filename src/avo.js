@@ -134,8 +134,16 @@ async function prepare(env, row, sex) {
 // Stories pictured before the news-only finder: their pictures are looked up again (two a minute,
 // newest first, only those still in rotation; hand-written ones keep the pictures they were given).
 async function repicture(env) {
-  const { results } = await env.DB.prepare("SELECT article_id, title, published_at FROM avo_stories WHERE status IN ('ready','off') AND img_v<4 AND origin='auto' AND published_at>=? ORDER BY published_at DESC LIMIT 2")
-    .bind(new Date(Date.now() - AVO_HOURS * 3600e3).toISOString()).all().catch(() => ({ results: [] }));
+  // Once: the image model's first verdicts (asked about the Bengali headline, which it cannot read)
+  // are dropped, and every story is judged again.
+  const ver = await env.DB.prepare("SELECT value FROM settings WHERE key='avo:img_rules'").first().catch(() => null);
+  if (ver?.value !== "2") {
+    await env.DB.batch([env.DB.prepare("DELETE FROM photo_checks WHERE ai=1"), env.DB.prepare("UPDATE avo_stories SET img_v=3 WHERE img_v=4 AND origin='auto'"),
+      env.DB.prepare("UPDATE bulletin_images SET url='', credit='', query='', checked_at='2000-01-01T00:00:00Z'"),
+      env.DB.prepare("INSERT INTO settings (key,value) VALUES ('avo:img_rules','2') ON CONFLICT(key) DO UPDATE SET value='2'")]).catch(() => {});
+  }
+  const { results } = await env.DB.prepare("SELECT article_id, title, published_at FROM avo_stories WHERE status IN ('ready','off') AND img_v<4 AND origin='auto' AND published_at>=? ORDER BY published_at DESC LIMIT 3")
+    .bind(new Date(Date.now() - 24 * 3600e3).toISOString()).all().catch(() => ({ results: [] }));
   for (const r of results) {
     const { photos, log } = await checkedPhotos(env, { id: r.article_id, title: r.title, at: r.published_at }, 6).catch(() => ({ photos: [], log: [] }));
     await env.DB.prepare("UPDATE avo_stories SET images=?, img_log=?, img_v=4 WHERE article_id=?").bind(JSON.stringify(photos), JSON.stringify(log.slice(0, 12)), r.article_id).run();
