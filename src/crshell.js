@@ -3,6 +3,7 @@
 import "./control.css";
 import { initUiLang, langSwitch } from "./uilang.js";
 import { digits } from "./i18n.js";
+import { mountPhoneNav, foldPanels } from "./crmobile.js";
 
 export const esc = (s = "") => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 export const $ = (s, el = document) => el.querySelector(s);
@@ -41,6 +42,13 @@ export async function shell(title, { staff = true } = {}) {
   tick(); setInterval(tick, 1000);
   if (!staff) return null;
   const me = await api("/api/auth/me").catch(() => ({}));
+  // On a phone: the bottom tab bar and the menu of every screen (with the language switch), and
+  // panels that fold. (The prompter is full screen: no tab bar.)
+  if (location.pathname !== "/prompter.html") {
+    const nav = mountPhoneNav({ owner: !!me.user?.owner, hidden: me.user?.role === "admin" ? [] : ["members", "sales", "social"] });
+    const ls = langSwitch(); ls.classList.add("m-lang"); nav?.sheet.querySelector(".m-foot").prepend(ls);
+    const main = $("main"); if (main) foldPanels(main);
+  }
   if (!me.user || !["admin", "editor"].includes(me.user.role)) {
     const main = $("main"); if (main) main.innerHTML = `<div class="cr-denied"><h2>Sign in first</h2><p>This screen is for the Rashtrix newsroom (editors and administrators). Sign in on the website with your newsroom account, then open this page again.</p><p><a href="/en/">Go to sign in</a></p></div>`;
     return null;
