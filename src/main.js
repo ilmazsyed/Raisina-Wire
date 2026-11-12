@@ -370,7 +370,7 @@ function interceptLinks(e) {
   a.closest("dialog")?.close();
   navigate(href);
 }
-const views = { about: viewAbout, ...Object.fromEntries(LEGAL_ORDER.map(([k]) => [k, viewLegal])), coverage: viewCoverage, home: viewHome, desk: viewDesk, briefs: viewBriefs, editions: viewLive, edition: viewStory, article: viewStory, author: viewAuthor, tag: viewTag, my: viewMy, live: viewLive, community: viewCommunity, discussion: viewDiscussion, events: viewEvents, watch: viewWatch, tv: viewWatch, shorts: viewShorts, account: viewAccount, saved: viewSaved, search: viewSearch };
+const views = { about: viewAbout, ...Object.fromEntries(LEGAL_ORDER.map(([k]) => [k, viewLegal])), coverage: viewCoverage, home: viewHome, desk: viewDesk, briefs: viewBriefs, editions: viewLive, edition: viewStory, article: viewStory, author: viewAuthor, tag: viewTag, my: viewMy, live: viewLive, community: viewCommunity, discussion: viewDiscussion, events: viewEvents, watch: viewWatch, tv: viewWatch, shorts: viewShorts, account: viewAccount, saved: viewSaved, search: viewSearch, mybrief: viewMyBrief };
 const DEFAULT_TITLE = "Rashtrix 24×7 News";
 let routeSeq = 0;
 async function route({ restoreY = null } = {}) {
@@ -1277,7 +1277,7 @@ async function ownerMenu(slug) {
   const live = x.status === "published" && !x.pulled;
   const btn = (act, label, cls = "") => `<button type="button" class="own-act ${cls}" data-own="${act}">${esc(tr(label))}</button>`;
   document.body.insertAdjacentHTML("beforeend", `<dialog class="own-sheet" id="ownSheet"><div class="own-head"><span class="kicker">${esc(tr("Story tools"))}</span><b data-no-tr lang="${esc(x.lang || "bn")}">${esc(x.title)}</b></div>
-    <div class="own-acts">${btn("edit", "Edit story")}${btn("versions", "Earlier versions")}${btn("no-pictures", "Remove pictures")}${live ? btn("top", "Move to the top") + btn("breaking", "Breaking on TV") + btn("alert", x.alertState === "sent" ? "Alert sent" : "Send alert", x.alertState === "sent" ? "off" : "") : ""}${OWN_LANGS.filter(l => l !== (x.lang || "bn")).map(l => (x.hiddenLangs || []).includes(l) ? btn(`show-${l}`, OWN_LANG_LABEL[l][1]) : btn(`hide-${l}`, OWN_LANG_LABEL[l][0])).join("")}${live ? btn("pull", "Pull the story", "warn") : btn("restore", "Put it back")}${btn("delete", "Delete for good", "danger")}</div>
+    <div class="own-acts">${btn("edit", "Edit story")}${btn("versions", "Earlier versions")}${btn("no-pictures", "Remove pictures")}${live ? btn("top", "Move to the top") + btn("breaking", "Breaking on TV") + btn("alert", x.alertState === "sent" ? "Alert sent" : "Send alert", x.alertState === "sent" ? "off" : "") : ""}${OWN_LANGS.filter(l => l !== (x.lang || "bn")).map(l => (x.hiddenLangs || []).includes(l) ? btn(`show-${l}`, OWN_LANG_LABEL[l][1]) : btn(`hide-${l}`, OWN_LANG_LABEL[l][0])).join("")}${live ? btn("pull", "Pull the story", "warn") : btn("restore", "Put it back")}${btn("delete", "Delete for good", "danger")}${live ? btn("brief", "Add to my next brief") : ""}${btn("mybrief", "Open Desk Brief")}</div>
     <button type="button" class="own-cancel" data-own="close">${esc(tr("Cancel"))}</button></dialog>`);
   const dlg = document.getElementById("ownSheet");
   dlg.addEventListener("click", e => {
@@ -1286,7 +1286,9 @@ async function ownerMenu(slug) {
     if (!b || b.classList.contains("off")) return;
     dlg.close();
     const act = b.dataset.own, lm = act.match(/^(hide|show)-(\w+)$/);
-    if (act === "edit") ownerEdit(x); else if (act === "versions") ownerVersions(x); else if (lm) ownerLang(x.slug, lm[2], lm[1] === "hide"); else ownerDo(x.slug, act);
+    if (act === "brief") briefAPI("pick", { add: x.id }).then(() => toast(tr("Added to your next brief."))).catch(e => toast(tr(e.message)));
+    else if (act === "mybrief") navigate("/mybrief");
+    else if (act === "edit") ownerEdit(x); else if (act === "versions") ownerVersions(x); else if (lm) ownerLang(x.slug, lm[2], lm[1] === "hide"); else ownerDo(x.slug, act);
   });
   dlg.addEventListener("close", () => dlg.remove());
   dlg.showModal();
@@ -1355,6 +1357,66 @@ function ownerInit() {
   document.addEventListener("touchend", cancel, { passive: true });
   // The tap that ends a long-press does not open the story.
   document.addEventListener("click", e => { if (fired && e.target.closest(sel)) { e.preventDefault(); e.stopPropagation(); fired = false; } }, true);
+}
+/* ---------- The owner's Desk Brief (/mybrief; src/ownerbrief.js) ----------
+   Five times a day the major news comes to the owner's phone and Telegram. Fifteen minutes before,
+   the draft is here: tick the stories to send, or leave it and the desk's choice goes. */
+async function briefAPI(action, body) {
+  const r = await fetch(`/api/owner/brief${action ? `/${action}` : ""}`, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : { cache: "no-store" });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || "Something went wrong. Try again.");
+  return d;
+}
+async function viewMyBrief() {
+  await Promise.race([userReady, new Promise(res => setTimeout(res, 4000))]);
+  if (!isOwner()) { $("#view").innerHTML = `<div class="wrap"><div class="empty" style="margin-top:30px">${esc(tr("Not available."))}</div></div>`; return; }
+  let s; try { s = await briefAPI(); } catch (e) { $("#view").innerHTML = `<div class="wrap"><div class="empty" style="margin-top:30px">${esc(tr(e.message))}</div></div>`; return; }
+  if (parseRoute().page !== "mybrief") return;
+  const items = s.draft?.items || s.preview || [], picks = new Set(s.draft?.picks || []);
+  const when = t => { try { return new Date(t).toLocaleString(LOCALE, { ...IST, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
+  const row = (x, pick = true) => `<div class="mb-item${picks.has(x.id) ? " on" : ""}">${pick ? `<label class="mb-check"><input type="checkbox" data-pick="${esc(x.id)}"${picks.has(x.id) ? " checked" : ""}><span></span></label>` : ""}
+    <div class="mb-text"><a href="/article/${encodeURIComponent(x.slug)}" data-no-tr lang="bn">${esc(x.title)}</a><small>${esc(when(x.at))}${x.sources >= 3 ? ` · ${digits(String(x.sources))} ${esc(tr("outlets"))}` : ""}${x.moved ? ` · <b>${esc(tr("Updated"))}</b>` : ""}</small></div>
+    ${pick ? `<div class="mb-acts"><button type="button" data-bact="breaking" data-slug="${esc(x.slug)}">${esc(tr("Breaking on TV"))}</button><button type="button" data-bact="alert" data-slug="${esc(x.slug)}">${esc(tr("Send alert"))}</button><button type="button" data-bact="top" data-slug="${esc(x.slug)}">${esc(tr("Move to the top"))}</button></div>` : ""}</div>`;
+  const sections = list => Object.entries(s.sections).map(([k, label]) => { const xs = list.filter(x => x.sec === k); return xs.length ? `<h3 class="mb-sec" data-no-tr lang="bn">${esc(label)}</h3>${xs.map(x => row(x, list === items)).join("")}` : ""; }).join("");
+  const r = s.rules, tg = s.telegram;
+  $("#view").innerHTML = `<div class="wrap mybrief"><div class="page-head"><div><div class="kicker">${esc(tr("Desk Brief"))}</div><h1>${esc(tr("Next brief"))}: <span data-no-tr lang="bn">${esc(s.next.label)}</span></h1>
+    <p>${esc(tr(s.draft ? "The draft is ready. Tick the stories to send; if you do not pick by the brief's time, the desk's choice goes." : "The draft is ready 15 minutes before each brief (11am, 2pm, 5pm, 7pm and 9pm). This is what the desk would choose now."))}</p></div></div>
+    <div class="mb-bar"><span>${esc(tr("Picked"))}: <b>${digits(String(picks.size))}</b>${s.draft?.confirmed ? ` · ${esc(tr("Only your picks will go."))}` : ""}</span>
+      <button class="btn btn-dark btn-sm" type="button" data-bdo="confirm"${picks.size ? "" : " disabled"}>${esc(tr(s.draft?.confirmed ? "Mix with the desk's choice" : "Send only my picks"))}</button>
+      <button class="btn btn-red btn-sm" type="button" data-bdo="send">${esc(tr("Send now"))}</button></div>
+    <div class="mb-list">${items.length ? sections(items) : `<div class="empty">${esc(tr("No new major stories since the last brief."))}</div>`}</div>
+    <details class="mb-box"><summary>${esc(tr("Brief rules"))}</summary><form id="mbRules" class="mb-rules">
+      <div class="mb-counts">${Object.entries(s.sections).map(([k, label]) => `<label><span data-no-tr lang="bn">${esc(label)}</span><input type="number" min="0" max="8" name="c_${k}" value="${r.counts[k]}"></label>`).join("")}</div>
+      <label>${esc(tr("Always include stories with these words (one per line)"))}<textarea name="follow" rows="3">${esc(r.follow.join("\n"))}</textarea></label>
+      <label>${esc(tr("Never include stories with these words (one per line)"))}<textarea name="mute" rows="3">${esc(r.mute.join("\n"))}</textarea></label>
+      <button class="btn btn-dark btn-sm" type="submit">${esc(tr("Save rules"))}</button></form></details>
+    ${tg.ready ? `<details class="mb-box"${tg.connected ? "" : " open"}><summary>Telegram</summary><div class="mb-tg">
+      ${tg.connected ? `<p>${esc(tr("Connected"))}: <b>${esc(tg.name)}</b></p><button class="btn btn-light btn-sm" type="button" data-bdo="tg-test">${esc(tr("Send a test"))}</button> <button class="btn btn-light btn-sm" type="button" data-bdo="tg-off">${esc(tr("Disconnect"))}</button>` : `<button class="btn btn-dark btn-sm" type="button" data-bdo="tg-on">${esc(tr("Connect Telegram"))}</button>`}</div></details>` : ""}
+    <details class="mb-box"><summary>${esc(tr("Briefs sent"))}</summary>${s.sent.length ? s.sent.map(b => `<div class="mb-sent"><b data-no-tr lang="bn">${esc(b.items.length ? b.items[0].title : "—")}</b><small>${esc(when(b.at))} · ${digits(String(b.items.length))} ${esc(tr("stories"))} · ${esc(tr(b.mode === "picked" ? "your picks" : b.mode === "mixed" ? "your picks and the desk's" : "the desk's choice"))}</small></div>`).join("") : `<p class="muted">${esc(tr("None yet."))}</p>`}</details>
+    <p class="muted mb-note">${esc(tr("Alerts come to this device when alerts are on and you are signed in. Big stories between briefs come at once."))} <button class="btn btn-light btn-sm" type="button" data-action="alerts">${ICON_BELL} ${esc(tr("Alerts"))}</button></p></div>`;
+  const v = $("#view");
+  v.querySelectorAll("[data-pick]").forEach(c => c.addEventListener("change", async () => {
+    try { await briefAPI("pick", c.checked ? { add: c.dataset.pick } : { remove: c.dataset.pick }); } catch (e) { toast(tr(e.message)); }
+    viewMyBrief();
+  }));
+  v.querySelectorAll("[data-bact]").forEach(b => b.addEventListener("click", () => ownerDo(b.dataset.slug, b.dataset.bact)));
+  v.querySelectorAll("[data-bdo]").forEach(b => b.addEventListener("click", async () => {
+    const d = b.dataset.bdo;
+    try {
+      if (d === "confirm") await briefAPI("pick", { confirm: !s.draft?.confirmed });
+      else if (d === "send") { if (!confirm(tr("Send the brief now?"))) return; await briefAPI("send", {}); toast(tr("Brief sent.")); }
+      else if (d === "tg-on") { const x = await briefAPI("telegram", {}); if (!x.ready) throw new Error(x.error || "Telegram is not set up yet."); window.open(x.link, "_blank"); toast(tr("In Telegram, tap Start. Then come back here.")); return; }
+      else if (d === "tg-test") { const x = await briefAPI("telegram", { test: true }); toast(tr(x.ok ? "Test sent." : "Could not send. Connect again.")); return; }
+      else if (d === "tg-off") await briefAPI("telegram", { disconnect: true });
+    } catch (e) { toast(tr(e.message)); return; }
+    viewMyBrief();
+  }));
+  $("#mbRules")?.addEventListener("submit", async e => {
+    e.preventDefault(); const f = new FormData(e.target);
+    const lines = k => String(f.get(k) || "").split("\n").map(x => x.trim()).filter(Boolean);
+    try { await briefAPI("rules", { counts: Object.fromEntries(Object.keys(s.sections).map(k => [k, Number(f.get(`c_${k}`))])), follow: lines("follow"), mute: lines("mute") }); toast(tr("Saved.")); } catch (er) { toast(tr(er.message)); return; }
+    viewMyBrief();
+  });
 }
 // Once, the first time the owner opens the app: how to reach the tools.
 function ownerHint() {

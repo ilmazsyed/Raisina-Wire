@@ -59,6 +59,7 @@ import { ARTICLE_COLS, toArticle, listPublished, getBySlug, splitTags, tagSlug, 
 import { LANGS, PAGE_LANGS, isLang, localiseArticles, localisePage, PAGES, pageVer } from "./translate.js";
 import { mtReady, translateFields, translateBody } from "./mt.js";
 import { vapidKeys, createAlert, drainAlerts } from "./push.js";
+import { briefStep, briefState, briefPick, saveBriefRules, sendBrief, telegramConnect, telegramHook, ownerTelegram } from "./ownerbrief.js";
 import { renderPage, sitemap, newsSitemap, robots, feed, PAGE_PATTERN } from "./seo.js";
 
 const JSON_HEADERS = {
@@ -940,6 +941,33 @@ async function api(request, env, ctx) {
     return json({ok:true,slug:c.slug,alert},200,{"cache-control":"no-store"});
   }
 
+  // ---- The owner's Desk Brief (src/ownerbrief.js; the app's /mybrief page). Owner only.
+  if (url.pathname === "/api/telegram/hook" && request.method === "POST") return telegramHook(request, env);
+  if (url.pathname.startsWith("/api/owner/brief")) {
+    const user = await currentUser(request, env);
+    if (!isOwner(env, user)) return err("Not available.", 403);
+    const out = x => json(x, 200, { "cache-control": "no-store" });
+    if (url.pathname === "/api/owner/brief" && request.method === "GET") return out(await briefState(env));
+    const b = await request.json().catch(() => ({}));
+    try {
+      if (url.pathname === "/api/owner/brief/pick" && request.method === "POST") return out({ ok: true, draft: await briefPick(env, b) });
+      if (url.pathname === "/api/owner/brief/rules" && request.method === "POST") { const r = await saveBriefRules(env, b); await audit(env, user, "owner.brief-rules", "settings", "brief:rules", r); return out({ ok: true, rules: r }); }
+      if (url.pathname === "/api/owner/brief/send" && request.method === "POST") {
+        // Send now: the draft as it stands (the owner's picks when they confirmed them).
+        const st = await briefState(env), d = st.draft ? { ...st.draft, confirmed: true } : null;
+        const r = await sendBrief(env, Date.now(), st.next.h, d);
+        if (st.draft) await env.DB.prepare("DELETE FROM settings WHERE key='brief:draft'").run();
+        return out({ ok: true, ...r });
+      }
+      if (url.pathname === "/api/owner/brief/telegram" && request.method === "POST") {
+        if (b.test) return out({ ok: await ownerTelegram(env, "<b>রাষ্ট্রিক্স ডেস্ক ব্রিফ</b>\nপরীক্ষা: টেলিগ্রাম সংযোগ ঠিক আছে।") });
+        if (b.disconnect) { await env.DB.prepare("DELETE FROM settings WHERE key='tg:chat'").run(); return out({ ok: true }); }
+        return out(await telegramConnect(env, url.origin));
+      }
+    } catch (e) { return err(e.message || "Failed.", 400); }
+    return err("Not found.", 404);
+  }
+
   // ---- The owner's story tools inside the reader app (src/main.js ownerMenu). Owner only; every
   // action goes into the audit log, and edits, pulls and deletes keep the text as it was before
   // (corrections table). A story pulled, deleted or edited also leaves TV at once: its AVO story,
@@ -1486,6 +1514,10 @@ async function api(request, env, ctx) {
     // Staff devices get a newsroom alert (an output problem) when there is a fresh one.
     if (request.headers.get("cookie")?.includes("rw_session")) {
       const user = await currentUser(request, env).catch(() => null);
+      // The owner's own alerts (the Desk Brief, src/ownerbrief.js) come first on their devices.
+      const own = isOwner(env, user) && await env.DB.prepare("SELECT value FROM settings WHERE key='owner_alert'").first();
+      const oa = own ? JSON.parse(own.value) : null;
+      if (oa && Date.now() - Date.parse(oa.at) < 5 * 60e3) return json({ alert: { title: oa.title, body: oa.body, url: oa.url, createdAt: oa.at } }, 200, { "cache-control": "no-store" });
       const row = isStaff(user) && await env.DB.prepare("SELECT value FROM settings WHERE key='staff_alert'").first();
       const sa = row ? JSON.parse(row.value) : null;
       if (sa && Date.now() - Date.parse(sa.at) < 5 * 60e3) return json({ alert: { title: sa.title, body: sa.body, url: sa.url, createdAt: sa.at } }, 200, { "cache-control": "no-store" });
@@ -1762,6 +1794,7 @@ async function scheduled(env) {
   await step("scheduled stories", async () => { for (const row of results) await storyAlert(env, null, null, row); });
   await step("daily alerts", () => dailyAlerts(env, env.CRON_TEST_NOW ? new Date(env.CRON_TEST_NOW) : new Date())); // CRON_TEST_NOW: local tests only
   await step("push delivery", () => drainAlerts(env));
+  await step("owner brief", () => briefStep(env, env.CRON_TEST_NOW ? Date.parse(env.CRON_TEST_NOW) : Date.now()));
   await step("translations", () => mtWarm(env));
   await step("translation cache", () => env.DB.prepare("DELETE FROM mt_cache WHERE created_at < datetime('now','-45 days')").run());
   // The wire desk (approved sources → rewrites and briefs) and the Wix import (rashtrix.live).
