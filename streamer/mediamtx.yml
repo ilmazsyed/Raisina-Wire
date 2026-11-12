@@ -1,0 +1,34 @@
+# The media server: takes each channel's stream from its capture (inside this machine only) and
+# serves it as HLS (standard MPEG-TS segments, which every streaming platform reads).
+logLevel: warn
+authMethod: internal
+authInternalUsers:
+  # Publishing only from the captures on the private Docker network; anyone can read (Caddy
+  # keeps the addresses behind a secret path).
+  - user: any
+    ips: ["172.16.0.0/12", "127.0.0.1/32"]
+    permissions:
+      - action: publish
+  - user: any
+    permissions:
+      - action: read
+api: false
+metrics: false
+pprof: false
+playback: false
+rtsp: false
+webrtc: false
+srt: false
+moq: false
+rtmp: true
+rtmpAddress: :1935
+hls: true
+hlsAddress: :8888
+hlsAllowOrigins: ["*"]
+hlsAlwaysRemux: true
+hlsVariant: mpegts
+hlsSegmentCount: 10
+hlsSegmentDuration: 2s
+paths:
+  h:
+  v:

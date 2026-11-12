@@ -1,0 +1,12 @@
+# HTTPS for the HLS addresses (a free certificate from Let's Encrypt, renewed by itself). Only
+# addresses under the secret path are served:
+#   https://DOMAIN/FEED_SECRET/h/index.m3u8   horizontal
+#   https://DOMAIN/FEED_SECRET/v/index.m3u8   vertical
+{$DOMAIN} {
+	handle_path /{$FEED_SECRET}/* {
+		reverse_proxy mediamtx:8888
+	}
+	handle {
+		respond "Not found" 404
+	}
+}

@@ -238,6 +238,25 @@ rest, whenever you are ready:
     `[vars]` and `npx wrangler secret put NRCS_PASSWORD`.
 14. **Bitfocus Companion (optional):** PCR → *Companion* → **Make a token**, then follow the steps on
     that screen.
+15. **Both channels as HLS for streaming platforms (`streamer/`, Oracle Cloud Always Free):** a
+    machine that opens each channel's output address in a hidden browser, records it and serves it
+    as HLS around the clock (MediaMTX for HLS, Caddy for HTTPS; optional RTMP push to a platform).
+    1. Oracle Cloud → *Compute → Instances → Create*: image **Ubuntu 24.04**, shape **Ampere
+       VM.Standard.A1.Flex**, 4 OCPU and 24 GB (all inside Always Free). Save the SSH key it offers.
+       In the instance's subnet → *Security list* → add ingress rules for TCP **80** and **443** from
+       `0.0.0.0/0`.
+    2. A free address: **duckdns.org** → sign in → add a subdomain (e.g. `rashtrix-tv`) → set it to
+       the machine's public IP. Your DOMAIN is `rashtrix-tv.duckdns.org`.
+    3. On the machine: `git clone` this repository, `cd Raisina-Wire/streamer`, `sudo bash setup.sh`
+       (installs Docker, opens the ports, makes `.env`), then `nano .env`: the two output keys (the
+       `key=` part of each output address in control room → TV channels), DOMAIN, and a long random
+       FEED_SECRET (`openssl rand -hex 16`). Run `sudo bash setup.sh` again: it starts everything and
+       prints the two HLS addresses, `https://DOMAIN/FEED_SECRET/h/index.m3u8` and `…/v/index.m3u8`.
+    4. Optional: a platform that takes RTMP instead (ingest address + stream key) → `PUSH_H` /
+       `PUSH_V` in `.env`, then `docker compose up -d`.
+    Start at 720p (the default); 1080p for both channels may be more than the free machine can
+    encode. A new output address in the control room stops the old one: then update `.env` and run
+    `docker compose up -d`. Only stream to platforms the rights to the videos on the channel allow.
 
 Machine translation of English live coverage into Bengali and Hindi uses Cloudflare Workers AI
 (free daily allowance) through the `[ai]` binding; no key needed.
