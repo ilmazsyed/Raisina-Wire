@@ -1218,6 +1218,8 @@ async function onAction(e) {
   if (a === "voice") toggleVoice();
   if (a === "tv-ch") { store.set("rw-tv-ch", el.dataset.ch); $$("[data-action=tv-ch]").forEach(b => b.setAttribute("aria-selected", String(b === el))); $("#tvWatch")?.classList.toggle("is-v", el.dataset.ch === "v"); mountWatchTV(); }
   if (a === "short") openShorts(Number(el.dataset.index) || 0);
+  if (a === "w-cat") { $$("[data-action=w-cat]").forEach(b => b.setAttribute("aria-pressed", String(b === el))); filterWatch(undefined, el.dataset.cat); }
+  if (a === "w-prog") playProg(el.dataset.kind, el.dataset.id);
   if (a === "play-video") playInline(el.dataset.id);
   if (a === "lead-step") { const t = document.getElementById("lcTrack"), c = t?.children[0]; if (t && c) t.scrollBy({ left: Number(el.dataset.dir) * (c.offsetWidth + 16), behavior: "smooth" }); }
   if (a === "carousel") { const c = el.closest("section")?.querySelector(".vcarousel"); c?.scrollBy({ left: Number(el.dataset.dir) * c.clientWidth * .85, behavior: "smooth" }); }
@@ -1771,6 +1773,7 @@ async function viewShorts() {
   if (want) document.getElementById(`s-${want}`)?.scrollIntoView({ block: "start" });
 }
 async function loadMedia() {
+  fetch("/api/tv/h").then(r => r.ok ? r.json() : null).then(d => { if (!d) return; state.tvProg = { avo: d.avo || [], bulletin: d.bulletin || [], segs: d.segs || {}, segNames: d.segNames || {} }; if (["tv", "watch"].includes(parseRoute().page)) viewWatch(); }).catch(() => {});
   const [media, tv] = await Promise.all([
     fetch("/api/media").then(r => r.ok ? r.json() : null).then(d => d?.items || []).catch(() => []),
     fetch("/api/tv/videos").then(r => r.ok ? r.json() : null).then(d => d?.videos || []).catch(() => [])
@@ -1778,7 +1781,8 @@ async function loadMedia() {
   // The channel's long YouTube videos sit with the desk's own videos, filed by desk.
   const yt = tv.filter(v => !v.short).map(v => ({ id: `yt-${v.id}`, title: v.title, mediaType: "video", mediaUrl: `https://www.youtube.com/watch?v=${v.id}`,
     thumbnailUrl: v.thumb || `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`, category: v.category, publishedAt: v.publishedAt, duration: v.duration, plays: 0, fromChannel: true }));
-  state.media = [...media, ...yt.filter(v => !media.some(m => String(m.mediaUrl || "").includes(v.id.slice(3))))];
+  // (The channel's long YouTube videos play on Rashtrix TV only; the app lists none of them.)
+  void yt; state.media = media;
   state.tvShorts = tv.filter(v => v.short);
   if (["tv", "watch"].includes(parseRoute().page)) viewWatch();
   renderHomeMedia();
@@ -1956,24 +1960,21 @@ function viewWatch() {
     <div class="wrap"><section class="tv-watch"><div class="tv-watch-head"><div><div class="kicker"><span class="dot-live"></span> Rashtrix TV</div><h1>Watch live</h1></div>
       <div class="pill-tabs" role="tablist" aria-label="Channel">${[["h", "Rashtrix TV"], ["v", "Rashtrix Shorts"]].map(([k, l]) => `<button type="button" role="tab" data-action="tv-ch" data-ch="${k}" aria-selected="${k === tvChannel()}">${l}</button>`).join("")}</div></div>
       <div class="tv-watch-player ${tvChannel() === "v" ? "is-v" : ""}" id="tvWatch" data-no-tr></div><div id="tvInteract" class="tv-interact"></div></section>
-      <div class="page-head"><div><div class="kicker">Watch</div><h2>Videos</h2><p>Videos and shorts from Rashtrix.</p></div></div>
+      <div class="page-head"><div><div class="kicker">Watch</div><h2>On demand</h2><p>Bulletins, news stories, segments and shorts from Rashtrix TV.</p></div></div>
       ${all == null ? `<div class="skeleton" style="height:260px;margin-top:30px"></div>` : `
-      <div class="w-tools"><div class="chips" role="tablist">${["All", ...cats.map(([c]) => c)].map(c => `<button class="chip" type="button" data-action="w-cat" data-cat="${esc(c)}" aria-pressed="${c === "All"}">${esc(c === "All" ? "All" : CAT_NAMES[c] || c)}</button>`).join("")}</div>
+      <div class="w-tools"><div class="chips" role="tablist">${progChips().map(([k, l]) => `<button class="chip" type="button" data-action="w-cat" data-cat="${esc(k)}" aria-pressed="${k === "all"}">${esc(tr(l))}</button>`).join("")}</div>
         <label class="w-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input type="search" id="wSearch" placeholder="Search videos" aria-label="Search videos"></label></div>
       <div id="wRows">
-        ${sh.length ? `<section class="w-row w-shorts" id="shorts"><div class="w-row-head"><h2>Shorts</h2><span class="meta">${sh.length}</span></div><div class="w-rail">${sh.map((m, i) => `<button class="w-short" type="button" data-action="short" data-index="${i}" aria-label="Play: ${esc(m.title)}">${thumbImg(m.thumbnailUrl, i < 5)}<span class="play-badge" aria-hidden="true"></span><b>${esc(m.title)}</b></button>`).join("")}</div></section>` : ""}
-        ${(state.tvShorts || []).length ? `<section class="w-row w-shorts" data-row="ytshorts"><div class="w-row-head"><h2>Rashtrix Shorts</h2><a class="link-gold" href="${withLang("/shorts")}">All shorts →</a></div><div class="w-rail">${state.tvShorts.slice(0, 30).map(v => `<a class="w-short" href="${withLang(`/shorts?v=${encodeURIComponent(v.id)}`)}"><span class="w-short-face"><img src="${esc(v.thumb || `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`)}" alt="" loading="lazy"></span><b data-no-tr>${esc(v.title)}</b></a>`).join("")}</div></section>` : ""}
-        ${wRow("continue", "Continue watching", cont)}
-        ${wRow("latest", "Latest videos", films.slice(0, 14))}
-        ${last && because.length ? wRow("because", `Because you watched ${last.title.length > 40 ? last.title.slice(0, 38) + "…" : last.title}`, because) : ""}
-        ${cats.map(([c, l]) => wRow(`cat:${c}`, CAT_NAMES[c] || c, l, ` data-cat="${esc(c)}"`)).join("")}
-        ${wRow("popular", "Most watched", popular)}
-        ${wRow("more", "More videos", more)}
-        ${others.length ? `<section class="w-row" data-row="other"><div class="w-row-head"><h2>Audio, images and more</h2><span class="meta">${others.length}</span></div><div class="media-grid">${others.map(m => `<article class="glass media-card" id="m-${esc(m.id)}">${mediaEmbed(m)}<div class="body"><span class="kicker">${esc(m.category || m.mediaType)}</span><h3>${esc(m.title)}</h3>${m.description ? `<p>${esc(m.description)}</p>` : ""}${shareBtn(m.title, mediaUrl(m))}</div></article>`).join("")}</div></section>` : ""}
+        ${progRows()}
+        ${sh.length ? `<section class="w-row w-shorts" data-group="shorts" id="shorts"><div class="w-row-head"><h2>Shorts</h2><span class="meta">${sh.length}</span></div><div class="w-rail">${sh.map((m, i) => `<button class="w-short" type="button" data-action="short" data-index="${i}" aria-label="Play: ${esc(m.title)}">${thumbImg(m.thumbnailUrl, i < 5)}<span class="play-badge" aria-hidden="true"></span><b>${esc(m.title)}</b></button>`).join("")}</div></section>` : ""}
+        ${(state.tvShorts || []).length ? `<section class="w-row w-shorts" data-group="shorts" data-row="ytshorts"><div class="w-row-head"><h2>Rashtrix Shorts</h2><a class="link-gold" href="${withLang("/shorts")}">All shorts →</a></div><div class="w-rail">${state.tvShorts.slice(0, 30).map(v => `<a class="w-short" href="${withLang(`/shorts?v=${encodeURIComponent(v.id)}`)}"><span class="w-short-face"><img src="${esc(v.thumb || `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`)}" alt="" loading="lazy"></span><b data-no-tr>${esc(v.title)}</b></a>`).join("")}</div></section>` : ""}
+        ${films.length ? wRow("latest", "Rashtrix videos", films.slice(0, 14), ` data-group="videos"`) : ""}
+        ${others.length ? `<section class="w-row" data-group="other" data-row="other"><div class="w-row-head"><h2>Audio, images and more</h2><span class="meta">${others.length}</span></div><div class="media-grid">${others.map(m => `<article class="glass media-card" id="m-${esc(m.id)}">${mediaEmbed(m)}<div class="body"><span class="kicker">${esc(m.category || m.mediaType)}</span><h3>${esc(m.title)}</h3>${m.description ? `<p>${esc(m.description)}</p>` : ""}${shareBtn(m.title, mediaUrl(m))}</div></article>`).join("")}</div></section>` : ""}
       </div><div id="wResults" class="w-results" hidden></div>
-      ${!films.length && !sh.length && !others.length ? `<div class="empty">Nothing published yet. Videos will appear here.</div>` : ""}`}
+      ${!films.length && !sh.length && !others.length && !state.tvProg ? `<div class="skeleton" style="height:200px;margin-top:20px"></div>` : ""}`}
     </div></div>`;
   $("#wSearch")?.addEventListener("input", e => filterWatch(e.target.value));
+  void cont; void because; void cats; void more; void popular;
   watchDurations(); watchHover();
   // A shared link (/watch?v=id) opens that short in the player, or plays that explainer.
   const want = parseRoute().params.get("v");
@@ -1985,6 +1986,82 @@ function viewWatch() {
   }
   if (carry) { const fresh = $("#tvWatch"); if (fresh) { oldTV.className = fresh.className; fresh.parentNode.moveBefore(oldTV, fresh); fresh.remove(); } else oldTV.remove(); }
   mountWatchTV();
+}
+/* ---------- Watch on demand: the channel's own programmes ----------
+   The bulletins (the latest full bulletin and the latest quick one), the AVO news stories filed
+   by desk, and the segments, each played on demand in the channel's own player (src/engine.js,
+   a fixed scene), the same way they go out on Rashtrix TV. */
+const PROG_DESKS = [["bengal", "West Bengal", d => ["West Bengal", "Kolkata"].includes(d)], ["india", "India", d => ["India", "Probashi Bangali"].includes(d)],
+  ["world", "World", d => d === "World"], ["sports", "Sports", d => d === "Sports"], ["entertainment", "Entertainment", d => d === "Entertainment"],
+  ["lifestyle", "Lifestyle", d => d === "Lifestyle"]];
+const SEG_ORDER = ["soth", "kolkata10", "city", "world", "bangladesh", "numbers", "sports", "entertainment", "lifestyle", "onthisday"];
+const progSegs = () => { const S = state.tvProg?.segs || {}; return SEG_ORDER.filter(n => Array.isArray(S[n]) ? S[n].length >= 2 : !!(S[n] && typeof S[n] === "object")); };
+const avoDesk = x => PROG_DESKS.find(([, , f]) => f(x.desk))?.[0] || "more";
+function progChips() {
+  const P = state.tvProg, out = [["all", "All"]];
+  if (P?.bulletin?.length) out.push(["bulletin", "Bulletins"]);
+  for (const [k, l] of PROG_DESKS) if ((P?.avo || []).some(x => avoDesk(x) === k)) out.push([`avo:${k}`, l]);
+  if (progSegs().length) out.push(["seg", "Segments"]);
+  if (shorts().length || (state.tvShorts || []).length) out.push(["shorts", "Shorts"]);
+  return out;
+}
+const progTime = t => { try { return digits(new Date(t).toLocaleTimeString("en-GB", { ...IST, hour: "2-digit", minute: "2-digit" })); } catch { return ""; } };
+const progThumb = (img, label) => img ? thumbImg(img) : `<span class="w-gthumb"><img src="/brand/logo-sm.webp" alt=""><b data-no-tr lang="bn">${esc(label)}</b></span>`;
+function progCard(kind, id, { img, kick, title, dur, label }) {
+  return `<button class="w-card w-progcard" type="button" data-action="w-prog" data-kind="${kind}" data-id="${esc(id)}">
+    <span class="w-thumb">${progThumb(img, label || title)}${dur ? `<span class="w-dur">${fmtDur(dur)}</span>` : ""}<span class="w-play" aria-hidden="true"></span></span>
+    <span class="w-meta"><span class="kicker">${esc(kick)}</span><b data-no-tr lang="bn">${esc(title)}</b></span></button>`;
+}
+function progRows() {
+  const P = state.tvProg; if (!P) return "";
+  const row = (group, title, cards) => cards.length ? `<section class="w-row" data-group="${esc(group)}"><div class="w-row-head"><h2>${esc(tr(title))}</h2><span class="meta">${digits(String(cards.length))}</span></div><div class="w-rail">${cards.join("")}</div></section>` : "";
+  const out = [];
+  // The bulletins: the latest full bulletin (two minutes, at :00 and :30) and the latest quick one (:15, :45).
+  if (P.bulletin.length) {
+    const now = Date.now(), Q = 900e3, q = Math.floor(now / Q) * Q, full = q - (Math.floor(q / Q) % 2 ? Q : 0), quick = q - (Math.floor(q / Q) % 2 ? 0 : Q);
+    const img = (P.bulletin.find(b => b.image) || {}).image;
+    out.push(row("bulletin", "News bulletins", [
+      progCard("bulletin", `full:${full}`, { img, kick: `${tr("Bulletin")} · ${progTime(full)}`, title: "সংবাদ বুলেটিন", dur: 120, label: "সংবাদ বুলেটিন" }),
+      progCard("bulletin", `quick:${quick}`, { img: (P.bulletin.filter(b => b.image)[1] || {}).image || img, kick: `${tr("Bulletin")} · ${progTime(quick)}`, title: "খবর সংক্ষেপে", dur: 65, label: "খবর সংক্ষেপে" })]));
+  }
+  // The AVO news stories, by desk, newest first.
+  for (const [k, l] of [...PROG_DESKS, ["more", "More news"]]) {
+    const xs = P.avo.filter(x => avoDesk(x) === k).sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0)).slice(0, 20);
+    out.push(row(`avo:${k}`, k === "more" ? l : `News now: ${l}`, xs.map(x => progCard("avo", x.id, { img: (x.images || [])[0]?.src, kick: `${tr(DESK_LABEL(x.desk))} · ${progTime(x.at)}`, title: x.title, dur: Math.round(Math.max(8, (x.secs || 20) + 2)), label: DESK_BN_APP[x.desk] || x.title }))));
+  }
+  // The segments.
+  out.push(row("seg", "Segments", progSegs().map(n => progCard("seg", n, { img: ((P.segs[n] || [])[0] || {}).img, kick: tr("Segment"), title: P.segNames[n] || n, label: P.segNames[n] || n }))));
+  return out.join("");
+}
+const DESK_LABEL = d => d || "News";
+const DESK_BN_APP = { Kolkata: "কলকাতা", "West Bengal": "পশ্চিমবঙ্গ", India: "ভারত", "Probashi Bangali": "প্রবাসী বাঙালি", World: "বিশ্ব", Entertainment: "বিনোদন", Sports: "খেলা", Lifestyle: "জীবনধারা" };
+// One programme in the channel's player, in a sheet over the page.
+let progTV = null;
+async function playProg(kind, id) {
+  const P = state.tvProg; if (!P) return;
+  let graphic, dur, title;
+  if (kind === "avo") { const x = P.avo.find(y => y.id === id); if (!x) return; graphic = { kind: "avo", stories: [x] }; dur = Math.ceil(Math.max(8, (x.secs || 20) + 2)); title = x.title; }
+  else if (kind === "bulletin") { const quick = id.startsWith("quick"); graphic = { kind: "bulletin" }; dur = quick ? 65 : 120; title = quick ? "খবর সংক্ষেপে" : "সংবাদ বুলেটিন"; }
+  else { graphic = { kind: "seg", name: id }; dur = 0; title = P.segNames[id] || id; }
+  progTV?.destroy?.(); document.getElementById("progSheet")?.remove();
+  document.body.insertAdjacentHTML("beforeend", `<dialog class="prog-sheet" id="progSheet"><div class="prog-head"><b data-no-tr lang="bn">${esc(title)}</b><button type="button" class="prog-x" aria-label="${esc(tr("Close"))}">✕</button></div><div class="prog-screen" data-no-tr></div><div class="prog-end" hidden><button type="button" class="btn btn-red" data-again>${esc(tr("Play again"))}</button><button type="button" class="btn btn-light" data-close>${esc(tr("Close"))}</button></div></dialog>`);
+  const dlg = document.getElementById("progSheet"), screen = dlg.querySelector(".prog-screen"), end = dlg.querySelector(".prog-end");
+  let timer = 0;
+  const start = () => {
+    progTV?.destroy?.(); end.hidden = true; screen.innerHTML = "";
+    const startAt = kind === "bulletin" && id.includes(":") ? Number(id.split(":")[1]) : Date.now();
+    progTV = mountTV(screen, { channel: "h", mode: "scene", muted: false, scene: { layout: "graphic", sources: [], full: true, dur: dur || 90, startAt: Date.now(), playAt: startAt, key: `od:${kind}:${id}:${Date.now()}`, graphic } });
+    clearTimeout(timer);
+    // When it ends (a segment's length is known once it is built), the choice to play it again.
+    // (a segment with nothing to show just now says so)
+    const t0 = Date.now(), wait = () => { const d = dur || progTV?.sceneDur?.() || 0;
+      if (!d) { if (Date.now() - t0 > 8000) { screen.innerHTML = `<div class="prog-none">${esc(tr("This programme is not available right now. Try again later."))}</div>`; end.hidden = false; return; } return (timer = setTimeout(wait, 1000)); }
+      timer = setTimeout(() => { end.hidden = false; }, d * 1000 + 600); };
+    wait();
+  };
+  dlg.addEventListener("click", e => { if (e.target === dlg || e.target.closest(".prog-x,[data-close]")) dlg.close(); if (e.target.closest("[data-again]")) start(); });
+  dlg.addEventListener("close", () => { clearTimeout(timer); progTV?.destroy?.(); progTV = null; dlg.remove(); });
+  dlg.showModal(); start();
 }
 // Rashtrix TV in the app: the channel's own player (not the YouTube page of the stream).
 const tvChannel = () => store.get("rw-tv-ch", "h") === "v" ? "v" : "h";
@@ -2022,7 +2099,18 @@ async function drawTvInteract() {
 }
 function filterWatch(q, cat) {
   const rows = $("#wRows"), res = $("#wResults"); if (!rows) return;
-  q = (q || "").trim().toLowerCase();
+  // The chips show one group of rows; the search keeps the cards whose title matches.
+  if (cat !== undefined) state.wCat = cat;
+  q = (q ?? $("#wSearch")?.value ?? "").trim().toLowerCase(); cat = state.wCat || "all";
+  res.hidden = true; rows.hidden = false;
+  rows.querySelectorAll(".w-row").forEach(r => {
+    const g = r.dataset.group || "";
+    let show = cat === "all" || g === cat;
+    if (show && q) { let any = false; r.querySelectorAll(".w-card,.w-short").forEach(c => { const hit = (c.textContent || "").toLowerCase().includes(q); c.hidden = !hit; any ||= hit; }); show = any; }
+    else r.querySelectorAll(".w-card,.w-short").forEach(c => { c.hidden = false; });
+    r.hidden = !show;
+  });
+  return;
   const films = (state.media || []).filter(isFilm);
   if (!q && (!cat || cat === "All")) { rows.hidden = false; res.hidden = true; return; }
   const hits = films.filter(m => (!cat || cat === "All" || m.category === cat) && (!q || `${m.title} ${m.description || ""}`.toLowerCase().includes(q)));
