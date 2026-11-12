@@ -20,8 +20,8 @@ const bnDigits = s => String(s).replace(/\d/g, d => "০১২৩৪৫৬৭৮
 const DESK_BN = { Kolkata: "কলকাতা", "West Bengal": "পশ্চিমবঙ্গ", India: "ভারত", "Probashi Bangali": "প্রবাসী বাঙালি", World: "বিশ্ব", Entertainment: "বিনোদন", Sports: "খেলা", Lifestyle: "জীবনধারা" };
 const SIZE = { h: [1920, 1080], v: [1080, 1920] };
 const LOGO = "/brand/logo.webp";
-// The studio pictures (the channel's face, the full logo in the set behind): the wide one in the
-// L-band and, every twenty seconds for four, in the ad box; the square one as an image wipe.
+// The studio pictures (the channel's face, the full logo in the set behind): the square one in the
+// L-band; the wide one in the ad box (four seconds in every twenty) and, full screen, as an image wipe.
 const STUDIO_WIDE = "/brand/studio-wide.webp", STUDIO_SQUARE = "/brand/studio-square.webp";
 
 // Slot rectangles (percent of the frame: x, y, w, h) for each layout and orientation.
@@ -1150,7 +1150,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // time), one in eight at other hours.
       const primeNow = (h => h >= 17 && h < 23)(new Date(now() + 5.5 * 3600e3).getUTCHours());
       st.stingN = (st.stingN || 0) + 1;
-      if (t.type === "stinger" && st.stingN % (primeNow ? 3 : 8) === 0) { w.className = "tvp-stinger tvp-studiowipe"; w.innerHTML = `<i class="sw a"></i><i class="sw b"></i><div class="sw-pic"><img src="${STUDIO_SQUARE}" alt=""><i></i></div><i class="sw c"></i>`; }
+      if (t.type === "stinger" && st.stingN % (primeNow ? 3 : 8) === 0) { w.className = "tvp-stinger tvp-studiowipe"; w.innerHTML = `<div class="sw-full"><img src="${channel === "v" ? STUDIO_SQUARE : STUDIO_WIDE}" alt=""><i class="sw-shine"></i></div><i class="sw-edge"></i>`; }
       else if (t.type === "stinger") w.innerHTML = `<img src="${LOGO}" alt="">`;
       stage.append(w); box.style.visibility = "hidden";
       if (!st.muted) (t.type === "stinger" ? stingerSound : whoosh)(st.audio);
@@ -1912,7 +1912,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const Hs = (st.tv?.headlines || []).filter(h => h.text), n = Hs.length;
     const main = st.tv?.lband?.text || (n ? Hs[k % n].text : airLabel(sc));
     const side = n ? [1, 2, 3, 4].map(i => Hs[(k + i) % n]).filter((h, i, a) => h && a.indexOf(h) === i && h.text !== main) : [];
-    put(".tvp-lbl", `<div class="lb-auto-box${on ? "" : " out"}" data-k="${k}"><div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${side.slice(0, 3).map((h, i) => `<p style="--n:${i}"><small>${esc(DESK_BN[h.desk] || h.desk || "")}</small>${esc(h.text)}</p>`).join("")}<div class="lb-logo lb-studio"><img src="${STUDIO_WIDE}" alt=""><i></i></div></div><div class="lb-bottom"><b>${esc(main)}</b>${L.ad ? `<div class="tv-adslot"></div>` : ""}</div></div>`);
+    put(".tvp-lbl", `<div class="lb-auto-box${on ? "" : " out"}" data-k="${k}"><div class="lb-side"><span class="lb-kicker">শিরোনাম</span>${side.slice(0, 3).map((h, i) => `<p style="--n:${i}"><small>${esc(DESK_BN[h.desk] || h.desk || "")}</small>${esc(h.text)}</p>`).join("")}<div class="lb-logo lb-studio"><img src="${STUDIO_SQUARE}" alt=""><i></i></div></div><div class="lb-bottom"><b>${esc(main)}</b>${L.ad ? `<div class="tv-adslot"></div>` : ""}</div></div>`);
   }
   // The card that names what is coming, before the headlines or a breaking story: the word
   // wipes in over a bar of light, in English and Bengali, then the screen wipes to the story.
