@@ -72,6 +72,14 @@ async function onThisDay(env) {
 // Places a story may name, for the story of the hour's map: Bengal's districts and towns, India,
 // Bangladesh and the world (Bengali spellings first, then English), with latitude and longitude.
 const PLACES = [
+  // Towns first (a town is more exact than its district).
+  ["নৈহাটি|Naihati", 22.89, 88.42], ["ব্যারাকপুর|Barrackpore", 22.76, 88.38], ["কল্যাণী|Kalyani", 22.98, 88.43], ["ব্যান্ডেল|Bandel", 22.92, 88.38], ["শ্রীরামপুর|Serampore", 22.75, 88.34],
+  ["উত্তরপাড়া|Uttarpara", 22.66, 88.35], ["আরামবাগ|Arambagh", 22.88, 87.78], ["দমদম|Dum Dum", 22.62, 88.42], ["সল্টলেক|বিধাননগর|Salt Lake", 22.58, 88.41], ["নিউটাউন|নিউ টাউন|New Town", 22.59, 88.48],
+  ["সোনারপুর|Sonarpur", 22.44, 88.43], ["বারুইপুর|Baruipur", 22.36, 88.43], ["ক্যানিং|Canning", 22.31, 88.66], ["কাকদ্বীপ|Kakdwip", 21.88, 88.19], ["গঙ্গাসাগর|সাগরদ্বীপ|Gangasagar", 21.65, 88.08],
+  ["নবদ্বীপ|Nabadwip", 23.41, 88.37], ["রানাঘাট|Ranaghat", 23.18, 88.57], ["কাটোয়া|Katwa", 23.65, 88.13], ["কালনা|Kalna", 23.22, 88.36], ["জঙ্গিপুর|Jangipur", 24.47, 88.08],
+  ["ফরাক্কা|Farakka", 24.82, 87.92], ["কাঁথি|Contai", 21.78, 87.75], ["ঘাটাল|Ghatal", 22.66, 87.73], ["বিষ্ণুপুর|Bishnupur", 23.07, 87.32], ["রামপুরহাট|Rampurhat", 24.17, 87.78],
+  ["তারাপীঠ|Tarapith", 24.11, 87.8], ["মন্দারমণি|Mandarmani", 21.66, 87.71], ["কার্শিয়াং|Kurseong", 26.88, 88.28], ["মিরিক|Mirik", 26.89, 88.18], ["ইসলামপুর|Islampur", 26.27, 88.19],
+  ["বেলুড়|Belur", 22.63, 88.34], ["দক্ষিণেশ্বর|Dakshineswar", 22.65, 88.36], ["বনগাঁ|Bangaon", 23.05, 88.82], ["বসিরহাট|Basirhat", 22.66, 88.87], ["ডায়মন্ড হারবার|Diamond Harbour", 22.19, 88.19],
   ["কলকাতা|Kolkata", 22.57, 88.36], ["হাওড়া|Howrah", 22.59, 88.31], ["হুগলি|Hooghly|চুঁচুড়া", 22.9, 88.39], ["উত্তর ২৪ পরগনা|বারাসত|Barasat", 22.72, 88.48], ["দক্ষিণ ২৪ পরগনা|আলিপুর", 22.16, 88.43],
   ["দার্জিলিং|Darjeeling", 27.04, 88.26], ["শিলিগুড়ি|Siliguri", 26.73, 88.4], ["জলপাইগুড়ি|Jalpaiguri", 26.52, 88.72], ["কোচবিহার|Cooch Behar", 26.32, 89.45], ["আলিপুরদুয়ার|Alipurduar", 26.49, 89.53],
   ["মালদা|মালদহ|Malda", 25.01, 88.14], ["মুর্শিদাবাদ|বহরমপুর|Murshidabad", 24.1, 88.25], ["নদিয়া|কৃষ্ণনগর|Nadia", 23.4, 88.5], ["বর্ধমান|Bardhaman", 23.23, 87.86], ["আসানসোল|Asansol", 23.68, 86.98],
@@ -86,7 +94,22 @@ const PLACES = [
   ["কাঠমান্ডু|নেপাল|Kathmandu", 27.72, 85.32], ["ইসলামাবাদ|Islamabad", 33.68, 73.05], ["কলম্বো|শ্রীলঙ্কা|Colombo", 6.93, 79.86], ["থিম্পু|ভুটান|Thimphu", 27.47, 89.64], ["বেজিং|Beijing", 39.9, 116.4],
   ["ওয়াশিংটন|Washington", 38.9, -77.04], ["মস্কো|Moscow", 55.76, 37.62], ["লন্ডন|London", 51.51, -0.13], ["কিভ|কিয়েভ|Kyiv", 50.45, 30.52], ["গাজা|Gaza", 31.5, 34.47], ["তেহরান|Tehran", 35.69, 51.39], ["দুবাই|Dubai", 25.2, 55.27]
 ].map(([n, lat, lon]) => ({ names: n.split("|"), name: n.split("|")[0], lat, lon }));
-const placesIn = text => { const out = []; for (const p of PLACES) if (p.names.some(n => text.includes(n)) && !out.some(o => o.name === p.name)) out.push({ name: p.name, lat: p.lat, lon: p.lon }); return out.slice(0, 4); };
+// In the order the text names them; a place within a few kilometres of one already found (a
+// town and its district) is left out.
+const placesIn = text => {
+  const hits = [];
+  for (const p of PLACES) { let at = Infinity; for (const n of p.names) { const i = text.indexOf(n); if (i >= 0 && i < at) at = i; } if (at < Infinity) hits.push({ at, p }); }
+  const out = [];
+  for (const { p } of hits.sort((a, b) => a.at - b.at)) if (!out.some(o => o.name === p.name || Math.hypot(o.lat - p.lat, o.lon - p.lon) < 0.12)) out.push({ name: p.name, lat: p.lat, lon: p.lon });
+  return out.slice(0, 3);
+};
+// What the story is about, for the segment's icon.
+const TOPICS = [["fire", /আগুন|অগ্নিকাণ্ড|বিস্ফোরণ|দমকল/], ["crash", /দুর্ঘটনা|সংঘর্ষ|লাইনচ্যুত|উল্টে/], ["crime", /পুলিশ|গ্রেফতার|খুন|চুরি|ডাকাতি|অভিযুক্ত|সিবিআই|ইডি|তদন্ত|আটক/],
+  ["court", /আদালত|হাইকোর্ট|সুপ্রিম কোর্ট|বিচারপতি|মামলা|রায়/], ["vote", /নির্বাচন|ভোট|প্রার্থী|কমিশন|বিধানসভা|লোকসভা/], ["weather", /বৃষ্টি|ঝড়|ঘূর্ণিঝড়|আবহাওয়া|তাপমাত্রা|শীত|গরম|বন্যা|নিম্নচাপ/],
+  ["health", /হাসপাতাল|চিকিৎসা|ডেঙ্গি|রোগী|স্বাস্থ্য|ডাক্তার|চিকিৎসক/], ["sport", /ম্যাচ|ক্রিকেট|ফুটবল|গোল|উইকেট|মোহনবাগান|ইস্টবেঙ্গল|টুর্নামেন্ট/],
+  ["faith", /পুজো|প্রতিমা|বিসর্জন|উৎসব|মন্দির|ভক্ত|ইদ|মেলা/], ["travel", /ট্রেন|মেট্রো|বাস|বিমান|উড়ান|ফেরি|রাস্তা|যান চলাচল/], ["protest", /বিক্ষোভ|ধর্মঘট|অবরোধ|মিছিল|আন্দোলন/],
+  ["money", /টাকা|দাম|বাজার|শেয়ার|বাজেট|কর|ব্যাংক|ব্যাঙ্ক/], ["school", /পরীক্ষা|স্কুল|বিশ্ববিদ্যালয়|ছাত্র|শিক্ষক|পড়ুয়া/], ["politics", /মন্ত্রী|সরকার|তৃণমূল|বিজেপি|সিপিএম|কংগ্রেস|দল|নেতা/]];
+const topicOf = text => (TOPICS.find(([, re]) => re.test(text)) || ["news"])[0];
 const QUOTE = /[“"‘']([^”"’']{25,170})[”"’']/;
 const words = t => new Set(String(t || "").toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s]/gu, " ").split(/\s+/).filter(w => w.length >= 3));
 // The story of the hour: the biggest story in the AVO pool of the last three hours (most outlets
@@ -97,7 +120,9 @@ async function storyOfHour(env, avo) {
   const top = (recent.length ? recent : (avo || []).filter(x => x.voice?.length)).slice().sort((a, b) => (b.score || 0) - (a.score || 0) || String(b.at).localeCompare(String(a.at)))[0];
   if (!top) return null;
   const art = top.id && !String(top.id).startsWith("brk:") ? await env.DB.prepare("SELECT title, substr(body,1,4000) AS body, published_at FROM articles WHERE id=?").bind(top.id).first().catch(() => null) : null;
-  const body = plain(art?.body || ""), text = `${top.title} ${(top.lines || []).join(" ")} ${body}`;
+  const body = plain(art?.body || ""), lines = top.lines || [];
+  // The map shows only the places the headline or the first two sentences name (a place further
+  // down a report is often only a mention).
   const q = body.match(QUOTE);
   let timeline = [];
   if (art) {
@@ -106,7 +131,12 @@ async function storyOfHour(env, avo) {
       .bind(top.id, new Date(Date.now() - 48 * 3600e3).toISOString(), art.published_at).all().catch(() => ({ results: [] }));
     timeline = results.filter(r => { let n = 0; for (const w of words(r.title)) if (W.has(w)) n++; return n >= 2; }).slice(0, 4).map(r => ({ t: r.title, at: r.published_at })).reverse();
   }
-  return { id: top.id, t: top.title, d: top.desk, lines: top.lines || [], voice: top.voice, secs: top.secs, images: top.images || [], upd: !!top.upd, places: placesIn(text), quote: q ? q[1].trim() : "", timeline };
+  // A figure in each sentence, if it has one (the segment counts it up on screen).
+  const figs = lines.map(l => { const m = l.match(FIG); const n = m ? toNum(m[1]) : 0; return n > 0 && !(m[2] === "বছর" && n > 150) ? { n, dec: /[.]/.test(m[1]), unit: m[2] } : null; });
+  // No photographs: the story of the hour is told in the channel's own graphics (a search picture
+  // can belong to another story).
+  return { id: top.id, t: top.title, d: top.desk, at: top.at, lines, voice: top.voice, secs: top.secs, upd: !!top.upd, topic: topicOf(`${top.title} ${lines.slice(0, 2).join(" ")}`),
+    places: placesIn(`${top.title} ${lines.slice(0, 2).join(" ")}`), figs, quote: q ? q[1].trim() : "", timeline };
 }
 
 const memo = new Map();
