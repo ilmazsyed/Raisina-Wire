@@ -11,12 +11,15 @@
 //   sentences, about 30 seconds read at the bulletin's pace. Its first part is the bulletin's own
 //   line (the same recording, so it costs nothing twice); the rest is recorded once.
 // - The newsreader: Despina and Sadachbia in turn, story by story.
-// - Pictures: four or more clean, credited photographs (src/bulletinimg.js storyPhotos); the
-//   screens fill any gap with the channel's graphic cards.
+// - Pictures: only photographs that are about the story (src/bulletinimg.js checkedPhotos: its own
+//   reports or plainly the same story elsewhere, page and picture rules, then the image model; with
+//   the model unavailable, the stricter free rules). A story with fewer than two is told in motion
+//   graphics on the screens (its icon, map, figure and sentences).
 // - A story leaves the rotation when it is six hours old or has been on air four times.
 import { readLine, voiceKey, tvVoice, voiceRate, voiceBudget, chargeVoice } from "./bulletinvoice.js";
 import { synthesize, sha256, ttsEnabled } from "./tts.js";
-import { newsPhotos } from "./bulletinimg.js";
+import { checkedPhotos } from "./bulletinimg.js";
+import { placesIn, topicOf } from "./segments.js";
 import { labelsOf } from "./labels.js";
 
 export const AVO_DAILY = 45, AVO_HOURS = 6, AVO_MAX_AIRED = 4, AVO_SECONDS = 30;
@@ -95,7 +98,7 @@ export async function avoFromBreaking(env, br) {
 async function prepare(env, row, sex) {
   const own = row.origin === "manual" || row.origin === "breaking" || row.article_id.startsWith("brk:");
   const brief = own ? (JSON.parse(row.script || "[]").join(" ") || row.title) : "";
-  const a = own ? { id: row.article_id, title: row.title, dek: "", body: brief } : await env.DB.prepare("SELECT id, title, dek, body FROM articles WHERE id=?").bind(row.article_id).first();
+  const a = own ? { id: row.article_id, title: row.title, dek: "", body: brief, published_at: row.published_at } : await env.DB.prepare("SELECT id, title, dek, body, published_at FROM articles WHERE id=?").bind(row.article_id).first();
   if (!a) { await env.DB.prepare("UPDATE avo_stories SET status='failed' WHERE article_id=?").bind(row.article_id).run(); return; }
   // A hand-written story is read as written (its brief, up to 450 characters), in one recording.
   const s = own ? { item: { text: brief, title: a.title }, first: brief, rest: "", lines: sentencesOf(brief).length ? sentencesOf(brief) : [brief], whole: true } : avoScript(a);
@@ -117,25 +120,25 @@ async function prepare(env, row, sex) {
   }
   // Pictures: a hand-written story keeps the ones given (searching for more only when it has
   // fewer than four and the desk asked for it).
-  let photos = own ? JSON.parse(row.images || "[]") : [];
+  let photos = own ? JSON.parse(row.images || "[]") : [], log = [];
   if (!own || (photos.length < 4 && row.find_more)) {
-    const found = await newsPhotos(env, { id: a.id, title: a.title, dek: a.dek || "" }, 6).catch(() => []);
-    const seen = new Set(photos.map(x => x.url));
-    for (const x of found) if (photos.length < 6 && !seen.has(x.url)) { photos.push(x); seen.add(x.url); }
+    const found = await checkedPhotos(env, { id: a.id, title: a.title, at: a.published_at }, 6).catch(() => ({ photos: [], log: [] }));
+    const seen = new Set(photos.map(x => x.url)); log = found.log;
+    for (const x of found.photos) if (photos.length < 6 && !seen.has(x.url)) { photos.push(x); seen.add(x.url); }
   }
-  await env.DB.prepare("UPDATE avo_stories SET script=?, sex=?, voice=?, secs=?, images=?, img_v=3, prepared_at=?, status='ready' WHERE article_id=?")
-    .bind(JSON.stringify(s.lines), sex, JSON.stringify(keys), Math.round(bytes / 4000 * 10) / 10, JSON.stringify(photos), new Date().toISOString(), row.article_id).run();
+  await env.DB.prepare("UPDATE avo_stories SET script=?, sex=?, voice=?, secs=?, images=?, img_log=?, img_v=4, prepared_at=?, status='ready' WHERE article_id=?")
+    .bind(JSON.stringify(s.lines), sex, JSON.stringify(keys), Math.round(bytes / 4000 * 10) / 10, JSON.stringify(photos), JSON.stringify(log.slice(0, 12)), new Date().toISOString(), row.article_id).run();
 }
 
 // The minute cron: choose new stories, then prepare up to two.
 // Stories pictured before the news-only finder: their pictures are looked up again (two a minute,
 // newest first, only those still in rotation; hand-written ones keep the pictures they were given).
 async function repicture(env) {
-  const { results } = await env.DB.prepare("SELECT article_id, title FROM avo_stories WHERE status IN ('ready','off') AND img_v<3 AND origin='auto' AND published_at>=? ORDER BY published_at DESC LIMIT 2")
+  const { results } = await env.DB.prepare("SELECT article_id, title, published_at FROM avo_stories WHERE status IN ('ready','off') AND img_v<4 AND origin='auto' AND published_at>=? ORDER BY published_at DESC LIMIT 2")
     .bind(new Date(Date.now() - AVO_HOURS * 3600e3).toISOString()).all().catch(() => ({ results: [] }));
   for (const r of results) {
-    const photos = await newsPhotos(env, { id: r.article_id, title: r.title, dek: "" }, 6).catch(() => []);
-    await env.DB.prepare("UPDATE avo_stories SET images=?, img_v=3 WHERE article_id=?").bind(JSON.stringify(photos), r.article_id).run();
+    const { photos, log } = await checkedPhotos(env, { id: r.article_id, title: r.title, at: r.published_at }, 6).catch(() => ({ photos: [], log: [] }));
+    await env.DB.prepare("UPDATE avo_stories SET images=?, img_log=?, img_v=4 WHERE article_id=?").bind(JSON.stringify(photos), JSON.stringify(log.slice(0, 12)), r.article_id).run();
   }
   return results.length;
 }
@@ -183,7 +186,9 @@ export function screenStory(r) {
   const j = (v, d) => { try { return JSON.parse(v || d); } catch { return JSON.parse(d); } };
   return { id: r.article_id, title: r.title, desk: r.desk, region: r.region, sex: r.sex, lines: j(r.script, "[]"),
     voice: j(r.voice, "[]").map(k => `/api/tv/voice/${k}.mp3`), secs: r.secs,
-    images: j(r.images, "[]").map((x, i) => ({ src: /^\/(media|brand)\//.test(x.url || "") ? x.url : `/api/tv/aimg/${encodeURIComponent(r.article_id)}/${i}`, credit: x.credit || "" })), at: r.published_at, origin: r.origin || "auto", score: r.score || 0,
+    images: (r.origin !== "manual" && (r.img_v || 0) < 4 ? [] : j(r.images, "[]")).map((x, i) => ({ src: /^\/(media|brand)\//.test(x.url || "") ? x.url : `/api/tv/aimg/${encodeURIComponent(r.article_id)}/${i}`, credit: x.credit || "" })), at: r.published_at, origin: r.origin || "auto", score: r.score || 0,
+    places: placesIn(`${r.title} ${j(r.script, "[]").slice(0, 2).join(" ")}`), topic: topicOf(`${r.title} ${j(r.script, "[]").slice(0, 2).join(" ")}`),
+    imgLog: j(r.img_log, "[]"),
     upd: !!(r.prepared_at && r.created_at && Date.parse(r.prepared_at) - Date.parse(String(r.created_at).replace(" ", "T") + "Z") > 15 * 60e3),
     ...labelsOf(r.desk, `${r.title} ${j(r.script, "[]").join(" ")}`, (() => { try { return JSON.parse(r.labels || "null"); } catch { return null; } })()) };
 }

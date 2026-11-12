@@ -333,6 +333,41 @@ const INTERNAL_LABELS = /^(running order|continuity|program|preview|standby|slat
 const airLabel = sc => { const l = String(sc?.label || "").trim(); return !l || INTERNAL_LABELS.test(l) || sc?.sources?.[0]?.kind === "continuity" ? "" : l; };
 const MAPS = {};   // the map outlines, loaded once when a map is first on air
 const inRing = (x, y, r) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, yi] = r[i], [xj, yj] = r[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+// A sentence as words, the figures and the places it names marked: the screen lights each word as
+// the newsreader reaches it (over d seconds).
+function soWords(l, d, places = []) {
+  const ws = String(l || "").split(/\s+/).filter(Boolean), n = ws.reduce((a, b) => a + b.length + 1, 0); let at = 0;
+  return ws.map(wd => { const hot = /[০-৯0-9]/.test(wd) || places.some(p => wd.startsWith(p.name)); const t = (at / n) * d * 0.86; at += wd.length + 1; return `<span class="${hot ? "so-hot" : ""}" style="--t:${t.toFixed(2)}s">${esc(wd)}</span>`; }).join(" ");
+}
+// The map of a story's places: India's states (Natural Earth), the neighbours, the places pinned; it
+// flies in from a wide view, and the labels sit inside the frame, clear of each other.
+async function soMap(svg, pl, v) {
+    const near = pl.every(p => p.lon > 60 && p.lon < 100 && p.lat > 5 && p.lat < 40);
+    const [sts, cts] = await Promise.all([near ? (MAPS.st ||= fetch("/tv/map-states.json").then(r => r.json()).catch(() => [])) : [], MAPS[near ? "sa" : "w"] ||= fetch(near ? "/tv/map-southasia.json" : "/tv/map-world.json").then(r => r.json()).catch(() => [])]);
+    if (!svg.isConnected) return;
+    // The frame's own size (before the screen's scaling), so labels are the same size everywhere.
+    const box = { width: svg.clientWidth || svg.getBoundingClientRect().width, height: svg.clientHeight || svg.getBoundingClientRect().height }, W = 1000, Hh = Math.round(1000 * (box.height / Math.max(1, box.width))) || 560;
+    svg.setAttribute("viewBox", `0 0 ${W} ${Hh}`);
+    const lat0 = pl.reduce((a, p) => a + p.lat, 0) / pl.length, kx = Math.cos(lat0 * Math.PI / 180);
+    let lo0 = Math.min(...pl.map(p => p.lon)), lo1 = Math.max(...pl.map(p => p.lon)), la0 = Math.min(...pl.map(p => p.lat)), la1 = Math.max(...pl.map(p => p.lat));
+    // At least Bengal's width around a local story; room for the labels to the side.
+    const minSpan = near ? 4.2 : 18;
+    const sx = Math.max(minSpan, (lo1 - lo0) * 1.9 + 2), sy = Math.max(minSpan * 0.75, (la1 - la0) * 1.9 + 1.4);
+    const cx = (lo0 + lo1) / 2, cy = (la0 + la1) / 2, k = Math.min(W / (sx * kx), Hh / sy);
+    const P = (lon, lat) => [W / 2 + (lon - cx) * kx * k, Hh / 2 - (lat - cy) * k];
+    const path = r => "M" + r.map(([a, b]) => P(a, b).map(n => n.toFixed(1)).join(",")).join("L") + "Z";
+    const home = pl.map(p => sts.find(sh => sh.r.some(r => inRing(p.lon, p.lat, r)))).filter(Boolean);
+    const fs = 34 * W / Math.max(1, box.width) * (v ? 1.15 : 1);
+    const placed = [];
+    svg.innerHTML = `<g class="fly">${cts.filter(c => !(near && c.id === "356")).map(c => `<path class="ct" d="${c.r.map(path).join("")}"/>`).join("")}${sts.map(sh => `<path class="stt${home.includes(sh) ? " home" : ""}" d="${sh.r.map(path).join("")}"/>`).join("")}
+      ${sts.filter(sh => sh.bn && !home.includes(sh)).map(sh => { const [x, y] = P(sh.c[0], sh.c[1]); return x > 30 && x < W - 30 && y > 30 && y < Hh - 30 ? `<text class="sn" x="${x.toFixed(0)}" y="${y.toFixed(0)}" style="font-size:${(fs * 0.62).toFixed(1)}px">${esc(sh.bn)}</text>` : ""; }).join("")}</g>` +
+      pl.map((p, j) => { const [x, y] = P(p.lon, p.lat); let right = x < W * 0.62;
+        // A label never lies over another place's label: it goes to the other side.
+        const lw = fs * 0.62 * p.name.length + fs, clash = r => placed.some(q => Math.abs(q.y - y) < fs * 1.2 && (r ? x + lw > q.x0 && x < q.x1 : x - lw < q.x1 && x > q.x0));
+        if (clash(right) && !clash(!right)) right = !right;
+        placed.push({ y, x0: right ? x : x - lw, x1: right ? x + lw : x });
+        return `<g class="pin" style="--i:${j}"><g transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><circle class="ring" r="${(fs * 0.45).toFixed(1)}"/><circle class="dot" r="${(fs * 0.32).toFixed(1)}"/><text x="${(right ? 1 : -1) * fs * 0.8}" y="${(fs * 0.35).toFixed(1)}" text-anchor="${right ? "start" : "end"}" style="font-size:${fs.toFixed(1)}px">${esc(p.name)}</text></g></g>`; }).join("");
+  }
 // The story of the hour's icons (drawn for the channel: one per kind of story).
 const SOTH_ICON = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const SOTH_ICONS = {
@@ -1239,8 +1274,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const places = H0.places || [], icon = SOTH_ICONS[H0.topic] || SOTH_ICONS.news;
       // A sentence as words, the figures and the places it names marked (the screen lights each word
       // as the newsreader reaches it).
-      const wordsOf = (l, d) => { const ws = String(l || "").split(/\s+/).filter(Boolean), n = ws.reduce((a, b) => a + b.length + 1, 0); let at = 0;
-        return ws.map(wd => { const hot = /[০-৯0-9]/.test(wd) || places.some(p => wd.startsWith(p.name)); const t = (at / n) * d * 0.86; at += wd.length + 1; return `<span class="${hot ? "so-hot" : ""}" style="--t:${t.toFixed(2)}s">${esc(wd)}</span>`; }).join(" "); };
+      const wordsOf = (l, d) => soWords(l, d, places);
       const partOfDay = h => h < 4 ? "রাত" : h < 6 ? "ভোর" : h < 12 ? "সকাল" : h < 16 ? "দুপুর" : h < 18 ? "বিকেল" : h < 20 ? "সন্ধ্যা" : "রাত";
       const clockBn = t => { const d = new Date(t + 5.5 * 3600e3), h = d.getUTCHours(), m = d.getUTCMinutes(); return `${partOfDay(h)} ${bnDigits(h % 12 || 12)}টা${m ? ` ${bnDigits(String(m).padStart(2, "0"))}` : ""}`; };
       const dayOf = t => new Date(t + 5.5 * 3600e3).toISOString().slice(0, 10);
@@ -1266,33 +1300,6 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const root = el.querySelector(".so");
       // The map: India's states (Natural Earth), the neighbours, the places pinned; it flies in from
       // a wide view to the places, and the labels always sit inside the frame.
-      const drawMap = async (svg, pl) => {
-        const near = pl.every(p => p.lon > 60 && p.lon < 100 && p.lat > 5 && p.lat < 40);
-        const [sts, cts] = await Promise.all([near ? (MAPS.st ||= fetch("/tv/map-states.json").then(r => r.json()).catch(() => [])) : [], MAPS[near ? "sa" : "w"] ||= fetch(near ? "/tv/map-southasia.json" : "/tv/map-world.json").then(r => r.json()).catch(() => [])]);
-        if (!svg.isConnected) return;
-        // The frame's own size (before the screen's scaling), so labels are the same size everywhere.
-        const box = { width: svg.clientWidth || svg.getBoundingClientRect().width, height: svg.clientHeight || svg.getBoundingClientRect().height }, W = 1000, Hh = Math.round(1000 * (box.height / Math.max(1, box.width))) || 560;
-        svg.setAttribute("viewBox", `0 0 ${W} ${Hh}`);
-        const lat0 = pl.reduce((a, p) => a + p.lat, 0) / pl.length, kx = Math.cos(lat0 * Math.PI / 180);
-        let lo0 = Math.min(...pl.map(p => p.lon)), lo1 = Math.max(...pl.map(p => p.lon)), la0 = Math.min(...pl.map(p => p.lat)), la1 = Math.max(...pl.map(p => p.lat));
-        // At least Bengal's width around a local story; room for the labels to the side.
-        const minSpan = near ? 4.2 : 18;
-        const sx = Math.max(minSpan, (lo1 - lo0) * 1.9 + 2), sy = Math.max(minSpan * 0.75, (la1 - la0) * 1.9 + 1.4);
-        const cx = (lo0 + lo1) / 2, cy = (la0 + la1) / 2, k = Math.min(W / (sx * kx), Hh / sy);
-        const P = (lon, lat) => [W / 2 + (lon - cx) * kx * k, Hh / 2 - (lat - cy) * k];
-        const path = r => "M" + r.map(([a, b]) => P(a, b).map(n => n.toFixed(1)).join(",")).join("L") + "Z";
-        const home = pl.map(p => sts.find(sh => sh.r.some(r => inRing(p.lon, p.lat, r)))).filter(Boolean);
-        const fs = 34 * W / Math.max(1, box.width) * (v ? 1.15 : 1);
-        const placed = [];
-        svg.innerHTML = `<g class="fly">${cts.filter(c => !(near && c.id === "356")).map(c => `<path class="ct" d="${c.r.map(path).join("")}"/>`).join("")}${sts.map(sh => `<path class="stt${home.includes(sh) ? " home" : ""}" d="${sh.r.map(path).join("")}"/>`).join("")}
-          ${sts.filter(sh => sh.bn && !home.includes(sh)).map(sh => { const [x, y] = P(sh.c[0], sh.c[1]); return x > 30 && x < W - 30 && y > 30 && y < Hh - 30 ? `<text class="sn" x="${x.toFixed(0)}" y="${y.toFixed(0)}" style="font-size:${(fs * 0.62).toFixed(1)}px">${esc(sh.bn)}</text>` : ""; }).join("")}</g>` +
-          pl.map((p, j) => { const [x, y] = P(p.lon, p.lat); let right = x < W * 0.62;
-            // A label never lies over another place's label: it goes to the other side.
-            const lw = fs * 0.62 * p.name.length + fs, clash = r => placed.some(q => Math.abs(q.y - y) < fs * 1.2 && (r ? x + lw > q.x0 && x < q.x1 : x - lw < q.x1 && x > q.x0));
-            if (clash(right) && !clash(!right)) right = !right;
-            placed.push({ y, x0: right ? x : x - lw, x1: right ? x + lw : x });
-            return `<g class="pin" style="--i:${j}"><g transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><circle class="ring" r="${(fs * 0.45).toFixed(1)}"/><circle class="dot" r="${(fs * 0.32).toFixed(1)}"/><text x="${(right ? 1 : -1) * fs * 0.8}" y="${(fs * 0.35).toFixed(1)}" text-anchor="${right ? "start" : "end"}" style="font-size:${fs.toFixed(1)}px">${esc(p.name)}</text></g></g>`; }).join("");
-      };
       let shownI = -2, voiced = false;
       const tones = { head: 1, type: 0, split: 2, stat: 1, map: 3, quote: 2, tl: 0, end: 1 };
       const draw = () => {
@@ -1313,7 +1320,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         root.querySelector(".so-ct").textContent = x.line != null && x.k !== "end" ? `${bnDigits(li)}/${bnDigits(nOf)}` : "";
         root.classList.toggle("bar-t", i > 0);
         stg.querySelectorAll(".num[data-to]").forEach(n => { if (!n.dataset.go) { n.dataset.go = 1; count(n); } });
-        if (x.k === "map") { const svg = stg.lastElementChild?.querySelector("svg"); if (svg) drawMap(svg, x.places); }
+        if (x.k === "map") { const svg = stg.lastElementChild?.querySelector("svg"); if (svg) soMap(svg, x.places, v); }
         if (x.k === "end" || x.k === "quote" || x.k === "tl") { if (!st.muted) whoosh(st.audio); }
         // The newsreader reads the story from the headline beat on (once; a late joiner hears it
         // from where the beat began only if it is still the headline).
@@ -1411,7 +1418,21 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const UNITS = "কোটি|লক্ষ|লাখ|হাজার|টাকা|জন|শতাংশ|%|ফুট|কিমি|কিলোমিটার|ডিগ্রি|বছর|দিন|ঘণ্টা|মিটার|টন|বিঘা|একর|কেজি|বার|টি";
       const factOf = x => { for (const l of x.lines || []) { const m = l.match(new RegExp(`([০-৯0-9][০-৯0-9,.]*)\\s*(${UNITS})`)); if (m && toNum(m[1]) > 0) return { n: toNum(m[1]), dec: /[.]/.test(m[1]), unit: m[2], line: l.length > 120 ? l.slice(0, 118).replace(/\s+\S*$/, "") + "…" : l }; } return null; };
       const pointsOf = x => (x.lines || []).slice(1, 4).map(l => l.length > 84 ? l.slice(0, 82).replace(/\s+\S*$/, "") + "…" : l);
+      // A story with fewer than two verified photos (src/bulletinimg.js) is told in motion
+      // graphics: its headline with the story's icon, the map of its places, its figure counting up,
+      // its sentences lighting up as they are read (and its one photo, if it has one).
+      const graphic = x => (x.images || []).length < 2;
+      const gSlides = x => {
+        const P = (x.images || []).filter(i => imgState.get(i.src) === "ok"), f = factOf(x), out = [{ brk: 1 }, { g: "head" }];
+        if (P[0]) out.push({ img: P[0] });
+        if ((x.places || []).length) out.push({ g: "map" });
+        if (f) out.push({ g: "stat", f });
+        // (the sentence with the figure is already on the figure's slide)
+        (x.lines || []).slice(1).filter(l => !(f && l.startsWith(f.line.replace(/…$/, "")))).forEach((l, i) => out.push({ g: i % 2 ? "split" : "type", l, n: i + 2 }));
+        return out;
+      };
       const slidesOf = x => {
+        if (graphic(x)) return gSlides(x);
         const P = (x.images || []).filter(i => imgState.get(i.src) === "ok").slice(0, 6);
         const ex = [{ brk: 1 }], f = factOf(x), pts = pointsOf(x);
         if (f) ex.unshift({ fact: f });
@@ -1430,7 +1451,17 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         return out.slice(0, 7);
       };
       const bgOf = x => (x.images || []).find(i => imgState.get(i.src) === "ok");
-      const slideHTML = (x, sl) => {
+      const gHTML = (x, sl, d) => {
+        const icon = SOTH_ICONS[x.topic] || SOTH_ICONS.news, pl = x.places || [], tone = { head: 1, map: 3, stat: 2, type: 0, split: 2 }[sl.g] ?? 0;
+        const beat = sl.g === "head" ? `<div class="so-beat so-head"><div class="so-ico">${icon}<i></i><i></i></div><div class="so-hd"><span class="so-tag red">${x.upd ? "নতুন তথ্য" : "এইমাত্র"}</span><span class="so-tag">${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span><h1>${soWords(x.title, d * 0.6, pl)}</h1></div></div>`
+          : sl.g === "map" ? `<div class="so-beat so-map"><div class="so-mapbox"><svg preserveAspectRatio="xMidYMid meet"></svg></div></div>`
+          : sl.g === "stat" ? `<div class="so-beat so-stat"><div class="so-fig"><b class="num" data-to="${sl.f.n}" data-dec="${sl.f.dec ? 1 : 0}">০</b><em>${esc(sl.f.unit)}</em></div><p>${soWords(sl.f.line, d, pl)}</p></div>`
+          : sl.g === "split" ? `<div class="so-beat so-split"><div class="so-ico sm">${icon}</div><p>${soWords(sl.l, d, pl)}</p></div>`
+          : `<div class="so-beat so-type"><b class="so-n">${bnDigits(String(sl.n).padStart(2, "০"))}</b><p>${soWords(sl.l, d, pl)}</p></div>`;
+        return `<div class="avo-slide avo-g"><div class="so on${channel === "v" ? " v" : ""}" data-tone="${tone}"><i class="so-bg"></i><i class="so-stripes"></i><div class="so-wm">${icon}</div><div class="so-stage">${beat}</div></div></div>`;
+      };
+      const slideHTML = (x, sl, d = 5) => {
+        if (sl.g) return gHTML(x, sl, d);
         const desk = esc(DESK_BN[x.desk] || x.desk || "খবর");
         if (sl.img && sl.fx === "duo") return `<div class="avo-slide fx-duo"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"><i class="duo"></i><b class="avo-big">${esc(x.title)}</b></div>`;
         if (sl.img && sl.fx === "split") return `<div class="avo-slide fx-split"><div class="sp a"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"></div><div class="sp b"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"></div><i class="sp-line"></i></div>`;
@@ -1503,9 +1534,10 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         if (si !== shownS) {
           const firstSlide = !box.querySelector(".avo-pics > .avo-slide"); shownS = si; const pics = box.querySelector(".avo-pics"), sl = slides[si];
           const put = () => {
-            pics.insertAdjacentHTML("beforeend", slideHTML(x, sl).replace(/class="avo-slide([^"]*)"/, `class="avo-slide$1" style="--d:${(lens[k] / slides.length + 1.5).toFixed(1)}s"`));
+            pics.insertAdjacentHTML("beforeend", slideHTML(x, sl, lens[k] / slides.length).replace(/class="avo-slide([^"]*)"/, `class="avo-slide$1" style="--d:${(lens[k] / slides.length + 1.5).toFixed(1)}s"`));
             [...pics.querySelectorAll(":scope > .avo-slide")].slice(0, -1).forEach(n => n.remove());
             countUp(pics);
+            if (sl.g === "map") { const svg = pics.lastElementChild?.querySelector(".so-mapbox svg"); if (svg) soMap(svg, x.places || [], channel === "v"); }
             box.querySelector(".avo-credit").textContent = sl.img?.credit || (sl.brk ? bgOf(x)?.credit || "" : "");
           };
           if (firstSlide) put();
