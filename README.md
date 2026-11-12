@@ -257,6 +257,17 @@ rest, whenever you are ready:
     Start at 720p (the default); 1080p for both channels may be more than the free machine can
     encode. A new output address in the control room stops the old one: then update `.env` and run
     `docker compose up -d`. Only stream to platforms the rights to the videos on the channel allow.
+16. **The owner's Desk Brief (`src/ownerbrief.js`, app page `/mybrief`):** at 11:00, 14:00, 17:00,
+    19:00 and 21:00 (India time) the major West Bengal politics, India politics, world and developing
+    stories go to the owner (`ADMIN_EMAIL`) only, as a push on their signed-in devices and on
+    Telegram. The draft is ready 15 minutes before; the owner's picks go if made, otherwise the
+    desk's choice. Big stories between briefs come at once. Rules (counts, follow and mute words)
+    are on the page. Telegram (optional, free):
+    1. In Telegram, open **@BotFather**, send `/newbot`, give it a name and a username ending in
+       `bot`. Copy the token it gives.
+    2. `npx wrangler secret put TELEGRAM_BOT_TOKEN` and paste the token (or Cloudflare dashboard →
+       Workers → rashtrix → Settings → Variables and Secrets → Add → Secret).
+    3. In the app, signed in as the owner: `/mybrief` → Telegram → **Connect Telegram** → Start.
 
 Machine translation of English live coverage into Bengali and Hindi uses Cloudflare Workers AI
 (free daily allowance) through the `[ai]` binding; no key needed.
