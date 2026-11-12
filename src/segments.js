@@ -96,7 +96,7 @@ const PLACES = [
 ].map(([n, lat, lon]) => ({ names: n.split("|"), name: n.split("|")[0], lat, lon }));
 // In the order the text names them; a place within a few kilometres of one already found (a
 // town and its district) is left out.
-const placesIn = text => {
+export const placesIn = text => {
   const hits = [];
   for (const p of PLACES) { let at = Infinity; for (const n of p.names) { const i = text.indexOf(n); if (i >= 0 && i < at) at = i; } if (at < Infinity) hits.push({ at, p }); }
   const out = [];
@@ -109,7 +109,7 @@ const TOPICS = [["fire", /আগুন|অগ্নিকাণ্ড|বিস�
   ["health", /হাসপাতাল|চিকিৎসা|ডেঙ্গি|রোগী|স্বাস্থ্য|ডাক্তার|চিকিৎসক/], ["sport", /ম্যাচ|ক্রিকেট|ফুটবল|গোল|উইকেট|মোহনবাগান|ইস্টবেঙ্গল|টুর্নামেন্ট/],
   ["faith", /পুজো|প্রতিমা|বিসর্জন|উৎসব|মন্দির|ভক্ত|ইদ|মেলা/], ["travel", /ট্রেন|মেট্রো|বাস|বিমান|উড়ান|ফেরি|রাস্তা|যান চলাচল/], ["protest", /বিক্ষোভ|ধর্মঘট|অবরোধ|মিছিল|আন্দোলন/],
   ["money", /টাকা|দাম|বাজার|শেয়ার|বাজেট|কর|ব্যাংক|ব্যাঙ্ক/], ["school", /পরীক্ষা|স্কুল|বিশ্ববিদ্যালয়|ছাত্র|শিক্ষক|পড়ুয়া/], ["politics", /মন্ত্রী|সরকার|তৃণমূল|বিজেপি|সিপিএম|কংগ্রেস|দল|নেতা/]];
-const topicOf = text => (TOPICS.find(([, re]) => re.test(text)) || ["news"])[0];
+export const topicOf = text => (TOPICS.find(([, re]) => re.test(text)) || ["news"])[0];
 const QUOTE = /[“"‘']([^”"’']{25,170})[”"’']/;
 const words = t => new Set(String(t || "").toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s]/gu, " ").split(/\s+/).filter(w => w.length >= 3));
 // The story of the hour: the biggest story in the AVO pool of the last three hours (most outlets

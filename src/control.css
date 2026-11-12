@@ -193,3 +193,9 @@ dialog::backdrop { background: #000a; }
 .ad-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .ad-preview{width:min(92vw,960px);padding:12px;border-radius:14px}
 .ad-screen{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden}
+
+/* AVO desk: the picture checks of a story (src/bulletinimg.js checkedPhotos). */
+.ad-checks{margin:6px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.ad-checks li b{display:inline-block;width:18px}
+.ad-checks li.ok b{color:#1d8a4a}.ad-checks li.no b{color:#c8100f}
+.ad-checks a{color:inherit;opacity:.7}
