@@ -1355,3 +1355,117 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 @keyframes swfull{0%{clip-path:polygon(0 0,0 0,-12% 100%,-12% 100%)}32%,68%{clip-path:polygon(0 0,112% 0,100% 100%,-12% 100%)}100%{clip-path:polygon(112% 0,112% 0,100% 100%,100% 100%)}}
 @keyframes swedge{0%{left:-6%}32%{left:104%}33%,67%{left:104%;opacity:0}68%{left:-6%;opacity:1}100%{left:104%}}
 @keyframes swzoom{from{transform:scale(1.12)}to{transform:scale(1)}}
+
+/* ---------- The AVO's explainer look (political and world stories; src/engine.js exSlides) ----------
+   Paper, serif type, one idea per shot, in Rashtrix red and gold: a headline built word by word,
+   taped photo clippings, big counting numbers, figures side by side, quotes on torn paper, the map,
+   the story's lines with key words marked, and the photo full frame to close. */
+.avo.ex{--paper:#f3eee4;--ink:#17110f;--exr:#c8100f;--hl:#f7d65a;background:var(--paper);color:var(--ink)}
+.avo.ex .avo-pics{z-index:0}
+.ex-s{background:var(--paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .45  0 0 0 0 .38  0 0 0 0 .3  0 0 0 .09 0'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>");display:flex;align-items:center;justify-content:center}
+.ex-s:after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 55%,rgba(90,60,30,.16) 100%)}
+.ex-bgimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.05) blur(3px);mix-blend-mode:multiply;opacity:.07}
+.ex-cam{position:relative;z-index:1;width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:170px 170px 250px;box-sizing:border-box;animation:expush var(--d,6s) linear both}
+@keyframes expush{from{transform:scale(1)}to{transform:scale(1.07)}}
+.ex-kick{display:inline-block;margin-bottom:28px;padding-bottom:6px;border-bottom:3px solid var(--exr);font:600 26px "DM Mono","Hind Siliguri",monospace;letter-spacing:.14em;color:var(--exr);animation:exfade .5s .1s both}
+.ex-cam span[style*="--t"]{display:inline-block;opacity:0;transform:translateY(.35em);animation:exword .45s calc(var(--t) + .15s) cubic-bezier(.2,.9,.2,1) forwards}
+@keyframes exword{to{opacity:1;transform:none}}
+@keyframes exfade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.ex-red{color:var(--exr)}
+.ex-hl{position:relative;z-index:0}
+.ex-hl:before{content:"";position:absolute;z-index:-1;left:-.12em;right:-.12em;top:.18em;bottom:.02em;background:var(--hl);border-radius:4px;transform:scaleX(0);transform-origin:left;animation:exhl .5s calc(var(--t) + .55s) cubic-bezier(.6,0,.2,1) forwards}
+@keyframes exhl{to{transform:scaleX(1)}}
+/* headline */
+.ex-head{text-align:center;max-width:1500px}
+.ex-head h1{margin:0;font:800 104px/1.24 "Noto Serif Bengali",serif;letter-spacing:-.01em}
+/* taped clipping */
+.ex-clip{position:relative;margin:0;width:1180px;max-width:78%;aspect-ratio:16/10;padding:16px;background:#fff;box-shadow:0 30px 60px rgba(60,40,20,.28),0 2px 6px rgba(0,0,0,.12);transform:rotate(var(--tilt));animation:exclip .7s cubic-bezier(.2,1.2,.4,1) both}
+@keyframes exclip{from{opacity:0;transform:rotate(calc(var(--tilt) * 3)) scale(.86) translateY(60px)}to{opacity:1;transform:rotate(var(--tilt))}}
+.ex-clip img{width:100%;height:100%;object-fit:cover;display:block;animation:exkb var(--d,6s) linear both}
+@keyframes exkb{from{transform:scale(1)}to{transform:scale(1.08)}}
+.ex-clip{overflow:visible}
+.ex-clip>img{clip-path:inset(0)}
+.ex-clip .tape{position:absolute;width:190px;height:48px;background:rgba(240,226,180,.82);box-shadow:0 2px 4px rgba(0,0,0,.08)}
+.ex-clip .tape.a{top:-22px;left:-40px;transform:rotate(-24deg)}
+.ex-clip .tape.b{top:-20px;right:-46px;transform:rotate(28deg)}
+.ex-clip .sweep{position:absolute;inset:16px;pointer-events:none;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.45) 50%,transparent 65%);transform:translateX(-120%);animation:unshine 1.3s .6s ease both}
+.ex-stamp{position:absolute;left:46px;bottom:46px;padding:8px 22px;background:var(--ink);color:#fff;font:700 40px "Hind Siliguri",sans-serif;border-radius:4px;animation:exfade .5s .7s both}
+/* the photo full frame to close */
+.ex-close .ex-cam{padding:0}
+.ex-full{position:absolute;inset:0}
+.ex-full img{width:100%;height:100%;object-fit:cover;animation:exkb var(--d,6s) linear both}
+.ex-fade{position:absolute;inset:0;background:linear-gradient(180deg,transparent 35%,rgba(16,8,6,.86) 100%)}
+.ex-fullt{position:absolute;left:150px;right:150px;bottom:250px;color:#fff}
+.ex-fullt .ex-kick{color:#fff;border-color:var(--gold)}
+.ex-fullt h2{margin:0;font:800 76px/1.25 "Noto Serif Bengali",serif;text-shadow:0 4px 24px rgba(0,0,0,.5)}
+/* the number */
+.ex-num,.ex-vs{text-align:center}
+.ex-fig{display:flex;align-items:baseline;justify-content:center;gap:24px;color:var(--exr);animation:exburst .6s .2s cubic-bezier(.2,1.5,.4,1) both}
+.ex-fig b{font:800 300px/1 "Noto Serif Bengali",serif;letter-spacing:-.02em}
+.ex-fig em{font:700 100px "Noto Serif Bengali",serif;font-style:normal}
+@keyframes exburst{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
+.ex-num p,.ex-vs p{max-width:1300px;margin:26px auto 0;font:600 44px/1.45 "Hind Siliguri",sans-serif;color:#3a312b;animation:exfade .6s .9s both}
+/* side by side */
+.ex-vsrow{display:flex;align-items:center;justify-content:center;gap:80px}
+.ex-vsrow>div{display:flex;align-items:baseline;gap:16px;font-family:"Noto Serif Bengali",serif}
+.ex-vsrow b{font-size:200px;font-weight:800;line-height:1}
+.ex-vsrow em{font-size:70px;font-weight:700;font-style:normal}
+.ex-vsrow .a{color:#6b5f55;animation:exfade .5s .2s both}
+.ex-vsrow .b{color:var(--exr);animation:exburst .6s 1.2s cubic-bezier(.2,1.5,.4,1) both}
+.ex-arrow{width:120px;height:6px;background:var(--ink);position:relative;transform-origin:left;animation:exhl .5s .8s cubic-bezier(.6,0,.2,1) both;transform:scaleX(0)}
+.ex-arrow:after{content:"";position:absolute;right:-4px;top:-13px;border:16px solid transparent;border-left:26px solid var(--ink);border-right:0}
+/* the quote on torn paper */
+.ex-paper{position:relative;max-width:1400px;padding:60px 80px 70px;background:#fffdf8;box-shadow:0 24px 50px rgba(60,40,20,.22);transform:rotate(-.8deg);animation:exclip .7s cubic-bezier(.2,1.2,.4,1) both;--tilt:-.8deg;
+  clip-path:polygon(0 3%,4% 0,9% 2.5%,15% .5%,22% 2.8%,30% .4%,38% 2.2%,46% .3%,55% 2.6%,63% .6%,71% 2.4%,80% .2%,88% 2.6%,95% .5%,100% 2.2%,100% 97%,95% 100%,88% 97.6%,80% 99.6%,71% 97.4%,63% 99.5%,55% 97.2%,46% 99.7%,38% 97.6%,30% 99.6%,22% 97.2%,15% 99.4%,9% 97.4%,4% 99.8%,0 97%)}
+.ex-src{display:block;margin-bottom:22px;padding-bottom:12px;border-bottom:1px solid #e3d8c7;font:600 24px "DM Mono","Hind Siliguri",monospace;letter-spacing:.12em;color:var(--exr)}
+.ex-paper blockquote{margin:0;font:700 64px/1.45 "Noto Serif Bengali",serif;color:var(--ink)}
+/* the map */
+.ex-map{width:100%;height:100%;display:flex;flex-direction:column;align-items:flex-start}
+.ex-map h3{margin:0 0 20px;font:800 60px/1.2 "Noto Serif Bengali",serif}
+.ex-map .so-mapbox{width:100%;flex:1;min-height:0;border-radius:6px;background:#ebe3d4;box-shadow:inset 0 0 0 2px #d8ccb6}
+.ex-map .so-mapbox .ct{fill:#e2d8c6;stroke:#c9bba2}
+.ex-map .so-mapbox .stt{fill:#ddd2bd;stroke:#b9a98c}
+.ex-map .so-mapbox .stt.home{fill:rgba(200,16,15,.22);stroke:var(--exr)}
+.ex-map .so-mapbox .sn{fill:#8d7f6a}
+.ex-map .so-mapbox .pin .dot{fill:var(--exr);stroke:#fff}
+.ex-map .so-mapbox .pin .ring{stroke:var(--exr)}
+.ex-map .so-mapbox text{fill:var(--ink)}
+/* one line per shot */
+.ex-line{max-width:1480px}
+.ex-n{display:inline-block;margin-bottom:24px;padding:4px 14px;background:var(--exr);color:#fff;font:700 30px "DM Mono",monospace;letter-spacing:.08em;animation:exfade .4s both}
+.ex-line p{margin:0;font:700 82px/1.4 "Noto Serif Bengali",serif}
+/* the frame: tag (full logo), the headline in a caption pill, a thin red progress line */
+.ex-tag{position:absolute;left:40px;top:172px;z-index:3;display:flex;align-items:center;gap:14px;padding:8px 20px 8px 10px;border-radius:10px;background:#fffdf8;box-shadow:0 6px 18px rgba(60,40,20,.18);animation:exfade .5s .2s both}
+.ex-tag img{height:46px;width:auto}
+.ex-tag b{font:800 30px "Hind Siliguri",sans-serif;color:var(--exr)}
+.ex-tag span{padding:2px 12px;border-radius:6px;background:var(--ink);color:#fff;font:700 24px "Hind Siliguri",sans-serif}
+.ex-cap{position:absolute;left:0;right:0;bottom:96px;z-index:3;display:flex;justify-content:center;pointer-events:none}
+.ex-cap .lt-text{max-width:1500px;padding:12px 30px;border-radius:12px;background:rgba(23,17,15,.9);color:#fff;font:600 38px/1.35 "Hind Siliguri",sans-serif;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ex-cap .lt-text.swap{animation:exfade .5s both}
+.avo.ex .avo-credit{z-index:3;bottom:170px;color:#7a6c5c}
+.avo.ex .ex-steps{z-index:3;left:0;right:0;bottom:0;gap:4px}
+.avo.ex .ex-steps i{height:8px;border-radius:0;background:rgba(23,17,15,.12)}
+.avo.ex .ex-steps i.done,.avo.ex .ex-steps i.on:after{background:var(--exr)}
+/* cuts */
+.ex-s.cut-whip{z-index:2;animation:exwhip .5s cubic-bezier(.7,0,.25,1) both}
+@keyframes exwhip{from{transform:translateX(100%);filter:blur(24px)}60%{filter:blur(8px)}to{transform:none;filter:none}}
+.ex-s.cut-zoom{z-index:2;animation:exzoom .5s cubic-bezier(.2,.8,.2,1) both}
+@keyframes exzoom{from{opacity:0;transform:scale(1.3)}to{opacity:1;transform:none}}
+.ex-s.cut-hard{z-index:2}
+/* vertical channel (1080 x 1920) */
+.avo.ex.v .ex-cam{padding:330px 70px 480px}
+.avo.ex.v .ex-head h1{font-size:92px}
+.avo.ex.v .ex-clip{width:86%;max-width:86%;aspect-ratio:4/5}
+.avo.ex.v .ex-fig b{font-size:240px}
+.avo.ex.v .ex-fig em{font-size:84px}
+.avo.ex.v .ex-vsrow{flex-direction:column;gap:30px}
+.avo.ex.v .ex-arrow{width:90px;margin:30px 0 40px;transform:rotate(90deg);animation:none}
+.avo.ex.v .ex-vsrow b{font-size:170px}
+.avo.ex.v .ex-paper{padding:50px 50px 60px}
+.avo.ex.v .ex-paper blockquote{font-size:60px}
+.avo.ex.v .ex-line p{font-size:76px}
+.avo.ex.v .ex-fullt{left:60px;right:60px;bottom:520px}
+.avo.ex.v .ex-tag{top:300px;left:44px}
+.avo.ex.v .ex-cap{bottom:220px;padding:0 40px}
+.avo.ex.v .ex-cap .lt-text{white-space:normal;font-size:40px}
+.avo.ex.v .avo-credit{bottom:330px}

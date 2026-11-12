@@ -20,7 +20,7 @@ import { readLine, voiceKey, tvVoice, voiceRate, voiceBudget, chargeVoice } from
 import { synthesize, sha256, ttsEnabled } from "./tts.js";
 import { checkedPhotos } from "./bulletinimg.js";
 import { placesIn, topicOf } from "./segments.js";
-import { labelsOf } from "./labels.js";
+import { labelsOf, bulletinRank } from "./labels.js";
 
 export const AVO_DAILY = 45, AVO_HOURS = 6, AVO_MAX_AIRED = 4, AVO_SECONDS = 30;
 const QUOTA = { bengal: 27, india: 9, neighbours: 7, world: 2 };
@@ -208,6 +208,9 @@ export function screenStory(r) {
     places: placesIn(`${r.title} ${j(r.script, "[]").slice(0, 2).join(" ")}`), topic: topicOf(`${r.title} ${j(r.script, "[]").slice(0, 2).join(" ")}`),
     imgLog: j(r.img_log, "[]"),
     upd: !!(r.prepared_at && r.created_at && Date.parse(r.prepared_at) - Date.parse(String(r.created_at).replace(" ", "T") + "Z") > 15 * 60e3),
+    // The explainer look (src/engine.js exSlides): West Bengal, Kolkata and India politics, the world
+    // and Bangladesh. Other stories keep the AVO's own look.
+    ex: bulletinRank(r.desk, `${r.title} ${j(r.script, "[]").slice(0, 2).join(" ")}`) <= 2 || ["World"].includes(r.desk) || /বাংলাদেশ|ঢাকা/.test(r.title || ""),
     ...labelsOf(r.desk, `${r.title} ${j(r.script, "[]").join(" ")}`, (() => { try { return JSON.parse(r.labels || "null"); } catch { return null; } })()) };
 }
 

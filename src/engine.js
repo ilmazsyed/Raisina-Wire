@@ -1486,6 +1486,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         return out;
       };
       const slidesOf = x => {
+        if (x.ex) return exSlides(x);
         if (graphic(x)) return gSlides(x);
         const P = (x.images || []).filter(i => imgState.get(i.src) === "ok").slice(0, 6);
         const ex = [{ brk: 1 }], f = factOf(x), pts = pointsOf(x);
@@ -1514,7 +1515,71 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           : `<div class="so-beat so-type"><b class="so-n">${bnDigits(String(sl.n).padStart(2, "০"))}</b><p>${soWords(sl.l, d, pl)}</p></div>`;
         return `<div class="avo-slide avo-g"><div class="so on${channel === "v" ? " v" : ""}" data-tone="${tone}"><i class="so-bg"></i><i class="so-stripes"></i><div class="so-wm">${icon}</div><div class="so-stage">${beat}</div></div></div>`;
       };
+      // ---- The explainer look (political and world stories; src/avo.js screenStory `ex`): paper,
+      // serif type, one idea per shot. A headline that builds word by word, the story's checked photos
+      // as taped clippings, its figure as a big counting number, two figures side by side, a quote
+      // on torn paper, the map of its places, its lines one per shot with the key words marked, and
+      // the photo again full frame to close. Cuts run hard, whip, hard, zoom; every shot pushes in.
+      const exShort = (t, n = 110) => (t = String(t || "")).length > n ? t.slice(0, n - 2).replace(/\s+\S*$/, "") + "…" : t;
+      const quoteOf = x => {
+        for (const l of x.lines || []) {
+          const m = l.match(/[“"‘]([^”"’]{14,170})[”"’]/); if (!m || m[1].split(/\s+/).length < 4) continue;
+          // The speaker: the words before "বলেন / বলেছেন / জানান…" in the same line (never a pronoun).
+          const sp = l.replace(m[0], " ").match(/([^\s,।:]+(?:\s[^\s,।:]+)?)\s+(?:বলেন|বলেছেন|বললেন|জানান|জানিয়েছেন|দাবি করেন|মন্তব্য করেন)/);
+          const who = sp && !/^(তিনি|তাঁরা|তাঁর|উনি|ওঁরা|এদিন|সেখানে|তবে|আর)/.test(sp[1]) ? sp[1] : "";
+          return { text: m[1].trim(), who, line: l };
+        }
+        return null;
+      };
+      const versusOf = x => {
+        for (const l of x.lines || []) {
+          const ms = [...l.matchAll(new RegExp(`([০-৯0-9][০-৯0-9,.]*)\\s*(${UNITS})`, "g"))].map(m => ({ n: toNum(m[1]), dec: /[.]/.test(m[1]), unit: m[2] })).filter(m => m.n > 0);
+          for (let i = 0; i < ms.length; i++) for (let j = i + 1; j < ms.length; j++) if (ms[i].unit === ms[j].unit && ms[i].n !== ms[j].n) return { a: ms[i], b: ms[j], line: exShort(l, 130) };
+        }
+        return null;
+      };
+      const exSlides = x => {
+        const P = (x.images || []).filter(i => imgState.get(i.src) === "ok").slice(0, 3), f = factOf(x), q = quoteOf(x), vs = versusOf(x);
+        const lines = (x.lines || []).slice(1).filter(l => l !== q?.line && !(f && l.startsWith(f.line.replace(/…$/, "")))).map(l => exShort(l, 120));
+        const out = [{ ex: "head" }];
+        if (P[0]) out.push({ ex: "clip", img: P[0], n: 0 });
+        if (f) out.push({ ex: "num", f });
+        if (lines[0]) out.push({ ex: "line", l: lines[0], n: 2 });
+        if (q) out.push({ ex: "quote", q });
+        if (vs && !(f && vs.a.n === f.n && !q)) out.push({ ex: "vs", vs });
+        if ((x.places || []).length) out.push({ ex: "map" });
+        if (P[1]) out.push({ ex: "clip", img: P[1], n: 1 });
+        lines.slice(1).forEach((l, i) => out.push({ ex: "line", l, n: i + 3 }));
+        if (P[2]) out.push({ ex: "clip", img: P[2], n: 2 });
+        // The close: the first photo full frame with the headline (or the headline again, on paper).
+        out.push(P[0] ? { ex: "close", img: P[0] } : { ex: "head", close: 1 });
+        return out;
+      };
+      const exWords = (l, d, pl = []) => {
+        const ws = String(l || "").split(/\s+/).filter(Boolean), n = ws.reduce((a, b) => a + b.length + 1, 0); let at = 0;
+        return ws.map(wd => {
+          const cls = /[০-৯0-9]/.test(wd) ? "ex-hl" : pl.some(p => wd.startsWith(p.name)) ? "ex-red" : "";
+          const t = (at / n) * d * 0.8; at += wd.length + 1;
+          return `<span class="${cls}" style="--t:${t.toFixed(2)}s">${esc(wd)}</span>`;
+        }).join(" ");
+      };
+      const exDate = () => bnDigits(new Date(now() + 5.5 * 3600e3).toLocaleDateString("bn-IN", { timeZone: "UTC", day: "numeric", month: "long" }));
+      const exHTML = (x, sl, d) => {
+        const pl = x.places || [], desk = esc(DESK_BN[x.desk] || x.desk || "খবর"), bg = bgOf(x);
+        const back = bg && sl.ex !== "clip" && sl.ex !== "close" ? `<img class="ex-bgimg" src="${esc(bg.src)}" alt="" referrerpolicy="no-referrer">` : "";
+        const kick = t => `<span class="ex-kick">${t}</span>`;
+        const body = sl.ex === "head" ? `<div class="ex-head">${kick(`${desk} · ${x.upd ? "নতুন তথ্য" : sl.close ? "এক নজরে" : "এইমাত্র"}`)}<h1>${exWords(x.title, d * 0.55, pl)}</h1></div>`
+          : sl.ex === "clip" ? `<figure class="ex-clip" style="--tilt:${[-2.2, 1.8, -1.2][sl.n] || -2}deg"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"><i class="tape a"></i><i class="tape b"></i><i class="sweep"></i><b class="ex-stamp">${esc(pl[0]?.name || DESK_BN[x.desk] || "খবর")}</b></figure>`
+          : sl.ex === "close" ? `<div class="ex-full"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"><i class="ex-fade"></i><div class="ex-fullt">${kick(desk)}<h2>${exWords(x.title, d * 0.5, pl)}</h2></div></div>`
+          : sl.ex === "num" ? `<div class="ex-num">${kick(`${desk} · সংখ্যায়`)}<div class="ex-fig"><b class="num" data-to="${sl.f.n}" data-dec="${sl.f.dec ? 1 : 0}">০</b><em>${esc(sl.f.unit)}</em></div><p>${esc(exShort(sl.f.line, 120))}</p></div>`
+          : sl.ex === "vs" ? `<div class="ex-vs">${kick(`${desk} · তুলনায়`)}<div class="ex-vsrow"><div class="a"><b class="num" data-to="${sl.vs.a.n}" data-dec="${sl.vs.a.dec ? 1 : 0}">০</b><em>${esc(sl.vs.a.unit)}</em></div><i class="ex-arrow"></i><div class="b"><b class="num" data-to="${sl.vs.b.n}" data-dec="${sl.vs.b.dec ? 1 : 0}">০</b><em>${esc(sl.vs.b.unit)}</em></div></div><p>${esc(sl.vs.line)}</p></div>`
+          : sl.ex === "quote" ? `<div class="ex-quote"><div class="ex-paper"><span class="ex-src">${esc(sl.q.who ? `${sl.q.who} · ${exDate()}` : exDate())}</span><blockquote>“${exWords(sl.q.text, d * 0.85, [])}”</blockquote></div></div>`
+          : sl.ex === "map" ? `<div class="ex-map">${kick(`${desk} · কোথায়`)}<h3>${esc(pl.slice(0, 3).map(p => p.name).join(" · "))}</h3><div class="so-mapbox"><svg preserveAspectRatio="xMidYMid meet"></svg></div></div>`
+          : `<div class="ex-line"><span class="ex-n">${bnDigits(String(sl.n).padStart(2, "০"))}</span><p>${exWords(sl.l, d * 0.85, pl)}</p></div>`;
+        return `<div class="avo-slide ex-s ex-${sl.ex}">${back}<div class="ex-cam">${body}</div></div>`;
+      };
       const slideHTML = (x, sl, d = 5) => {
+        if (sl.ex) return exHTML(x, sl, d);
         if (sl.g) return gHTML(x, sl, d);
         const desk = esc(DESK_BN[x.desk] || x.desk || "খবর");
         if (sl.img && sl.fx === "duo") return `<div class="avo-slide fx-duo"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"><i class="duo"></i><b class="avo-big">${esc(x.title)}</b></div>`;
@@ -1529,7 +1594,11 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const countUp = box => box.querySelectorAll(".num[data-to]").forEach(n => { if (n.dataset.done) return; n.dataset.done = 1; const to = Number(n.dataset.to), dec = n.dataset.dec === "1", t0 = performance.now(), dur = 1300;
         const step = t => { if (!n.isConnected) return; const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3), v = to * e; n.textContent = bnDigits((dec ? v.toFixed(1) : Math.round(v)).toLocaleString("en-IN")); if (p < 1) requestAnimationFrame(step); };
         requestAnimationFrame(step); });
-      const storyHTML = (x, k) => `<div class="avo${channel === "v" ? " v" : ""}" data-k="${k}"><div class="avo-pics"></div><i class="avo-shade"></i>
+      const storyHTML = (x, k) => x.ex ? `<div class="avo ex${channel === "v" ? " v" : ""}" data-k="${k}" data-ex="1"><div class="avo-pics"></div>
+        <div class="ex-tag"><img src="${LOGO}" alt=""><b>খবরের ভেতরে</b><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span></div>
+        <div class="ex-cap"><span class="lt-text">${esc(x.title)}</span></div><small class="avo-credit"></small>
+        <div class="avo-steps ex-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${lens[j]}s"></i>`).join("")}</div></div>`
+        : `<div class="avo${channel === "v" ? " v" : ""}" data-k="${k}"><div class="avo-pics"></div><i class="avo-shade"></i>
         <div class="avo-kick"><i class="lt-pulse"></i><b>এই মুহূর্তে</b><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span></div>
         <div class="avo-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>এই মুহূর্তে</small></span><span class="lt-text">${esc(x.title)}</span></div>
         <small class="avo-credit"></small>
@@ -1561,7 +1630,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         const into = e - starts[k], cap = Math.max(2, Math.min(7, Math.floor(lens[k] / 4.5))), want = Math.max(2, Math.min(cap, real.length));
         // A picture that finishes loading may add a slide, only when that leaves the slide on screen as it is.
         if (!slideN.has(k) || (want > slideN.get(k) && (shownS < 0 || Math.floor(into / (lens[k] / want)) === shownS))) slideN.set(k, want);
-        const nS = slideN.get(k), slides = real.slice(0, nS);
+        const nS = slideN.get(k), slides = x.ex && real.length > nS ? [...real.slice(0, nS - 1), real[real.length - 1]] : real.slice(0, nS);
         while (slides.length < nS) slides.push({ brk: 2 + slides.length });
         const si = Math.min(slides.length - 1, Math.max(0, Math.floor(into / (lens[k] / slides.length))));
         if (k !== shownK) {
@@ -1573,13 +1642,13 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           const logKey = `${x.id}@${Math.round(at0 + starts[k] * 1000)}`;
           if ((mode === "app" || output) && !avoLogged.has(logKey)) { avoLogged.add(logKey); markAvoSeen(x.id); fetch("/api/tv/avo/played", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: x.id, ch: channel, key: output ? key : "" }), keepalive: true }).catch(() => {}); }
           const box0 = el.querySelector(".avo");
-          if (first || !el.isConnected || !box0) return paint();
+          if (first || !el.isConnected || !box0 || !!box0.dataset.ex !== !!x.ex) return paint();
           // The next story comes in without a cut: the এই মুহূর্তে tag, the NEWS UPDATE strip and the
           // progress stay on screen; the strip's headline changes, and its picture comes in under the
           // stinger with a whoosh.
           box0.dataset.k = k;
-          const kick = box0.querySelector(".avo-kick span"); if (kick) kick.textContent = DESK_BN[x.desk] || x.desk || "খবর";
-          const lt = box0.querySelector(".avo-l3 .lt-text"); if (lt) { lt.textContent = x.title; lt.classList.remove("swap"); void lt.offsetWidth; lt.classList.add("swap"); }
+          const kick = box0.querySelector(".avo-kick span, .ex-tag span"); if (kick) kick.textContent = DESK_BN[x.desk] || x.desk || "খবর";
+          const lt = box0.querySelector(".avo-l3 .lt-text, .ex-cap .lt-text"); if (lt) { lt.textContent = x.title; lt.classList.remove("swap"); void lt.offsetWidth; lt.classList.add("swap"); }
           box0.querySelectorAll(".avo-steps i").forEach((n, j) => { n.className = j < k ? "done" : j === k ? "on" : ""; });
           if (!st.muted) whoosh(st.audio);
           speakAvo(x); st.resumeVoice = () => { if (el.isConnected) speakAvo(x); };
@@ -1591,10 +1660,20 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
             pics.insertAdjacentHTML("beforeend", slideHTML(x, sl, lens[k] / slides.length).replace(/class="avo-slide([^"]*)"/, `class="avo-slide$1" style="--d:${(lens[k] / slides.length + 1.5).toFixed(1)}s"`));
             [...pics.querySelectorAll(":scope > .avo-slide")].slice(0, -1).forEach(n => n.remove());
             countUp(pics);
-            if (sl.g === "map") { const svg = pics.lastElementChild?.querySelector(".so-mapbox svg"); if (svg) soMap(svg, x.places || [], channel === "v"); }
+            if (sl.g === "map" || sl.ex === "map") { const svg = pics.lastElementChild?.querySelector(".so-mapbox svg"); if (svg) soMap(svg, x.places || [], channel === "v"); }
             box.querySelector(".avo-credit").textContent = sl.img?.credit || (sl.brk ? bgOf(x)?.credit || "" : "");
           };
           if (firstSlide) put();
+          else if (x.ex) {
+            const cut = ["hard", "whip", "hard", "zoom"][si % 4];
+            pics.insertAdjacentHTML("beforeend", slideHTML(x, sl, lens[k] / slides.length).replace(/class="avo-slide([^"]*)"/, `class="avo-slide$1 cut-${cut}" style="--d:${(lens[k] / slides.length + 1.5).toFixed(1)}s"`));
+            const olds = [...pics.querySelectorAll(":scope > .avo-slide")].slice(0, -1);
+            setTimeout(() => olds.forEach(n => n.remove()), cut === "hard" ? 60 : 520);
+            countUp(pics);
+            if (sl.ex === "map") { const svg = pics.lastElementChild?.querySelector(".so-mapbox svg"); if (svg) soMap(svg, x.places || [], channel === "v"); }
+            box.querySelector(".avo-credit").textContent = sl.img?.credit || "";
+            if (cut === "whip" && !st.muted) whoosh(st.audio);
+          }
           else { const w = document.createElement("div"); w.className = "avo-sting"; w.innerHTML = "<i></i><i></i><i></i>"; pics.append(w); setTimeout(put, 300); setTimeout(() => w.remove(), 800); }
         }
       };
