@@ -262,7 +262,7 @@ rest, whenever you are ready:
     stories go to the owner (`ADMIN_EMAIL`) only, as a push on their signed-in devices and on
     Telegram. The draft is ready 15 minutes before; the owner's picks go if made, otherwise the
     desk's choice. Big stories between briefs come at once. Rules (counts, follow and mute words)
-    are on the page. Telegram (optional, free):
+    are on the page. Telegram is off unless a bot token is added (the page then shows it):
     1. In Telegram, open **@BotFather**, send `/newbot`, give it a name and a username ending in
        `bot`. Copy the token it gives.
     2. `npx wrangler secret put TELEGRAM_BOT_TOKEN` and paste the token (or Cloudflare dashboard →
