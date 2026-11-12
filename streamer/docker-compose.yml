@@ -1,0 +1,65 @@
+# Rashtrix TV streams: both channels as HLS, running all day on one machine.
+# Settings are in .env (copy .env.example). Start: docker compose up -d --build
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:1.21.3
+    restart: unless-stopped
+    volumes: ["./mediamtx.yml:/mediamtx.yml:ro"]
+
+  caddy:
+    image: caddy:2.10.2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN}
+      FEED_SECRET: ${FEED_SECRET}
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddy-data:/data"]
+    depends_on: [mediamtx]
+
+  capture-h:
+    build: .
+    image: rashtrix-capture
+    restart: unless-stopped
+    shm_size: 1gb
+    environment:
+      URL: ${SITE}/tv.html?ch=h&key=${KEY_H}
+      OUT: rtmp://mediamtx:1935/h
+      WIDTH: ${H_WIDTH:-1280}
+      HEIGHT: ${H_HEIGHT:-720}
+      FPS: ${FPS:-30}
+      VIDEO_BITRATE: ${H_BITRATE:-3000k}
+    depends_on: [mediamtx]
+
+  capture-v:
+    build: .
+    image: rashtrix-capture
+    restart: unless-stopped
+    shm_size: 1gb
+    environment:
+      URL: ${SITE}/tv.html?ch=v&key=${KEY_V}
+      OUT: rtmp://mediamtx:1935/v
+      WIDTH: ${V_WIDTH:-720}
+      HEIGHT: ${V_HEIGHT:-1280}
+      FPS: ${FPS:-30}
+      VIDEO_BITRATE: ${V_BITRATE:-3000k}
+    depends_on: [mediamtx]
+
+  # Optional: the same streams pushed to a platform's RTMP ingest (PUSH_H / PUSH_V in .env).
+  push-h:
+    build: .
+    image: rashtrix-capture
+    restart: unless-stopped
+    entrypoint: ["tini", "--", "/relay.sh"]
+    environment: { SRC: "rtmp://mediamtx:1935/h", PUSH_URL: "${PUSH_H:-}" }
+    depends_on: [capture-h]
+
+  push-v:
+    build: .
+    image: rashtrix-capture
+    restart: unless-stopped
+    entrypoint: ["tini", "--", "/relay.sh"]
+    environment: { SRC: "rtmp://mediamtx:1935/v", PUSH_URL: "${PUSH_V:-}" }
+    depends_on: [capture-v]
+
+volumes:
+  caddy-data:

@@ -4,3 +4,4 @@ dist/
 .dev.vars
 video/out/
 __pycache__/
+streamer/.env
