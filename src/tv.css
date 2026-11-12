@@ -1331,3 +1331,27 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tvp-v .pr-when{grid-column:2/4;margin:0;border-radius:0;padding:10px 18px;gap:10px}
 .tvp-v .pr-when span{font-size:24px}.tvp-v .pr-when b{font-size:30px}.tvp-v .pr-when svg{width:28px;height:28px}
 .tvp-v .pr-logo{display:none}
+
+/* The studio pictures (src/engine.js STUDIO_WIDE / STUDIO_SQUARE). In the L-band, where the logo
+   card was: the wide picture, framed in gold, with its shine. */
+.lb-side .lb-logo.lb-studio{padding:0;border-radius:16px;width:100%;max-width:400px;aspect-ratio:1;background:#1a0405}
+.lb-side .lb-logo.lb-studio img{display:block;width:100%;height:100%;object-fit:cover;animation:lbkb 9s ease-out both}
+@keyframes lbkb{from{transform:scale(1.08)}to{transform:scale(1)}}
+/* The ad box, four seconds in every twenty: the wide picture, turning in like the ads do. */
+.tv-ad.tv-ad-studio{padding:0;overflow:hidden;background:#1a0405}
+.tv-ad.tv-ad-studio img{width:100%;height:100%;object-fit:cover;object-position:62% 40%;animation:adkb 4.2s ease-out both}
+.tv-ad.tv-ad-studio i{position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.7) 50%,transparent 65%);transform:translateX(-130%);animation:unshine 1s .4s ease both}
+@keyframes adkb{from{transform:scale(1.12)}to{transform:scale(1)}}
+/* The studio image wipe: the wide picture full screen wipes in behind a gold edge, holds with a
+   shine, and wipes out with the cut underneath (the vertical channel: the square picture across
+   the frame on the channel red, so the logo in the set is never cut). */
+.tvp-studiowipe{background:none!important;overflow:hidden;animation:none!important}
+.tvp-studiowipe:before{display:none}
+.tvp-studiowipe .sw-full{position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(165deg,#d10a0a,#6e0000);animation:swfull 1.4s cubic-bezier(.7,0,.3,1) both}
+.tvp-studiowipe .sw-full img{width:100%;height:100%;object-fit:cover;animation:swzoom 1.4s ease-out both}
+.tvp-v .tvp-studiowipe .sw-full img{width:100%;height:auto;object-fit:contain;box-shadow:0 0 0 8px #D4A017}
+.tvp-studiowipe .sw-shine{position:absolute;top:0;bottom:0;left:-30%;width:18%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.6),transparent);transform:skewX(-16deg);animation:prshine .9s .45s ease-in-out both}
+.tvp-studiowipe .sw-edge{position:absolute;top:-10%;bottom:-10%;width:3.5%;background:linear-gradient(90deg,#f2c14e,#D4A017);box-shadow:0 0 40px rgba(242,193,78,.8);transform:skewX(-12deg);animation:swedge 1.4s cubic-bezier(.7,0,.3,1) both}
+@keyframes swfull{0%{clip-path:polygon(0 0,0 0,-12% 100%,-12% 100%)}32%,68%{clip-path:polygon(0 0,112% 0,100% 100%,-12% 100%)}100%{clip-path:polygon(112% 0,112% 0,100% 100%,100% 100%)}}
+@keyframes swedge{0%{left:-6%}32%{left:104%}33%,67%{left:104%;opacity:0}68%{left:-6%;opacity:1}100%{left:104%}}
+@keyframes swzoom{from{transform:scale(1.12)}to{transform:scale(1)}}
