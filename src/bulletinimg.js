@@ -228,7 +228,19 @@ async function pageMeta(url) {
   try { u = img ? new URL(img, r.url || url) : null; } catch { u = null; }
   return { page: r.url || url, img: u && /^https?:$/.test(u.protocol) ? u.href : "", alt: meta("og:image:alt") || meta("twitter:image:alt"), width: Number(meta("og:image:width")) || 0,
     title: meta("og:title") || dec(html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1]), published: meta("article:published_time") || meta("datePublished") || dec(html.match(/"datePublished"\s*:\s*"([^"]+)"/)?.[1]),
-    caption: strip(html.match(/<figcaption[^>]*>([\s\S]{0,400}?)<\/figcaption>/i)?.[1] || "") };
+    caption: strip(html.match(/<figcaption[^>]*>([\s\S]{0,400}?)<\/figcaption>/i)?.[1] || ""),
+    // Other photographs in the report itself: pictures inside its figures (never icons, logos,
+    // avatars, ads or thumbnails of other stories), up to three.
+    more: (() => {
+      const out = [], at = html.search(/<article|<figure|class=["'][^"']*(?:story|article|post)-?(?:body|content)/i), body = at >= 0 ? html.slice(at) : html;
+      for (const m of body.matchAll(/<figure[\s\S]{0,600}?<img[^>]+?(?:data-src|data-lazy-src|src)=["']([^"']+)["'][^>]*>/gi)) {
+        let u; try { u = new URL(m[1].replace(/&amp;/g, "&"), r.url || url); } catch { continue; }
+        if (!/^https?:$/.test(u.protocol) || /^data:/.test(m[1]) || /icon|avatar|logo|sprite|placeholder|lazy|blank|1x1|banner|advert|\/ads?\//i.test(u.href)) continue;
+        if (!out.includes(u.href)) out.push(u.href);
+        if (out.length >= 3) break;
+      }
+      return out;
+    })() };
 }
 // Rules 1–2 for one page's photo; returns the reason it is refused, or "".
 async function pageRules(m, { expect, storyAt }) {
@@ -292,9 +304,10 @@ export async function checkedPhotos(env, story, want = 6) {
   // Other outlets' reports on the same story (only while the image model can check them).
   const aiOn = !!env.AI && visionDaily(env) > 0;
   if (aiOn && story.title) {
-    const tried = new Set(cands.map(c => c.page));
-    for (const h of await newsSearch(story.title).catch(() => [])) {
-      if (tried.has(h.url) || broadcaster(h.source, h.url) || sharedKeys(h.title, story.title) < 2) continue;
+    const tried = new Set(cands.map(c => c.page)), en = /[a-z]{3}/i.test(about) ? about : "";
+    const hits = [...await newsSearch(story.title).catch(() => []), ...(en ? await newsSearch(en).catch(() => []) : [])];
+    for (const h of hits) {
+      if (tried.has(h.url) || broadcaster(h.source, h.url) || Math.max(sharedKeys(h.title, story.title), en ? sharedKeys(h.title, en) : 0) < 2) continue;
       const pub = Date.parse(h.date || ""); if (pub && Math.abs(pub - storyAt) > 36 * 3600e3) continue;
       tried.add(h.url); cands.push({ page: h.url, expect: h.title, credit: `ছবি: সৌজন্যে ${h.source || "সংবাদমাধ্যম"}`, own: false });
       if (cands.length >= 10) break;
@@ -323,6 +336,17 @@ export async function checkedPhotos(env, story, want = 6) {
     if (v.ok && c.own && !v.ai && ownKept >= 2) v = { ok: false, why: "two rule-checked photos at most" };
     log.push({ url: m.img, page: c.page, ok: v.ok, why: v.why });
     if (v.ok) { photos.push({ url: m.img, page: c.page, credit: c.credit }); if (c.own) ownKept++; }
+    // More photographs from the same report: each judged by the image model (never without it).
+    if (v.ok && c.own && v.ai) for (const extra of m.more || []) {
+      if (photos.length >= want || seen.has(extra)) continue;
+      seen.add(extra);
+      const bad = await pageRules({ ...m, img: extra, alt: "", caption: "", width: 0 }, { expect: "", storyAt });
+      let w = bad ? { ok: false, why: bad } : null;
+      if (!w) { const k = await env.DB.prepare("SELECT ok, why, ai FROM photo_checks WHERE url=?").bind(extra).first().catch(() => null); w = k ? { ok: !!k.ok, why: k.why, ai: !!k.ai } : await visionCheck(env, extra, about); if (w && !k) await remember(env, extra, w); }
+      if (!w) continue;   // the model could not be asked: not used
+      log.push({ url: extra, page: c.page, ok: w.ok, why: w.ok ? `another photo in the same report: ${w.why}` : w.why });
+      if (w.ok) photos.push({ url: extra, page: c.page, credit: c.credit });
+    }
   }
   return { photos, log };
 }
