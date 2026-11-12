@@ -98,18 +98,21 @@ const PLACES = [
 // town and its district) is left out.
 export const placesIn = text => {
   const hits = [];
-  for (const p of PLACES) { let at = Infinity; for (const n of p.names) { const i = text.indexOf(n); if (i >= 0 && i < at) at = i; } if (at < Infinity) hits.push({ at, p }); }
+  for (const p of PLACES) { let at = Infinity; for (const n of p.names) { const m = text.match(new RegExp(`(?<![\\p{L}\\p{M}])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "u")); if (m && m.index < at) at = m.index; } if (at < Infinity) hits.push({ at, p }); }
   const out = [];
   for (const { p } of hits.sort((a, b) => a.at - b.at)) if (!out.some(o => o.name === p.name || Math.hypot(o.lat - p.lat, o.lon - p.lon) < 0.12)) out.push({ name: p.name, lat: p.lat, lon: p.lon });
   return out.slice(0, 3);
 };
 // What the story is about, for the segment's icon.
-const TOPICS = [["fire", /আগুন|অগ্নিকাণ্ড|বিস্ফোরণ|দমকল/], ["crash", /দুর্ঘটনা|সংঘর্ষ|লাইনচ্যুত|উল্টে/], ["crime", /পুলিশ|গ্রেফতার|খুন|চুরি|ডাকাতি|অভিযুক্ত|সিবিআই|ইডি|তদন্ত|আটক/],
+const TOPICS = [["fire", /আগুন|অগ্নিকাণ্ড|বিস্ফোরণ|দমকল/], ["crash", /দুর্ঘটনা|সংঘর্ষ|লাইনচ্যুত|উল্টে/], ["crime", /পুলিশ|গ্রেফতার|খুন|চুরি|ডাকাতি|অভিযুক্ত|সিবিআই|ইডি|তদন্ত|আটক|হামলা|গুলি|বোমা|জঙ্গি/],
   ["court", /আদালত|হাইকোর্ট|সুপ্রিম কোর্ট|বিচারপতি|মামলা|রায়/], ["vote", /নির্বাচন|ভোট|প্রার্থী|কমিশন|বিধানসভা|লোকসভা/], ["weather", /বৃষ্টি|ঝড়|ঘূর্ণিঝড়|আবহাওয়া|তাপমাত্রা|শীত|গরম|বন্যা|নিম্নচাপ/],
   ["health", /হাসপাতাল|চিকিৎসা|ডেঙ্গি|রোগী|স্বাস্থ্য|ডাক্তার|চিকিৎসক/], ["sport", /ম্যাচ|ক্রিকেট|ফুটবল|গোল|উইকেট|মোহনবাগান|ইস্টবেঙ্গল|টুর্নামেন্ট/],
-  ["faith", /পুজো|প্রতিমা|বিসর্জন|উৎসব|মন্দির|ভক্ত|ইদ|মেলা/], ["travel", /ট্রেন|মেট্রো|বাস|বিমান|উড়ান|ফেরি|রাস্তা|যান চলাচল/], ["protest", /বিক্ষোভ|ধর্মঘট|অবরোধ|মিছিল|আন্দোলন/],
-  ["money", /টাকা|দাম|বাজার|শেয়ার|বাজেট|কর|ব্যাংক|ব্যাঙ্ক/], ["school", /পরীক্ষা|স্কুল|বিশ্ববিদ্যালয়|ছাত্র|শিক্ষক|পড়ুয়া/], ["politics", /মন্ত্রী|সরকার|তৃণমূল|বিজেপি|সিপিএম|কংগ্রেস|দল|নেতা/]];
-export const topicOf = text => (TOPICS.find(([, re]) => re.test(text)) || ["news"])[0];
+  ["faith", /পুজো|প্রতিমা|বিসর্জন|উৎসব|মন্দির|ভক্ত|ইদ(?![\p{L}\p{M}])|ইদের|মেলা/], ["travel", /ট্রেন|মেট্রো|বাস|বিমান|উড়ান|ফেরি|রাস্তা|যান চলাচল/], ["protest", /বিক্ষোভ|ধর্মঘট|অবরোধ|মিছিল|আন্দোলন/],
+  ["money", /টাকা|দাম(?![\p{L}\p{M}])|দামে|বাজার|শেয়ার|বাজেট|কর(?![\p{L}\p{M}])|করের|ব্যাংক|ব্যাঙ্ক/], ["school", /পরীক্ষা|স্কুল|বিশ্ববিদ্যালয়|ছাত্র|শিক্ষক|পড়ুয়া/], ["politics", /মন্ত্রী|সরকার|তৃণমূল|বিজেপি|সিপিএম|কংগ্রেস|দল(?![\p{L}\p{M}])|দলের|দলীয়|নেতা/]];
+// A word must start where the match starts (so "রায়" is not found in "ইসরায়েল", nor "বাস" in "বিশ্বাস").
+const atWordStart = re => new RegExp(`(?<![\\p{L}\\p{M}])(?:${re.source})`, "u");
+const TOPIC_RE = TOPICS.map(([k, re]) => [k, atWordStart(re)]);
+export const topicOf = text => (TOPIC_RE.find(([, re]) => re.test(text)) || ["news"])[0];
 const QUOTE = /[“"‘']([^”"’']{25,170})[”"’']/;
 const words = t => new Set(String(t || "").toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s]/gu, " ").split(/\s+/).filter(w => w.length >= 3));
 // The story of the hour: the biggest story in the AVO pool of the last three hours (most outlets
