@@ -1,7 +1,12 @@
 // The channel's segments and its programming clock (src/engine.js plays them).
 //
-// Each half-hour has two segment slots (eight and twenty-two minutes in) on top of the bulletins,
-// the weather and the markets; which segment fills a slot depends on the time of day:
+// Bulletins at :00, :15, :30 and :45, each when the item on air ends (a video is never cut): West
+// Bengal politics first, then Kolkata's, India's, then West Bengal, Kolkata, India, the world,
+// sports, entertainment, lifestyle (src/labels.js bulletinRank), from the last thirty minutes. The
+// :00 and :30 bulletins are followed by the weather and the markets; the :15 and :45 ones by a desk
+// segment (slot c: sports, entertainment, world, lifestyle, by time of day). No two segments run
+// back to back. Each half-hour also has two segment slots (eight and twenty-two minutes in) on top
+// of the bulletins; which segment fills a slot depends on the time of day:
 //   morning 6–10   শহরের খবর, কলকাতা ১০            (the city and the commute)
 //   day 10–17      বাংলাদেশ ডেস্ক / এক মিনিটে বিশ্ব, সংখ্যায় আজ
 //   prime 17–23    story of the hour, কলকাতা ১০ / খেলার খবর
@@ -14,14 +19,17 @@
 // weather, and Bengali Wikipedia's "on this day" page for আজকের দিনে (fetched once a day).
 import { labelsOf } from "./labels.js";
 
-export const SEG_NAMES = { city: "শহরের খবর", kolkata10: "কলকাতা ১০", bangladesh: "বাংলাদেশ ডেস্ক", world: "এক মিনিটে বিশ্ব", numbers: "সংখ্যায় আজ", sports: "খেলার খবর", onthisday: "আজকের দিনে", soth: "এই ঘণ্টার বড় খবর" };
+export const SEG_NAMES = { city: "শহরের খবর", kolkata10: "কলকাতা ১০", bangladesh: "বাংলাদেশ ডেস্ক", world: "এক মিনিটে বিশ্ব", numbers: "সংখ্যায় আজ", sports: "খেলার খবর", onthisday: "আজকের দিনে", soth: "এই ঘণ্টার বড় খবর", entertainment: "বিনোদনের খবর", lifestyle: "জীবনধারা" };
+// Slots a (:08 and :38) and b (:22 and :52) rotate half-hour by half-hour; slot c follows the
+// quick bulletins at :15 and :45 with the desk segments (sports, entertainment, world, lifestyle),
+// a fixed turn for each quarter so the promos can say when each one plays.
 export const CLOCK_DEFAULT = {
-  morning: { from: 6, a: ["city"], b: ["kolkata10"], avoEvery: 3 },
-  day: { from: 10, a: ["bangladesh", "world"], b: ["numbers", "kolkata10"], avoEvery: 3 },
-  prime: { from: 17, a: ["soth"], b: ["kolkata10", "sports"], avoEvery: 2 },
-  late: { from: 23, a: ["onthisday"], b: ["numbers"], avoEvery: 4 }
+  morning: { from: 6, a: ["city"], b: ["kolkata10"], c: ["lifestyle", "sports"], avoEvery: 3 },
+  day: { from: 10, a: ["bangladesh", "city"], b: ["numbers", "kolkata10"], c: ["world", "entertainment", "lifestyle"], avoEvery: 3 },
+  prime: { from: 17, a: ["soth"], b: ["kolkata10", "numbers"], c: ["sports", "entertainment", "world"], avoEvery: 2 },
+  late: { from: 23, a: ["onthisday"], b: ["numbers"], c: ["entertainment", "world"], avoEvery: 4 }
 };
-export const SLOT_MINUTES = { a: 8, b: 22 };
+export const SLOT_MINUTES = { a: 8, b: 22, c: 15 };
 // The clock as the control room set it (each daypart's slot lists and AVO rhythm), on the defaults.
 export function clockOf(s) {
   const out = structuredClone(CLOCK_DEFAULT), c = s.clock || {};
@@ -29,6 +37,7 @@ export function clockOf(s) {
     const x = c[k] || {}, ok = v => Array.isArray(v) ? v.filter(n => SEG_NAMES[n]).slice(0, 4) : null;
     if (ok(x.a)?.length) d.a = ok(x.a);
     if (ok(x.b)?.length) d.b = ok(x.b);
+    if (ok(x.c)?.length) d.c = ok(x.c);
     if (Number.isFinite(+x.avoEvery)) d.avoEvery = Math.max(1, Math.min(8, Math.round(+x.avoEvery)));
   }
   return out;
@@ -173,6 +182,8 @@ export async function segmentsData(env, s, voices = new Map(), avo = []) {
       world: take(x => x.dk === "world", 5),
       bangladesh: take(x => x.dk === "bangladesh", 5),
       sports: take(x => x.dk === "sports", 5),
+      entertainment: take(x => x.d === "Entertainment", 5),
+      lifestyle: take(x => x.d === "Lifestyle", 5),
       city: take(x => (x.dk === "kolkata" || x.dk === "bengal") && CITY.test(x.text), 4),
       numbers,
       onthisday: await onThisDay(env)
@@ -184,6 +195,7 @@ export async function segmentsData(env, s, voices = new Map(), avo = []) {
     ...base,
     soth: await (async () => { const h = memo.get("soth"); if (h && Date.now() - h.at < 60e3) return h.value; const v = await storyOfHour(env, avo).catch(() => null); memo.set("soth", { at: Date.now(), value: v }); return v; })(),
     kolkata10: voiced(base.kolkata10), world: voiced(base.world), bangladesh: voiced(base.bangladesh), sports: voiced(base.sports), city: voiced(base.city),
+    entertainment: voiced(base.entertainment), lifestyle: voiced(base.lifestyle),
     score: s.score?.on && s.score.text ? s.score.text : "",
     notice: s.notice?.on && s.notice.text ? s.notice.text : ""
   };
