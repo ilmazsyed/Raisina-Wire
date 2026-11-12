@@ -1254,7 +1254,10 @@ function ownerStory(a) {
   if (!isOwner()) return;
   document.body.insertAdjacentHTML("beforeend", `<button class="own-fab" id="ownFab" type="button" aria-label="${esc(tr("Story tools"))}">${ICON_PEN}</button>`);
   document.getElementById("ownFab").addEventListener("click", () => ownerMenu(a.slug));
-  if (a.status !== "published") {
+  if (a.hiddenHere) {
+    $(".reader-article")?.insertAdjacentHTML("afterbegin", `<div class="own-banner" id="ownBanner"><span>${esc(tr("Hidden in this language. Readers here cannot see it."))}</span><button type="button" class="btn btn-dark btn-sm">${esc(tr("Show it here"))}</button></div>`);
+    $("#ownBanner button")?.addEventListener("click", () => ownerLang(a.slug, lang, false));
+  } else if (a.status !== "published") {
     $(".reader-article")?.insertAdjacentHTML("afterbegin", `<div class="own-banner" id="ownBanner"><span>${esc(tr("This story is pulled. Only you can see it."))}</span><button type="button" class="btn btn-dark btn-sm">${esc(tr("Put it back"))}</button></div>`);
     $("#ownBanner button")?.addEventListener("click", () => ownerDo(a.slug, "restore"));
   }
@@ -1267,7 +1270,7 @@ async function ownerMenu(slug) {
   const live = x.status === "published" && !x.pulled;
   const btn = (act, label, cls = "") => `<button type="button" class="own-act ${cls}" data-own="${act}">${esc(tr(label))}</button>`;
   document.body.insertAdjacentHTML("beforeend", `<dialog class="own-sheet" id="ownSheet"><div class="own-head"><span class="kicker">${esc(tr("Story tools"))}</span><b data-no-tr lang="${esc(x.lang || "bn")}">${esc(x.title)}</b></div>
-    <div class="own-acts">${btn("edit", "Edit story")}${btn("no-pictures", "Remove pictures")}${live ? btn("top", "Move to the top") + btn("breaking", "Breaking on TV") + btn("alert", x.alertState === "sent" ? "Alert sent" : "Send alert", x.alertState === "sent" ? "off" : "") : ""}${live ? btn("pull", "Pull the story", "warn") : btn("restore", "Put it back")}${btn("delete", "Delete for good", "danger")}</div>
+    <div class="own-acts">${btn("edit", "Edit story")}${btn("versions", "Earlier versions")}${btn("no-pictures", "Remove pictures")}${live ? btn("top", "Move to the top") + btn("breaking", "Breaking on TV") + btn("alert", x.alertState === "sent" ? "Alert sent" : "Send alert", x.alertState === "sent" ? "off" : "") : ""}${OWN_LANGS.filter(l => l !== (x.lang || "bn")).map(l => (x.hiddenLangs || []).includes(l) ? btn(`show-${l}`, OWN_LANG_LABEL[l][1]) : btn(`hide-${l}`, OWN_LANG_LABEL[l][0])).join("")}${live ? btn("pull", "Pull the story", "warn") : btn("restore", "Put it back")}${btn("delete", "Delete for good", "danger")}</div>
     <button type="button" class="own-cancel" data-own="close">${esc(tr("Cancel"))}</button></dialog>`);
   const dlg = document.getElementById("ownSheet");
   dlg.addEventListener("click", e => {
@@ -1275,7 +1278,39 @@ async function ownerMenu(slug) {
     if (e.target === dlg || b?.dataset.own === "close") { dlg.close(); return; }
     if (!b || b.classList.contains("off")) return;
     dlg.close();
-    if (b.dataset.own === "edit") ownerEdit(x); else ownerDo(x.slug, b.dataset.own);
+    const act = b.dataset.own, lm = act.match(/^(hide|show)-(\w+)$/);
+    if (act === "edit") ownerEdit(x); else if (act === "versions") ownerVersions(x); else if (lm) ownerLang(x.slug, lm[2], lm[1] === "hide"); else ownerDo(x.slug, act);
+  });
+  dlg.addEventListener("close", () => dlg.remove());
+  dlg.showModal();
+}
+const OWN_LANGS = ["bn", "en", "hi"];
+const OWN_LANG_LABEL = { bn: ["Hide in Bengali", "Show in Bengali"], en: ["Hide in English", "Show in English"], hi: ["Hide in Hindi", "Show in Hindi"] };
+async function ownerLang(slug, l, hide) {
+  try { await ownerAPI(slug, "lang", { lang: l, hide }); } catch (e) { toast(tr(e.message)); return; }
+  toast(tr(hide ? "Hidden in that language." : "Shown in that language again."));
+  ownerRefresh(slug);
+}
+// Earlier versions: the text before each change; one tap brings one back (the text now is kept too).
+async function ownerVersions(x) {
+  let list = [];
+  try { const r = await fetch(`/api/owner/stories/${encodeURIComponent(x.slug)}/versions`, { cache: "no-store" }); const d = await r.json(); if (!r.ok) throw new Error(d.error || "Something went wrong. Try again."); list = d.versions || []; }
+  catch (e) { toast(tr(e.message)); return; }
+  document.getElementById("ownSheet")?.remove();
+  const when = t => { try { return new Date(String(t).replace(" ", "T") + (/[zZ+]/.test(String(t)) ? "" : "Z")).toLocaleString(LOCALE, { ...IST, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
+  const ACT = { edit: "Edited", correct: "Corrected", rollback: "Rolled back", pull: "Pulled", restore: "Put back", delete: "Deleted" };
+  document.body.insertAdjacentHTML("beforeend", `<dialog class="own-sheet own-vers" id="ownSheet"><div class="own-head"><span class="kicker">${esc(tr("Earlier versions"))}</span><b data-no-tr lang="${esc(x.lang || "bn")}">${esc(x.title)}</b></div>
+    <div class="own-acts">${list.length ? list.map(v => `<div class="own-ver"><div><small>${esc(tr(ACT[v.action] || "Edited"))} · ${esc(when(v.at))}</small><b data-no-tr lang="${esc(x.lang || "bn")}">${esc(v.title)}</b><p data-no-tr lang="${esc(x.lang || "bn")}">${esc(String(v.preview || "").replace(/\s+/g, " ").slice(0, 160))}…</p></div><button type="button" class="btn btn-dark btn-sm" data-ver="${esc(v.id)}">${esc(tr("Bring back"))}</button></div>`).join("") : `<p class="own-none">${esc(tr("No earlier versions yet."))}</p>`}</div>
+    <button type="button" class="own-cancel" data-own="close">${esc(tr("Close"))}</button></dialog>`);
+  const dlg = document.getElementById("ownSheet");
+  dlg.addEventListener("click", async e => {
+    if (e.target === dlg || e.target.closest("[data-own=close]")) { dlg.close(); return; }
+    const b = e.target.closest("[data-ver]"); if (!b) return;
+    if (!confirm(tr("Bring back this version? The text now is kept as a version too."))) return;
+    dlg.close();
+    try { await ownerAPI(x.slug, "rollback", { version: b.dataset.ver }); } catch (err) { toast(tr(err.message)); return; }
+    toast(tr("Earlier version is back. TV reads it too."));
+    ownerRefresh(x.slug);
   });
   dlg.addEventListener("close", () => dlg.remove());
   dlg.showModal();

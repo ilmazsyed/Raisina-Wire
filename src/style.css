@@ -1978,3 +1978,11 @@ html.standalone,html.standalone body{overscroll-behavior-y:none}
 [data-theme="dark"] .own-sheet{background:#1b1416;color:#f2ede6}
 [data-theme="dark"] .own-head,[data-theme="dark"] .own-cancel{border-color:#2c2326}
 [data-theme="dark"] .own-act:hover{background:#2a2023}
+.own-vers .own-acts{max-height:60vh;overflow:auto;padding:4px 0}
+.own-ver{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #f0ece4}
+.own-ver>div{flex:1;min-width:0}
+.own-ver small{display:block;color:#8a6d2b;font-weight:700;font-size:12px}
+.own-ver b{display:block;margin-top:3px;font:600 15px/1.35 "Noto Serif Bengali",serif}
+.own-ver p{margin:4px 0 0;color:#666;font-size:13px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.own-none{padding:18px 20px;color:#666}
+[data-theme="dark"] .own-ver{border-color:#2c2326}[data-theme="dark"] .own-ver p{color:#b9aea6}

@@ -3,7 +3,7 @@
 // once per voice, stored in D1 and reused, so the cost depends on what is published, not on how
 // many people listen. Needs the GOOGLE_TTS_API_KEY secret; without it the site falls back to
 // the device's own voice.
-import { getBySlug, isPublic, textBlocks } from "./store.js";
+import { getBySlug, isPublic, textBlocks, shownIn } from "./store.js";
 import { isLang, localiseArticles } from "./translate.js";
 
 // Voices per language: female and male, each with a fallback. Override in wrangler.toml with
@@ -61,6 +61,7 @@ export async function handleTts(request, env, url, json, err) {
   let a = slug ? await getBySlug(env, slug) : null;
   if (!isPublic(a)) return err("Story not found.", 404);
   const want = url.searchParams.get("lang");
+  if (isLang(want) && !shownIn(a, want)) return err("Story not found.", 404);
   if (isLang(want)) [a] = await localiseArticles(env, want, [a]);
   const lang = isLang(a.lang) ? a.lang : "bn", parts = storyParts(a), sex = sexOf(url.searchParams.get("voice"));
   // Each part carries a version, so an edited paragraph gets fresh audio despite long caching.
