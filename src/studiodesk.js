@@ -18,7 +18,7 @@ async function load() {
 }
 function draw() {
   const r = room();
-  $("main").innerHTML = `<div class="pr" style="grid-template-columns:260px minmax(0,1fr) 320px">
+  $("main").innerHTML = `<div class="pr sd">
     <aside class="panel"><h2>Rooms</h2>${S.rooms.map(x => `<button class="rd" data-room="${x.id}" ${x.id === S.room ? 'aria-current="true"' : ""} style="display:block;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:8px;padding:8px;color:inherit"><b data-no-tr>${esc(x.title)}</b><small style="display:block;color:var(--mute)">${x.channel === "h" ? "Rashtrix TV" : "Rashtrix Shorts"} · ${x.effectiveMode === "vdo" ? "VDO.Ninja" : "Cloudflare Realtime"} · ${digits(x.guests.length)} guests${x.status === "closed" ? " · closed" : ""}</small></button>`).join("") || `<p class="muted">No rooms yet.</p>`}
       <form id="newRoom" class="stack" style="margin-top:10px"><input name="title" placeholder="Room name (e.g. সন্ধ্যার আলোচনা)" required data-no-tr><div class="grid2"><select name="channel"><option value="h">Rashtrix TV</option><option value="v">Rashtrix Shorts</option></select><select name="mode"><option value="auto">Automatic</option><option value="realtime">Cloudflare Realtime</option><option value="vdo">VDO.Ninja</option></select></div><button class="btn green">+ New room</button></form>
       <p class="muted" style="font-size:12px;margin-top:10px">${S.realtime ? `Cloudflare Realtime is set up${S.turn ? " (with TURN)" : " (no TURN key: some office networks may fail)"}.` : "Cloudflare Realtime is not set up yet, so rooms use VDO.Ninja (free, no account). Add the Realtime keys to switch (README)."} Last resort: put the guest on a Google Meet call and capture the window in OBS.</p></aside>

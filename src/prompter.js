@@ -8,7 +8,7 @@ import { initUiLang } from "./uilang.js";
 import { esc } from "./crshell.js";
 
 const q = new URLSearchParams(location.search), ch = q.get("ch") === "v" ? "v" : "h";
-const P = { ctl: null, scripts: {}, rundownId: null, y: 0, speed: Number(localStorage.getItem("rx-pspeed")) || 60, run: true, size: Number(localStorage.getItem("rx-psize")) || 64, mirror: localStorage.getItem("rx-pmirror") === "1", last: 0 };
+const P = { ctl: null, scripts: {}, rundownId: null, y: 0, speed: Number(localStorage.getItem("rx-pspeed")) || 60, run: true, size: Number(localStorage.getItem("rx-psize")) || (matchMedia("(max-width: 760px)").matches ? 34 : 64), mirror: localStorage.getItem("rx-pmirror") === "1", last: 0 };
 
 async function loadScripts(id) {
   if (!id || P.rundownId === id) return;
@@ -76,6 +76,8 @@ window.addEventListener("wheel", e => { P.y += e.deltaY; }, { passive: true });
   await initUiLang();
   document.body.innerHTML = `<div class="prompter" data-no-tr-scroll><div class="cue"></div><div class="scroll" data-no-tr></div><div class="pctl"></div></div>`;
   controls();
+  // With the controls hidden, a tap anywhere brings them back (a phone has no hover).
+  document.querySelector(".prompter").addEventListener("click", e => { const p = e.currentTarget; if (p.classList.contains("hidectl") && !e.target.closest(".pctl")) p.classList.remove("hidectl"); });
   const me = await fetch("/api/auth/me").then(r => r.json()).catch(() => ({}));
   if (!me.user || !["admin", "editor"].includes(me.user.role)) { document.querySelector(".scroll").innerHTML = `<div class="story"><p>Sign in with a newsroom account to use the prompter.</p></div>`; return; }
   const st = await fetch(`/api/ctl/${ch}/state`, { cache: "no-store" }).then(r => r.json()).catch(() => ({}));
