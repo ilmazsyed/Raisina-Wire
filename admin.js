@@ -37,6 +37,7 @@ async function uploadImage(file){
 }
 function wireImageFields(){
   $$("[data-image-field]").forEach(box=>{
+    if(box.dataset.wired)return;box.dataset.wired="1";
     const input=box.querySelector(`input[name="${box.dataset.imageField}"]`),preview=box.querySelector(".img-preview"),status=box.querySelector(".upload-status"),lib=box.querySelector(".lib-grid");
     const show=url=>{input.value=url;preview.style.backgroundImage=url?`url('${url.replace(/'/g,"%27")}')`:"";preview.textContent=url?"":"No image"};
     input.addEventListener("change",()=>show(input.value.trim()));
@@ -328,7 +329,7 @@ async function render(view){
       <div class="panel"><h2>Programming clock</h2><p class="muted" style="font-size:13px">Each half-hour has two segment slots, at 8 and 22 minutes past (and 38 and 52), played when the item on air ends. Each daypart (India time) lists the segments for each slot; the list rotates half-hour by half-hour, and a segment with nothing to show gives way to the next. Segments: <b>city</b> শহরের খবর, <b>kolkata10</b> কলকাতা ১০, <b>bangladesh</b> বাংলাদেশ ডেস্ক, <b>world</b> এক মিনিটে বিশ্ব, <b>numbers</b> সংখ্যায় আজ, <b>sports</b> খেলার খবর, <b>onthisday</b> আজকের দিনে, <b>soth</b> story of the hour. “AVO every” is the number of videos between AVO blocks.</p>
         <p class="muted" style="font-size:13px">Segments: city, kolkata10, bangladesh, world, numbers, sports, entertainment, lifestyle, onthisday, soth. The quick bulletins at :15 and :45 are followed by one segment, a fixed turn through its list each quarter (the promos say when each plays). No two segments run back to back.</p>
         <div class="row-actions"><button class="action" data-clock="h">Horizontal clock</button><button class="action" data-clock="v">Vertical clock</button></div><div id="tvClock"></div></div>
-      <div class="panel"><h2>Programme promos</h2><p class="muted" style="font-size:13px">The promo lower third (every five minutes, over videos) takes turns between these shows and the channel's own segments, with when each plays: every day at a time, every week on a day, or once on a date (shown without the year). No voice-over.</p>
+      <div class="panel"><h2>Programme promos</h2><p class="muted" style="font-size:13px">The promo strip (every five minutes over videos, in the ticker's place, ten seconds, no voice-over) takes turns between these shows and the channel's own segments: COMING UP, the show's picture, its name and teaser, and when it plays: every day at a time, every week on a day, or once on a date (shown without the year).</p>
         <div class="row-actions"><button class="action" data-progs="h">Horizontal promos</button><button class="action" data-progs="v">Vertical promos</button></div><div id="tvProgs"></div></div>
       <div class="panel"><h2>Videos on each channel</h2><div class="row-actions"><button class="action" data-items="h">Horizontal videos</button><button class="action" data-items="v">Vertical videos</button></div><div id="tvItems"></div></div>`;
     wireImageFields();
@@ -364,14 +365,21 @@ async function render(view){
     $$("[data-clock]").forEach(b=>b.addEventListener("click",()=>showClock(b.dataset.clock)));
     const DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
     const showProgs=ch=>{const list=(C[ch].programs||[]).map(p=>({...p}));
-      const row=(p,i)=>`<tr data-prow="${i}"><td><input data-pf="title" value="${esc(p.title||"")}" maxlength="80" lang="bn" placeholder="অনুষ্ঠানের নাম"></td><td><input data-pf="tag" value="${esc(p.tag||"")}" maxlength="110" lang="bn" placeholder="এক লাইনে কী দেখাবে"></td>
-        <td><select data-pf="kind">${[["daily","Every day"],["weekly","Every week"],["once","Once"]].map(([v,n])=>`<option value="${v}" ${p.kind===v?"selected":""}>${n}</option>`).join("")}</select></td>
-        <td><select data-pf="day">${DAYS.map((d,k)=>`<option value="${k}" ${Number(p.day??6)===k?"selected":""}>${d}</option>`).join("")}</select></td><td><input data-pf="date" type="date" value="${esc(p.date||"")}"></td><td><input data-pf="time" type="time" value="${esc(p.time||"21:00")}"></td>
-        <td><label class="field check" style="margin:0"><input type="checkbox" data-pf="on" ${p.on!==false?"checked":""}> On</label></td><td><button class="action" type="button" data-pdel="${i}">Remove</button></td></tr>`;
-      const draw=()=>{$("#tvProgs").innerHTML=`<div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Show</th><th>Teaser line</th><th>When</th><th>Day (weekly)</th><th>Date (once)</th><th>Time (India)</th><th></th><th></th></tr></thead><tbody>${list.map(row).join("")||`<tr><td colspan="8" class="muted">No shows yet: the promos run the channel's own segments.</td></tr>`}</tbody></table></div>
-        <div class="row-actions"><button class="action" type="button" id="padd">Add a show</button><button class="action primary" type="button" id="psave">Save the ${ch==="h"?"horizontal":"vertical"} promos</button></div>`;
-        const read=()=>$$("[data-prow]").forEach(r=>{const p=list[Number(r.dataset.prow)];r.querySelectorAll("[data-pf]").forEach(x=>{p[x.dataset.pf]=x.type==="checkbox"?x.checked:x.value})});
-        $("#padd").onclick=()=>{read();list.push({title:"",tag:"",kind:"weekly",day:6,date:"",time:"21:00",on:true});draw()};
+      const card=(p,i)=>`<div class="panel" data-prow="${i}" style="margin-top:12px"><div class="form-grid">
+        <label class="field">Show<input data-pf="title" value="${esc(p.title||"")}" maxlength="80" lang="bn" placeholder="অনুষ্ঠানের নাম"></label>
+        <label class="field">Teaser line<input data-pf="tag" value="${esc(p.tag||"")}" maxlength="110" lang="bn" placeholder="এক লাইনে কী দেখাবে"></label>
+        <label class="field">When<select data-pf="kind">${[["daily","Every day"],["weekly","Every week"],["once","Once"]].map(([v,n])=>`<option value="${v}" ${p.kind===v?"selected":""}>${n}</option>`).join("")}</select></label>
+        <label class="field">Day (every week)<select data-pf="day">${DAYS.map((d,k)=>`<option value="${k}" ${Number(p.day??6)===k?"selected":""}>${d}</option>`).join("")}</select></label>
+        <label class="field">Date (once)<input data-pf="date" type="date" value="${esc(p.date||"")}"></label>
+        <label class="field">Time (India)<input data-pf="time" type="time" value="${esc(p.time||"21:00")}"></label>
+        ${imageField(`pimg_${i}`,"Picture (a snapshot of the show; landscape)",p.image||"")}
+        <label class="field check"><input type="checkbox" data-pf="on" ${p.on!==false?"checked":""}> On</label></div>
+        <div class="row-actions"><button class="action" type="button" data-pdel="${i}">Remove</button></div></div>`;
+      const draw=()=>{$("#tvProgs").innerHTML=`${list.map(card).join("")||`<p class="muted" style="margin-top:12px">No shows yet: the promos run the channel's own segments.</p>`}
+        <div class="row-actions" style="margin-top:12px"><button class="action" type="button" id="padd">Add a show</button><button class="action primary" type="button" id="psave">Save the ${ch==="h"?"horizontal":"vertical"} promos</button></div>`;
+        wireImageFields();
+        const read=()=>$$("[data-prow]").forEach(r=>{const i=Number(r.dataset.prow),p=list[i];r.querySelectorAll("[data-pf]").forEach(x=>{p[x.dataset.pf]=x.type==="checkbox"?x.checked:x.value});p.image=(r.querySelector(`input[name="pimg_${i}"]`)?.value||"").trim()});
+        $("#padd").onclick=()=>{read();list.push({title:"",tag:"",kind:"weekly",day:6,date:"",time:"21:00",image:"",on:true});draw()};
         $$("[data-pdel]").forEach(b=>b.onclick=()=>{read();list.splice(Number(b.dataset.pdel),1);draw()});
         $("#psave").onclick=()=>{read();go(`/api/admin/tv/${ch}`,J("PUT",{programs:list.map(p=>({...p,day:Number(p.day)}))}),"Promos saved. Screens pick them up within a minute.")}};
       draw()};

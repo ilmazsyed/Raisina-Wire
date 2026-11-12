@@ -66,6 +66,7 @@ export async function saveTvSettings(env, ch, b) {
   if (Array.isArray(b.programs)) s.programs = b.programs.slice(0, 20).map(p => ({
     id: clean(p?.id, 20) || crypto.randomUUID().slice(0, 8), title: clean(p?.title, 80), tag: clean(p?.tag, 110),
     kind: ["daily", "weekly", "once"].includes(p?.kind) ? p.kind : "daily", day: int(p?.day, 0, 6, 6),
+    image: /^(\/media\/[\w.-]+|https:\/\/[^\s"'<>]{6,1400})$/.test(p?.image || "") ? p.image : "",
     date: /^\d{4}-\d{2}-\d{2}$/.test(p?.date || "") ? p.date : "", time: /^([01]\d|2[0-3]):[0-5]\d$/.test(p?.time || "") ? p.time : "21:00", on: p?.on !== false
   })).filter(p => p.title);
   if (Array.isArray(b.ticker)) s.ticker = b.ticker.map(x => clean(x, 160)).filter(Boolean).slice(0, 20);

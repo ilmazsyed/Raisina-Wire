@@ -393,6 +393,11 @@ const SOTH_ICONS = {
   money: SOTH_ICON('<path d="M7 4h10M7 8.5h10M7 4c5 0 7 1.5 7 4.5S12 13 8 13l7 7"/>'),
   school: SOTH_ICON('<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5M22 9v6"/>'),
   politics: SOTH_ICON('<path d="M3 21h18M4 10h16M12 3l8 5H4z"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8"/>'),
+  globe: SOTH_ICON('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>'),
+  film: SOTH_ICON('<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 7l3-4h4l-3 4M10 7l3-4h4l-3 4M17 7l3-4"/>'),
+  leaf: SOTH_ICON('<path d="M5 19c0-8 5-14 15-14 0 10-6 15-14 15"/><path d="M5 19c3-4 6-6 10-8"/>'),
+  chart: SOTH_ICON('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
+  book: SOTH_ICON('<path d="M4 5c3-1.5 6-1.5 8 0v15c-2-1.5-5-1.5-8 0zM20 5c-3-1.5-6-1.5-8 0v15c2-1.5 5-1.5 8 0z"/>'),
   news: SOTH_ICON('<circle cx="12" cy="12" r="2"/><path d="M8.5 8.5a5 5 0 000 7M15.5 8.5a5 5 0 010 7M5.5 5.5a9 9 0 000 13M18.5 5.5a9 9 0 010 13"/>')
 };
 // The running order's variety rules: never two stories from the same desk in a row (so Bengal,
@@ -1766,17 +1771,22 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (p.kind === "once") {
         const at = Date.parse(`${p.date}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:00+05:30`);
         if (!(at > t - 30 * 60e3) || at - t > 14 * 864e5) continue;
-        out.push({ title: p.title, tag: p.tag, when: bnDayDate(at), time: bnTimeHM(hh, mm), desk: true });
-      } else out.push({ title: p.title, tag: p.tag, when: p.kind === "weekly" ? `প্রতি ${BN_DAYS[p.day ?? 6]}` : "প্রতিদিন", time: bnTimeHM(hh, mm), desk: true });
+        out.push({ title: p.title, tag: p.tag, when: bnDayDate(at), time: bnTimeHM(hh, mm), image: p.image || "", icon: "news" });
+      } else out.push({ title: p.title, tag: p.tag, when: p.kind === "weekly" ? `প্রতি ${BN_DAYS[p.day ?? 6]}` : "প্রতিদিন", time: bnTimeHM(hh, mm), image: p.image || "", icon: "news" });
     }
     const segs = [];
-    for (const [name, at] of nextSegTimes(t)) if (segBuild(name)) segs.push({ title: NAMES[name] || name, tag: SEG_TEASE[name] || "", when: "প্রতিদিন", time: bnTime(at) });
+    const ICON = { sports: "sport", world: "globe", bangladesh: "globe", entertainment: "film", lifestyle: "leaf", numbers: "chart", onthisday: "book", kolkata10: "politics", city: "weather", soth: "news" };
+    for (const [name, at] of nextSegTimes(t)) if (segBuild(name)) segs.push({ title: NAMES[name] || name, tag: SEG_TEASE[name] || "", when: "প্রতিদিন", time: bnTime(at), icon: ICON[name] || "news" });
     // The desk's programmes take every other turn.
     const mixed = []; for (let i = 0; i < Math.max(out.length, segs.length); i++) { if (out[i]) mixed.push(out[i]); if (segs[i]) mixed.push(segs[i]); }
     return mixed;
   }
   const PROMO_CLOCK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`;
-  const promoHTML = x => `<div class="pr-l3"><i class="pr-wipe"></i><div class="pr-tag"><i class="lt-pulse"></i><b>${x.desk ? "আসছে" : "দেখুন"}</b></div>
+  // In the ticker's place (the headline ticker and the market ticker step aside while it runs): the
+  // programme's picture (or the segment's tile), COMING UP, the name and teaser, when it plays.
+  const promoHTML = x => `<div class="pr-l3"><i class="pr-wipe"></i>
+    <div class="pr-pic">${x.image ? `<img src="${esc(x.image)}" alt="" referrerpolicy="no-referrer">` : `<div class="pr-tile">${SOTH_ICONS[x.icon] || SOTH_ICONS.news}</div>`}</div>
+    <div class="pr-tag"><i class="lt-pulse"></i><b data-no-tr>COMING UP</b></div>
     <div class="pr-body"><b>${esc(x.title)}</b>${x.tag ? `<small>${esc(x.tag)}</small>` : ""}</div>
     <div class="pr-when">${PROMO_CLOCK}<span>${esc(x.when)}</span><b>${esc(x.time)}</b></div><i class="pr-shine"></i><img class="pr-logo" src="${LOGO}" alt=""></div>`;
   function segPeek(t, q) {
@@ -1831,6 +1841,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const pk = on ? `${k}` : "";
       if (pr.dataset.k !== pk) { pr.dataset.k = pk; pr.hidden = !on; pr.innerHTML = html; }
       if (on) pr.classList.toggle("out", t - st.promo.at > 9.1e3);
+      stage.classList.toggle("promo-on", !!on && t - st.promo.at < 9.6e3);
     }
     const key = tease ? `${tease.k}|${tease.b}` : "";
     if (te.dataset.t !== key) { te.dataset.t = key; te.hidden = !tease; te.innerHTML = tease ? `<span>${esc(tease.k)}</span><b>${esc(tease.b)}</b>` : ""; }
