@@ -315,6 +315,7 @@ export async function checkedPhotos(env, story, want = 6) {
     }
   }
   let ownKept = 0, failed = 0;
+  const fileOnes = [];
   for (const c of cands) {
     if (photos.length >= want) break;
     const m = await pageMeta(c.page).catch(() => ({ failed: true }));
@@ -325,6 +326,7 @@ export async function checkedPhotos(env, story, want = 6) {
     let v = known ? { ok: !!known.ok, sure: !!known.ok && known.why === "checked by the image model", why: known.why, ai: !!known.ai } : null;
     if (!v) {
       const bad = await pageRules(m, { expect: c.expect, storyAt });
+      if (bad && c.own && /earlier date|older report/.test(bad)) fileOnes.push({ m, c });
       if (bad) v = { ok: false, why: bad };
       else {
         const ai = await visionCheck(env, m.img, about);
@@ -358,6 +360,13 @@ export async function checkedPhotos(env, story, want = 6) {
       log.push({ url: extra, page: c.page, ok: w.ok, why: w.ok ? `another photo in the same report: ${w.why}` : w.why });
       if (w.ok) photos.push({ url: extra, page: c.page, credit: c.credit });
     }
+  }
+  // No photo at all: a file photo from the story's own report, when the image model is sure it shows
+  // the story's subject (a parliament story, the parliament).
+  if (!photos.length) for (const { m, c } of fileOnes.slice(0, 2)) {
+    const w = await visionCheck(env, m.img, about);
+    if (!w) break;
+    if (w.sure) { photos.push({ url: m.img, page: c.page, credit: c.credit }); log.push({ url: m.img, page: c.page, ok: true, why: "a file photo of the story's subject (the story had no other photo; the image model is sure)" }); break; }
   }
   return { photos, log, failed };
 }
