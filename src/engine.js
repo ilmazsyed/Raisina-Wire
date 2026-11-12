@@ -332,6 +332,26 @@ const noCaptions = p => { try { p.unloadModule?.("captions"); p.unloadModule?.("
 const INTERNAL_LABELS = /^(running order|continuity|program|preview|standby|slate)$/i;
 const airLabel = sc => { const l = String(sc?.label || "").trim(); return !l || INTERNAL_LABELS.test(l) || sc?.sources?.[0]?.kind === "continuity" ? "" : l; };
 const MAPS = {};   // the map outlines, loaded once when a map is first on air
+const inRing = (x, y, r) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, yi] = r[i], [xj, yj] = r[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+// The story of the hour's icons (drawn for the channel: one per kind of story).
+const SOTH_ICON = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const SOTH_ICONS = {
+  fire: SOTH_ICON('<path d="M12 22c4 0 7-3 7-7 0-3-2-5.5-3.5-7-.5 2-1.5 3-3 3.5C13 8 12 5 9 2c0 4-4 6.5-4 12 0 4 3 8 7 8z"/><path d="M12 22c-2 0-3.5-1.5-3.5-3.5 0-2 1.5-3 2.5-4.5 1 1.5 4 2.5 4 4.5S14 22 12 22z"/>'),
+  crash: SOTH_ICON('<path d="M3 17h18M5 17l1.5-5h11L19 17"/><circle cx="7.5" cy="17.5" r="1.8"/><circle cx="16.5" cy="17.5" r="1.8"/><path d="M12 3v4M8 5l1.5 2.5M16 5l-1.5 2.5"/>'),
+  crime: SOTH_ICON('<path d="M12 2l7 3v6c0 5-3 9-7 11-4-2-7-6-7-11V5z"/><path d="M9 12l2 2 4-4"/>'),
+  court: SOTH_ICON('<path d="M14 4l6 6M11 7l6 6M8.5 9.5l6-6 3.5 3.5-6 6z"/><path d="M11 12l-8 8"/><path d="M13 21h8"/>'),
+  vote: SOTH_ICON('<rect x="4" y="10" width="16" height="11" rx="1.5"/><path d="M8 10V4h8v6M10 14h4"/><path d="M10 6.5l1.5 1.5 3-3"/>'),
+  weather: SOTH_ICON('<path d="M7 16a4 4 0 010-8 5.5 5.5 0 0110.5 1.5A3.5 3.5 0 0117 16z"/><path d="M9 19l-1 2M13 19l-1 2M17 19l-1 2"/>'),
+  health: SOTH_ICON('<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/>'),
+  sport: SOTH_ICON('<circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 5h-5L8 10z"/><path d="M12 3v4M21 10l-5 0M16 21l-1.5-6M8 21l1.5-6M3 10h5"/>'),
+  faith: SOTH_ICON('<path d="M4 15c0 3 3.5 5 8 5s8-2 8-5H4z"/><path d="M12 15c-2 0-3-1.5-3-3.5S12 6 12 4c0 2 3 5.5 3 7.5S14 15 12 15z"/>'),
+  travel: SOTH_ICON('<rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 21l-2-3M15 21l2-3"/><circle cx="9" cy="14" r=".8"/><circle cx="15" cy="14" r=".8"/>'),
+  protest: SOTH_ICON('<path d="M4 10v4l3 1 9 4V5L7 9z"/><path d="M7 15l1 5h2l-1-4.5M19 9.5a3 3 0 010 5"/>'),
+  money: SOTH_ICON('<path d="M7 4h10M7 8.5h10M7 4c5 0 7 1.5 7 4.5S12 13 8 13l7 7"/>'),
+  school: SOTH_ICON('<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5M22 9v6"/>'),
+  politics: SOTH_ICON('<path d="M3 21h18M4 10h16M12 3l8 5H4z"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8"/>'),
+  news: SOTH_ICON('<circle cx="12" cy="12" r="2"/><path d="M8.5 8.5a5 5 0 000 7M15.5 8.5a5 5 0 010 7M5.5 5.5a9 9 0 000 13M18.5 5.5a9 9 0 010 13"/>')
+};
 // The running order's variety rules: never two stories from the same desk in a row (so Bengal,
 // India and the world take turns), and a light story after every two heavy ones. The first `keep`
 // items (the lead) stay where they are; each next item is the first that fits, else the nearest.
@@ -717,18 +737,29 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const S = st.tv?.segs || {};
     let items = [];
     if (name === "soth") {
-      // The story of the hour: the lead read in full over its picture, then its map, a quote from
-      // the report, the earlier stories on it, its key points and more of its pictures.
-      const x = S.soth; if (!x?.voice?.length) return null;
-      items.push({ lead: x, d0: Math.max(10, (x.secs || 20) + 1.5) });
-      if (x.places?.length) items.push({ map: x.places, d0: 8 });
-      if (x.quote) items.push({ quote: x.quote, d0: 8 });
-      if ((x.timeline || []).length >= 2) items.push({ timeline: x.timeline, title: x.t, d0: 10 });
-      if ((x.lines || []).length >= 3) items.push({ pts: x.lines.slice(1, 4), d0: 9 });
-      for (const im of (x.images || []).slice(1, 3)) items.push({ photo: im, title: x.t, d0: 6 });
-      if (items.length < 3) return null;
-      const head = st.tv?.links?.["seg:soth"] ? 5.5 : 4;
-      return { name, head, items: items.map(i => ({ ...i })), dur: head + items.reduce((a, b) => a + b.d0, 0) };
+      // The story of the hour, told fast in the channel's own graphics (no photographs): a stinger,
+      // then one beat per sentence of the newsreader's reading (the headline, the big words, a
+      // figure counting up, the map flying in to the place), then a quote, the story so far, and
+      // out. Each beat lasts as long as its sentence takes to read.
+      const x = S.soth, lines = (x?.lines || []).filter(Boolean).slice(0, 6);
+      if (!x?.voice?.length || !lines.length) return null;
+      const head = st.tv?.links?.["seg:soth"] ? 5 : 2.6, places = x.places || [], figs = x.figs || [];
+      const total = Math.max(6, x.secs || 20) + 0.8, w = lines.map(l => Math.max(24, l.length)), sum = w.reduce((a, b) => a + b, 0);
+      let mapAt = places.length ? lines.findIndex((l, i) => i > 0 && places.some(p => l.includes(p.name))) : -1;
+      if (places.length && mapAt < 0 && lines.length > 1) mapAt = 1;
+      const items = []; let alt = 0;
+      lines.forEach((l, i) => {
+        const d0 = Math.max(2.8, total * w[i] / sum);
+        if (i === 0) items.push({ k: "head", d0, line: l, t: x.t, d: x.d, upd: !!x.upd, topic: x.topic || "news", at: x.at, voice: x.voice, places });
+        else if (i === mapAt) items.push({ k: "map", d0: Math.max(4.5, d0), line: l, places });
+        else if (figs[i]) items.push({ k: "stat", d0, line: l, fig: figs[i], places });
+        else items.push({ k: alt++ % 2 ? "split" : "type", d0, line: l, n: i, topic: x.topic || "news", places });
+      });
+      if (places.length && mapAt < 0) items.push({ k: "map", d0: 5, line: "", places });
+      if (x.quote) items.push({ k: "quote", d0: 6.5, quote: x.quote });
+      if ((x.timeline || []).length >= 2) items.push({ k: "tl", d0: 7, timeline: x.timeline.slice(-3), t: x.t });
+      items.push({ k: "end", d0: 3 });
+      return { name, head, items, dur: head + items.reduce((a, b) => a + b.d0, 0) };
     }
     if (name === "city") {
       const wx = (st.tv?.weatherPlaces || []).filter(w => w.zone === "wb").slice(0, 4);
@@ -1202,6 +1233,98 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         stage.append(w); if (!st.muted) whoosh(st.audio);
         setTimeout(paint, 330); setTimeout(() => w.remove(), 900); };
       drawW(); const tw = setInterval(() => el.isConnected ? drawW() : clearInterval(tw), 250);
+    } else if (g.kind === "seg" && g.name === "soth") {   // এই ঘণ্টার বড় খবর: fast beats in the channel's graphics
+      const items = g.items || [], head = g.head || 2.6, v = channel === "v", H0 = items[0] || {};
+      const starts = []; { let a = head; for (const x of items) { starts.push(a); a += x.d0; } }
+      const places = H0.places || [], icon = SOTH_ICONS[H0.topic] || SOTH_ICONS.news;
+      // A sentence as words, the figures and the places it names marked (the screen lights each word
+      // as the newsreader reaches it).
+      const wordsOf = (l, d) => { const ws = String(l || "").split(/\s+/).filter(Boolean), n = ws.reduce((a, b) => a + b.length + 1, 0); let at = 0;
+        return ws.map(wd => { const hot = /[০-৯0-9]/.test(wd) || places.some(p => wd.startsWith(p.name)); const t = (at / n) * d * 0.86; at += wd.length + 1; return `<span class="${hot ? "so-hot" : ""}" style="--t:${t.toFixed(2)}s">${esc(wd)}</span>`; }).join(" "); };
+      const partOfDay = h => h < 4 ? "রাত" : h < 6 ? "ভোর" : h < 12 ? "সকাল" : h < 16 ? "দুপুর" : h < 18 ? "বিকেল" : h < 20 ? "সন্ধ্যা" : "রাত";
+      const clockBn = t => { const d = new Date(t + 5.5 * 3600e3), h = d.getUTCHours(), m = d.getUTCMinutes(); return `${partOfDay(h)} ${bnDigits(h % 12 || 12)}টা${m ? ` ${bnDigits(String(m).padStart(2, "0"))}` : ""}`; };
+      const dayOf = t => new Date(t + 5.5 * 3600e3).toISOString().slice(0, 10);
+      const tIST = x => { const t = Date.parse(x); if (!t) return ""; const dd = Math.round((Date.parse(dayOf(now())) - Date.parse(dayOf(t))) / 864e5); return `${dd === 1 ? "গতকাল " : dd > 1 ? `${bnDigits(dd)} দিন আগে ` : ""}${clockBn(t)}`; };
+      const count = n => { const to = Number(n.dataset.to), dec = n.dataset.dec === "1", t0 = performance.now(); const step = t => { if (!n.isConnected) return; const p = Math.min(1, (t - t0) / 1400), e = 1 - Math.pow(1 - p, 3); n.textContent = bnDigits((dec ? (to * e).toFixed(1) : Math.round(to * e)).toLocaleString("en-IN")); if (p < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+      const nOf = items.filter(x => x.line != null && x.k !== "end").length;
+      const beatHTML = (x, i) => {
+        const tag = (t, cls = "") => `<span class="so-tag ${cls}">${esc(t)}</span>`;
+        if (x.k === "head") return `<div class="so-beat so-head"><div class="so-ico">${icon}<i></i><i></i></div><div class="so-hd">${tag(x.upd ? "নতুন তথ্য" : "এইমাত্র", "red")}${tag(DESK_BN[x.d] || x.d || "খবর")}<h1>${wordsOf(x.t, x.d0 * 0.6)}</h1></div></div>`;
+        if (x.k === "type") return `<div class="so-beat so-type"><b class="so-n">${bnDigits(String(x.n + 1).padStart(2, "০"))}</b><p>${wordsOf(x.line, x.d0)}</p></div>`;
+        if (x.k === "split") return `<div class="so-beat so-split"><div class="so-ico sm">${icon}</div><p>${wordsOf(x.line, x.d0)}</p></div>`;
+        if (x.k === "stat") return `<div class="so-beat so-stat"><div class="so-fig"><b class="num" data-to="${x.fig.n}" data-dec="${x.fig.dec ? 1 : 0}">০</b><em>${esc(x.fig.unit)}</em></div><p>${wordsOf(x.line, x.d0)}</p></div>`;
+        if (x.k === "map") return `<div class="so-beat so-map"><div class="so-mapbox"><svg preserveAspectRatio="xMidYMid meet"></svg></div>${x.line ? `<p class="so-cap">${wordsOf(x.line, x.d0)}</p>` : ""}</div>`;
+        if (x.k === "quote") return `<div class="so-beat so-quote"><b class="q">“</b><p>${wordsOf(x.quote, 4.5)}</p><small>প্রতিবেদন থেকে</small></div>`;
+        if (x.k === "tl") return `<div class="so-beat so-tl">${tag("এখনও পর্যন্ত", "gold")}<ol>${x.timeline.map((r, j) => `<li style="--i:${j}"><em>${esc(tIST(r.at))}</em><span>${esc(r.t)}</span></li>`).join("")}<li class="now" style="--i:${x.timeline.length}"><em>এখন</em><span>${esc(x.t)}</span></li></ol></div>`;
+        if (x.k === "end") return `<div class="so-beat so-end"><img src="${LOGO}" alt=""><div><b>আরও খবর আসছে</b><span>দেখতে থাকুন রাষ্ট্রিক্স ২৪×৭</span></div></div>`;
+        return "";
+      };
+      el.innerHTML = `<div class="so${v ? " v" : ""}" data-tone="0" style="--o:${head}s"><i class="so-bg"></i><i class="so-stripes"></i><div class="so-wm">${icon}</div>
+        <div class="so-open"><i class="sl a"></i><i class="sl b"></i><i class="sl c"></i><div class="so-open-in"><small>এই ঘণ্টার</small><b>বড় খবর</b><span>${esc(clockBn(now()))}</span></div></div>
+        <div class="so-stage"></div>
+        <div class="so-bar"><b><i></i>ঘণ্টার বড় খবর</b><span class="so-bar-t">${esc(H0.t || "")}</span><em class="so-ct"></em><div class="so-steps">${items.map(x => `<i style="--d:${x.d0}s"></i>`).join("")}</div></div></div>`;
+      const root = el.querySelector(".so");
+      // The map: India's states (Natural Earth), the neighbours, the places pinned; it flies in from
+      // a wide view to the places, and the labels always sit inside the frame.
+      const drawMap = async (svg, pl) => {
+        const near = pl.every(p => p.lon > 60 && p.lon < 100 && p.lat > 5 && p.lat < 40);
+        const [sts, cts] = await Promise.all([near ? (MAPS.st ||= fetch("/tv/map-states.json").then(r => r.json()).catch(() => [])) : [], MAPS[near ? "sa" : "w"] ||= fetch(near ? "/tv/map-southasia.json" : "/tv/map-world.json").then(r => r.json()).catch(() => [])]);
+        if (!svg.isConnected) return;
+        // The frame's own size (before the screen's scaling), so labels are the same size everywhere.
+        const box = { width: svg.clientWidth || svg.getBoundingClientRect().width, height: svg.clientHeight || svg.getBoundingClientRect().height }, W = 1000, Hh = Math.round(1000 * (box.height / Math.max(1, box.width))) || 560;
+        svg.setAttribute("viewBox", `0 0 ${W} ${Hh}`);
+        const lat0 = pl.reduce((a, p) => a + p.lat, 0) / pl.length, kx = Math.cos(lat0 * Math.PI / 180);
+        let lo0 = Math.min(...pl.map(p => p.lon)), lo1 = Math.max(...pl.map(p => p.lon)), la0 = Math.min(...pl.map(p => p.lat)), la1 = Math.max(...pl.map(p => p.lat));
+        // At least Bengal's width around a local story; room for the labels to the side.
+        const minSpan = near ? 4.2 : 18;
+        const sx = Math.max(minSpan, (lo1 - lo0) * 1.9 + 2), sy = Math.max(minSpan * 0.75, (la1 - la0) * 1.9 + 1.4);
+        const cx = (lo0 + lo1) / 2, cy = (la0 + la1) / 2, k = Math.min(W / (sx * kx), Hh / sy);
+        const P = (lon, lat) => [W / 2 + (lon - cx) * kx * k, Hh / 2 - (lat - cy) * k];
+        const path = r => "M" + r.map(([a, b]) => P(a, b).map(n => n.toFixed(1)).join(",")).join("L") + "Z";
+        const home = pl.map(p => sts.find(sh => sh.r.some(r => inRing(p.lon, p.lat, r)))).filter(Boolean);
+        const fs = 34 * W / Math.max(1, box.width) * (v ? 1.15 : 1);
+        const placed = [];
+        svg.innerHTML = `<g class="fly">${cts.filter(c => !(near && c.id === "356")).map(c => `<path class="ct" d="${c.r.map(path).join("")}"/>`).join("")}${sts.map(sh => `<path class="stt${home.includes(sh) ? " home" : ""}" d="${sh.r.map(path).join("")}"/>`).join("")}
+          ${sts.filter(sh => sh.bn && !home.includes(sh)).map(sh => { const [x, y] = P(sh.c[0], sh.c[1]); return x > 30 && x < W - 30 && y > 30 && y < Hh - 30 ? `<text class="sn" x="${x.toFixed(0)}" y="${y.toFixed(0)}" style="font-size:${(fs * 0.62).toFixed(1)}px">${esc(sh.bn)}</text>` : ""; }).join("")}</g>` +
+          pl.map((p, j) => { const [x, y] = P(p.lon, p.lat); let right = x < W * 0.62;
+            // A label never lies over another place's label: it goes to the other side.
+            const lw = fs * 0.62 * p.name.length + fs, clash = r => placed.some(q => Math.abs(q.y - y) < fs * 1.2 && (r ? x + lw > q.x0 && x < q.x1 : x - lw < q.x1 && x > q.x0));
+            if (clash(right) && !clash(!right)) right = !right;
+            placed.push({ y, x0: right ? x : x - lw, x1: right ? x + lw : x });
+            return `<g class="pin" style="--i:${j}"><g transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><circle class="ring" r="${(fs * 0.45).toFixed(1)}"/><circle class="dot" r="${(fs * 0.32).toFixed(1)}"/><text x="${(right ? 1 : -1) * fs * 0.8}" y="${(fs * 0.35).toFixed(1)}" text-anchor="${right ? "start" : "end"}" style="font-size:${fs.toFixed(1)}px">${esc(p.name)}</text></g></g>`; }).join("");
+      };
+      let shownI = -2, voiced = false;
+      const tones = { head: 1, type: 0, split: 2, stat: 1, map: 3, quote: 2, tl: 0, end: 1 };
+      const draw = () => {
+        if (!el.isConnected) return;
+        const e = (now() - (sc.startAt || now())) / 1000;
+        let i = -1; for (let j = 0; j < starts.length; j++) if (e >= starts[j]) i = j;
+        if (i <= shownI) return;   // forward only
+        const first = shownI === -2; shownI = i;
+        if (i < 0) return;
+        root.classList.add("on");
+        const x = items[i], stg = root.querySelector(".so-stage");
+        root.dataset.tone = String(tones[x.k] ?? 0);
+        stg.insertAdjacentHTML("beforeend", beatHTML(x, i));
+        [...stg.children].slice(0, -1).forEach(n => { n.classList.add("out"); setTimeout(() => n.remove(), 450); });
+        if (!first) { const sw = document.createElement("i"); sw.className = "so-swipe"; root.append(sw); setTimeout(() => sw.remove(), 600); }
+        root.querySelectorAll(".so-steps i").forEach((n, j) => { n.className = j < i ? "done" : j === i ? "on" : ""; });
+        const li = items.slice(0, i + 1).filter(y => y.line != null && y.k !== "end").length;
+        root.querySelector(".so-ct").textContent = x.line != null && x.k !== "end" ? `${bnDigits(li)}/${bnDigits(nOf)}` : "";
+        root.classList.toggle("bar-t", i > 0);
+        stg.querySelectorAll(".num[data-to]").forEach(n => { if (!n.dataset.go) { n.dataset.go = 1; count(n); } });
+        if (x.k === "map") { const svg = stg.lastElementChild?.querySelector("svg"); if (svg) drawMap(svg, x.places); }
+        if (x.k === "end" || x.k === "quote" || x.k === "tl") { if (!st.muted) whoosh(st.audio); }
+        // The newsreader reads the story from the headline beat on (once; a late joiner hears it
+        // from where the beat began only if it is still the headline).
+        if (!voiced && x.k === "head" && e - starts[i] < 2) { voiced = true; sothSay(H0.voice || []); }
+      };
+      let tok = {};
+      const sothSay = list => { tok.off = true; const me = tok = {};
+        const play = k => { if (me.off || k >= list.length || st.muted || !st.audio) return; voiceBuf(list[k]).then(buf => { if (me.off || !buf || st.muted || !el.isConnected) return; const src = st.audio.createBufferSource(), gn = st.audio.createGain(); gn.gain.value = 1.25; src.buffer = buf; src.connect(gn).connect(st.audio.destination); src.onended = () => setTimeout(() => play(k + 1), 80); src.start(); me.src = src; }); };
+        play(0); };
+      draw(); const tS = setInterval(() => { if (el.isConnected) draw(); else { clearInterval(tS); tok.off = true; try { tok.src?.stop(); } catch { /* done */ } } }, 120);
+      if ((now() - (sc.startAt || now())) / 1000 < 1.5) { if (!st.muted) whoosh(st.audio); playLink("seg:soth", el); }
     } else if (g.kind === "seg") {   // a segment (src/segments.js): a title card, then its items one by one
       const NAMES = st.tv?.segNames || {}, name = g.name, title = NAMES[name] || "", items = g.items || [], v = channel === "v" ? " v" : "";
       const head = g.head || 4, starts = []; { let a = head; for (const x of items) { starts.push(a); a += x.d0; } }

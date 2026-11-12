@@ -1145,3 +1145,139 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 /* Vertical channel: with the logo at top right, the LIVE clock of full-screen graphics sits just
    to its left, never under it. */
 .tvp-v .tv-liveclock{right:190px;top:52px}
+
+/* এই ঘণ্টার বড় খবর: fast beats in the channel's graphics (no photographs). Tones change beat by
+   beat; a gold swipe crosses on each cut; the words light up as the newsreader reads them. */
+.so{position:absolute;inset:0;overflow:hidden;color:#fff;--bg:#16070a;--ac:#f2c14e}
+.so[data-tone="1"]{--bg:#b10d12}.so[data-tone="2"]{--bg:#3d060a}.so[data-tone="3"]{--bg:#0f1622}
+.so-bg{position:absolute;inset:0;background:var(--bg);transition:background .45s ease}
+.so-bg:after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 80% 20%,rgba(242,193,78,.22),transparent 50%),radial-gradient(circle at 10% 95%,rgba(0,0,0,.45),transparent 55%)}
+.so-stripes{position:absolute;inset:-20%;background:repeating-linear-gradient(115deg,rgba(255,255,255,.05) 0 3px,transparent 3px 60px);animation:sostr 9s linear infinite}
+@keyframes sostr{to{transform:translateX(120px)}}
+.so-wm{position:absolute;right:-120px;bottom:-140px;width:760px;height:760px;color:rgba(255,255,255,.06);animation:sowm 30s linear infinite}
+.so-wm svg{width:100%;height:100%}
+@keyframes sowm{to{transform:rotate(18deg) scale(1.08)}}
+/* The stinger */
+.so-open{position:absolute;inset:0;z-index:5;pointer-events:none}
+.so-open .sl{position:absolute;top:-20%;bottom:-20%;width:70%;transform:skewX(-18deg) translateX(-160%)}
+.so-open .sl.a{background:#c8100f;animation:sosl var(--o,2.6s) cubic-bezier(.7,0,.2,1) both}
+.so-open .sl.b{background:var(--ac);animation:sosl var(--o,2.6s) .08s cubic-bezier(.7,0,.2,1) both}
+.so-open .sl.c{background:#16070a;animation:sosl var(--o,2.6s) .16s cubic-bezier(.7,0,.2,1) both}
+@keyframes sosl{0%{transform:skewX(-18deg) translateX(-160%)}22%,72%{transform:skewX(-18deg) translateX(20%)}100%{transform:skewX(-18deg) translateX(260%)}}
+.so-open-in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;animation:soin var(--o,2.6s) both}
+@keyframes soin{0%,12%{opacity:0;transform:scale(1.6)}24%{opacity:1;transform:scale(1)}70%{opacity:1;transform:scale(1.04)}86%,100%{opacity:0;transform:scale(.9)}}
+.so-open-in small{font:800 64px "Hind Siliguri",sans-serif;color:var(--ac);letter-spacing:.06em}
+.so-open-in b{padding:0 44px 10px;background:#c8100f;box-shadow:0 0 0 8px #fff,0 30px 80px rgba(0,0,0,.5);font:900 190px/1.25 "Noto Serif Bengali",serif;animation:soshake .3s .6s 2}
+.so-open-in span{margin-top:30px;padding:8px 26px;border-radius:999px;background:#fff;color:#c8100f;font:800 46px "Hind Siliguri",sans-serif}
+@keyframes soshake{25%{transform:translate(-6px,3px) rotate(-1deg)}75%{transform:translate(6px,-3px) rotate(1deg)}}
+.so.on .so-open{display:none}
+/* The beats */
+.so-stage{position:absolute;inset:0}
+.so-beat{position:absolute;left:110px;right:110px;top:200px;bottom:230px;display:flex;align-items:center;gap:70px;animation:sobin .42s cubic-bezier(.2,.9,.2,1) both}
+.so-beat.out{animation:sobout .4s cubic-bezier(.7,0,.3,1) forwards}
+@keyframes sobin{from{opacity:0;transform:translateX(160px) skewX(-6deg)}}
+@keyframes sobout{to{opacity:0;transform:translateX(-200px) scale(.96)}}
+.so-swipe{position:absolute;z-index:4;top:-10%;bottom:-10%;left:-30%;width:22%;background:linear-gradient(90deg,transparent,var(--ac) 40%,#fff 50%,var(--ac) 60%,transparent);transform:skewX(-18deg);animation:soswipe .55s cubic-bezier(.6,0,.3,1) forwards;mix-blend-mode:screen;opacity:.85;pointer-events:none}
+@keyframes soswipe{to{left:120%}}
+.so-beat p,.so-beat h1{margin:0}
+.so-beat p span,.so-beat h1 span{opacity:.28;transition:none;animation:soword .25s var(--t) ease-out forwards}
+.so-beat .so-hot{color:#fff;background:linear-gradient(var(--ac),var(--ac)) no-repeat 0 85%/0 82%;padding:0 6px;border-radius:6px;animation:soword .25s var(--t) ease-out forwards,sohot .35s calc(var(--t) + .1s) ease-out forwards}
+@keyframes soword{to{opacity:1}}
+@keyframes sohot{to{background-size:100% 82%;color:#1a0405}}
+.so-tag{display:inline-block;margin:0 14px 18px 0;padding:6px 22px;border-radius:10px;background:rgba(255,255,255,.14);font:800 36px "Hind Siliguri",sans-serif;animation:nupop .4s .15s cubic-bezier(.2,1.6,.4,1) both}
+.so-tag.red{background:#fff;color:#c8100f;animation:nupop .4s .1s cubic-bezier(.2,1.6,.4,1) both,avopulse 1.2s 1s ease-in-out infinite}
+.so-tag.gold{background:var(--ac);color:#1a0405}
+.so-ico{position:relative;flex:none;width:340px;height:340px;display:grid;place-items:center;border-radius:50%;background:var(--ac);color:#1a0405;box-shadow:0 30px 70px rgba(0,0,0,.4);animation:nupop .55s .1s cubic-bezier(.2,1.5,.4,1) both}
+.so-ico svg{width:58%;height:58%;animation:soico 2.4s ease-in-out infinite}
+@keyframes soico{50%{transform:scale(1.08) rotate(-4deg)}}
+.so-ico i{position:absolute;inset:0;border-radius:50%;border:6px solid var(--ac);animation:soring 1.8s ease-out infinite}
+.so-ico i+i{animation-delay:.9s}
+@keyframes soring{from{transform:scale(1);opacity:.9}to{transform:scale(1.55);opacity:0}}
+.so-ico.sm{width:230px;height:230px;background:rgba(255,255,255,.1);color:var(--ac);box-shadow:inset 0 0 0 5px var(--ac)}
+.so-hd{flex:1;min-width:0}
+.so-hd h1{font:800 84px/1.28 "Noto Serif Bengali",serif;text-shadow:0 6px 24px rgba(0,0,0,.35);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.so-hd h1 span{opacity:0;animation:sopop .35s var(--t) cubic-bezier(.2,1.4,.4,1) forwards}
+.so-hd h1 .so-hot{animation:sopop .35s var(--t) cubic-bezier(.2,1.4,.4,1) forwards,sohot .35s calc(var(--t) + .2s) ease-out forwards}
+@keyframes sopop{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
+.so-hd h1 span{display:inline-block}
+.so-type{gap:60px}
+.so-n{flex:none;font:900 300px/1 Montserrat,sans-serif;color:transparent;-webkit-text-stroke:5px var(--ac);opacity:.9;animation:sobin .5s cubic-bezier(.2,.9,.2,1) both}
+.so-type p,.so-split p{flex:1;font:700 80px/1.35 "Noto Serif Bengali",serif;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.so-split p{padding-left:44px;border-left:12px solid var(--ac)}
+.so-stat{flex-direction:column;align-items:flex-start;justify-content:center;gap:24px}
+.so-fig{display:flex;align-items:baseline;gap:30px}
+.so-fig .num{font:900 300px/1 Montserrat,"Hind Siliguri",sans-serif;color:var(--ac);text-shadow:0 14px 50px rgba(0,0,0,.35)}
+.so-fig em{font:800 120px "Noto Serif Bengali",serif;font-style:normal}
+.so-stat p{font:700 58px/1.35 "Noto Serif Bengali",serif;max-width:1650px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.so-map{flex-direction:column;align-items:stretch;gap:20px}
+.so-mapbox{flex:1;min-height:0;border-radius:26px;overflow:hidden;background:radial-gradient(circle at 50% 40%,#1c2c44,#0a1018);box-shadow:inset 0 0 0 3px rgba(242,193,78,.6),0 30px 70px rgba(0,0,0,.4)}
+.so-mapbox svg{display:block;width:100%;height:100%}
+.so-mapbox .fly{transform-origin:50% 50%;animation:sofly 1.6s cubic-bezier(.3,0,.1,1) both}
+@keyframes sofly{from{transform:scale(.32);opacity:.2}to{transform:none;opacity:1}}
+.so-mapbox .ct{fill:rgba(255,255,255,.05);stroke:rgba(255,255,255,.28);stroke-width:1.2;vector-effect:non-scaling-stroke}
+.so-mapbox .stt{fill:rgba(255,255,255,.09);stroke:rgba(242,193,78,.45);stroke-width:1.2;vector-effect:non-scaling-stroke}
+.so-mapbox .stt.home{fill:rgba(200,16,15,.55);stroke:#f2c14e;stroke-width:2.5}
+.so-mapbox .sn{fill:rgba(255,255,255,.5);font-family:"Hind Siliguri",sans-serif;font-weight:700;text-anchor:middle}
+.so-mapbox .pin{opacity:0;animation:soped .5s calc(1.4s + var(--i)*.35s) cubic-bezier(.2,1.6,.4,1) forwards}
+@keyframes soped{from{opacity:0;transform:translateY(-40px)}to{opacity:1;transform:none}}
+.so-mapbox .pin .dot{fill:#f2c14e;stroke:#fff;stroke-width:4;vector-effect:non-scaling-stroke}
+.so-mapbox .pin .ring{fill:none;stroke:#f2c14e;stroke-width:4;vector-effect:non-scaling-stroke;transform-box:fill-box;transform-origin:center;animation:sopr 1.4s 1.8s ease-out infinite}
+@keyframes sopr{from{transform:scale(1);opacity:1}to{transform:scale(3.2);opacity:0}}
+.so-mapbox .pin text{fill:#fff;font-family:"Hind Siliguri",sans-serif;font-weight:800;paint-order:stroke;stroke:#0a1018;stroke-width:10px;stroke-linejoin:round}
+.so-cap{font:700 46px/1.35 "Noto Serif Bengali",serif;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.so-quote{flex-direction:column;align-items:flex-start;justify-content:center;gap:0}
+.so-quote .q{font:900 340px/.7 "Noto Serif Bengali",serif;color:var(--ac);height:150px;animation:nupop .5s cubic-bezier(.2,1.5,.4,1) both}
+.so-quote p{font:700 80px/1.35 "Noto Serif Bengali",serif;font-style:italic;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.so-quote small{margin-top:26px;font:700 38px "Hind Siliguri",sans-serif;color:var(--ac)}
+.so-tl{flex-direction:column;align-items:stretch;justify-content:center;gap:10px}
+.so-tl .so-tag{align-self:flex-start}
+.so-tl ol{position:relative;list-style:none;margin:30px 0 0;padding:0;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:40px}
+.so-tl ol:before{content:"";position:absolute;left:0;right:0;top:22px;height:8px;border-radius:4px;background:rgba(255,255,255,.18)}
+.so-tl ol:after{content:"";position:absolute;left:0;top:22px;height:8px;border-radius:4px;background:var(--ac);animation:sotl 3s .2s ease-out both}
+@keyframes sotl{from{width:0}to{width:100%}}
+.so-tl li{position:relative;padding-top:70px;opacity:0;animation:sopop .45s calc(.3s + var(--i)*.8s) cubic-bezier(.2,1.4,.4,1) forwards}
+.so-tl li:before{content:"";position:absolute;left:0;top:6px;width:40px;height:40px;border-radius:50%;background:var(--ac);box-shadow:0 0 0 8px rgba(242,193,78,.25);z-index:1}
+.so-tl li.now:before{background:#fff;box-shadow:0 0 0 8px rgba(255,255,255,.3);animation:avopulse 1.2s ease-in-out infinite}
+.so-tl li em{display:block;font:800 40px "Hind Siliguri",sans-serif;font-style:normal;color:var(--ac)}
+.so-tl li.now em{color:#fff}
+.so-tl li span{display:-webkit-box;margin-top:10px;font:700 44px/1.3 "Noto Serif Bengali",serif;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.so-end{justify-content:center;gap:60px}
+.so-end img{height:300px;border-radius:18px;animation:nupop .5s cubic-bezier(.2,1.5,.4,1) both}
+.so-end div{display:flex;flex-direction:column;gap:14px}
+.so-end b{font:900 100px/1.2 "Noto Serif Bengali",serif;animation:sopop .45s .2s both}
+.so-end span{font:700 48px "Hind Siliguri",sans-serif;color:var(--ac);animation:sopop .45s .4s both}
+/* The bar along the bottom: the segment's name, the headline after the first beat, beat n of N */
+.so-bar{position:absolute;left:56px;right:56px;bottom:70px;height:104px;display:flex;align-items:center;gap:26px;padding:0 30px 0 0;border-radius:14px;background:rgba(10,4,6,.88);box-shadow:0 18px 40px rgba(0,0,0,.4),inset 0 0 0 2px rgba(242,193,78,.5);opacity:0;transform:translateY(40px);transition:all .45s cubic-bezier(.2,.9,.2,1)}
+.so.on .so-bar{opacity:1;transform:none}
+.so-bar>b{flex:none;display:flex;align-items:center;gap:14px;height:100%;padding:0 28px;border-radius:14px 0 0 14px;background:#c8100f;font:800 40px "Hind Siliguri",sans-serif}
+.so-bar>b i{width:16px;height:16px;border-radius:50%;background:#fff;animation:sodot 1s ease-in-out infinite}
+@keyframes sodot{50%{opacity:.2}}
+.so-bar-t{flex:1;min-width:0;font:700 40px "Noto Serif Bengali",serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .4s}
+.so.bar-t .so-bar-t{opacity:1}
+.so-ct{flex:none;font:800 40px Montserrat,"Hind Siliguri",sans-serif;font-style:normal;color:var(--ac)}
+.so-steps{position:absolute;left:0;right:0;bottom:-16px;display:flex;gap:6px}
+.so-steps i{flex:1;height:7px;border-radius:4px;background:rgba(255,255,255,.18);overflow:hidden;position:relative}
+.so-steps i.done{background:var(--ac)}
+.so-steps i.on:after{content:"";position:absolute;left:0;top:0;bottom:0;width:0;background:var(--ac);animation:tvprog var(--d) linear forwards}
+/* Vertical channel */
+.so.v .so-open-in small{font-size:58px}.so.v .so-open-in b{font-size:140px;padding:0 30px 8px}
+.so.v .so-beat{left:60px;right:60px;top:400px;bottom:520px;flex-direction:column;align-items:flex-start;justify-content:center;gap:40px}
+.so.v .so-ico{width:220px;height:220px}.so.v .so-ico.sm{width:160px;height:160px}
+.so.v .so-hd h1{font-size:72px;-webkit-line-clamp:6}
+.so.v .so-n{font-size:200px}
+.so.v .so-type p,.so.v .so-split p{font-size:68px;-webkit-line-clamp:7}
+.so.v .so-fig .num{font-size:220px}.so.v .so-fig em{font-size:90px}
+.so.v .so-stat p{font-size:56px;-webkit-line-clamp:5}
+.so.v .so-map{align-items:stretch}.so.v .so-mapbox{width:100%}
+.so.v .so-cap{font-size:46px;-webkit-line-clamp:3}
+.so.v .so-quote p{font-size:70px;-webkit-line-clamp:7}
+.so.v .so-tl ol{grid-auto-flow:row;grid-auto-rows:auto;gap:30px;padding-left:70px}
+.so.v .so-tl ol:before{left:16px;right:auto;top:0;bottom:0;width:8px;height:auto}
+.so.v .so-tl ol:after{left:16px;top:0;width:8px;height:0;animation:sotlv 3s .2s ease-out both}
+@keyframes sotlv{to{height:100%}}
+.so.v .so-tl li{padding-top:0}.so.v .so-tl li:before{left:-70px;top:4px}
+.so.v .so-end{flex-direction:column;align-items:center;text-align:center}
+.so.v .so-end img{height:260px}.so.v .so-end b{font-size:84px}
+.so.v .so-bar{bottom:200px;height:96px}
+.so.v .so-bar>b{font-size:34px}.so.v .so-bar-t{font-size:34px}
+.so.v .so-wm{width:600px;height:600px}
