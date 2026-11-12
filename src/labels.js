@@ -23,4 +23,20 @@ export function weightOf(category = "", text = "") {
   if (["sports", "entertainment", "lifestyle"].includes(String(category).toLowerCase()) || LIGHT.test(text)) return "light";
   return "mid";
 }
+// The bulletins' order (src/tvchannel.js, src/engine.js): West Bengal politics first, then Kolkata
+// politics, India's politics, then West Bengal, Kolkata and India, then the world, sports,
+// entertainment, lifestyle and the rest. A word must start where the match starts.
+const POLITICS = /(?<![\p{L}\p{M}])(?:রাজনীতি|রাজনৈতিক|তৃণমূল|বিজেপি|সিপিএম|সিপিআই|কংগ্রেস|বামফ্রন্ট|বামেদের|আইএসএফ|মমতা|শুভেন্দু|অভিষেক|সুকান্ত|শমীক|মুখ্যমন্ত্রী|মন্ত্রী|প্রধানমন্ত্রী|বিধায়ক|সাংসদ|বিধানসভা|লোকসভা|রাজ্যসভা|সংসদ|নির্বাচন|উপনির্বাচন|ভোট|প্রার্থী|রাজ্যপাল|নবান্ন|মোদী|অমিত শাহ|রাহুল গান্ধী|পঞ্চায়েত|কাউন্সিলর|দলবদল|tmc|bjp|cpi|congress|election|minister|assembly|parliament)/iu;
+export const isPolitics = text => POLITICS.test(String(text || ""));
+export function bulletinRank(category = "", text = "") {
+  const c = String(category).toLowerCase(), pol = isPolitics(text), dk = deskKey(category, text);
+  if (dk === "bengal") return pol ? 0 : 3;
+  if (dk === "kolkata") return pol ? 1 : 4;
+  if (dk === "india") return pol ? 2 : 5;
+  if (dk === "world" || dk === "bangladesh") return 6;
+  if (c === "sports") return 7;
+  if (c === "entertainment") return 8;
+  if (c === "lifestyle") return 9;
+  return 10;
+}
 export const labelsOf = (category, text, override) => ({ dk: override?.dk || deskKey(category, text), weight: override?.weight || weightOf(category, text) });

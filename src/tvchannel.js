@@ -1,7 +1,7 @@
 import { readyVoices, readyLinks } from "./bulletinvoice.js";
 import { cleanCredit } from "./bulletinimg.js";
 import { avoForScreens } from "./avo.js";
-import { labelsOf } from "./labels.js";
+import { labelsOf, bulletinRank } from "./labels.js";
 import { segmentsData, clockOf, SEG_NAMES } from "./segments.js";
 import { bnLine } from "./bnline.js";
 // Rashtrix TV, Phase 2: two channels, each on or off, each with its own secret output address
@@ -61,6 +61,14 @@ export async function saveTvSettings(env, ch, b) {
   if (b.notice !== undefined) s.notice = { on: !!b.notice?.on, text: clean(b.notice?.text, 200) };
   if (b.otherSources !== undefined) s.otherSources = !!b.otherSources;
   if (b.promoEvery !== undefined) s.promoEvery = int(b.promoEvery, 1, 20, s.promoEvery);
+  // Programme promos (the promo lower third, src/engine.js): a show and when it plays — every day,
+  // every week on a day, or once on a date — at a time (India time).
+  if (Array.isArray(b.programs)) s.programs = b.programs.slice(0, 20).map(p => ({
+    id: clean(p?.id, 20) || crypto.randomUUID().slice(0, 8), title: clean(p?.title, 80), tag: clean(p?.tag, 110),
+    kind: ["daily", "weekly", "once"].includes(p?.kind) ? p.kind : "daily", day: int(p?.day, 0, 6, 6),
+    image: /^(\/media\/[\w.-]+|https:\/\/[^\s"'<>]{6,1400})$/.test(p?.image || "") ? p.image : "",
+    date: /^\d{4}-\d{2}-\d{2}$/.test(p?.date || "") ? p.date : "", time: /^([01]\d|2[0-3]):[0-5]\d$/.test(p?.time || "") ? p.time : "21:00", on: p?.on !== false
+  })).filter(p => p.title);
   if (Array.isArray(b.ticker)) s.ticker = b.ticker.map(x => clean(x, 160)).filter(Boolean).slice(0, 20);
   if (b.ad) s.ad = { image: /^(https:\/\/|\/media\/|\/brand\/)/.test(b.ad.image || "") ? clean(b.ad.image, 1500) : "", line1: clean(b.ad.line1, 40), line2: clean(b.ad.line2, 60), line3: clean(b.ad.line3, 80) };
   // The studio's own stream for the app (OBS → the media server on the Oracle Cloud VM): HLS
@@ -244,6 +252,20 @@ async function wireStories(env, limit = 20) {
   const fresh = await pick(FRESH_HOURS);
   return fresh.length >= 4 ? fresh : pick(24);
 }
+// The bulletins' pool: stories published or updated in the last two hours, in the bulletin order
+// (src/labels.js bulletinRank), newest first within each; on a quiet night the newest three of
+// the last twelve hours make it up to three. Each screen then reads the last thirty minutes'
+// stories (src/engine.js bulletinPick).
+async function bulletinPool(env) {
+  const since = new Date(Date.now() - 2 * 3600e3).toISOString();
+  const { results } = await env.DB.prepare(`SELECT id, title, category, kind, body, published_at, updated_at FROM articles WHERE status='published' AND lang='bn' AND pulled_at IS NULL
+    AND kind IN ('rewrite','brief') AND (published_at>=? OR updated_at>=?) ORDER BY published_at DESC LIMIT 60`).bind(since, since).all().catch(() => ({ results: [] }));
+  let rows = results;
+  if (rows.length < 3) rows = rows.concat((await wireStories(env, 6)).filter(r => !rows.some(x => x.id === r.id))).slice(0, 3);
+  const last = r => Math.max(Date.parse(r.published_at) || 0, Date.parse(r.updated_at) || 0);
+  return rows.map(r => ({ ...r, pri: bulletinRank(r.category, `${r.title} ${String(r.body || "").slice(0, 400)}`) }))
+    .sort((a, b) => a.pri - b.pri || last(b) - last(a)).slice(0, 16);
+}
 const firstWords = (body, n = 100) => {
   const words = String(body || "").replace(/<[^>]+>/g, " ").replace(/[#*_>]+/g, " ").replace(/\s+/g, " ").trim().split(" ");
   return words.slice(0, n).join(" ") + (words.length > n ? "…" : "");
@@ -253,11 +275,11 @@ export async function tvState(env, ch) {
   const hit = memo.get(ch);
   if (hit && Date.now() - hit.at < 4000) return hit.value;
   const s = await tvSettings(env, ch);
-  const [videos, cards, live, stories, cuts, avo, evergreen] = await Promise.all([
+  const [videos, cards, live, stories, cuts, avo, evergreen, pool] = await Promise.all([
     playable(env, ch, s), ch === "v" ? promos(env) : [],
     env.DB.prepare("SELECT CASE WHEN live_video<>'' THEN live_video ELSE yt_id END AS ytId, title FROM tv_sources WHERE channel=? AND kind='live' AND active=1 AND on_air=1 AND live_now=1 LIMIT 1").bind(ch).first(),
     wireStories(env), cutinsOnAir(env, ch).catch(() => []), s.avoOn === false ? [] : avoForScreens(env).catch(() => []),
-    evergreens(env, ch).catch(() => [])
+    evergreens(env, ch).catch(() => []), bulletinPool(env)
   ]);
   // Each story carries its labels (src/labels.js): desk and weight, for the running order's variety rules.
   const lab = a => labelsOf(a.category, `${a.title} ${String(a.body || "").slice(0, 400)}`);
@@ -265,10 +287,10 @@ export async function tvState(env, ch) {
   // Each bulletin story's picture and its credit (src/bulletinimg.js), when one was found.
   // Twelve in the bulletin pool: the :00 and :30 bulletins lead with the newest, the :15 and :45
   // ones read four the last bulletin did not (src/engine.js).
-  const top = stories.slice(0, 12), pics = new Map();
+  const top = pool, pics = new Map();
   if (top.length) (await env.DB.prepare(`SELECT article_id, url, credit FROM bulletin_images WHERE url<>'' AND article_id IN (${top.map(() => "?").join(",")})`).bind(...top.map(r => r.id)).all().catch(() => ({ results: [] }))).results.forEach(r => pics.set(r.article_id, r));
   const updated = r => r.updated_at && Date.parse(r.updated_at) - Date.parse(r.published_at) > 10 * 60e3 ? r.updated_at : "";
-  const bulletin = top.map(r => ({ title: r.title, desk: r.category, kind: r.kind, at: r.published_at, upd: updated(r), ...lab(r), text: firstWords(r.body), image: pics.has(r.id) ? `/api/tv/bimg/${encodeURIComponent(r.id)}?v=${encodeURIComponent(pics.get(r.id).url.length + (pics.get(r.id).url.split("/").pop() || "").slice(-12))}` : "", credit: cleanCredit(pics.get(r.id)?.credit) }));
+  const bulletin = top.map(r => ({ title: r.title, desk: r.category, kind: r.kind, at: r.published_at, upd: updated(r), pri: r.pri, ...lab(r), text: firstWords(r.body), image: pics.has(r.id) ? `/api/tv/bimg/${encodeURIComponent(r.id)}?v=${encodeURIComponent(pics.get(r.id).url.length + (pics.get(r.id).url.split("/").pop() || "").slice(-12))}` : "", credit: cleanCredit(pics.get(r.id)?.credit) }));
   // The newsreader's line for each story, when it is ready (src/bulletinvoice.js).
   const voices = await readyVoices(env, bulletin).catch(() => new Map());
   bulletin.forEach(b => { const v = voices.get(b); if (v) { b.voice = `/api/tv/voice/${v.key}.mp3`; b.secs = v.secs; } });
@@ -289,6 +311,7 @@ export async function tvState(env, ch) {
     // The horizontal channel's automatic L-band during videos: every 40 seconds, for 7 seconds.
     lbandAuto: ch === "h" ? { on: s.lbandAuto?.on !== false, every: s.lbandAuto?.every || 40, seconds: s.lbandAuto?.seconds || 10 } : null, lowerThird: s.lowerThird || "", band: s.band || "", appStream: s.appStream || null,
     ad: s.ad, sets: s.sets, setSeconds: s.setSeconds,
+    programs: (s.programs || []).filter(p => p.on),
     ticker: [...s.ticker, ...headlines.slice(0, 14).map(h => h.text)],
     headlines, bulletin,
     // The app plays its own copy of the order for each viewer, newest video first (src/engine.js).

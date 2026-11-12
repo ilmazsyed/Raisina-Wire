@@ -368,6 +368,14 @@ async function soMap(svg, pl, v) {
         placed.push({ y, x0: right ? x : x - lw, x1: right ? x + lw : x });
         return `<g class="pin" style="--i:${j}"><g transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><circle class="ring" r="${(fs * 0.45).toFixed(1)}"/><circle class="dot" r="${(fs * 0.32).toFixed(1)}"/><text x="${(right ? 1 : -1) * fs * 0.8}" y="${(fs * 0.35).toFixed(1)}" text-anchor="${right ? "start" : "end"}" style="font-size:${fs.toFixed(1)}px">${esc(p.name)}</text></g></g>`; }).join("");
   }
+// Times and dates as the promos write them, India time: "রাত ৮টা ১৫", "শনিবার, ১৫ নভেম্বর".
+const BN_DAYS = ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার", "শুক্রবার", "শনিবার"];
+const BN_MONTHS = ["জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"];
+const istOf = t => new Date(t + 5.5 * 3600e3);
+const bnPart = h => h < 4 ? "রাত" : h < 6 ? "ভোর" : h < 12 ? "সকাল" : h < 16 ? "দুপুর" : h < 18 ? "বিকেল" : h < 20 ? "সন্ধ্যা" : "রাত";
+const bnTimeHM = (h, m) => `${bnPart(h)} ${bnDigits(h % 12 || 12)}টা${m ? ` ${bnDigits(String(m).padStart(2, "0"))}` : ""}`;
+const bnTime = t => { const d = istOf(t); return bnTimeHM(d.getUTCHours(), d.getUTCMinutes()); };
+const bnDayDate = t => { const d = istOf(t); return `${BN_DAYS[d.getUTCDay()]}, ${bnDigits(d.getUTCDate())} ${BN_MONTHS[d.getUTCMonth()]}`; };
 // The story of the hour's icons (drawn for the channel: one per kind of story).
 const SOTH_ICON = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const SOTH_ICONS = {
@@ -385,6 +393,11 @@ const SOTH_ICONS = {
   money: SOTH_ICON('<path d="M7 4h10M7 8.5h10M7 4c5 0 7 1.5 7 4.5S12 13 8 13l7 7"/>'),
   school: SOTH_ICON('<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5M22 9v6"/>'),
   politics: SOTH_ICON('<path d="M3 21h18M4 10h16M12 3l8 5H4z"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8"/>'),
+  globe: SOTH_ICON('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>'),
+  film: SOTH_ICON('<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 7l3-4h4l-3 4M10 7l3-4h4l-3 4M17 7l3-4"/>'),
+  leaf: SOTH_ICON('<path d="M5 19c0-8 5-14 15-14 0 10-6 15-14 15"/><path d="M5 19c3-4 6-6 10-8"/>'),
+  chart: SOTH_ICON('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
+  book: SOTH_ICON('<path d="M4 5c3-1.5 6-1.5 8 0v15c-2-1.5-5-1.5-8 0zM20 5c-3-1.5-6-1.5-8 0v15c2-1.5 5-1.5 8 0z"/>'),
   news: SOTH_ICON('<circle cx="12" cy="12" r="2"/><path d="M8.5 8.5a5 5 0 000 7M15.5 8.5a5 5 0 010 7M5.5 5.5a9 9 0 000 13M18.5 5.5a9 9 0 010 13"/>')
 };
 // The running order's variety rules: never two stories from the same desk in a row (so Bengal,
@@ -412,7 +425,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       <div class="tvp-bg"><i class="dots"></i><i class="arc a1"></i><i class="arc a2"></i><i class="sheen"></i></div>
       ${mode === "app" ? `<div class="tvp-ytlayer" hidden><div class="tvs-ytwrap"><div class="tvs-yt"></div></div><div class="tvp-shield"></div></div>` : ""}
       <div class="tvp-stage"></div>
-      <div class="tvp-lbl"></div><div class="tvp-gfx"></div><div class="tvp-ovl"></div><div class="tvp-cd" hidden></div><div class="tvp-tease" hidden></div><div class="tvp-cm" hidden></div>
+      <div class="tvp-lbl"></div><div class="tvp-gfx"></div><div class="tvp-ovl"></div><div class="tvp-cd" hidden></div><div class="tvp-tease" hidden></div><div class="tvp-promo" hidden></div><div class="tvp-cm" hidden></div>
       <div class="tv-bug tv-bug-fixed"><img src="${LOGO}" alt=""></div>
       <div class="tv-mkt" hidden><span class="mkt-label" data-no-tr>MARKETS</span><div class="mkt-track"></div></div>
       <div class="tvp-standby" hidden><img src="${LOGO}" alt=""><b>অনুষ্ঠান একটু পরেই</b><small>আমাদের সঙ্গে থাকুন</small></div>
@@ -491,7 +504,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const BEDS = { flash: { style: "headlines" }, upnext: { style: "upnext" }, bulletin: { style: "bulletin" }, weather: { style: "weather" }, market: { style: "market" }, avo: { style: "avo", duck: 0.7 },
     // The segments: each its own music (the newsreader's lines over it, softer).
     "seg:kolkata10": { style: "bulletin", duck: 0.6 }, "seg:city": { style: "weather", duck: 0.7 }, "seg:world": { style: "headlines", duck: 0.6 }, "seg:bangladesh": { style: "headlines", duck: 0.6 },
-    "seg:sports": { style: "market", duck: 0.6 }, "seg:numbers": { style: "market", duck: 0.8 }, "seg:onthisday": { style: "avo", duck: 0.8 }, "seg:soth": { style: "avo", duck: 0.7 } };
+    "seg:sports": { style: "market", duck: 0.6 }, "seg:entertainment": { style: "market", duck: 0.7 }, "seg:lifestyle": { style: "avo", duck: 0.8 }, "seg:numbers": { style: "market", duck: 0.8 }, "seg:onthisday": { style: "avo", duck: 0.8 }, "seg:soth": { style: "avo", duck: 0.7 } };
   function startBed(sc) {
     const kind = sc?.graphic?.kind === "seg" ? `seg:${sc.graphic.name}` : sc?.graphic?.kind;
     if (!BEDS[kind] || st.muted || !st.audio || (mode !== "app" && !output) || st.bed) return;
@@ -749,6 +762,23 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const vidLast = (() => { try { return JSON.parse(localStorage.getItem(`rw-vid-last-${channel}`) || "{}"); } catch { return {}; } })();
   const markVid = id => { vidLast[id] = Date.now(); try { localStorage.setItem(`rw-vid-last-${channel}`, JSON.stringify(Object.fromEntries(Object.entries(vidLast).slice(-150)))); } catch { /* private mode */ } };
   const recent = id => Date.now() - (vidLast[id] || 0) < VIDEO_GAP;
+  // The time to the next bulletin, and a video that ends before it: the one chosen when it fits
+  // (with half a minute to spare), else the freshest that does; under a minute left and none that
+  // fits, a short filler instead (marked fill).
+  function toBulletin(t) {
+    const q = st.seq || {}, sl = Math.floor(t / QUARTER) * QUARTER;
+    if (!(st.tv?.bulletin || []).length) return Infinity;
+    const next = (q.bDone || []).includes(sl) || t - sl >= 11 * 60e3 ? sl + QUARTER : sl;
+    return Math.max(0, next - t);
+  }
+  function fitVideo(q, loop, x, t) {
+    if (x?.type !== "video") return x;
+    const left = toBulletin(t);
+    if (left === Infinity || x.dur * 1000 <= left + 30e3 || left > 20 * 60e3) return x;
+    const fits = loop.filter(y => y.type === "video" && !recent(y.ytId) && y.dur * 1000 <= left + 30e3);
+    if (fits.length) return fits.sort((a, b) => (vidLast[a.ytId] || 0) - (vidLast[b.ytId] || 0))[0];
+    return left < 60e3 ? { ...x, fill: true } : x;
+  }
   function freshVideo(q, loop, x) {
     if (!recent(x.ytId)) return x;
     for (let j = 1; j < loop.length; j++) { const y = loop[(q.i + j) % loop.length]; if (y.type === "video" && !recent(y.ytId)) { q.i = (q.i + j) % loop.length; return y; } }
@@ -763,7 +793,10 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // item on air ends (never cutting a video), within six minutes of its time; its list rotates
   // half-hour by half-hour, and a segment with nothing to show gives way to the next that has.
   const SLOT_MIN = { a: 8, b: 22 }, SEG_FALLBACK = ["kolkata10", "numbers", "world", "bangladesh", "onthisday"];
-  const SEG_ITEM = { kolkata10: 8, world: 10, bangladesh: 10, sports: 10, city: 10, numbers: 8, onthisday: 10 };
+  const SEG_ITEM = { kolkata10: 8, world: 10, bangladesh: 10, sports: 10, city: 10, numbers: 8, onthisday: 10, entertainment: 9, lifestyle: 9 };
+  // Slot c: the segment straight after the quick bulletins at :15 and :45, a fixed turn through the
+  // daypart's list for each quarter of the day (so the promos can say when each one plays).
+  const cName = at => { const dp = daypart(at), list = dp?.c || []; if (!list.length) return ""; const d = new Date(at + 5.5 * 3600e3); return list[(d.getUTCHours() * 2 + (d.getUTCMinutes() >= 30 ? 1 : 0)) % list.length]; };
   const daypart = t => { const h = new Date(t + 5.5 * 3600e3).getUTCHours(), c = st.tv?.clock || {}; const order = Object.entries(c).sort((a, b) => a[1].from - b[1].from); let dp = order[order.length - 1]; for (const e of order) if (h >= e[1].from) dp = e; return dp ? dp[1] : null; };
   const avoEvery = () => daypart(now())?.avoEvery || AVO_EVERY;
   // A segment's running order: its items, each as long as its line (the newsreader's, when the
@@ -825,7 +858,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     return null;
   }
   function segDue(t, q) {
-    if (!st.tv?.segs || q.resume || (q.pending || []).length || q.item?.type === "upnext" || q.item?.type === "seg") return null;
+    if (!st.tv?.segs || q.resume || (q.pending || []).length || (q.block || []).length || ["upnext", "seg", "bulletin", "weather", "market"].includes(q.item?.type)) return null;
     const half = Math.floor(t / 1800e3) * 1800e3, dp = daypart(t); if (!dp) return null;
     q.segDone ||= [];
     for (const k of ["a", "b"]) {
@@ -837,73 +870,55 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     }
     return null;
   }
-  // The bulletin's stories, the same for everyone at that moment: stories published since the last
-  // bulletin lead (marked নতুন), then stories updated since (নতুন তথ্য), then the rest, newest first.
-  // The quick bulletins at :15 and :45 read four the bulletin before did not. Then the variety
-  // order, the lead staying first.
+  // The bulletin's stories, the same for everyone at that moment: the last thirty minutes' stories
+  // (published or updated); with fewer than three, the last hour's, then two hours'. In the
+  // bulletin order (src/labels.js bulletinRank): West Bengal politics, Kolkata politics, India's
+  // politics, West Bengal, Kolkata, India, the world, sports, entertainment, lifestyle; newest first
+  // within each. Stories new since the last bulletin are marked নতুন, updated ones নতুন তথ্য. The
+  // quick bulletins at :15 and :45 read first the stories the bulletin before did not.
   function bulletinPick(slot, short, depth = 0) {
     const L = st.tv?.bulletin || []; if (!L.length) return [];
-    const since = slot - QUARTER, ts = v => Date.parse(v || "") || 0;
-    const rank = b => ts(b.at) >= since ? 0 : b.upd && ts(b.upd) >= since ? 1 : 2;
-    let pool = L.map((b, i) => ({ b, i })).sort((x, y) => rank(x.b) - rank(y.b) || x.i - y.i).map(x => ({ ...x.b, tag: rank(x.b) === 0 ? "নতুন" : rank(x.b) === 1 ? "নতুন তথ্য" : "" }));
+    const ts = v => Date.parse(v || "") || 0, last = b => Math.max(ts(b.at), ts(b.upd));
+    let pool = [];
+    for (const mins of [30, 60, 120]) { pool = L.filter(b => slot - last(b) <= mins * 60e3); if (pool.length >= 3) break; }
+    if (!pool.length) pool = L.slice(0, 3);
+    const since = slot - QUARTER;
+    pool = pool.slice().sort((a, b) => (a.pri ?? 10) - (b.pri ?? 10) || last(b) - last(a))
+      .map(b => ({ ...b, tag: ts(b.at) >= since ? "নতুন" : b.upd && ts(b.upd) >= since ? "নতুন তথ্য" : "" }));
     if (short && depth === 0) {
       const before = new Set(bulletinPick(since, bulletinMs(since) !== 120e3, 1).map(b => b.title));
       const unread = pool.filter(b => !before.has(b.title));
       if (unread.length >= 3) pool = unread.concat(pool.filter(b => before.has(b.title)));
     }
-    return vary(pool.slice(0, short ? 4 : 7), 1);
+    return pool.slice(0, short ? 4 : 7);
   }
   function localSeg() {
     const loop = st.tv?.loop || []; if (!loop.length) return null;
     const t = now(), q = st.seq ||= { i: 0, item: null, seg: null, start: 0, n: 0, head: loop[0]?.ytId || "" };
     const slot = Math.floor(t / QUARTER) * QUARTER, BULLETIN_MS = bulletinMs(slot);
-    if (t - slot < BULLETIN_MS && (st.tv?.bulletin || []).length) {
-      if (q.item?.type !== "bulletin" || q.start !== slot) {
-        // Whatever was on stops for the bulletin; a video is picked up again afterwards.
-        if (q.item?.type === "video") { const at = (q.item.in || 0) + ytPos(q.item.ytId); q.resume = at < q.item.dur - 8 ? { ...q.item, at, resumed: true } : null; }
-        else if (q.item?.type === "upnext") q.resume = q.item.video;
-        q.item = { type: "bulletin", dur: BULLETIN_MS / 1000, sting: true }; q.start = slot; q.n++;
-        q.seg = { ...q.item, start: slot, in: 0 };
+    // The bulletins at :00, :15, :30 and :45 never cut into a video, an AVO block or a segment: the
+    // bulletin starts as soon as the item on air ends. At :00 and :30 the weather (45 seconds) and
+    // the markets (20 seconds) follow it; at :15 and :45 a desk segment (slot c). A bulletin that
+    // cannot start by eleven minutes past its quarter gives way to the next one. In the last minutes
+    // before a bulletin the channel picks videos that end in time (fitVideo below).
+    q.bDone ||= [];
+    const bulletinDue = () => (st.tv?.bulletin || []).length && !q.bDone.includes(slot) && t - slot < 11 * 60e3;
+    const blockFor = () => {
+      const out = [];
+      if (BULLETIN_MS === 120e3) {
+        if (channel === "h" && (st.tv?.weatherPlaces || []).length) { out.push({ type: "weather", dur: 45, sting: true }); if (st.tv?.market?.nifty) out.push({ type: "market", dur: 20, sting: true }); }
+      } else {
+        // This quarter's segment; with nothing to show, the next on the daypart's list that has.
+        const list = daypart(slot)?.c || [], first = list.indexOf(cName(slot));
+        let b = null; for (let k = 0; k < list.length && !b; k++) b = segBuild(list[(Math.max(0, first) + k) % list.length]);
+        if (b) out.push({ type: "seg", name: b.name, head: b.head, items: b.items, dur: b.dur, sting: true });
       }
-      st.preWant = null;
-      return q.seg;
-    }
-    // Every 30 minutes, straight after the two-minute bulletins at :00 and :30, the weather
-    // briefing (45 seconds), then the markets (horizontal channel, when the weather has come in).
-    const WX = channel === "h" && (st.tv?.weatherPlaces || []).length && (st.tv?.bulletin || []).length && BULLETIN_MS === 120e3 ? 45e3 : 0;
-    // Then the market update, 20 seconds (when its figures have come in).
-    const MK = WX && st.tv?.market?.nifty ? 20e3 : 0;
-    if (MK && t - slot >= BULLETIN_MS + WX && t - slot < BULLETIN_MS + WX + MK) {
-      const ms = slot + BULLETIN_MS + WX;
-      if (q.item?.type !== "market" || q.start !== ms) {
-        if (q.item?.type === "video") { const at = (q.item.in || 0) + ytPos(q.item.ytId); q.resume = at < q.item.dur - 8 ? { ...q.item, at, resumed: true } : null; }
-        else if (q.item?.type === "upnext") q.resume = q.item.video;
-        q.item = { type: "market", dur: MK / 1000, sting: true }; q.start = ms; q.n++;
-        q.seg = { ...q.item, start: ms, in: 0 };
-      }
-      st.preWant = null;
-      return q.seg;
-    }
-    if (WX && t - slot >= BULLETIN_MS && t - slot < BULLETIN_MS + WX) {
-      const ws = slot + BULLETIN_MS;
-      if (q.item?.type !== "weather" || q.start !== ws) {
-        if (q.item?.type === "video") { const at = (q.item.in || 0) + ytPos(q.item.ytId); q.resume = at < q.item.dur - 8 ? { ...q.item, at, resumed: true } : null; }
-        else if (q.item?.type === "upnext") q.resume = q.item.video;
-        q.item = { type: "weather", dur: WX / 1000, sting: true }; q.start = ws; q.n++;
-        q.seg = { ...q.item, start: ws, in: 0 };
-      }
-      st.preWant = null;
-      return q.seg;
-    }
+      return out;
+    };
     // Scheduled cut-ins (control room > Scheduler): at the set time the chosen videos go on air,
     // in order, then the channel goes back to its running order (picking up the video that was
     // cut). A time that falls in the bulletin, weather and market block starts straight after it.
-    const blockEnd = at => {
-      if (!(st.tv?.bulletin || []).length) return at;
-      const sl = Math.floor(at / QUARTER) * QUARTER, bm = bulletinMs(sl);
-      const wx = channel === "h" && (st.tv?.weatherPlaces || []).length && bm === 120e3 ? 45e3 : 0, mk = wx && st.tv?.market?.nifty ? 20e3 : 0;
-      return at < sl + bm + wx + mk ? sl + bm + wx + mk : at;
-    };
+    const blockEnd = at => at;
     for (const c of st.tv?.cutins || []) {
       const vids = (c.videos || []).filter(v => v.ytId && v.dur > 0); if (!vids.length) continue;
       const start = blockEnd(c.at), end = start + vids.reduce((n, v) => n + v.dur, 0) * 1000;
@@ -927,6 +942,28 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         : age >= it.dur * 1000;
       if (!done) return q.seg;
     }
+    // The bulletin block: the bulletin, then what follows it (each when the one before has ended).
+    if (q.block?.length) {
+      const b = q.block.shift(); q.n++;
+      q.item = { ...b }; q.start = t;
+      q.seg = { ...b, start: t, in: 0, n: q.n };
+      const after = loop.slice(q.i).concat(loop.slice(0, q.i)).find(x => x.type === "video");
+      st.preWant = after ? { id: after.ytId, at: 0 } : null;
+      return q.seg;
+    }
+    if (bulletinDue()) {
+      // An "up next" card that ended: its video plays after the bulletin block.
+      if (q.item?.type === "upnext") q.resume = q.item.video;
+      q.bDone = [...q.bDone.slice(-8), slot];
+      q.item = { type: "bulletin", dur: BULLETIN_MS / 1000, sting: true }; q.start = t; q.n++;
+      q.seg = { ...q.item, start: t, in: 0, n: q.n };
+      q.block = blockFor();
+      q.pending = (q.pending || []).filter(x => x.type !== "flash");
+      st.preWant = null;
+      return q.seg;
+    }
+    // A quarter whose bulletin could not start in time is let go.
+    if ((st.tv?.bulletin || []).length && !q.bDone.includes(slot) && t - slot >= 11 * 60e3) q.bDone = [...q.bDone.slice(-8), slot];
     // A poll or its result whose time has come, when the item on air is done.
     const pd = pollDue(t, q);
     if (pd) {
@@ -973,8 +1010,12 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // The horizontal channel places its own headline cards (below); no flash straight after
       // the bulletin on either channel.
       while (x.type === "flash" && (channel === "h" || q.item?.type === "bulletin") && loop.some(y => y.type === "video")) { take(); x = loop[q.i % loop.length]; }
-      if (x.type === "video") x = freshVideo(q, loop, x);
-      if (x.type === "video" && q.item?.type === "video") {
+      if (x.type === "video") x = fitVideo(q, loop, freshVideo(q, loop, x), t);
+      // Under a minute to a bulletin and no video short enough: the headlines (or the channel ID)
+      // fill the gap, so the bulletin starts on time.
+      if (x.type === "video" && x.fill) { next = channel === "h" && q.item?.type !== "flash" ? { type: "flash", dur: 8, sting: true } : { type: "ident", dur: 5, sting: false }; x = null; }
+      if (!x) { /* a filler, chosen above */ }
+      else if (x.type === "video" && q.item?.type === "video") {
         // Between two videos (always after the stinger): on the horizontal channel the channel ID
         // after every second video, and the headlines after three videos, then two, then three…;
         // then the "up next" card.
@@ -1335,7 +1376,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     } else if (g.kind === "seg") {   // a segment (src/segments.js): a title card, then its items one by one
       const NAMES = st.tv?.segNames || {}, name = g.name, title = NAMES[name] || "", items = g.items || [], v = channel === "v" ? " v" : "";
       const head = g.head || 4, starts = []; { let a = head; for (const x of items) { starts.push(a); a += x.d0; } }
-      const kick = { kolkata10: "শহর ও রাজ্যের দশ খবর", world: "দুনিয়ার বড় খবর", bangladesh: "পড়শি দেশের খবর", sports: "মাঠের খবর", numbers: "আজকের খবরের অঙ্ক", onthisday: "ইতিহাসের পাতা থেকে", city: "আবহাওয়া, যাতায়াত, শহর", soth: "বিস্তারিত" }[name] || "";
+      const kick = { entertainment: "পর্দা, মঞ্চ আর তারকাদের খবর", lifestyle: "স্বাস্থ্য, খাওয়াদাওয়া, বেড়ানো", kolkata10: "শহর ও রাজ্যের দশ খবর", world: "দুনিয়ার বড় খবর", bangladesh: "পড়শি দেশের খবর", sports: "মাঠের খবর", numbers: "আজকের খবরের অঙ্ক", onthisday: "ইতিহাসের পাতা থেকে", city: "আবহাওয়া, যাতায়াত, শহর", soth: "বিস্তারিত" }[name] || "";
       const count = n => { const to = Number(n.dataset.to), dec = n.dataset.dec === "1", t0 = performance.now(); const step = t => { if (!n.isConnected) return; const p = Math.min(1, (t - t0) / 1300), e = 1 - Math.pow(1 - p, 3); n.textContent = bnDigits((dec ? (to * e).toFixed(1) : Math.round(to * e)).toLocaleString("en-IN")); if (p < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
       const tIST = v => { try { return bnDigits(new Date(Date.parse(v) + 5.5 * 3600e3).toISOString().slice(11, 16)); } catch { return ""; } };
       const itemHTML = (x, i) => {
@@ -1709,6 +1750,45 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // Cues over a video: the countdown to the next bulletin (its last five minutes), and a tease of
   // what comes next — the bulletin in its last minute, a segment whose slot has come, or the AVO
   // stories when they are due after this video (its last twenty-five seconds).
+  // What the promo lower third can show: the programmes the desk set (src/tvchannel.js programs)
+  // and the segments that have material now, each with its next time on air in the coming day.
+  const SEG_TEASE = { kolkata10: "শহর ও রাজ্যের দশ খবর", world: "দুনিয়ার বড় খবর এক মিনিটে", bangladesh: "পড়শি দেশের খবর", sports: "মাঠের সব খবর", numbers: "আজকের খবর, সংখ্যায়", onthisday: "ইতিহাসের পাতা থেকে",
+    city: "আবহাওয়া, যাতায়াত, শহরের খবর", soth: "এই ঘণ্টার সবচেয়ে বড় খবর, বিস্তারিত", entertainment: "পর্দা, মঞ্চ আর তারকাদের খবর", lifestyle: "স্বাস্থ্য, খাওয়াদাওয়া, বেড়ানো" };
+  function nextSegTimes(t) {
+    const out = new Map(), start = Math.floor(t / 1800e3) * 1800e3;
+    for (let h = start; h < t + 24 * 3600e3; h += 1800e3) {
+      const dp = daypart(h); if (!dp) continue;
+      const r = Math.floor(h / 1800e3);
+      const slots = [[h + 8 * 60e3, (dp.a || [])[r % Math.max(1, (dp.a || []).length)]], [h + 15 * 60e3, cName(h + 15 * 60e3)], [h + 22 * 60e3, (dp.b || [])[r % Math.max(1, (dp.b || []).length)]]];
+      for (const [at, name] of slots) if (name && at > t + 120e3 && !out.has(name)) out.set(name, at);
+    }
+    return out;
+  }
+  function promoList(t) {
+    const NAMES = st.tv?.segNames || {}, out = [];
+    for (const p of st.tv?.programs || []) {
+      const [hh, mm] = String(p.time || "21:00").split(":").map(Number);
+      if (p.kind === "once") {
+        const at = Date.parse(`${p.date}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:00+05:30`);
+        if (!(at > t - 30 * 60e3) || at - t > 14 * 864e5) continue;
+        out.push({ title: p.title, tag: p.tag, when: bnDayDate(at), time: bnTimeHM(hh, mm), image: p.image || "", icon: "news" });
+      } else out.push({ title: p.title, tag: p.tag, when: p.kind === "weekly" ? `প্রতি ${BN_DAYS[p.day ?? 6]}` : "প্রতিদিন", time: bnTimeHM(hh, mm), image: p.image || "", icon: "news" });
+    }
+    const segs = [];
+    const ICON = { sports: "sport", world: "globe", bangladesh: "globe", entertainment: "film", lifestyle: "leaf", numbers: "chart", onthisday: "book", kolkata10: "politics", city: "weather", soth: "news" };
+    for (const [name, at] of nextSegTimes(t)) if (segBuild(name)) segs.push({ title: NAMES[name] || name, tag: SEG_TEASE[name] || "", when: "প্রতিদিন", time: bnTime(at), icon: ICON[name] || "news" });
+    // The desk's programmes take every other turn.
+    const mixed = []; for (let i = 0; i < Math.max(out.length, segs.length); i++) { if (out[i]) mixed.push(out[i]); if (segs[i]) mixed.push(segs[i]); }
+    return mixed;
+  }
+  const PROMO_CLOCK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`;
+  // In the ticker's place (the headline ticker and the market ticker step aside while it runs): the
+  // programme's picture (or the segment's tile), COMING UP, the name and teaser, when it plays.
+  const promoHTML = x => `<div class="pr-l3"><i class="pr-wipe"></i>
+    <div class="pr-pic">${x.image ? `<img src="${esc(x.image)}" alt="" referrerpolicy="no-referrer">` : `<div class="pr-tile">${SOTH_ICONS[x.icon] || SOTH_ICONS.news}</div>`}</div>
+    <div class="pr-tag"><i class="lt-pulse"></i><b data-no-tr>COMING UP</b></div>
+    <div class="pr-body"><b>${esc(x.title)}</b>${x.tag ? `<small>${esc(x.tag)}</small>` : ""}</div>
+    <div class="pr-when">${PROMO_CLOCK}<span>${esc(x.when)}</span><b>${esc(x.time)}</b></div><i class="pr-shine"></i><img class="pr-logo" src="${LOGO}" alt=""></div>`;
   function segPeek(t, q) {
     const half = Math.floor(t / 1800e3) * 1800e3, dp = daypart(t); if (!dp || !st.tv?.segs) return null;
     for (const k of ["a", "b"]) {
@@ -1724,7 +1804,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const q = st.seq, t = now(), onVideo = (mode === "app" || output) && q?.item?.type === "video" && !st.ctl?.breaking && !st.current?.scene?.graphic && !stage.querySelector(".tvp-scene + .tvp-scene");
     let cdText = "", tease = null;
     if (onVideo && (st.tv?.bulletin || []).length) {
-      const toQ = (Math.floor(t / QUARTER) * QUARTER + QUARTER - t) / 1000;
+      const toQ = toBulletin(t) / 1000;
       const left = (q.start + ((q.item.dur || 0) - (q.item.in || 0)) * 1000 - t) / 1000;
       if (toQ <= 300 && toQ > 60) cdText = `পরের বুলেটিন ${bnDigits(Math.ceil(toQ / 60))} মিনিটে`;
       if (toQ <= 60) tease = { k: "আসছে", b: "খবরের বুলেটিন" };
@@ -1746,6 +1826,23 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (pb.dataset.h !== html) { pb.dataset.h = html; pb.hidden = !html; pb.innerHTML = html; }
     }
     if (cd.dataset.t !== cdText) { cd.dataset.t = cdText; cd.hidden = !cdText; cd.innerHTML = cdText ? `<i class="lt-pulse"></i>${esc(cdText)}` : ""; }
+    // The promo lower third: every five minutes, over a video (never with a tease or a poll on
+    // screen), ten seconds: one of the channel's segments or a programme the desk has set, with
+    // when it plays. Segments play every day ("প্রতিদিন · রাত ৮টা ১৫"); a weekly show names its day,
+    // a one-off its day and date (no year). No voice-over.
+    const pr = $(".tvp-promo");
+    if (pr) {
+      const k = Math.floor(t / 300e3), into5 = t - k * 300e3, vidIn = q ? (t - q.start) / 1000 : 0;
+      if (!st.promo || st.promo.k !== k) {
+        if (onVideo && !tease && !cdText && vidIn >= 6 && into5 < 240e3 && !(pb && !pb.hidden)) { const list = promoList(t); if (list.length) st.promo = { k, at: t, x: list[k % list.length] }; }
+      }
+      const on = st.promo && st.promo.k === k && t - st.promo.at < 10e3 && onVideo;
+      const html = on ? promoHTML(st.promo.x) : "";
+      const pk = on ? `${k}` : "";
+      if (pr.dataset.k !== pk) { pr.dataset.k = pk; pr.hidden = !on; pr.innerHTML = html; }
+      if (on) pr.classList.toggle("out", t - st.promo.at > 9.1e3);
+      stage.classList.toggle("promo-on", !!on && t - st.promo.at < 9.6e3);
+    }
     const key = tease ? `${tease.k}|${tease.b}` : "";
     if (te.dataset.t !== key) { te.dataset.t = key; te.hidden = !tease; te.innerHTML = tease ? `<span>${esc(tease.k)}</span><b>${esc(tease.b)}</b>` : ""; }
   }

@@ -37,6 +37,7 @@ async function uploadImage(file){
 }
 function wireImageFields(){
   $$("[data-image-field]").forEach(box=>{
+    if(box.dataset.wired)return;box.dataset.wired="1";
     const input=box.querySelector(`input[name="${box.dataset.imageField}"]`),preview=box.querySelector(".img-preview"),status=box.querySelector(".upload-status"),lib=box.querySelector(".lib-grid");
     const show=url=>{input.value=url;preview.style.backgroundImage=url?`url('${url.replace(/'/g,"%27")}')`:"";preview.textContent=url?"":"No image"};
     input.addEventListener("change",()=>show(input.value.trim()));
@@ -326,7 +327,10 @@ async function render(view){
       <div class="panel"><h2>Scheduler</h2><p class="muted" style="font-size:13px">Put one video or a set of videos on air at set times (India time), once on a day or every day. At each time the channel cuts in live and plays them in order, then goes back to autopilot. A time that falls in a news bulletin (or its weather and market update) starts straight after it. Scheduled videos can be older than 30 hours.</p>
         <div class="row-actions"><button class="action" data-cut="h">Horizontal schedule</button><button class="action" data-cut="v">Vertical schedule</button></div><div id="tvCuts"></div></div>
       <div class="panel"><h2>Programming clock</h2><p class="muted" style="font-size:13px">Each half-hour has two segment slots, at 8 and 22 minutes past (and 38 and 52), played when the item on air ends. Each daypart (India time) lists the segments for each slot; the list rotates half-hour by half-hour, and a segment with nothing to show gives way to the next. Segments: <b>city</b> শহরের খবর, <b>kolkata10</b> কলকাতা ১০, <b>bangladesh</b> বাংলাদেশ ডেস্ক, <b>world</b> এক মিনিটে বিশ্ব, <b>numbers</b> সংখ্যায় আজ, <b>sports</b> খেলার খবর, <b>onthisday</b> আজকের দিনে, <b>soth</b> story of the hour. “AVO every” is the number of videos between AVO blocks.</p>
+        <p class="muted" style="font-size:13px">Segments: city, kolkata10, bangladesh, world, numbers, sports, entertainment, lifestyle, onthisday, soth. The quick bulletins at :15 and :45 are followed by one segment, a fixed turn through its list each quarter (the promos say when each plays). No two segments run back to back.</p>
         <div class="row-actions"><button class="action" data-clock="h">Horizontal clock</button><button class="action" data-clock="v">Vertical clock</button></div><div id="tvClock"></div></div>
+      <div class="panel"><h2>Programme promos</h2><p class="muted" style="font-size:13px">The promo strip (every five minutes over videos, in the ticker's place, ten seconds, no voice-over) takes turns between these shows and the channel's own segments: COMING UP, the show's picture, its name and teaser, and when it plays: every day at a time, every week on a day, or once on a date (shown without the year).</p>
+        <div class="row-actions"><button class="action" data-progs="h">Horizontal promos</button><button class="action" data-progs="v">Vertical promos</button></div><div id="tvProgs"></div></div>
       <div class="panel"><h2>Videos on each channel</h2><div class="row-actions"><button class="action" data-items="h">Horizontal videos</button><button class="action" data-items="v">Vertical videos</button></div><div id="tvItems"></div></div>`;
     wireImageFields();
     const go=async(p,opts,msg)=>{try{const r=await api(p,opts);notice(typeof msg==="function"?msg(r):msg);render("tv").then(labelTables)}catch(e){notice(e.message)}};
@@ -350,15 +354,36 @@ async function render(view){
     $$("[data-promodel]").forEach(b=>b.addEventListener("click",()=>{if(confirm("Remove this promo card?"))go(`/api/admin/tv/promos/${encodeURIComponent(b.dataset.promodel)}`,{method:"DELETE"},"Removed.")}));
     const DP={morning:"Morning (6–10)",day:"Day (10–17)",prime:"Prime time (17–23)",late:"Late night (23–6)"};
     const showClock=async ch=>{try{const st=await (await fetch(`/api/tv/${ch}`,{cache:"no-store"})).json();const c=st.clock||{},sg=st.segs||{};
-      $("#tvClock").innerHTML=`<form id="clockForm" class="form-grid" style="margin-top:12px"><div class="table-wrap"><table><thead><tr><th>Daypart</th><th>Slot at :08 / :38</th><th>Slot at :22 / :52</th><th>AVO every</th></tr></thead><tbody>${Object.entries(DP).map(([k,n])=>`<tr><td><b>${n}</b></td><td><input name="${k}_a" value="${esc((c[k]?.a||[]).join(", "))}"></td><td><input name="${k}_b" value="${esc((c[k]?.b||[]).join(", "))}"></td><td><input name="${k}_avo" type="number" min="1" max="8" value="${c[k]?.avoEvery||3}" style="width:70px"></td></tr>`).join("")}</tbody></table></div>
+      $("#tvClock").innerHTML=`<form id="clockForm" class="form-grid" style="margin-top:12px"><div class="table-wrap"><table><thead><tr><th>Daypart</th><th>Slot at :08 / :38</th><th>Slot at :22 / :52</th><th>After the :15 / :45 bulletin</th><th>AVO every</th></tr></thead><tbody>${Object.entries(DP).map(([k,n])=>`<tr><td><b>${n}</b></td><td><input name="${k}_a" value="${esc((c[k]?.a||[]).join(", "))}"></td><td><input name="${k}_b" value="${esc((c[k]?.b||[]).join(", "))}"></td><td><input name="${k}_c" value="${esc((c[k]?.c||[]).join(", "))}"></td><td><input name="${k}_avo" type="number" min="1" max="8" value="${c[k]?.avoEvery||3}" style="width:70px"></td></tr>`).join("")}</tbody></table></div>
         <label class="field check"><input type="checkbox" name="scoreOn" ${sg.score?"checked":""}> Score strip in খেলার খবর</label><label class="field"><span>Score (e.g. ভারত ২৪৫/৩, ৪০ ওভার)</span><input name="score" value="${esc(sg.score||"")}" maxlength="140"></label>
         <label class="field check"><input type="checkbox" name="noticeOn" ${sg.notice?"checked":""}> Desk notice in শহরের খবর</label><label class="field"><span>Notice (Metro, trains, traffic, power cuts)</span><input name="notice" value="${esc(sg.notice||"")}" maxlength="200"></label>
         <button class="action primary" type="submit">Save the ${ch==="h"?"horizontal":"vertical"} clock</button></form>`;
       $("#clockForm").addEventListener("submit",e=>{e.preventDefault();const v=Object.fromEntries(new FormData(e.currentTarget)),list=t=>String(t||"").split(/[\s,]+/).map(x=>x.trim()).filter(Boolean);
-        const clock=Object.fromEntries(Object.keys(DP).map(k=>[k,{a:list(v[k+"_a"]),b:list(v[k+"_b"]),avoEvery:Number(v[k+"_avo"])||3}]));
+        const clock=Object.fromEntries(Object.keys(DP).map(k=>[k,{a:list(v[k+"_a"]),b:list(v[k+"_b"]),c:list(v[k+"_c"]),avoEvery:Number(v[k+"_avo"])||3}]));
         go(`/api/admin/tv/${ch}`,J("PUT",{clock,score:{on:!!v.scoreOn,text:v.score},notice:{on:!!v.noticeOn,text:v.notice}}),"Clock saved. Screens pick it up within a minute.")});
     }catch(e){notice(e.message)}};
     $$("[data-clock]").forEach(b=>b.addEventListener("click",()=>showClock(b.dataset.clock)));
+    const DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    const showProgs=ch=>{const list=(C[ch].programs||[]).map(p=>({...p}));
+      const card=(p,i)=>`<div class="panel" data-prow="${i}" style="margin-top:12px"><div class="form-grid">
+        <label class="field">Show<input data-pf="title" value="${esc(p.title||"")}" maxlength="80" lang="bn" placeholder="অনুষ্ঠানের নাম"></label>
+        <label class="field">Teaser line<input data-pf="tag" value="${esc(p.tag||"")}" maxlength="110" lang="bn" placeholder="এক লাইনে কী দেখাবে"></label>
+        <label class="field">When<select data-pf="kind">${[["daily","Every day"],["weekly","Every week"],["once","Once"]].map(([v,n])=>`<option value="${v}" ${p.kind===v?"selected":""}>${n}</option>`).join("")}</select></label>
+        <label class="field">Day (every week)<select data-pf="day">${DAYS.map((d,k)=>`<option value="${k}" ${Number(p.day??6)===k?"selected":""}>${d}</option>`).join("")}</select></label>
+        <label class="field">Date (once)<input data-pf="date" type="date" value="${esc(p.date||"")}"></label>
+        <label class="field">Time (India)<input data-pf="time" type="time" value="${esc(p.time||"21:00")}"></label>
+        ${imageField(`pimg_${i}`,"Picture (a snapshot of the show; landscape)",p.image||"")}
+        <label class="field check"><input type="checkbox" data-pf="on" ${p.on!==false?"checked":""}> On</label></div>
+        <div class="row-actions"><button class="action" type="button" data-pdel="${i}">Remove</button></div></div>`;
+      const draw=()=>{$("#tvProgs").innerHTML=`${list.map(card).join("")||`<p class="muted" style="margin-top:12px">No shows yet: the promos run the channel's own segments.</p>`}
+        <div class="row-actions" style="margin-top:12px"><button class="action" type="button" id="padd">Add a show</button><button class="action primary" type="button" id="psave">Save the ${ch==="h"?"horizontal":"vertical"} promos</button></div>`;
+        wireImageFields();
+        const read=()=>$$("[data-prow]").forEach(r=>{const i=Number(r.dataset.prow),p=list[i];r.querySelectorAll("[data-pf]").forEach(x=>{p[x.dataset.pf]=x.type==="checkbox"?x.checked:x.value});p.image=(r.querySelector(`input[name="pimg_${i}"]`)?.value||"").trim()});
+        $("#padd").onclick=()=>{read();list.push({title:"",tag:"",kind:"weekly",day:6,date:"",time:"21:00",image:"",on:true});draw()};
+        $$("[data-pdel]").forEach(b=>b.onclick=()=>{read();list.splice(Number(b.dataset.pdel),1);draw()});
+        $("#psave").onclick=()=>{read();go(`/api/admin/tv/${ch}`,J("PUT",{programs:list.map(p=>({...p,day:Number(p.day)}))}),"Promos saved. Screens pick them up within a minute.")}};
+      draw()};
+    $$("[data-progs]").forEach(b=>b.addEventListener("click",()=>showProgs(b.dataset.progs)));
     const fmtDur=n=>`${Math.floor(n/60)}:${String(n%60).padStart(2,"0")}`;
     const showCuts=async ch=>{try{const r=await api(`/api/admin/tv/${ch}/cutins`);const name=ch==="h"?"horizontal":"vertical";
       $("#tvCuts").innerHTML=`<h3 style="margin:14px 0 6px">${ch==="h"?"Horizontal":"Vertical"} channel</h3>
