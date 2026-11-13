@@ -1548,3 +1548,17 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tvp-v.split-on .tvp-ytlayer,.tvp-v.split-on .tvp-stage .tvp-scene{clip-path:inset(656px 0 656px 0);box-shadow:none}
 .sp-body{flex:1;display:flex;flex-direction:column;gap:18px;min-height:0}
 .tvp.split-on .tvp-ovl .cm-box{display:none}
+
+/* The explainer's photo shots fill the frame (they used to sit as a small clipping on white paper:
+   the slide shared the clipping's class). The photo covers the screen with a slow push-in; the
+   place or desk stamp stays at the foot. */
+.avo .avo-slide.ex-s.ex-clip{position:absolute!important;height:auto!important;width:auto!important;max-width:none!important;aspect-ratio:auto!important;padding:0!important;margin:0;background:#0b0b0b!important;box-shadow:none!important;transform:none;inset:0}
+.avo .avo-slide.ex-s.ex-clip:not(.cut-whip):not(.cut-zoom){animation:none}
+.avo .avo-slide.ex-s.ex-clip:after{background:linear-gradient(180deg,rgba(0,0,0,.18) 0%,transparent 30%,transparent 62%,rgba(0,0,0,.55) 100%)}
+.avo .avo-slide.ex-s.ex-clip .ex-cam{padding:0!important;animation:none}
+.avo figure.ex-clip{position:absolute!important;inset:0;width:100%!important;max-width:none!important;height:100%;aspect-ratio:auto!important;margin:0;padding:0!important;background:#0b0b0b!important;box-shadow:none!important;transform:none!important;animation:exfade .4s both}
+.avo figure.ex-clip>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;clip-path:none}
+.avo figure.ex-clip .tape{display:none}
+.avo figure.ex-clip .sweep{inset:0}
+.avo figure.ex-clip .ex-stamp{left:60px;bottom:260px;z-index:2;box-shadow:0 10px 26px rgba(0,0,0,.4)}
+.avo.ex.v figure.ex-clip .ex-stamp{left:60px;bottom:520px}

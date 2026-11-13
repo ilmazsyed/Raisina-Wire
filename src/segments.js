@@ -17,6 +17,7 @@
 // Everything is built from what the channel already has: the wire's stories (last twelve hours),
 // their pictures (src/bulletinimg.js), the newsreader's lines where the bulletin has one, the
 // weather, and Bengali Wikipedia's "on this day" page for আজকের দিনে (fetched once a day).
+import { sentencesIn } from "./sentences.js";
 import { labelsOf } from "./labels.js";
 
 export const SEG_NAMES = { city: "শহরের খবর", kolkata10: "কলকাতা ১০", bangladesh: "বাংলাদেশ ডেস্ক", world: "এক মিনিটে বিশ্ব", numbers: "সংখ্যায় আজ", sports: "খেলার খবর", onthisday: "আজকের দিনে", soth: "এই ঘণ্টার বড় খবর", entertainment: "বিনোদনের খবর", lifestyle: "জীবনধারা" };
@@ -48,7 +49,8 @@ const UNITS = "কোটি|লক্ষ|লাখ|হাজার|টাকা|
 const FIG = new RegExp(`([০-৯0-9][০-৯0-9,.]*)\\s*(${UNITS})(?![\\p{L}\\p{M}])`, "u");
 const CITY = /মেট্রো|লোকাল ট্রেন|ট্রেন বাতিল|ট্রেন চলাচল|যানজট|ট্র্যাফিক|ট্রাফিক|বাস ধর্মঘট|বাস পরিষেবা|লোডশেডিং|বিদ্যুৎ বিভ্রাট|জল সরবরাহ|ফেরি|উড়ালপুল|রাস্তা বন্ধ|অটো|ক্যাব|বিমানবন্দর|শিয়ালদহ|হাওড়া স্টেশন/;
 const plain = t => String(t || "").replace(/<[^>]+>/g, " ").replace(/[#*_>]+/g, " ").replace(/\s+/g, " ").trim();
-const firstSentence = t => { const p = plain(t), m = p.match(/^.{20,170}?[।!?](\s|$)/); return m ? m[0].trim() : p.slice(0, 150).replace(/\s+\S*$/, "") + (p.length > 150 ? "…" : ""); };
+// The first sentence, whole (never cut with a "…"; src/sentences.js).
+const firstSentence = t => sentencesIn(t)[0] || "";
 
 // আজকের দিনে: Bengali Wikipedia's day page ("১১ নভেম্বর"), its events section, three lines.
 const MONTHS = ["জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"];

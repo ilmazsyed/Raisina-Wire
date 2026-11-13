@@ -1,3 +1,4 @@
+import { wholeSentences, noDots } from "./sentences.js";
 import { readyVoices, readyLinks } from "./bulletinvoice.js";
 import { cleanCredit } from "./bulletinimg.js";
 import { avoForScreens } from "./avo.js";
@@ -266,10 +267,8 @@ async function bulletinPool(env) {
   return rows.map(r => ({ ...r, pri: bulletinRank(r.category, `${r.title} ${String(r.body || "").slice(0, 400)}`) }))
     .sort((a, b) => a.pri - b.pri || last(b) - last(a)).slice(0, 16);
 }
-const firstWords = (body, n = 100) => {
-  const words = String(body || "").replace(/<[^>]+>/g, " ").replace(/[#*_>]+/g, " ").replace(/\s+/g, " ").trim().split(" ");
-  return words.slice(0, n).join(" ") + (words.length > n ? "…" : "");
-};
+// The bulletin's text: whole sentences (about 100 words), never cut with a "…" (src/sentences.js).
+const firstWords = body => wholeSentences(body, 650);
 const memo = new Map();
 export async function tvState(env, ch) {
   const hit = memo.get(ch);
@@ -283,14 +282,14 @@ export async function tvState(env, ch) {
   ]);
   // Each story carries its labels (src/labels.js): desk and weight, for the running order's variety rules.
   const lab = a => labelsOf(a.category, `${a.title} ${String(a.body || "").slice(0, 400)}`);
-  const headlines = stories.map(a => ({ text: a.title, desk: a.category, kind: a.kind, ...lab(a) }));
+  const headlines = stories.map(a => ({ text: noDots(a.title), desk: a.category, kind: a.kind, ...lab(a) }));
   // Each bulletin story's picture and its credit (src/bulletinimg.js), when one was found.
   // Twelve in the bulletin pool: the :00 and :30 bulletins lead with the newest, the :15 and :45
   // ones read four the last bulletin did not (src/engine.js).
   const top = pool, pics = new Map();
   if (top.length) (await env.DB.prepare(`SELECT article_id, url, credit FROM bulletin_images WHERE url<>'' AND article_id IN (${top.map(() => "?").join(",")})`).bind(...top.map(r => r.id)).all().catch(() => ({ results: [] }))).results.forEach(r => pics.set(r.article_id, r));
   const updated = r => r.updated_at && Date.parse(r.updated_at) - Date.parse(r.published_at) > 10 * 60e3 ? r.updated_at : "";
-  const bulletin = top.map(r => ({ title: r.title, desk: r.category, kind: r.kind, at: r.published_at, upd: updated(r), pri: r.pri, ...lab(r), text: firstWords(r.body), image: pics.has(r.id) ? `/api/tv/bimg/${encodeURIComponent(r.id)}?v=${encodeURIComponent(pics.get(r.id).url.length + (pics.get(r.id).url.split("/").pop() || "").slice(-12))}` : "", credit: cleanCredit(pics.get(r.id)?.credit) }));
+  const bulletin = top.map(r => ({ title: noDots(r.title), desk: r.category, kind: r.kind, at: r.published_at, upd: updated(r), pri: r.pri, ...lab(r), text: firstWords(r.body), image: pics.has(r.id) ? `/api/tv/bimg/${encodeURIComponent(r.id)}?v=${encodeURIComponent(pics.get(r.id).url.length + (pics.get(r.id).url.split("/").pop() || "").slice(-12))}` : "", credit: cleanCredit(pics.get(r.id)?.credit) }));
   // The newsreader's line for each story, when it is ready (src/bulletinvoice.js).
   const voices = await readyVoices(env, bulletin).catch(() => new Map());
   bulletin.forEach(b => { const v = voices.get(b); if (v) { b.voice = `/api/tv/voice/${v.key}.mp3`; b.secs = v.secs; } });
