@@ -1,3 +1,4 @@
+import { noDots } from "./sentences.js";
 import { bnLine, tidyLine } from "./bnline.js";
 // The Rashtrix wire desk. It reads the outlets the owner has approved (control room → Wire
 // sources), groups items about the same story, and writes a new report in our own words with
@@ -335,7 +336,7 @@ export async function writeJob(env, job, { onAlert } = {}) {
   const tags = splitTags((out.tags || []).join(",")).join(",");
   const auto = (await setting(env, "wire_autopublish", "on")) !== "off";
   const aid = id(), slug = await uniqueSlug(env, latinSlug(en.title) || `news-${aid.slice(0, 8)}`), at = now();
-  const row = { title: clean(bn.title).slice(0, 180), dek: clean(bn.dek).slice(0, 400), topic: desk, tags, body: clean(bn.body), hero_caption: "" };
+  const row = { title: noDots(clean(bn.title)).slice(0, 180), dek: noDots(clean(bn.dek)).slice(0, 400), topic: desk, tags, body: clean(bn.body), hero_caption: "" };
   const ver = await textHash(row);
   const tr = (lang, t) => env.DB.prepare(`INSERT OR REPLACE INTO translations (kind,ref,lang,src_ver,title,dek,topic,hero_caption,tags,body,status,model,updated_at) VALUES ('article',?,?,?,?,?,?,'',?,?,'ready','gemini',?)`)
     .bind(aid, lang, ver, clean(t.title).slice(0, 180), clean(t.dek).slice(0, 400), "", "[]", clean(t.body), at);

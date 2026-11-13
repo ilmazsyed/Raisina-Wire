@@ -6,6 +6,7 @@
 // music only. The month's characters are capped well inside Google's free allowance (1 million a
 // month for these voices), counting "Listen" too. TV_VOICE_FEMALE, TV_VOICE_MALE and TV_VOICE_RATE
 // change the voices and the pace.
+import { noDots } from "./sentences.js";
 import { synthesize, sha256, ttsEnabled } from "./tts.js";
 
 const VOICE = { f: "bn-IN-Chirp3-HD-Despina", m: "bn-IN-Chirp3-HD-Sadachbia" };   // smooth; lively
@@ -25,13 +26,12 @@ const sexAt = i => (i % 2 ? "m" : "f");
 // carries six or seven stories and a 65-second one three or four; with its punctuation made clear for the reader: every sentence ends in a
 // দাঁড়ি (or ? !), line breaks become sentence ends, and spaces follow commas and stops.
 export function readLine(item) {
-  let t = String(item.text || "").replace(/…$/, "").replace(/\s*\n+\s*/g, "। ").replace(/\s+/g, " ").trim();
+  let t = noDots(String(item.text || "")).replace(/\s*\n+\s*/g, "। ").replace(/\s+/g, " ").trim();
   t = t.replace(/\s*([,;:।!?])\s*/g, "$1 ").replace(/([।!?])\s*([।!?])+/g, "$1").replace(/\.(\s|$)/g, "।$1").trim();
   const sentences = t.split(/(?<=[।!?])\s+/).map(x => x.trim()).filter(Boolean);
   let line = "";
   for (const x of sentences.slice(0, 3)) { const next = line ? `${line} ${x}` : x; if (line && next.length > 190) break; line = next; }
   if (!line) line = String(item.title || "").trim();
-  if (line.length > 220) line = line.slice(0, 220).replace(/[\s,]+\S*$/, "");
   if (!/[।!?]$/.test(line)) line += "।";
   return line;
 }

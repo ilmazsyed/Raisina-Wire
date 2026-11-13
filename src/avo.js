@@ -16,6 +16,7 @@
 //   the model unavailable, the stricter free rules). A story with fewer than two is told in motion
 //   graphics on the screens (its icon, map, figure and sentences).
 // - A story leaves the rotation when it is six hours old or has been on air four times.
+import { wholeSentences, sentencesIn, noDots } from "./sentences.js";
 import { readLine, voiceKey, tvVoice, voiceRate, voiceBudget, chargeVoice } from "./bulletinvoice.js";
 import { synthesize, sha256, ttsEnabled } from "./tts.js";
 import { checkedPhotos } from "./bulletinimg.js";
@@ -28,15 +29,11 @@ const IST = 5.5 * 3600e3;
 const istDay = (t = Date.now()) => new Date(t + IST).toISOString().slice(0, 10);
 const NEIGH = /বাংলাদেশ|ঢাকা|ইউনূস|হাসিনা|আমেরিকা|মার্কিন|যুক্তরাষ্ট্র|ওয়াশিংটন|ট্রাম্প|হোয়াইট হাউস|চিন|চীন|বেজিং|জিনপিং|রাশিয়া|মস্কো|পুতিন|পাকিস্তান|ইসলামাবাদ|নেপাল|কাঠমান্ডু|ভুটান|শ্রীলঙ্কা|মায়ানমার|মায়ানমার|আফগানিস্তান|কাবুল|মালদ্বীপ|bangladesh|dhaka|america|united states|washington|trump|china|beijing|russia|moscow|putin|pakistan|nepal|bhutan|sri lanka|myanmar|afghanistan|maldives/i;
 const BENGAL_SPORT = /কলকাতা|মোহনবাগান|ইস্টবেঙ্গল|মহমেডান|ইডেন|সৌরভ|বাংলা দল/;
-// The same opening words the bulletin reads (src/tvchannel.js firstWords), so the line is shared.
-const firstWords = (body, n = 100) => {
-  const words = String(body || "").replace(/<[^>]+>/g, " ").replace(/[#*_>]+/g, " ").replace(/\s+/g, " ").trim().split(" ");
-  return words.slice(0, n).join(" ") + (words.length > n ? "…" : "");
-};
+// The same opening the bulletin reads (src/tvchannel.js firstWords), so the line is shared: whole
+// sentences only, never cut mid-sentence with a "…" (src/sentences.js).
+const firstWords = body => wholeSentences(body, 650);
 const plain = body => String(body || "").replace(/<[^>]+>/g, " ").replace(/[#*_>]+/g, " ").replace(/\s+/g, " ").trim();
-const sentencesOf = text => String(text || "").replace(/…$/, "").replace(/\s*\n+\s*/g, "। ").replace(/\s+/g, " ").trim()
-  .replace(/\s*([,;:।!?])\s*/g, "$1 ").replace(/([।!?])\s*([।!?])+/g, "$1").replace(/\.(\s|$)/g, "।$1").trim()
-  .split(/(?<=[।!?])\s+/).map(x => x.trim()).filter(Boolean);
+const sentencesOf = text => sentencesIn(text);
 
 export function regionOf(a) {
   const text = `${a.title || ""} ${a.dek || ""} ${a.tags || ""}`;
@@ -207,7 +204,7 @@ export async function avoForScreens(env) {
 }
 export function screenStory(r) {
   const j = (v, d) => { try { return JSON.parse(v || d); } catch { return JSON.parse(d); } };
-  return { id: r.article_id, title: r.title, desk: r.desk, region: r.region, sex: r.sex, lines: j(r.script, "[]"),
+  return { id: r.article_id, title: noDots(r.title), desk: r.desk, region: r.region, sex: r.sex, lines: j(r.script, "[]"),
     voice: j(r.voice, "[]").map(k => `/api/tv/voice/${k}.mp3`), secs: r.secs,
     // (a story never yet judged under the picture rules shows none; one waiting to be judged again
     // keeps the photos it was given)

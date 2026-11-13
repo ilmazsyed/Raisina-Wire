@@ -439,6 +439,23 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       <div class="tvp-bar"><button type="button" class="tvp-fsb" aria-label="Full screen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v2H6v4H4zm10 0h6v6h-2V6h-4zM4 14h2v4h4v2H4zm14 0h2v6h-6v-2h4z"/></svg><b>ফুল স্ক্রিন</b></button><button type="button" class="tvp-like" aria-label="Like" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.3 1.1 4.1 2.3h1C12.3 6.1 13.6 5 15.6 5 19 5 21.1 8.4 19.6 11.8 17.5 16.4 12 21 12 21z"/></svg><b>ভালো লাগা</b><span>০</span></button><button type="button" class="tvp-share" aria-label="Share"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 16a3 3 0 0 0-2.4 1.2l-6.8-3.4a3 3 0 0 0 0-1.6l6.8-3.4A3 3 0 1 0 15 7l-6.8 3.4a3 3 0 1 0 0 3.2L15 17a3 3 0 1 0 3-1z"/></svg><b>শেয়ার করুন</b></button></div>` : ""}`;
   const fit = host.querySelector(".tvp-fit"), stage = host.querySelector(".tvp");
   const $ = s => stage.querySelector(s);
+  // Text on screen is never cut with a "…": a headline or line set in a box of a few lines (CSS
+  // line-clamp) that runs longer is set smaller, step by step, until it fits whole.
+  const fitQ = new Set();
+  const fitText = roots => {
+    for (const r of roots) {
+      if (!r.isConnected) continue;
+      for (const el of [r, ...r.querySelectorAll("*")]) {
+        if (!(el instanceof HTMLElement) || !el.textContent.trim() || el.children.length > 40) continue;
+        const cs = getComputedStyle(el); if (!cs.webkitLineClamp || cs.webkitLineClamp === "none") continue;
+        if (!el.clientHeight || el.scrollHeight <= el.clientHeight + 2) continue;
+        const base = parseFloat(cs.fontSize); let fs = base, n = 0;
+        while (el.scrollHeight > el.clientHeight + 2 && fs > base * 0.55 && n++ < 14) { fs *= 0.93; el.style.fontSize = `${fs.toFixed(1)}px`; }
+      }
+    }
+  };
+  let fitT = 0;
+  new MutationObserver(ms => { for (const m of ms) if (m.type === "childList" && m.addedNodes.length) fitQ.add(m.target); if (fitQ.size && !fitT) fitT = requestAnimationFrame(() => { fitT = 0; const roots = [...fitQ]; fitQ.clear(); fitText(roots); setTimeout(() => fitText(roots), 700); }); }).observe(stage, { childList: true, subtree: true });
   // Full screen: the whole frame (picture, logo, strips, every graphic) fills the screen,
   // letterboxed; on phones that cannot make an element full screen (iPhone), the frame covers
   // the page instead.
@@ -1110,7 +1127,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   /* ---------- drawing a scene, with a transition ---------- */
   function drawScene(sc) {
     const old = st.current;
-    st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null; st.resumeVoice = null;
+    st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null; st.resumeVoice = null; voStop();
     old?.slots.forEach(s => { if (s.shared) s.destroy(); });
     const box = document.createElement("div"); box.className = "tvp-scene";
     const slots = [];
@@ -1392,7 +1409,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       };
       let tok = {};
       const sothSay = list => { tok.off = true; const me = tok = {};
-        const play = k => { if (me.off || k >= list.length || st.muted || !st.audio) return; voiceBuf(list[k]).then(buf => { if (me.off || !buf || st.muted || !el.isConnected) return; const src = st.audio.createBufferSource(), gn = st.audio.createGain(); gn.gain.value = 1.25; src.buffer = buf; src.connect(gn).connect(st.audio.destination); src.onended = () => setTimeout(() => play(k + 1), 80); src.start(); me.src = src; }); };
+        const play = k => { if (me.off || k >= list.length || st.muted || !st.audio) return; voiceBuf(list[k]).then(buf => { if (me.off || !buf || st.muted || !el.isConnected) return; me.src = voPlay(buf, 1.25, () => setTimeout(() => play(k + 1), 80)); }); };
         play(0); };
       draw(); const tS = setInterval(() => { if (el.isConnected) draw(); else { clearInterval(tS); tok.off = true; try { tok.src?.stop(); } catch { /* done */ } } }, 120);
       if ((now() - (sc.startAt || now())) / 1000 < 1.5) { if (!st.muted) whoosh(st.audio); playLink("seg:soth", el); }
@@ -1422,7 +1439,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       let shownI = -1, tok = {};
       // An item's line (or, for the story of the hour, its recordings one after the other).
       const say = x => { tok.off = true; try { tok.src?.stop(); } catch { /* done */ } tok = {}; const me = tok, list = x.lead ? x.lead.voice || [] : x.voice ? [x.voice] : [];
-        const play = k => { if (me.off || k >= list.length || st.muted || !st.audio) return; voiceBuf(list[k]).then(buf => { if (me.off || !buf || st.muted || !el.isConnected) return; const src = st.audio.createBufferSource(), gn = st.audio.createGain(); gn.gain.value = 1.25; src.buffer = buf; src.connect(gn).connect(st.audio.destination); src.onended = () => setTimeout(() => play(k + 1), 120); src.start(); me.src = src; }); };
+        const play = k => { if (me.off || k >= list.length || st.muted || !st.audio) return; voiceBuf(list[k]).then(buf => { if (me.off || !buf || st.muted || !el.isConnected) return; me.src = voPlay(buf, 1.25, () => setTimeout(() => play(k + 1), 120)); }); };
         play(0); };
       // The map: the region's outlines (Natural Earth, public/tv/), the places as pins, in Bengali.
       const drawMap = async (svg, places) => {
@@ -1480,8 +1497,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // duotone with the headline, a split frame). Never a logo card, never a blank.
       const BN0 = "০১২৩৪৫৬৭৮৯", toNum = t => Number(String(t).replace(/[০-৯]/g, d => BN0.indexOf(d)).replace(/,/g, ""));
       const UNITS = "কোটি|লক্ষ|লাখ|হাজার|টাকা|জন|শতাংশ|%|ফুট|কিমি|কিলোমিটার|ডিগ্রি|বছর|দিন|ঘণ্টা|মিটার|টন|বিঘা|একর|কেজি|বার|টি";
-      const factOf = x => { for (const l of x.lines || []) { const m = l.match(new RegExp(`([০-৯0-9][০-৯0-9,.]*)\\s*(${UNITS})`)); if (m && toNum(m[1]) > 0) return { n: toNum(m[1]), dec: /[.]/.test(m[1]), unit: m[2], line: l.length > 120 ? l.slice(0, 118).replace(/\s+\S*$/, "") + "…" : l }; } return null; };
-      const pointsOf = x => (x.lines || []).slice(1, 4).map(l => l.length > 84 ? l.slice(0, 82).replace(/\s+\S*$/, "") + "…" : l);
+      const factOf = x => { for (const l of x.lines || []) { const m = l.match(new RegExp(`([০-৯0-9][০-৯0-9,.]*)\\s*(${UNITS})`)); if (m && toNum(m[1]) > 0) return { n: toNum(m[1]), dec: /[.]/.test(m[1]), unit: m[2], line: l }; } return null; };
+      const pointsOf = x => (x.lines || []).slice(1, 4);
       // A story with fewer than two verified photos (src/bulletinimg.js) is told in motion
       // graphics: its headline with the story's icon, the map of its places, its figure counting up,
       // its sentences lighting up as they are read (and its one photo, if it has one).
@@ -1533,7 +1550,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // as taped clippings, its figure as a big counting number, two figures side by side, a quote
       // on torn paper, the map of its places, its lines one per shot with the key words marked, and
       // the photo again full frame to close. Cuts run hard, whip, hard, zoom; every shot pushes in.
-      const exShort = (t, n = 110) => (t = String(t || "")).length > n ? t.slice(0, n - 2).replace(/\s+\S*$/, "") + "…" : t;
+      // (lines stay whole sentences; a long one is set smaller to fit, never cut with a "…")
+      const exShort = t => String(t || "");
       const quoteOf = x => {
         for (const l of x.lines || []) {
           const m = l.match(/[“"‘]([^”"’]{14,170})[”"’]/); if (!m || m[1].split(/\s+/).length < 4) continue;
@@ -1622,8 +1640,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         const tok = {}; st.voice = { pause() { tok.off = true; try { tok.src?.stop(); } catch { /* done */ } } };
         const play = i => { if (tok.off || i >= x.voice.length) return; voiceBuf(x.voice[i]).then(buf => {
           if (tok.off || !buf || st.muted || st.alive === false) return;
-          const src = st.audio.createBufferSource(), gn = st.audio.createGain(); gn.gain.value = 1.25;
-          src.buffer = buf; src.connect(gn).connect(st.audio.destination); src.onended = () => setTimeout(() => play(i + 1), 120); src.start(); tok.src = src; }); };
+          // (over breaking news the line is skipped and the next one follows)
+          tok.src = voPlay(buf, 1.25, () => setTimeout(() => play(i + 1), 120));
+          if (!tok.src && Date.now() < (st.breakUntil || 0)) setTimeout(() => play(i + 1), Math.max(500, st.breakUntil - Date.now())); }); };
         play(0);
       };
       list.forEach(x => (x.voice || []).forEach(u => voiceBuf(u)));
@@ -1737,8 +1756,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           const tok = {}; st.voice = { pause() { tok.off = true; try { tok.src?.stop(); } catch { /* done */ } } };
           voiceBuf(x.voice).then(buf => {
             if (tok.off || !buf || st.muted || st.alive === false) return;
-            const src = st.audio.createBufferSource(), g = st.audio.createGain(); g.gain.value = 1.25;
-            src.buffer = buf; src.connect(g).connect(st.audio.destination); src.start(); tok.src = src;
+            tok.src = voPlay(buf, 1.25);
           });
           return;
         }
@@ -1805,7 +1823,21 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // The newsreader's readings, decoded once for the sound engine (and kept for the bulletin).
   const voiceCache = new Map();
   // A voice-over link (src/bulletinvoice.js LINKS) over a title card or an update's opening.
-  const playLink = (id, box) => { const url = st.tv?.links?.[id]; if (!url || st.muted || !st.audio) return; setTimeout(() => voiceBuf(url).then(buf => { if (!buf || st.muted || (box && !box.isConnected)) return; const src = st.audio.createBufferSource(), gn = st.audio.createGain(); gn.gain.value = 1.2; src.buffer = buf; src.connect(gn).connect(st.audio.destination); src.start(); }), 600); };
+  // One voice at a time. Every reading (the newsreader, the AVO stories, the segments' lines and
+  // the voice-over links) goes through voPlay: a new reading stops the one before, a change of
+  // scene stops it, nothing is read over breaking news (st.breakUntil), and a link never talks
+  // over a reading already going.
+  const voStop = () => { const h = st.vo; st.vo = null; try { h?.stop(); } catch { /* done */ } };
+  const voPlay = (buf, gain = 1.25, onended, { yieldTo = false } = {}) => {
+    if (!st.audio || !buf || st.muted || Date.now() < (st.breakUntil || 0)) return null;
+    if (yieldTo && st.vo) return null;
+    voStop();
+    const src = st.audio.createBufferSource(), gn = st.audio.createGain(); gn.gain.value = gain; src.buffer = buf; src.connect(gn).connect(st.audio.destination);
+    const h = { off: false, stop() { h.off = true; src.onended = null; try { src.stop(); } catch { /* done */ } } };
+    src.onended = () => { if (st.vo === h) st.vo = null; if (!h.off) onended?.(); };
+    src.start(); st.vo = h; return h;
+  };
+  const playLink = (id, box) => { const url = st.tv?.links?.[id]; if (!url || st.muted || !st.audio) return; setTimeout(() => voiceBuf(url).then(buf => { if (!buf || st.muted || (box && !box.isConnected)) return; voPlay(buf, 1.2, null, { yieldTo: true }); }), 600); };
   const voiceBuf = url => { if (!st.audio) return Promise.resolve(null);
     if (!voiceCache.has(url)) { if (voiceCache.size > 24) voiceCache.delete(voiceCache.keys().next().value);
       voiceCache.set(url, fetch(url).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status)).then(b => new Promise((ok, no) => st.audio.decodeAudioData(b, ok, no))).catch(() => { voiceCache.delete(url); return null; })); }
@@ -2055,6 +2087,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   }
   function showBreaking(b) {
     // A short BREAKING NEWS card first, then the story.
+    voStop(); st.breakUntil = Date.now() + (2 + (Number(b.seconds) || 20)) * 1000 + 400;
     const intro = document.createElement("div"); intro.className = "tv-intro"; intro.innerHTML = introCard(true); stage.append(intro);
     if (b.music && !st.muted) breakingSting(st.audio, Math.min(b.seconds, 8));
     setTimeout(() => { intro.remove(); showBreakingStory(b); }, 2000);
