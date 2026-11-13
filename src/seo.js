@@ -7,6 +7,7 @@ import { ABOUT, LEGAL, LEGAL_ORDER, LEGAL_UPDATED } from "./legal.js";
 import { listPublished, getBySlug, textBlocks, isPublic, tagSlug, WRITERS, writer, shownIn } from "./store.js";
 import { LANGS, PAGE_LANGS, localiseArticles, articleTranslations, localisePage } from "./translate.js";
 import { DESKS } from "./feeds.js";
+import { siteCardVersion } from "./ogcard.js";
 
 const DEFAULT = "bn";
 const LOCALES = { bn: "bn-IN", en: "en-IN", hi: "hi-IN" };
@@ -23,7 +24,14 @@ const HOME = {
   en: { title: "Rashtrix 24×7 News — Kolkata, West Bengal, India and world news", description: "Latest news from Kolkata, West Bengal, India, Bengalis abroad and the world, with live coverage and alerts, from Rashtrix 24×7 News in Bengali, English and Hindi.", latest: "Latest news" },
   hi: { title: "राष्ट्रिक्स 24×7 न्यूज़ — कोलकाता, पश्चिम बंगाल, भारत और दुनिया की खबरें", description: "कोलकाता, पश्चिम बंगाल, भारत, प्रवासी बंगाली और दुनिया की ताज़ा खबरें, लाइव कवरेज और अलर्ट — राष्ट्रिक्स 24×7 न्यूज़।", latest: "ताज़ा खबरें" }
 };
-const OG_IMAGE = "/og-image.jpg";
+// Every page without its own card shows the site's card: Rashtrix TV live, with what is on now
+// (src/ogcard.js); its address carries its version so share previews pick up the new one.
+const OG_IMAGE = "/og/site.jpg";
+const TV = {
+  bn: { title: "রাষ্ট্রিক্স টিভি লাইভ: ২৪×৭ বাংলা খবর", description: "রাষ্ট্রিক্স টিভি আর রাষ্ট্রিক্স শর্টস সরাসরি দেখুন, ২৪ ঘণ্টা: প্রতি আধ ঘণ্টায় বুলেটিন, এইমাত্র পাওয়া খবর, কলকাতা, পশ্চিমবঙ্গ, ভারত আর বিশ্বের খবর, খেলা আর বিনোদন।", h: "রাষ্ট্রিক্স টিভি: সরাসরি, ২৪×৭" },
+  en: { title: "Rashtrix TV Live: 24×7 Bengali news channel", description: "Watch Rashtrix TV and Rashtrix Shorts live, around the clock: bulletins every half hour, breaking news, Kolkata, West Bengal, India and world news, sport and entertainment.", h: "Rashtrix TV: live, 24×7" },
+  hi: { title: "राष्ट्रिक्स टीवी लाइव: 24×7 बांग्ला खबरें", description: "राष्ट्रिक्स टीवी और राष्ट्रिक्स शॉर्ट्स लाइव देखें, चौबीसों घंटे: हर आधे घंटे बुलेटिन, ब्रेकिंग न्यूज़, कोलकाता, पश्चिम बंगाल, भारत और दुनिया की खबरें।", h: "राष्ट्रिक्स टीवी: लाइव, 24×7" }
+};
 
 const esc = (s = "") => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const xml = esc;
@@ -86,6 +94,18 @@ async function pageFor(path, url, env, o, lang) {
           potentialAction: { "@type": "SearchAction", target: { "@type": "EntryPoint", urlTemplate: `${o}${prefixed(lang, "/search")}?q={search_term_string}` }, "query-input": "required name=search_term_string" } },
         { "@type": "ItemList", itemListElement: stories.slice(0, 10).map((s, i) => ({ "@type": "ListItem", position: i + 1, url: o + prefixed(lang, s.href) })) }] }],
       body: `<h1>${esc(t.title)}</h1><p>${esc(t.description)}</p><h2>${esc(t.latest)}</h2>${storyList(stories, lang)}` };
+  }
+
+  if (section === "watch") {
+    const t = TV[lang], image = `${o}/og/site.jpg`;
+    return { title: t.title, description: t.description, alternates: LANGS, type: "video.other",
+      ld: [{ "@context": "https://schema.org", "@graph": [organization(o),
+        { "@type": "VideoObject", "@id": `${o}${prefixed(lang, "/watch")}#live`, name: t.h, description: t.description, thumbnailUrl: [image, `${o}/brand/studio-wide.webp`],
+          uploadDate: "2026-10-01T00:00:00+05:30", embedUrl: o + prefixed(lang, "/watch"), inLanguage: "bn-IN", publisher: { "@id": `${o}/#organization` },
+          publication: { "@type": "BroadcastEvent", name: t.h, isLiveBroadcast: true, startDate: "2026-10-01T00:00:00+05:30" } },
+        { "@type": "BroadcastService", name: "Rashtrix TV", broadcastDisplayName: "রাষ্ট্রিক্স টিভি", broadcaster: { "@id": `${o}/#organization` }, inLanguage: "bn-IN", url: o + prefixed(lang, "/watch"),
+          areaServed: [{ "@type": "State", name: "West Bengal" }, { "@type": "Country", name: "India" }] }] }],
+      body: `<h1>${esc(t.h)}</h1><p>${esc(t.description)}</p>` };
   }
 
   if (section === "install") return { title: `${site}`, description: HOME[lang].description, noindex: true, body: `<h1>${esc(site)}</h1>` };
@@ -211,7 +231,8 @@ export async function renderPage(request, env, ensureSchema) {
   const alternates = page.alternates || [];
   const canonical = o + (page.canonicalPath || (full === "/" ? "/" : full));
   const hreflang = alternates.length > 1 ? [...alternates.map(l => `<link rel="alternate" hreflang="${LOCALES[l]}" href="${esc(o + prefixed(l, path))}">`), `<link rel="alternate" hreflang="x-default" href="${esc(o + path)}">`] : [];
-  const image = page.image || `${o}${OG_IMAGE}`, card = !page.image || page.imageCard;
+  const v = page.image ? "" : await siteCardVersion(env).catch(() => "");
+  const image = page.image || `${o}${OG_IMAGE}${v ? `?v=${v}` : ""}`, card = !page.image || page.imageCard;
   const head = [
     `<link rel="canonical" href="${esc(canonical)}">`, `<link rel="alternate" type="application/rss+xml" title="${esc(SITE[lang])}" href="${o}/feed.xml">`, ...hreflang,
     `<meta property="og:locale" content="${LOCALES[lang].replace("-", "_")}">`, `<meta property="og:url" content="${esc(canonical)}">`,
@@ -232,7 +253,7 @@ export async function renderPage(request, env, ensureSchema) {
     .on('meta[property="og:site_name"]', set("content", SITE[lang]))
     .on('meta[property="og:image"]', set("content", image))
     .on('meta[name="twitter:image"]', set("content", image))
-    .on('meta[property="og:image:alt"]', set("content", card ? SITE[lang] : page.ogTitle || page.title))
+    .on('meta[property="og:image:alt"]', set("content", page.image ? (page.ogTitle || page.title) : { bn: "রাষ্ট্রিক্স টিভি লাইভ, ২৪×৭", en: "Rashtrix TV live, 24×7", hi: "राष्ट्रिक्स टीवी लाइव, 24×7" }[lang]))
     .on('meta[property="og:image:width"]', { element(el) { if (!card) el.remove(); } })
     .on('meta[property="og:image:height"]', { element(el) { if (!card) el.remove(); } })
     .on('meta[property="og:locale"]', { element(el) { el.remove(); } })
@@ -262,7 +283,7 @@ export async function sitemap(request, env, ensureSchema) {
   const alt = (path, langs) => langs && langs.length > 1 ? langs.map(l => `<xhtml:link rel="alternate" hreflang="${LOCALES[l]}" href="${xml(o + prefixed(l, path))}"/>`).join("") : "";
   const all = (path, freq, pr, m = "") => LANGS.map(l => [prefixed(l, path), m, freq, pr, null, LANGS, path]);
   const urls = [
-    ...all("/", "hourly", "1.0", newest), ...all("/live", "always", "0.8", newest), ...all("/briefs", "hourly", "0.7", newest),
+    ...all("/", "hourly", "1.0", newest), ...all("/watch", "always", "0.9", newest), ...all("/live", "always", "0.8", newest), ...all("/briefs", "hourly", "0.7", newest),
     ...Object.values(DESK_SLUGS).flatMap(s => all(`/desk/${s}`, "hourly", "0.8", newest)),
     ...all("/community", "daily", "0.5"), ...all("/events", "daily", "0.4"),
     ["/about", "", "monthly", "0.4", null, ["bn", "en"], "/about"], ["/en/about", "", "monthly", "0.4", null, ["bn", "en"], "/about"],
@@ -320,4 +341,4 @@ ${stories.map(s => `<item><title>${xml(s.title)}</title><link>${o}${prefixed(s.l
 
 // Paths the Worker renders as HTML pages (the rest are app-only views or static files), tested
 // without the /en or /hi prefix.
-export const PAGE_PATTERN = /^\/(?:$|install\/?$|(?:edition|article|author|tag|discussion|coverage|desk)\/[^/]+\/?$|live\/?$|briefs\/?$|community\/?$|events\/?$|(?:about|terms|privacy|disclaimer|copyright|corrections|community-guidelines|grievance)\/?$)/;
+export const PAGE_PATTERN = /^\/(?:$|install\/?$|(?:edition|article|author|tag|discussion|coverage|desk)\/[^/]+\/?$|live\/?$|watch\/?$|briefs\/?$|community\/?$|events\/?$|(?:about|terms|privacy|disclaimer|copyright|corrections|community-guidelines|grievance)\/?$)/;

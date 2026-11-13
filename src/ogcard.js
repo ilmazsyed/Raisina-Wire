@@ -9,13 +9,55 @@
 import puppeteer from "@cloudflare/puppeteer";
 import { getBySlug, isPublic } from "./store.js";
 
-import { cardHTML } from "./ogcard-html.js";
+import { cardHTML, siteCardHTML } from "./ogcard-html.js";
+import { bulletinRank } from "./labels.js";
+
+// ---- The site's own card (/og/site.jpg): Rashtrix TV live as the hero, with what is on now. It
+// is the picture for the home page, the desks, Watch and every page without its own card.
+const SITE_SLUG = "__site";
+async function siteData(env) {
+  const since = new Date(Date.now() - 6 * 3600e3).toISOString();
+  const { results } = await env.DB.prepare("SELECT title, dek, category, published_at FROM articles WHERE status='published' AND lang='bn' AND pulled_at IS NULL AND published_at>=? AND published_at<=? ORDER BY published_at DESC LIMIT 40")
+    .bind(since, new Date().toISOString()).all().catch(() => ({ results: [] }));
+  // The top headlines in the channel's order (West Bengal politics first), newest first within it.
+  const heads = results.map(r => ({ t: r.title, p: bulletinRank(r.category, `${r.title} ${r.dek || ""}`), at: r.published_at }))
+    .sort((a, b) => a.p - b.p || String(b.at).localeCompare(String(a.at))).map(x => x.t).slice(0, 3);
+  // On the screen: the newest AVO story's first checked photo, else the studio.
+  const avo = await env.DB.prepare("SELECT article_id FROM avo_stories WHERE status='ready' AND json_array_length(images)>0 AND published_at>=? ORDER BY published_at DESC LIMIT 1").bind(since).first().catch(() => null);
+  return { headlines: heads, photo: avo ? `/api/tv/aimg/${encodeURIComponent(avo.article_id)}/0` : "/brand/studio-wide.webp" };
+}
+// The card's version (its time), for the address pages give it: share previews are cached by
+// address, so a new picture gets a new one.
+export async function siteCardVersion(env) {
+  const r = await env.DB.prepare("SELECT created_at FROM og_cards WHERE slug=?").bind(SITE_SLUG).first().catch(() => null);
+  return r ? String(Math.floor(Date.parse(r.created_at) / 1000) || "") : "";
+}
+// The cron: the card is drawn again when the top headline changes (at most every 20 minutes).
+export async function renderSiteCard(env, origin) {
+  if (!env.BROWSER || !origin) return { skipped: true };
+  const rest = await env.DB.prepare("SELECT value FROM settings WHERE key='og_rest_until'").first().catch(() => null);
+  if (rest && Date.parse(rest.value) > Date.now()) return { resting: rest.value };
+  const d = await siteData(env), key = (d.headlines[0] || "-") + "|" + d.photo;
+  const row = await env.DB.prepare("SELECT title, created_at FROM og_cards WHERE slug=?").bind(SITE_SLUG).first().catch(() => null);
+  if (row && (row.title === key || Date.now() - Date.parse(row.created_at) < 20 * 60e3)) return { kept: true };
+  const made = await renderSlugs(env, origin, [{ slug: SITE_SLUG, title: key }]);
+  return { done: !!made[0] };
+}
 
 // /og/card/<slug> (the page to photograph) and /og/<slug>.jpg (the picture). A card that has
 // not been made yet is made on the spot when it is first asked for (a share, or WhatsApp
 // fetching the preview); if that fails, the story's photo or the site card is sent as a picture
 // (not a redirect, which some apps do not follow).
 export async function ogRoute(url, env, ctx) {
+  if (url.pathname === `/og/card/${SITE_SLUG}`) {
+    return new Response(siteCardHTML({ ...await siteData(env), at: Date.now() }), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
+  }
+  if (url.pathname === "/og/site.jpg") {
+    const row = await env.DB.prepare("SELECT img FROM og_cards WHERE slug=?").bind(SITE_SLUG).first().catch(() => null);
+    if (row?.img) return new Response(new Uint8Array(row.img), { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=900" } });
+    const site = await env.ASSETS.fetch(new Request(new URL("/og-image.jpg", url.origin)));
+    return new Response(site.body, { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=600" } });
+  }
   const m = url.pathname.match(/^\/og\/card\/([^/]+)$/);
   if (m) {
     const a = await getBySlug(env, decodeURIComponent(m[1]));

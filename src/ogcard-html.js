@@ -72,3 +72,70 @@ ${photo ? `<img class="bg" src="${esc(photo)}" alt="">` : `<div class="rays"></d
 </div></body></html>`;
 }
 
+
+// The site's own share card (src/ogcard.js renderSiteCard): Rashtrix TV live, 24×7, as the hero:
+// a TV screen showing the channel now (the newest story's checked photo, or the studio), with
+// the channel's own graphics on it (the logo bug, LIVE and the time, the lower third with the top
+// headline, the ticker with the next ones), and beside it the full logo, "২৪×৭ লাইভ টিভি", the
+// tagline and the address. Redrawn through the day, so a shared link always shows what is on.
+export function siteCardHTML({ photo = "/brand/studio-wide.webp", headlines = [], at = Date.now() } = {}) {
+  const h0 = headlines[0] || "রাষ্ট্রিক্স ২৪×৭ নিউজ: কলকাতা, বাংলা, দেশ আর দুনিয়ার খবর", rest = headlines.slice(1, 3);
+  const time = at ? bnDigits(new Date(at).toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })) : "";
+  const len = [...h0].length, hs = len < 40 ? 34 : len < 64 ? 30 : 26;
+  return `<!doctype html><html lang="bn"><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@700;800;900&family=Hind+Siliguri:wght@600;700&family=Montserrat:wght@800;900&display=block" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{width:1200px;height:630px;overflow:hidden;background:#140304}
+.c{position:relative;width:1200px;height:630px;overflow:hidden;color:#fff;font-family:"Hind Siliguri",sans-serif;
+  background:radial-gradient(ellipse 60% 80% at 30% 45%,#7a0709 0%,transparent 70%),radial-gradient(ellipse 50% 70% at 100% 0%,#3d0507 0%,transparent 70%),linear-gradient(135deg,#2a0405,#120203 70%)}
+.rays{position:absolute;inset:-40%;background:repeating-conic-gradient(from 0deg at 34% 48%,rgba(255,255,255,.045) 0 3deg,transparent 3deg 12deg)}
+.dots{position:absolute;inset:0;background-image:radial-gradient(rgba(242,193,78,.16) 1.4px,transparent 1.4px);background-size:24px 24px;mask-image:linear-gradient(100deg,transparent 45%,#000 100%)}
+.glow{position:absolute;left:40px;top:120px;width:760px;height:430px;border-radius:40px;background:#ff2a2a;filter:blur(70px);opacity:.28}
+/* the TV */
+.tv{position:absolute;left:44px;top:96px;width:744px;height:420px;border-radius:22px;padding:10px;background:linear-gradient(145deg,#f2c14e,#a8780e 55%,#f7d77a);box-shadow:0 30px 70px rgba(0,0,0,.6)}
+.scr{position:relative;width:100%;height:100%;border-radius:14px;overflow:hidden;background:#000}
+.scr>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.scr .sh{position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.78) 0%,rgba(0,0,0,.1) 46%,transparent 60%),linear-gradient(180deg,rgba(0,0,0,.45),transparent 22%)}
+.bug{position:absolute;left:16px;top:14px;padding:6px 9px;background:#fff;border-radius:9px;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.bug img{height:44px;display:block}
+.live{position:absolute;right:14px;top:16px;display:flex;align-items:center;gap:8px}
+.live b{display:flex;align-items:center;gap:7px;padding:5px 12px;border-radius:7px;background:#e10b0b;font:900 19px Montserrat,sans-serif;letter-spacing:.08em;box-shadow:0 0 0 2px rgba(255,255,255,.25)}
+.live b i{width:10px;height:10px;border-radius:50%;background:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.3)}
+.live span{padding:5px 11px;border-radius:7px;background:rgba(0,0,0,.6);font:800 19px "Hind Siliguri",sans-serif}
+.l3{position:absolute;left:16px;right:16px;bottom:52px;display:flex;align-items:stretch;border-radius:8px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.l3 em{flex:none;display:flex;align-items:center;padding:0 14px;background:#c8100f;font:800 21px "Hind Siliguri",sans-serif;font-style:normal}
+.l3 h1{flex:1;padding:9px 14px;background:#fff;color:#14080a;font:800 ${hs}px/1.3 "Noto Serif Bengali",serif;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;border-bottom:4px solid #D4A017}
+.tk{position:absolute;left:0;right:0;bottom:0;height:40px;display:flex;align-items:center;background:#0d0d10;border-top:2px solid #D4A017}
+.tk b{flex:none;height:100%;display:flex;align-items:center;padding:0 12px;background:#D4A017;color:#1a0405;font:800 17px "Hind Siliguri",sans-serif}
+.tk span{padding:0 14px;font:700 17px "Hind Siliguri",sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tk span+span:before{content:"◆";color:#D4A017;margin-right:14px}
+.stand{position:absolute;left:360px;top:516px;width:112px;height:22px;background:linear-gradient(#a8780e,#5c3f06);clip-path:polygon(18% 0,82% 0,100% 100%,0 100%);border-radius:0 0 6px 6px}
+/* the side */
+.side{position:absolute;left:822px;right:36px;top:70px;bottom:44px;display:flex;flex-direction:column;align-items:flex-start}
+.logo{padding:12px 18px;background:#fff;border-radius:18px;box-shadow:0 12px 34px rgba(0,0,0,.45)}
+.logo img{height:96px;display:block}
+.big{margin-top:30px;font:900 64px/1.02 "Noto Serif Bengali",serif;color:#fff;text-shadow:0 6px 26px rgba(0,0,0,.5)}
+.big small{display:block;font:900 30px/1.2 Montserrat,sans-serif;letter-spacing:.14em;color:#f2c14e;margin-bottom:6px}
+.sub{margin-top:16px;font:700 23px/1.4 "Hind Siliguri",sans-serif;color:rgba(255,255,255,.88)}
+.tag{margin-top:10px;font:800 21px "Noto Serif Bengali",serif;color:#f2c14e}
+.cta{margin-top:auto;display:flex;align-items:center;gap:12px;padding:12px 20px;border-radius:999px;background:#e10b0b;font:800 24px "Hind Siliguri",sans-serif;box-shadow:0 10px 30px rgba(225,11,11,.5),0 0 0 3px rgba(242,193,78,.6)}
+.cta i{width:0;height:0;border-left:16px solid #fff;border-top:10px solid transparent;border-bottom:10px solid transparent}
+.cta small{font:800 20px Montserrat,sans-serif;opacity:.9}
+.band{position:absolute;left:0;right:0;top:0;height:8px;background:linear-gradient(90deg,#c8100f,#D4A017,#c8100f)}
+</style></head><body>
+<div class="c"><div class="rays"></div><div class="dots"></div><i class="band"></i><div class="glow"></div>
+<div class="tv"><div class="scr"><img src="${esc(photo)}" alt=""><div class="sh"></div>
+<div class="bug"><img src="/brand/logo.webp" alt=""></div>
+<div class="live"><b><i></i>LIVE</b>${time ? `<span>${esc(time)}</span>` : ""}</div>
+<div class="l3"><em>এইমাত্র</em><h1>${esc(h0)}</h1></div>
+<div class="tk"><b>শিরোনাম</b>${(rest.length ? rest : ["কলকাতা · পশ্চিমবঙ্গ · ভারত · বিশ্ব"]).map(t => `<span>${esc(t)}</span>`).join("")}</div>
+</div></div><i class="stand"></i>
+<div class="side"><span class="logo"><img src="/brand/logo.webp" alt=""></span>
+<div class="big"><small>LIVE TV</small>২৪×৭ খবর</div>
+<div class="sub">কলকাতা, বাংলা, দেশ আর দুনিয়ার খবর, সারাদিন সারারাত</div>
+<div class="tag">দেশ প্রথম । বলিদান পরম ধর্ম</div>
+<div class="cta"><i></i>এখনই দেখুন <small>rashtrix.live</small></div></div>
+</div></body></html>`;
+}

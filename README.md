@@ -53,6 +53,20 @@ Build brief and phases: `rashtrix/BRIEF.md`. Built so far: **Phase 1** (the Beng
 - **Removed:** the AI anchors, lip-sync, voice cloning and all anchor workflows and assets; Raisina
   TV (the two Rashtrix TV channels come in Phase 2); Calibrex ads; Markets; Raisina Wire's editions.
 
+## Search and sharing
+
+- Every public page is served with its title, description, canonical address, hreflang, schema.org
+  data and the page text (`src/seo.js`); sitemaps at `/sitemap.xml` and `/news-sitemap.xml` (Google
+  News), RSS at `/feed.xml`. **Watch** (`/watch`) has its own page with the live channel as a
+  VideoObject on air (BroadcastEvent).
+- **Share pictures:** each story has its own 1200×630 card (`/og/<slug>.jpg`); every other page shows
+  the **site card** (`/og/site.jpg`): Rashtrix TV live as the hero, with the top headline in the
+  lower third and the next ones in the ticker, drawn again when the top headline changes (at most
+  every 20 minutes, by the Browser Rendering free tier). `public/og-image.jpg` is its fixed fallback.
+- **IndexNow** (`src/indexnow.js`): new and changed stories are announced to Bing and the other
+  IndexNow engines every ten minutes; the key file is `public/<key>.txt`. Google reads the sitemaps:
+  add the site in Google Search Console and submit both sitemaps.
+
 ## Phase 2: Rashtrix TV (two channels)
 
 - **Horizontal** (1920×1080, "Rashtrix TV") and **vertical** (1080×1920, "Rashtrix Shorts") are separate
