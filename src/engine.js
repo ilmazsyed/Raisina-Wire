@@ -740,7 +740,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // a story with no recording yet gets the time it takes to read its lines at news pace.
   const avoLen = x => { const v = Number(x?.secs) || 0; if (v > 0) return Math.max(8, Math.round((v + 0.15 * Math.max(0, (x.voice?.length || 1) - 1) + 2) * 10) / 10);
     const n = (x?.lines || []).join(" ").length || String(x?.title || "").length; return Math.max(10, Math.min(40, Math.round(n / 14))); };
-  const avoTotal = L => L.reduce((n, x) => n + avoLen(x), 0);
+  // Every AVO block opens with the NEWS NOW sting (four seconds), then its stories.
+  const AVO_INTRO = 4;
+  const avoTotal = L => L.length ? AVO_INTRO + L.reduce((n, x) => n + avoLen(x), 0) : 0;
   const AVO_MIN = 4, AVO_EVERY = 3, AVO_REPEAT = 4, AVO_GAP = 15 * 60e3;
   const avoSeen = (() => { try { return JSON.parse(localStorage.getItem(`rw-avo-seen-${channel}`) || "{}"); } catch { return {}; } })();
   // When this viewer last saw each story: a story does not come back within fifteen minutes.
@@ -1000,7 +1002,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (block.length) {
         q.sinceAvo = 0; q.n++;
         q.item = { type: "avo", dur: avoTotal(block), stories: block }; q.start = t;
-        q.seg = { type: "avo", stories: block, dur: avoTotal(block), start: t, in: 0, sting: true, n: q.n };
+        q.seg = { type: "avo", stories: block, dur: avoTotal(block), start: t, in: 0, sting: false, n: q.n };
         const after = loop.slice(q.i).concat(loop.slice(0, q.i)).find(x => x.type === "video");
         st.preWant = after ? { id: after.ytId, at: 0 } : null;
         return q.seg;
@@ -1629,7 +1631,17 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const slideN = new Map();
       const drawA = () => {
         if (!el.isConnected && st.current) return;
-        const e = (now() - at0) / 1000; let k = 0; while (k < list.length - 1 && e >= starts[k + 1]) k++;
+        // The NEWS NOW sting first (AVO_INTRO seconds), then the stories.
+        const e0 = (now() - at0) / 1000;
+        if (e0 < AVO_INTRO && shownK < 0) {
+          if (!el.querySelector(".nn")) {
+            el.innerHTML = `<div class="nn${channel === "v" ? " v" : ""}"><i class="nn-bg"></i><i class="nn-bar a"></i><i class="nn-bar b"></i><i class="nn-bar c"></i><i class="nn-flash"></i>
+              <div class="nn-in"><img class="nn-logo" src="${LOGO}" alt=""><div class="nn-word" data-no-tr><b>NEWS</b><b class="now"><i></i>NOW</b></div><div class="nn-bn">এই মুহূর্তের খবর</div></div><i class="nn-line"></i></div>`;
+            if (!st.muted && st.audio && (mode === "app" || output)) { stingerSound(st.audio); setTimeout(() => { if (el.isConnected && !st.muted) whoosh(st.audio); }, 2900); }
+          }
+          return;
+        }
+        const e = e0 - AVO_INTRO; let k = 0; while (k < list.length - 1 && e >= starts[k + 1]) k++;
         const x = list[k]; if (!x) return;
         // A story's slide times are fixed by its length (each slide at least four and a half
         // seconds); a slide still to come takes a picture that finishes loading meanwhile, and a slide

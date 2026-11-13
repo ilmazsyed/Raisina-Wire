@@ -92,7 +92,7 @@ function drawList() {
   $$("[data-listen]").forEach(b => b.onclick = () => listen(find(b.dataset.listen)));
   $$("[data-rdsel]").forEach(sel => sel.onchange = async () => { const x = find(sel.dataset.rdsel), rd = sel.value; if (!rd) return;
     const story = { id: x.id, title: x.title, desk: x.desk, region: x.region, sex: x.sex, lines: x.lines, voice: x.voice, secs: x.secs, images: x.images, at: x.at };
-    try { await api(`/api/admin/rundowns/${rd}/items`, { method: "POST", body: { type: "avo", title: x.title.slice(0, 200), duration: Math.ceil(x.secs > 0 ? Math.max(8, x.secs + 2) : 20), data: { story, avoId: x.id } } }); toast("Added to the rundown."); } catch (e) { fail(e); } sel.value = ""; });
+    try { await api(`/api/admin/rundowns/${rd}/items`, { method: "POST", body: { type: "avo", title: x.title.slice(0, 200), duration: Math.ceil((x.secs > 0 ? Math.max(8, x.secs + 2) : 20) + 4), data: { story, avoId: x.id } } }); toast("Added to the rundown."); } catch (e) { fail(e); } sel.value = ""; });
   $$("[data-off]").forEach(b => b.onclick = async () => { try { await api(`/api/admin/tv/avo/${encodeURIComponent(b.dataset.off)}`, { method: "PUT", body: { off: b.dataset.v === "1" } }); toast(b.dataset.v === "1" ? "Taken out of rotation." : "Back in rotation."); load(); } catch (e) { fail(e); } });
   const relabel = async (id, part) => { const x = find(id); const cur = { dk: x.dk, weight: x.weight, ...(x.labelsSet || {}) }; try { await api(`/api/admin/tv/avo/${encodeURIComponent(id)}`, { method: "PUT", body: { labels: { ...cur, ...part } } }); toast("Relabelled."); } catch (e) { fail(e); } };
   $$("[data-dk]").forEach(b => b.onchange = () => relabel(b.dataset.dk, { dk: b.value }));
@@ -106,7 +106,7 @@ function preview(x) {
   const d = document.createElement("dialog"); d.className = "ad-preview";
   d.innerHTML = `<div class="stack"><div class="ad-screen"></div><div class="row"><button class="btn" data-close>Close</button></div></div>`;
   document.body.append(d); d.showModal();
-  pv = mountTV($(".ad-screen", d), { channel: "h", mode: "scene", scene: { layout: "graphic", sources: [], full: true, dur: Math.ceil(x.secs > 0 ? Math.max(8, x.secs + 2) : 20), startAt: Date.now(), key: `pv:${x.id}:${Date.now()}`, graphic: { kind: "avo", stories: [x] } } });
+  pv = mountTV($(".ad-screen", d), { channel: "h", mode: "scene", scene: { layout: "graphic", sources: [], full: true, dur: Math.ceil((x.secs > 0 ? Math.max(8, x.secs + 2) : 20) + 4), startAt: Date.now(), key: `pv:${x.id}:${Date.now()}`, graphic: { kind: "avo", stories: [x] } } });
   const close = () => { try { pv?.destroy(); } catch { /* gone */ } pv = null; d.remove(); };
   $("[data-close]", d).onclick = () => d.close(); d.addEventListener("close", close);
 }
