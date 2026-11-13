@@ -1380,4 +1380,6 @@ export default {
   "Save pointers": "पॉइंटर सेव करें",
   "Put all filled sets live": "सभी भरे सेट ऑन एयर करें",
   "Take all off air": "सब ऑन एयर से हटाएँ",
+  "Delete its AVO": "इसका एवीओ हटाएँ",
+  "AVO deleted": "एवीओ हटाया गया",
 };

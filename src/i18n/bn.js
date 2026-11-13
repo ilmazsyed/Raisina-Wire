@@ -1432,4 +1432,6 @@ export default {
   "Save pointers": "পয়েন্টার সেভ করুন",
   "Put all filled sets live": "সব ভরা সেট সম্প্রচারে দিন",
   "Take all off air": "সব সম্প্রচার থেকে সরান",
+  "Delete its AVO": "এর এভিও মুছুন",
+  "AVO deleted": "এভিও মোছা হয়েছে",
 };

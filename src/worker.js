@@ -1018,8 +1018,8 @@ async function api(request, env, ctx) {
       ]);
       // TV reads the new text: an automatic AVO story is made afresh from it (one sent by hand is
       // read again from the new text).
-      await env.DB.prepare("DELETE FROM avo_stories WHERE article_id=? AND origin='auto'").bind(c.id).run().catch(() => {});
-      await env.DB.prepare("UPDATE avo_stories SET title=?, script=?, voice='[]', status='new' WHERE article_id=? AND origin='sent' AND status<>'pulled'").bind(title, JSON.stringify(avoScript({ ...c, title, dek, body }).lines), c.id).run().catch(() => {});
+      await env.DB.prepare("DELETE FROM avo_stories WHERE article_id=? AND origin='auto' AND status<>'deleted'").bind(c.id).run().catch(() => {});
+      await env.DB.prepare("UPDATE avo_stories SET title=?, script=?, voice='[]', status='new' WHERE article_id=? AND origin='sent' AND status NOT IN ('pulled','deleted')").bind(title, JSON.stringify(avoScript({ ...c, title, dek, body }).lines), c.id).run().catch(() => {});
       await audit(env, user, "owner.edit", "article", c.id, { title, note });
       return ok();
     }
@@ -1034,7 +1034,7 @@ async function api(request, env, ctx) {
         env.DB.prepare("DELETE FROM translations WHERE kind='article' AND ref=? AND model IN ('gemini','indictrans2')").bind(c.id),
         log("rollback")
       ]);
-      await env.DB.prepare("DELETE FROM avo_stories WHERE article_id=? AND origin='auto'").bind(c.id).run().catch(() => {});
+      await env.DB.prepare("DELETE FROM avo_stories WHERE article_id=? AND origin='auto' AND status<>'deleted'").bind(c.id).run().catch(() => {});
       await audit(env, user, "owner.rollback", "article", c.id, { version: b.version, title: v.before_title });
       return ok();
     }
@@ -1050,7 +1050,7 @@ async function api(request, env, ctx) {
     }
     if (action === "pull") {
       await env.DB.batch([env.DB.prepare("UPDATE articles SET status='archived', pulled_at=?, updated_at=? WHERE id=?").bind(at, at, c.id), log("pull")]);
-      await offTv(env.DB.prepare("UPDATE avo_stories SET status='pulled' WHERE article_id=?").bind(c.id));
+      await offTv(env.DB.prepare("UPDATE avo_stories SET status='pulled' WHERE article_id=? AND status<>'deleted'").bind(c.id));
       await audit(env, user, "owner.pull", "article", c.id, { title: c.title });
       return ok();
     }
@@ -1344,10 +1344,17 @@ async function api(request, env, ctx) {
         try { for (const ch of chs) { br = await setBreaking(env, ch, b); await ctlCommand(env, ch, "breaking", br ? br : { clear: true }, user.display_name || user.email, "breaking").catch(() => {}); } }
         catch (e) { return err(e.message); }
         // One AVO story for the breaking (not one per channel), and the desk's log.
-        if (br) await avoFromBreaking(env, br).catch(() => {});
-        await deskLog(env, { act: br ? "breaking" : "clear", text: br?.text || "", channels: chs, seconds: br?.seconds || 0, by: user.display_name || user.email, at: new Date().toISOString() });
+        const avoId = br ? await avoFromBreaking(env, br).catch(() => "") : "";
+        await deskLog(env, { act: br ? "breaking" : "clear", text: br?.text || "", channels: chs, seconds: br?.seconds || 0, by: user.display_name || user.email, at: new Date().toISOString(), avoId: avoId || "" });
         await audit(env, user, br ? "tv.breaking" : "tv.breaking.clear", "tv", chs.join(","), br || {});
         return done({ ok: true, breaking: br });
+      }
+      // A breaking's AVO story deleted from the desk's log.
+      if (first === "desk" && second === "avo" && third && request.method === "DELETE") {
+        await avoManualDelete(env, third);
+        const log = await deskSettings(env, "tv:breaklog", []); log.forEach(x => { if (x.avoId === third) x.avoDeleted = true; }); await putDeskSettings(env, "tv:breaklog", log);
+        await audit(env, user, "avo.delete", "avo", third, { from: "breaking desk" });
+        return done({ ok: true });
       }
       if (first === "desk" && second === "live" && request.method === "PUT") {
         try { return done(await saveLiveDesk(env, b, user)); } catch (e) { return err(e.message); }

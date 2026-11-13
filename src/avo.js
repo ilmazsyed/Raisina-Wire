@@ -92,6 +92,7 @@ export async function avoFromBreaking(env, br) {
   const id = `brk:${Date.parse(br.at) || Date.now()}`;
   await env.DB.prepare("INSERT OR IGNORE INTO avo_stories (article_id,title,desk,region,score,script,status,day,published_at,origin) VALUES (?,?,?,?,?,?,?,?,?,'breaking')")
     .bind(id, String(br.text).slice(0, 300), "Breaking", "bengal", 99, JSON.stringify(sentencesOf(br.text).length ? sentencesOf(br.text) : [String(br.text)]), "new", istDay(), new Date().toISOString()).run().catch(() => {});
+  return id;
 }
 
 // Stories read as written (not from their report): the desk's own, breaking news typed in the
@@ -248,7 +249,7 @@ export async function avoPlayed(env, b, outputOk) {
 
 // The producer's AVO log: every story made in the last seven days, with every airing.
 export async function avoLog(env) {
-  const { results } = await env.DB.prepare("SELECT * FROM avo_stories WHERE created_at>=datetime('now','-7 days') ORDER BY created_at DESC LIMIT 500").all();
+  const { results } = await env.DB.prepare("SELECT * FROM avo_stories WHERE created_at>=datetime('now','-7 days') AND status<>'deleted' ORDER BY created_at DESC LIMIT 500").all();
   const plays = (await env.DB.prepare("SELECT article_id, channel, at FROM avo_plays WHERE at>=? ORDER BY at DESC LIMIT 5000").bind(new Date(Date.now() - 7 * 864e5).toISOString()).all()).results;
   const by = new Map(); plays.forEach(p => { if (!by.has(p.article_id)) by.set(p.article_id, []); by.get(p.article_id).push({ ch: p.channel, at: p.at }); });
   const day = istDay(), today = results.filter(r => r.day === day && (r.origin || "auto") === "auto");
@@ -307,11 +308,15 @@ export async function avoManualEdit(env, id, b) {
     .bind(m.title, m.desk, m.region, JSON.stringify(lines), JSON.stringify(m.images), m.findMore ? 1 : 0, origin, new Date().toISOString(), id).run();
   return { ok: true };
 }
+// Any AVO story can be deleted for good: off air at once, gone from the desk and the rundowns'
+// pickers. A desk-written or breaking one is removed; one made from a report is kept only as a
+// marker ("deleted") so the engine never makes it again by itself (sending the story to AVO by
+// hand still can). Its airings stay in the as-run log.
 export async function avoManualDelete(env, id) {
   const row = await env.DB.prepare("SELECT origin FROM avo_stories WHERE article_id=?").bind(id).first();
   if (!row) return { ok: true };
-  if (row.origin !== "manual") throw new Error("Only hand-written stories can be deleted; take others out of rotation instead.");
-  await env.DB.prepare("DELETE FROM avo_stories WHERE article_id=?").bind(id).run();
+  if (row.origin === "manual" || row.origin === "breaking" || id.startsWith("brk:") || id.startsWith("man:")) await env.DB.prepare("DELETE FROM avo_stories WHERE article_id=?").bind(id).run();
+  else await env.DB.prepare("UPDATE avo_stories SET status='deleted', voice='[]', images='[]', img_log='[]' WHERE article_id=?").bind(id).run();
   return { ok: true };
 }
 
