@@ -1608,7 +1608,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         const step = t => { if (!n.isConnected) return; const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3), v = to * e; n.textContent = bnDigits((dec ? v.toFixed(1) : Math.round(v)).toLocaleString("en-IN")); if (p < 1) requestAnimationFrame(step); };
         requestAnimationFrame(step); });
       const storyHTML = (x, k) => x.ex ? `<div class="avo ex${channel === "v" ? " v" : ""}" data-k="${k}" data-ex="1"><div class="avo-pics"></div>
-        <div class="ex-cap"><span class="lt-text">${esc(x.title)}</span></div><small class="avo-credit"></small>
+        <small class="avo-credit"></small>
         <div class="avo-steps ex-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${lens[j]}s"></i>`).join("")}</div></div>`
         : `<div class="avo${channel === "v" ? " v" : ""}" data-k="${k}"><div class="avo-pics"></div><i class="avo-shade"></i>
         <div class="avo-kick"><i class="lt-pulse"></i><b>এই মুহূর্তে</b><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span></div>

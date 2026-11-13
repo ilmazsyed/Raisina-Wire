@@ -1343,4 +1343,5 @@ export default {
   "Rashtrix videos": "राष्ट्रिक्स के वीडियो",
   "This programme is not available right now. Try again later.": "यह कार्यक्रम अभी उपलब्ध नहीं है। बाद में फिर कोशिश करें।",
   "The vertical channel: short videos, headlines and the news as it happens, around the clock.": "वर्टिकल चैनल: छोटे वीडियो, सुर्खियां और इस पल की खबरें, चौबीसों घंटे।",
+  "Shorts and the news stories from Rashtrix TV.": "शॉर्ट्स और राष्ट्रिक्स टीवी की खबरें।",
 };
