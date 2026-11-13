@@ -202,12 +202,19 @@ export class TvControl {
   // the standby slate goes up and staff get a push alert.
   checkHealth() {
     const s = this.state, t = now(); let changed = false;
-    const outs = Object.entries(this.health).filter(([, h]) => h.role === "output");
+    // (an output closed on purpose, the tab shut or the page reloaded, never counts as gone quiet)
+    const outs = Object.entries(this.health).filter(([, h]) => h.role === "output" && !h.closed);
     const stalled = outs.find(([, h]) => t - h.seen < 30000 && h.stalledFor >= 10);
     const silent = outs.find(([, h]) => t - h.seen >= 30000 && t - h.seen < 120000);
     if (stalled && !s.standby.on) { s.standby = { on: true, auto: true, reason: "A source stopped for 10 seconds" }; changed = true; this.alertStaff(`Rashtrix TV ${this.channel}: standby slate is up`, `A source stopped on output ${stalled[0]}.`); }
     if (!stalled && s.standby.on && s.standby.auto) { s.standby = { on: false, auto: false, reason: "" }; changed = true; }
-    if (silent && !this.health[silent[0]].alerted) { this.health[silent[0]].alerted = true; this.alertStaff(`Rashtrix TV ${this.channel}: an output went quiet`, `Output ${silent[0]} has not reported for 30 seconds.`); }
+    // An output that went quiet only matters when no other output of the channel is on (a reload
+    // or a restart comes back as a new one at once): then staff get one alert, in plain words.
+    const alive = outs.some(([, h]) => t - h.seen < 30000);
+    if (silent && !this.health[silent[0]].alerted) {
+      this.health[silent[0]].alerted = true;
+      if (!alive) { const name = this.channel === "v" ? "Rashtrix Shorts" : "Rashtrix TV"; this.alertStaff(`${name}: the broadcast output stopped`, `The ${name} output page (OBS or the streaming machine) has not reported for 30 seconds. Check that it is open and online.`); }
+    }
     for (const [id, h] of Object.entries(this.health)) if (t - h.seen > 6 * 3600e3) delete this.health[id];
     this.ctx.storage.put("health", this.health);
     return changed;
@@ -229,7 +236,13 @@ export class TvControl {
     }
     if (this.isRoom) return this.roomMessage(ws, role, who, m);
   }
-  async webSocketClose(ws) { if (this.isRoom) { const [role, who] = this.ctx.getTags(ws); if (role === "guest") await this.roomPresence(who, false); } }
+  async webSocketClose(ws, code) {
+    const [role, who] = this.ctx.getTags(ws);
+    if (this.isRoom) { if (role === "guest") await this.roomPresence(who, false); return; }
+    // An output whose page was closed or reloaded on purpose (a clean close) is not a failure; a
+    // dropped connection (no clean close) still raises the alarm after 30 seconds.
+    if (role === "output" && this.health[who] && (code === 1000 || code === 1001)) { this.health[who].closed = true; this.ctx.storage.put("health", this.health); }
+  }
   async webSocketError() { /* the client reconnects */ }
 
   /* ---------- live-studio rooms ---------- */
