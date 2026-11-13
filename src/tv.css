@@ -1562,3 +1562,18 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .avo figure.ex-clip .sweep{inset:0}
 .avo figure.ex-clip .ex-stamp{left:60px;bottom:260px;z-index:2;box-shadow:0 10px 26px rgba(0,0,0,.4)}
 .avo.ex.v figure.ex-clip .ex-stamp{left:60px;bottom:520px}
+
+/* Bigger type on the AVO screens (motion graphics and the explainer look): read easily on a
+   phone. Lines too long for their box are set a little smaller to fit (src/engine.js fitText). */
+.so-type p,.so-split p{font-size:100px;line-height:1.3}
+.so.v .so-type p,.so.v .so-split p{font-size:84px}
+.so-stat p{font-size:72px}
+.so.v .so-stat p{font-size:68px}
+.ex-head h1{font-size:120px}
+.avo.ex.v .ex-head h1{font-size:104px}
+.ex-line p{font-size:100px;line-height:1.32}
+.avo.ex.v .ex-line p{font-size:88px}
+.ex-num p,.ex-vs p{font-size:56px}
+.ex-kick{font-size:32px}
+.ex-n{font-size:36px}
+.ex-fullt h2{font-size:88px}

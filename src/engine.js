@@ -448,9 +448,17 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       for (const el of [r, ...r.querySelectorAll("*")]) {
         if (!(el instanceof HTMLElement) || !el.textContent.trim() || el.children.length > 40) continue;
         const cs = getComputedStyle(el); if (!cs.webkitLineClamp || cs.webkitLineClamp === "none") continue;
-        if (!el.clientHeight || el.scrollHeight <= el.clientHeight + 2) continue;
-        const base = parseFloat(cs.fontSize); let fs = base, n = 0;
-        while (el.scrollHeight > el.clientHeight + 2 && fs > base * 0.55 && n++ < 14) { fs *= 0.93; el.style.fontSize = `${fs.toFixed(1)}px`; }
+        // Each box is fitted once for its text, always from its own type size (never compounding),
+        // and never below three quarters of it; a box not laid out yet (or mid-animation, less
+        // than a line high) is left alone.
+        const key = `${el.textContent.length}:${el.clientWidth}`;
+        if (el.dataset.fitKey === key) continue;
+        if (!el.dataset.fs0) el.dataset.fs0 = cs.fontSize;
+        const fs0 = parseFloat(el.dataset.fs0), lh = parseFloat(cs.lineHeight) || fs0 * 1.3;
+        if (!el.clientHeight || el.clientHeight < lh * 0.9 || !el.clientWidth) continue;
+        el.dataset.fitKey = key; el.style.fontSize = "";
+        let fs = fs0, n = 0;
+        while (el.scrollHeight > el.clientHeight + 2 && fs > fs0 * 0.75 && n++ < 6) { fs *= 0.95; el.style.fontSize = `${fs.toFixed(1)}px`; }
       }
     }
   };
