@@ -1908,7 +1908,7 @@ a.w-short{aspect-ratio:auto;overflow:visible;background:none;border-radius:0}
 .hl-player{position:relative;background:#000}
 .hl-player .tvp-bar{display:none}
 .hl-player .tvp-sound{bottom:12px}
-@media (max-width:1180px){.lead-mid{display:contents}.home-live{display:none}}
+@media (max-width:760px){.lead-mid{display:contents}.home-live{display:none}}
 /* Laptop and desktop: the swipe cards fill the middle column one at a time, so no half card is
    cut off against the Shorts and Latest column; the columns get a little more air. */
 @media (min-width:1181px){
@@ -2029,3 +2029,29 @@ html.standalone,html.standalone body{overscroll-behavior-y:none}
 .prog-end[hidden]{display:none}
 @media(max-width:600px){.prog-sheet{width:100vw;border-radius:16px 16px 0 0;margin:auto 0 0}}
 .prog-none{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;text-align:center;font:600 17px/1.5 "Hind Siliguri",sans-serif;color:#f2c14e}
+
+/* প্রধান খবর: headlines only, no pictures (every screen size) */
+.side-item.side-text{display:block!important}
+.side-item.side-text .kicker{margin-top:0}
+.side-item.side-text h3{font-size:21px;line-height:1.3}
+
+/* Home: Rashtrix Shorts live under Rashtrix TV (laptops and desktops) */
+.home-live-v{margin-top:18px}
+.hlv{display:grid;grid-template-columns:250px minmax(0,1fr);gap:22px;align-items:center;padding:14px}
+.hl-v{width:250px;border-radius:14px;overflow:hidden}
+.hlv-info .hlv-live{display:inline-flex;align-items:center;gap:8px;font:800 13px Montserrat,var(--sans);letter-spacing:.1em;color:var(--red)}
+.hlv-info h3{margin:8px 0 6px;font:700 26px/1.2 var(--serif)}
+.hlv-info p{margin:0 0 16px;color:var(--muted);line-height:1.55}
+@media (max-width:1180px){.home-live-v{display:none}}
+
+/* Tablets (iPad and the like, 761–1180px): the swipe cards and Rashtrix TV across the full width,
+   the Shorts row under them, then the top stories and the latest news side by side. */
+@media (min-width:761px) and (max-width:1180px){
+  .home>.lead-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"car car" "tv tv" "shorts shorts" "side rail";gap:22px;align-items:start}
+  .lead-mid,.latest-col{display:contents}
+  .lead-carousel{grid-area:car;min-width:0}
+  .lead-mid>.home-live:not(.home-live-v){grid-area:tv;display:block}
+  #shortsRail{grid-area:shorts;min-width:0}
+  .side-stack{grid-area:side}
+  .latest-col .live-rail{grid-area:rail;align-self:start}
+}

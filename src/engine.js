@@ -195,7 +195,7 @@ export function newsBed(ctx, seconds = 10, { style = "headlines", level = 0.85, 
   if (!ctx) return () => {};
   const S = STYLES[style] || STYLES.headlines; level = (S.level || level) * duck;
   // Notes are scheduled a second ahead as it plays, so a two-minute piece costs no more than a short one.
-  const t0 = ctx.currentTime + 0.03 + delay, end = t0 + Math.min(seconds, 185), s16 = 60 / S.bpm / 4;
+  const t0 = ctx.currentTime + 0.03 + delay, end = t0 + Math.min(seconds, 1800), s16 = 60 / S.bpm / 4;
   const out = ctx.createGain(), tone = ctx.createBiquadFilter();
   tone.type = "lowpass"; tone.frequency.setValueAtTime(S.sweep ? 900 : 18000, t0);
   if (S.sweep) tone.frequency.exponentialRampToValueAtTime(12000, end);
@@ -492,7 +492,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const wake = () => { try { if (st.audio && st.audio.state !== "running") st.audio.resume(); } catch { /* none */ } };
   const unmute = () => {
     if (!st.alive) return;
-    st.muted = false; if (soundBtn) soundBtn.hidden = true;
+    st.muted = false; st.ytMuted = false; if (soundBtn) soundBtn.hidden = true;
     wake();
     st.current?.slots.forEach(sl => { sl.setMuted?.(false); sl.play?.(); });
     startBed(st.current?.scene);
@@ -512,17 +512,23 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     "seg:sports": { style: "market", duck: 0.6 }, "seg:entertainment": { style: "market", duck: 0.7 }, "seg:lifestyle": { style: "avo", duck: 0.8 }, "seg:numbers": { style: "market", duck: 0.8 }, "seg:onthisday": { style: "avo", duck: 0.8 }, "seg:soth": { style: "avo", duck: 0.7 } };
   function startBed(sc) {
     const kind = sc?.graphic?.kind === "seg" ? `seg:${sc.graphic.name}` : sc?.graphic?.kind;
-    if (!BEDS[kind] || st.muted || !st.audio || (mode !== "app" && !output) || st.bed) return;
+    // Music under everything the channel draws itself; only YouTube videos (and live sources) carry
+    // their own sound. A graphic with no music of its own gets the soft bed; a breaking card plays
+    // its sting (its own music); the channel ID plays its signature.
+    const spec = BEDS[kind] || (sc?.graphic && !(sc.sources || []).length && !["breaking", "ident"].includes(kind) && !(kind === "breaking" && sc.graphic.music) ? { style: "avo", duck: 0.6 } : null);
+    if (!spec || st.muted || !st.audio || (mode !== "app" && !output) || st.bed) return;
     wake();
     const gone = (now() - (sc.startAt || now())) / 1000, left = Math.max(2, (sc.dur || 10) - gone);
     // With the newsreader reading the stories, the bulletin's music stays on as the bed under
     // the voice, a little softer so the words stay clear.
     const duck = kind === "bulletin" && (st.tv?.bulletin || []).some(b => b.voice) ? 0.62 : 1;
-    if (kind === "bulletin" && gone < 4.5) { identSig(st.audio); st.bed = newsBed(st.audio, left - (4.5 - gone), { ...BEDS[kind], delay: 4.5 - gone, duck }); return; }
-    st.bed = newsBed(st.audio, left, BEDS[kind]);
+    if (kind === "bulletin" && gone < 4.5) { identSig(st.audio); st.bed = newsBed(st.audio, left - (4.5 - gone), { ...spec, delay: 4.5 - gone, duck }); return; }
+    st.bed = newsBed(st.audio, left, spec);
   }
   soundBtn?.addEventListener("click", unmute);
-  const soundOff = () => { st.muted = true; st.voice?.pause(); st.voice = null; if (soundBtn) soundBtn.hidden = false; };
+  // A browser that will not start a YouTube video with sound: only the videos are muted (a tap on
+  // the sound button brings them back); the channel's music, the newsreader and the stings go on.
+  const soundOff = () => { st.ytMuted = true; if (soundBtn) soundBtn.hidden = false; };
   // Some phones (iPhone in Low Power Mode) start a YouTube video only from a tap inside it: the
   // cover over it is lifted, with a hint, until it plays. The one player then plays every video.
   const needTap = on => { host.querySelector(".tvp-ytlayer")?.classList.toggle("tap", on); host.querySelector(".tvp")?.classList.toggle("yt-tap", on); if (tapHint) tapHint.hidden = !on; };
@@ -567,7 +573,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       try {
         y.ended = false;
         if (y.pre === src.id) { y.pre = null; y.preloading = false; y.rolling = null; let at = 0; try { at = y.player.getCurrentTime() || 0; } catch { /* none */ } if (Math.abs(at - start) > 0.6) y.player.seekTo(start, true); st.muted ? y.player.mute() : (y.player.unMute(), diagMark(91)); y.player.playVideo(); }
-        else { y.pre = null; y.player.loadVideoById({ videoId: src.id, startSeconds: start }); st.muted ? y.player.mute() : y.player.unMute(); }
+        else { y.pre = null; y.player.loadVideoById({ videoId: src.id, startSeconds: start }); st.muted || st.ytMuted ? y.player.mute() : y.player.unMute(); }
       } catch { /* none */ }
       checkStart();
     };
@@ -576,7 +582,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // Not moving after 0.6 s (a phone that will not start a video with sound without a tap in it):
       // it goes on silently at once, with the "tap for sound" button, rather than holding the
       // picture; later, a nudge, then a request to tap.
-      setTimeout(() => { const y = st.yt; if (!st.alive || st.ytOwner !== token || !y?.ready || [1, 3].includes(y.state)) return; diagMark(92); try { if (!st.muted) { soundOff(); y.player.mute(); } y.player.playVideo(); } catch { /* none */ } }, 600);
+      setTimeout(() => { const y = st.yt; if (!st.alive || st.ytOwner !== token || !y?.ready || [1, 3].includes(y.state)) return; diagMark(92); try { if (!st.muted && !st.ytMuted) { soundOff(); y.player.mute(); } y.player.playVideo(); } catch { /* none */ } }, 600);
       setTimeout(() => { const y = st.yt; if (!st.alive || st.ytOwner !== token || !y?.ready || [1, 3].includes(y.state)) return; diagMark(93); try { y.player.mute(); y.player.playVideo(); } catch { /* none */ } }, 1800);
       setTimeout(() => { const y = st.yt; if (st.alive && st.ytOwner === token && y && ![1, 3].includes(y.state)) { diagMark(94); needTap(true); } }, 4000);
     };
@@ -604,11 +610,11 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     st.yt = { state: -1, since: Date.now(), ready: false, pre: early ? id : null, preloading: early };
     if (early) layer.classList.add("pre");
     st.yt.player = new YT.Player(layer.querySelector(".tvs-yt"), { width: "100%", height: "100%", videoId: id,
-      playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, cc_load_policy: 0, playsinline: 1, fs: 0, autoplay: 1, mute: early || st.muted ? 1 : 0, start, origin: location.origin },
+      playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, cc_load_policy: 0, playsinline: 1, fs: 0, autoplay: 1, mute: early || st.muted || st.ytMuted ? 1 : 0, start, origin: location.origin },
       events: {
         onReady: e => {
           st.yt.ready = true;
-          if (st.ytOwner) { st.muted ? e.target.mute() : e.target.unMute(); st.ytLoad?.(); }   // its turn came while it was being made
+          if (st.ytOwner) { st.muted || st.ytMuted ? e.target.mute() : e.target.unMute(); st.ytLoad?.(); }   // its turn came while it was being made
           else { e.target.mute(); e.target.playVideo(); }   // early: start buffering (it pauses on its first frame)
         },
         onStateChange: e => {
@@ -616,7 +622,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           if (st.ytDiag) st.ytDiag.seq.push([Date.now() - st.ytDiag.t0, e.data]);
           // A video loaded in advance waits, paused and buffered, until its turn.
           if (st.yt.preloading && !st.ytOwner) { if (e.data === 1) { e.target.pauseVideo(); st.yt.preloading = false; } return; }
-          if (e.data === 2 && st.ytOwner && !st.muted && st.ytDiag && Date.now() - st.ytDiag.t0 < 6000) { diagMark(95); soundOff(); try { e.target.mute(); e.target.playVideo(); } catch { /* none */ } }
+          if (e.data === 2 && st.ytOwner && !st.muted && !st.ytMuted && st.ytDiag && Date.now() - st.ytDiag.t0 < 6000) { diagMark(95); soundOff(); try { e.target.mute(); e.target.playVideo(); } catch { /* none */ } }
           if (e.data === 0) st.yt.ended = true; ytMaskState(layer, e.data, e.data === 1 && !!st.ytPoster?.querySelector(".tvs-poster")); if (e.data === 1) { liftPoster(st.ytPoster); needTap(false); noCaptions(e.target); }
         },
         onError: () => { st.yt.state = 0; st.yt.ended = true; }
@@ -1166,6 +1172,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     stage.classList.toggle("vid", !sc?.graphic && sc?.layout === "full" && (sc?.sources || []).length === 1);
     stage.classList.toggle("full-gfx", !!sc?.full || sc?.graphic?.kind === "promo" || sc?.graphic?.kind === "ads");
     stage.classList.toggle("wx-on", ["weather", "market"].includes(sc?.graphic?.kind));
+    if (sc?.graphic?.kind !== "avo") stage.classList.remove("ex-on");
   }
 
   /* ---------- graphics ---------- */
@@ -1640,6 +1647,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           const first = shownK < 0; shownK = k; shownS = -1;
           // A fresh frame always gets its first slide (a slide drawn into the old frame during the
           // wipe must not count, or the new story stays black until its second slide).
+          stage.classList.toggle("ex-on", !!x.ex);
           const paint = () => { el.innerHTML = storyHTML(x, k); shownS = -1; speakAvo(x); st.resumeVoice = () => { if (el.isConnected) speakAvo(x); }; drawA(); };
           // Each story is logged: an airing from the broadcast output, a view from the app or site.
           const logKey = `${x.id}@${Math.round(at0 + starts[k] * 1000)}`;
@@ -1945,15 +1953,21 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   function drawJacket() {
     let gfx = "", ovl = "";
     const c = st.ctl || {}, L = c.layers || { bug: true, live: true, clock: true, lower: true, ticker: true, ad: true, weather: true }, s = st.tv || {};
-    const sc = st.current?.scene, fullGfx = stage.classList.contains("full-gfx");
+    const sc = st.current?.scene, fullGfx = stage.classList.contains("full-gfx"), exOn = fullGfx && stage.classList.contains("ex-on");
     // The channel's logo stays on screen throughout: videos, graphics, bulletins, the weather and
     // market updates, intro cards and breaking news (the control room can still turn it off).
     { const bug = $(".tv-bug-fixed"); if (bug) bug.hidden = L.bug === false; }
-    marketTicker(channel === "h" && L.ticker !== false && !fullGfx && sc && !sc.off && !sc.standby && sc.layout !== "lband");
+    marketTicker(channel === "h" && L.ticker !== false && (!fullGfx || exOn) && sc && !sc.off && !sc.standby && sc.layout !== "lband");
     // The automatic L-band is decided here, before any early return: a graphic, a stand-by or an
     // empty scene that cuts in while it is showing takes it off at once (it used to stay frozen).
     autoLband(sc, !!sc && !sc.off && !sc.standby && !fullGfx && !!(sc.sources || []).length && !sc.graphic && sc.layout !== "lband" && (sc.sources || []).length === 1 && sc.layout !== "pip", L);
     if (!sc || sc.off || sc.standby || mode === "scene" && !sc.sources?.length && !sc.graphic) { put(".tvp-gfx", ""); put(".tvp-ovl", ""); return; }
+    // The explainer AVO keeps the tickers running under it (the headlines and, on Rashtrix TV, the markets).
+    if (exOn) {
+      const tk = [...(c.ticker || []), ...(L.weather && s.weather ? [s.weather] : []), ...(s.ticker || [])];
+      const bar = L.ticker ? (channel === "h" ? `<div class="tv-ticker"><span class="tk-label">শিরোনাম</span><div class="tk-track">${tickerHTML(tk)}</div></div>` : `<div class="tv-ticker v"><span class="tk-label">খবর</span><div class="tk-track">${tickerHTML(tk)}</div></div>`) : "";
+      put(".tvp-gfx", (channel === "h" ? dtBar(L, s) : `<div class="tv-liveclock">${L.live ? `<span class="tv-live"><i></i>LIVE</span>` : ""}${L.clock ? `<span class="tv-clock">${ist()}</span>` : ""}</div>`) + bar); put(".tvp-ovl", ""); return;
+    }
     // Full-screen graphics (the bulletin, promos): LIVE and the clock stay on screen.
     if (fullGfx && channel === "h") { put(".tvp-gfx", dtBar(L, s)); put(".tvp-ovl", ""); return; }
     if (fullGfx) { put(".tvp-gfx", `<div class="tv-liveclock">${L.live ? `<span class="tv-live"><i></i>LIVE</span>` : ""}${L.clock ? `<span class="tv-clock">${ist()}</span>` : ""}</div>`); put(".tvp-ovl", ""); return; }
