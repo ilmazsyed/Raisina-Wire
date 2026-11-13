@@ -19,7 +19,7 @@ not_found_handling = "single-page-application"
 # under /en, Hindi under /hi; old /bn addresses redirect.
 run_worker_first = [
   "/api/*", "/mcp", "/oauth/*", "/.well-known/*", "/media/*", "/clips/*", "/", "/edition/*", "/article/*", "/author/*", "/tag/*", "/desk/*",
-  "/og/*", "/live", "/briefs", "/community", "/discussion/*", "/events", "/coverage/*",
+  "/og/*", "/live", "/watch", "/briefs", "/community", "/discussion/*", "/events", "/coverage/*",
   "/about", "/terms", "/privacy", "/disclaimer", "/copyright", "/corrections", "/community-guidelines", "/grievance", "/privacy.html", "/terms.html",
   "/en", "/en/*", "/hi", "/hi/*", "/bn", "/bn/*",
   "/sitemap.xml", "/news-sitemap.xml", "/robots.txt", "/feed.xml", "/rss.xml"

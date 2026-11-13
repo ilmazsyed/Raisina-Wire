@@ -42,7 +42,8 @@ import { bulletinImages, bulletinImageRoute } from "./bulletinimg.js";
 import { prepareBulletinVoices, prepareLinks, voiceRoute } from "./bulletinvoice.js";
 import { avoStep, avoImageRoute, avoPlayed, avoLog, avoFromBreaking, avoManualAdd, avoManualEdit, avoManualDelete } from "./avo.js";
 import { marketBrief } from "./markets.js";
-import { ogRoute, renderCards } from "./ogcard.js";
+import { ogRoute, renderCards, renderSiteCard } from "./ogcard.js";
+import { indexNow } from "./indexnow.js";
 import { handleControlRoom, control as ctlCommand } from "./controlroom.js";
 import { serveClip, clipHousekeeping } from "./clips.js";
 import { handleStudio } from "./studioapi.js";
@@ -1822,6 +1823,13 @@ async function scheduled(env) {
   await step("share cards", async () => {
     const origin = env.SITE_URL || (await env.DB.prepare("SELECT value FROM settings WHERE key='site_origin'").first())?.value;
     return renderCards(env, String(origin || "").replace(/\/$/, ""));
+  });
+  // New and changed stories announced to Bing and the other IndexNow engines (src/indexnow.js).
+  await step("indexnow", () => indexNow(env));
+  // The site's own card: Rashtrix TV live with the top headline (src/ogcard.js).
+  await step("site card", async () => {
+    const origin = env.SITE_URL || (await env.DB.prepare("SELECT value FROM settings WHERE key='site_origin'").first())?.value;
+    return renderSiteCard(env, String(origin || "").replace(/\/$/, ""));
   });
 }
 // 9 am and 9 pm India time, every day (unless switched off in the control room).
