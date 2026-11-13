@@ -22,7 +22,7 @@ const part = h => h < 12 ? "সকাল" : h < 16 ? "দুপুর" : h < 18 
 const tta = n => n === 2 ? "টো" : n === 3 || n === 4 ? "টে" : "টা";
 export const slotLabel = h => `${part(h)} ${bn(h % 12 || 12)}${tta(h % 12 || 12)}`;
 const esc = s => String(s || "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-const site = env => String(env.SITE_URL || "https://rashtrix.ilmazsyed.workers.dev").replace(/\/$/, "");
+const site = env => String(env.SITE_URL || "https://rashtrix.live").replace(/\/$/, "");
 
 export async function briefRules(env) {
   const r = await get(env, "brief:rules", {});

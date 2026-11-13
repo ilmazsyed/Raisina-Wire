@@ -10,7 +10,7 @@ export const LEGAL_UPDATED = "7 November 2026";
 // launch: the pages say the details are coming until they are set.
 export const GRIEVANCE = { name: "", title: "Grievance Officer, Rashtrix 24×7 News", email: "", phone: "", address: "" };
 export const CONTACT_EMAIL = GRIEVANCE.email;
-export const SITE_URL = "https://www.rashtrix.live";
+export const SITE_URL = "https://rashtrix.live";
 const mail = CONTACT_EMAIL ? `<a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>` : "the address on our <a href=\"/grievance\">Grievance Redressal</a> page";
 const mailBn = CONTACT_EMAIL ? `<a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>` : "<a href=\"/grievance\">অভিযোগ নিষ্পত্তি</a> পাতায় দেওয়া ঠিকানা";
 const officer = (bn = false) => GRIEVANCE.name && GRIEVANCE.email

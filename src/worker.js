@@ -1867,7 +1867,8 @@ export default {
       catch (e) { return json({error:"Internal API error",detail:e.message},500,{"cache-control":"no-store"}); }
     }
     // One public address for search engines: page visits to the workers.dev copy go to SITE_URL.
-    if (env.SITE_URL && url.hostname.endsWith(".workers.dev") && ["GET", "HEAD"].includes(request.method)) {
+    // (www.rashtrix.live too, when it is added to the Worker.)
+    if (env.SITE_URL && (url.hostname.endsWith(".workers.dev") || url.hostname === `www.${new URL(env.SITE_URL).hostname}`) && ["GET", "HEAD"].includes(request.method)) {
       const target = new URL(url.pathname + url.search, env.SITE_URL);
       if (target.host !== url.host) return Response.redirect(target.toString(), 301);
     }

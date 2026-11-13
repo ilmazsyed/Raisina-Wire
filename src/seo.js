@@ -42,7 +42,7 @@ function organization(o) {
     areaServed: [{ "@type": "State", name: "West Bengal" }, { "@type": "Country", name: "India" }],
     publishingPrinciples: `${o}/disclaimer`, correctionsPolicy: `${o}/corrections`, actionableFeedbackPolicy: `${o}/grievance`,
     founder: { "@type": "Person", name: "Ilmaz Syed", jobTitle: "Founder and Editor-in-Chief" },
-    logo: { "@type": "ImageObject", url: `${o}/icon-512.png`, width: 512, height: 512 }, sameAs: ["https://www.rashtrix.live"] };
+    logo: { "@type": "ImageObject", url: `${o}/icon-512.png`, width: 512, height: 512 }, sameAs: ["https://www.youtube.com/@rashtrixnews", "https://www.facebook.com/rashtrix.news", "https://x.com/rashtrixnews", "https://www.instagram.com/rashtrixnews"] };
 }
 function personLd(o, w) {
   return w.isDesk

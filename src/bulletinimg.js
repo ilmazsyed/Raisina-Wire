@@ -9,7 +9,7 @@
 // publishers that refuse other sites' pages still show.
 import { imageTerms } from "./wiredesk.js";
 
-const UA = "RashtrixTV/1.0 (bulletin pictures; https://rashtrix.ilmazsyed.workers.dev)";
+const UA = "RashtrixTV/1.0 (bulletin pictures; https://rashtrix.live)";
 const FREE = /^(cc0|public domain|pd\b|pd-|cc[- ]by(-sa)?[- ]\d)/i;
 const strip = h => String(h || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
 
@@ -79,7 +79,7 @@ const THUMB = /thumb|ytimg|video|youtube|watermark|share[-_]?card|og[-_]?image|s
 export const broadcaster = (name, url) => { try { if (BROADCAST_HOST.test(new URL(url).hostname + ".")) return true; } catch { /* name only */ } return BROADCAST.test(String(name || "")); };
 
 // The lead photo of a web page: og:image, else twitter:image.
-const BROWSER_UA = "Mozilla/5.0 (compatible; RashtrixTV/1.0; +https://rashtrix.ilmazsyed.workers.dev)";
+const BROWSER_UA = "Mozilla/5.0 (compatible; RashtrixTV/1.0; +https://rashtrix.live)";
 // A publication's own logo or house card (the picture a site shares when a report has no photo of
 // its own) is never used: by its address, and by being the same picture the site's front page shares.
 const HOUSE = /logo|placeholder|default|fallback|og[-_]?image|share[-_]?(img|image)|social[-_]?(share|image|card)|masthead|brand|no[-_]?image|1x1|spacer|\/theme\/|\/static\/(img|images)\/|\/assets\/(img|images)\//i;

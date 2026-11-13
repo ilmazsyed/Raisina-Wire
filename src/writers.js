@@ -6,7 +6,7 @@ export const WRITERS = [
     key: "rashtrix-desk", name: "Rashtrix News Desk", role: "The Rashtrix newsroom, Kolkata",
     photo: "/icon-192.png", portrait: "/icon-512.png", isDesk: true,
     bio: "News from the Rashtrix 24×7 News desk in Kolkata: Kolkata, West Bengal, India, Bengalis abroad and the world.",
-    sameAs: ["https://www.rashtrix.live"]
+    sameAs: ["https://www.youtube.com/@rashtrixnews", "https://www.facebook.com/rashtrix.news", "https://x.com/rashtrixnews", "https://www.instagram.com/rashtrixnews"]
   },
   {
     key: "rashtrix-wire", name: "Rashtrix Wire", role: "Wire desk",

@@ -3,7 +3,7 @@
 // rupee against the dollar, pound and euro. From Yahoo Finance's public chart data (delayed or
 // last available; nothing is estimated), fetched by the minute cron every ten minutes while the
 // Indian market is open and every hour otherwise, kept in settings ("market_brief").
-const UA = "Mozilla/5.0 (compatible; RashtrixTV/1.0; +https://rashtrix.ilmazsyed.workers.dev)";
+const UA = "Mozilla/5.0 (compatible; RashtrixTV/1.0; +https://rashtrix.live)";
 // The Nifty 50, with each company's short name in English and Bengali.
 const NIFTY50 = [
   ["ADANIENT", "Adani Ent", "আদানি এন্টারপ্রাইজ"], ["ADANIPORTS", "Adani Ports", "আদানি পোর্টস"], ["APOLLOHOSP", "Apollo Hospitals", "অ্যাপোলো হাসপাতাল"],
