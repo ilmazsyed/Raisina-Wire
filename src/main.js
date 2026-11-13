@@ -234,14 +234,11 @@ function renderShell() {
     <div id="searchResults" class="search-results"></div></dialog>
   <div class="toast" id="toast" role="status"></div>
   <div class="alert-banner glass" id="alertBanner" role="status" hidden></div>
-  <section class="sheet" id="alertsSheet" role="dialog" aria-labelledby="alertsSheetTitle" hidden>
-    <span class="sheet-grip" aria-hidden="true"></span>
-    <button class="sheet-x" type="button" data-action="alerts-later" aria-label="Close">${ICON_X}</button>
-    <div class="sheet-hero alerts"><span class="sheet-icon bell">${ICON_BELL}</span><span class="sheet-ping" aria-hidden="true"></span></div>
-    <span class="kicker">Breaking news, as it happens</span><h2 id="alertsSheetTitle">Turn on Rashtrix alerts</h2>
-    <ul class="sheet-list">${ALERT_TYPES.map(t => `<li>${ICON_CHECK}<span>${t}</span></li>`).join("")}</ul>
-    <div class="sheet-actions"><button class="btn btn-red sheet-primary" type="button" data-action="alerts-allow">Allow alerts</button><button class="sheet-secondary" type="button" data-action="alerts-later">Not now</button></div>
-    <p class="sheet-note">Your browser asks you to confirm once. Turn them off any time from the bell.</p>
+  <section class="nudge" id="alertsSheet" role="dialog" aria-labelledby="alertsSheetTitle" hidden>
+    <span class="nudge-icon bell" aria-hidden="true">${ICON_BELL}</span>
+    <div class="nudge-copy"><h2 id="alertsSheetTitle">Breaking news alerts</h2><p>Only the big stories. Turn off any time.</p></div>
+    <button class="nudge-x" type="button" data-action="alerts-later" aria-label="Close">${ICON_X}</button>
+    <div class="nudge-actions"><button class="nudge-later" type="button" data-action="alerts-later">Not now</button><button class="nudge-go" type="button" data-action="alerts-allow">Turn on</button></div>
   </section>
   <div class="offline-bar" id="offlineBar" role="status" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 4.2-2.6M10.7 5.1A15 15 0 0 1 22 8.8M5 12.9a10 10 0 0 1 5.2-2.7M19 12.9a10 10 0 0 0-2.3-1.6M8.5 16.4a5 5 0 0 1 7 0M12 20h.01M3 3l18 18"/></svg><span>You’re offline. Stories you opened recently and saved stories still open.</span></div>
   <div class="update-bar lang-suggest" id="langSuggest" role="status" hidden></div>
@@ -251,60 +248,15 @@ function renderShell() {
     <button class="btn btn-red btn-sm" type="button" data-action="apply-update">Update</button>
     <button class="ub-close" type="button" data-action="update-later" aria-label="Later">${ICON_X}</button>
   </div>
-  <section class="install-sheet" id="installSheet" role="dialog" aria-modal="true" aria-labelledby="installTitle" hidden>
-    <div class="install-panel">
-      <button class="install-close" type="button" data-action="install-dismiss" aria-label="Close">${ICON_X}</button>
-      <header class="install-brand">
-        <img class="install-brand-icon" src="/icon-192.png" alt="Rashtrix app icon" width="76" height="76">
-        <span class="install-brand-divider" aria-hidden="true"></span>
-        <span class="install-brand-copy"><b>RASHTRIX <i>24X7</i></b><small>KOLKATA <em>·</em> BENGAL <em>·</em> INDIA <em>·</em> WORLD</small></span>
-      </header>
-      <div class="install-intro">
-        <div class="install-copy">
-          <span class="install-eyebrow">THE RASHTRIX APP</span>
-          <h2 id="installTitle">Install the<br>Rashtrix <span>App</span></h2>
-          <p>A fast, secure and lightweight news experience — without the app-store download.</p>
-          <div class="install-benefits">
-            <span><b aria-hidden="true">ϟ</b>Lightweight<br>&amp; fast</span>
-            <span><b aria-hidden="true">◇</b>Safe<br>&amp; secure</span>
-            <span><b aria-hidden="true">⌁</b>Read<br>offline</span>
-            <span><b aria-hidden="true">▣</b>Phone, tablet<br>&amp; desktop</span>
-          </div>
-        </div>
-        <div class="install-device" aria-hidden="true">
-          <div class="install-device-frame"><div class="install-device-notch"></div><div class="install-device-screen">
-            <img src="/icon-192.png" alt="" width="100" height="100"><b>Rashtrix</b><span class="install-globe"></span>
-          </div></div>
-        </div>
-      </div>
-      <div class="install-platforms">
-        <div class="install-platform install-ios">
-          <h3><span class="platform-symbol">●</span> iPhone / iPad <small>(Safari)</small></h3>
-          <ol>
-            <li><span class="step">1</span><span>Tap <b>Share</b> <span class="install-inline-icon">↥</span></span></li>
-            <li><span class="step">2</span><span>Choose <b>Add to Home Screen</b> <span class="install-inline-icon">⊞</span></span></li>
-            <li><span class="step">3</span><span>Open Rashtrix from your home screen</span></li>
-          </ol>
-        </div>
-        <div class="install-platform install-android">
-          <h3><span class="platform-symbol android-symbol">●</span> Android <small>(Chrome &amp; other browsers)</small></h3>
-          <div class="install-actions">
-            <button class="btn btn-red sheet-primary" type="button" data-action="install"><span aria-hidden="true">↓</span> Install App</button>
-            <button class="btn btn-red sheet-primary" type="button" data-action="install-open" hidden>Open Rashtrix</button>
-          </div>
-          <p class="install-other" hidden>Or tap <b>⋮</b> in your browser and choose <b>Install app / Add to Home Screen</b>.</p>
-          <p class="install-installed" hidden>Already installed? Open Rashtrix from your app list or home screen.</p>
-        </div>
-      </div>
-      <div class="install-bottom">
-        <span><b>ϟ</b> Instant access<br><small>Live news &amp; analysis</small></span>
-        <span><b>♧</b> Real-time<br><small>alerts</small></span>
-        <span><b>▱</b> No app store<br><small>required</small></span>
-        <span><b>▣</b> One experience<br><small>across devices</small></span>
-      </div>
-      <p class="install-storage">Uses a small amount of device storage for the app and cached content. Offline saves may use more.</p>
-      <button class="sheet-secondary install-later" type="button" data-action="install-dismiss">Not now</button>
-    </div>
+  <section class="nudge" id="installSheet" role="dialog" aria-labelledby="installTitle" hidden>
+    <img class="nudge-icon app" src="/icon-192.png" alt="" width="46" height="46">
+    <div class="nudge-copy"><h2 id="installTitle">Get the Rashtrix app</h2>
+      <p class="install-android">Faster, works offline, no app store.</p>
+      <p class="install-ios" hidden>Tap Share, then Add to Home Screen.</p>
+      <p class="install-other" hidden>Or install from your browser menu.</p>
+      <p class="install-installed" hidden>Already installed. Open it from your home screen.</p></div>
+    <button class="nudge-x" type="button" data-action="install-dismiss" aria-label="Close">${ICON_X}</button>
+    <div class="nudge-actions install-actions"><button class="nudge-later" type="button" data-action="install-dismiss">Not now</button><button class="nudge-go" type="button" data-action="install">Install</button><button class="nudge-go" type="button" data-action="install-open" hidden>Open Rashtrix</button></div>
   </section>`;
 
   $("#today").textContent = new Date().toLocaleDateString(LOCALE, { ...IST, weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -2329,10 +2281,10 @@ function showInstallSheet({ force = false } = {}) {
   $(".install-android").hidden = ios;
   $(".install-other").hidden = ios || installed || !!state.installPrompt;
   $(".install-installed").hidden = !installed;
-  button.hidden = installed;
+  // iPhone: the two steps are the whole card (Safari has no install button to press).
+  button.hidden = installed || ios;
   openButton.hidden = !installed;
-  button.textContent = ios ? "How to add Rashtrix" : state.installPrompt ? "Install Rashtrix" : "Install / Add to Home Screen";
-  $("#installTitle").innerHTML = installed ? tr("Your Rashtrix app is ready") : `${tr("Install the")}<br>Rashtrix <span>${tr("App")}</span>`;
+  $("#installTitle").textContent = tr(installed ? "Your Rashtrix app is ready" : "Get the Rashtrix app");
   $("#installSheet").hidden = false;
 }
 function openInstalledPWA() {

@@ -1398,4 +1398,12 @@ export default {
   "Shorts from Rashtrix.": "রাষ্ট্রিক্সের শর্টস।",
   "Watch more videos on YouTube": "ইউটিউবে আরও ভিডিও দেখুন",
   "Shorts and the news stories from Rashtrix TV.": "শর্টস আর রাষ্ট্রিক্স টিভির খবর।",
+  "Breaking news alerts": "ব্রেকিং খবরের অ্যালার্ট",
+  "Only the big stories. Turn off any time.": "শুধু বড় খবর। যখন খুশি বন্ধ করা যায়।",
+  "Get the Rashtrix app": "রাষ্ট্রিক্স অ্যাপ নিন",
+  "Faster, works offline, no app store.": "আরও দ্রুত, অফলাইনেও চলে, অ্যাপ স্টোর লাগে না।",
+  "Or install from your browser menu.": "বা ব্রাউজারের মেনু থেকে ইনস্টল করুন।",
+  "Tap Share, then Add to Home Screen.": "শেয়ার-এ চাপুন, তারপর ‘অ্যাড টু হোম স্ক্রিন’।",
+  "Already installed. Open it from your home screen.": "অ্যাপ ইনস্টল করা আছে। হোম স্ক্রিন থেকে খুলুন।",
+  "Install": "ইনস্টল",
 };
