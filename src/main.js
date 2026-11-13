@@ -1963,16 +1963,14 @@ function viewWatch() {
     <div class="wrap"><section class="tv-watch"><div class="tv-watch-head"><div><div class="kicker"><span class="dot-live"></span> Rashtrix TV</div><h1>Watch live</h1></div>
       <div class="pill-tabs" role="tablist" aria-label="Channel">${[["h", "Rashtrix TV"], ["v", "Rashtrix Shorts"]].map(([k, l]) => `<button type="button" role="tab" data-action="tv-ch" data-ch="${k}" aria-selected="${k === tvChannel()}">${l}</button>`).join("")}</div></div>
       <div class="tv-watch-player ${tvChannel() === "v" ? "is-v" : ""}" id="tvWatch" data-no-tr></div><div id="tvInteract" class="tv-interact"></div></section>
-      <div class="page-head"><div><div class="kicker">Watch</div><h2>On demand</h2><p>Bulletins, news stories, segments and shorts from Rashtrix TV.</p></div></div>
+      <div class="page-head"><div><div class="kicker">Watch</div><h2>On demand</h2><p>Shorts and the news stories from Rashtrix TV.</p></div></div>
       ${all == null ? `<div class="skeleton" style="height:260px;margin-top:30px"></div>` : `
       <div class="w-tools"><div class="chips" id="wChips" role="tablist">${progChips().map(([k, l]) => `<button class="chip" type="button" data-action="w-cat" data-cat="${esc(k)}" aria-pressed="${k === "all"}">${esc(tr(l))}</button>`).join("")}</div>
         <label class="w-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input type="search" id="wSearch" placeholder="Search videos" aria-label="Search videos"></label></div>
       <div id="wRows">
-        <div id="progRows" style="display:contents">${progRows()}</div>
         ${sh.length ? `<section class="w-row w-shorts" data-group="shorts" id="shorts"><div class="w-row-head"><h2>Shorts</h2><span class="meta">${sh.length}</span></div><div class="w-rail">${sh.map((m, i) => `<button class="w-short" type="button" data-action="short" data-index="${i}" aria-label="Play: ${esc(m.title)}">${thumbImg(m.thumbnailUrl, i < 5)}<span class="play-badge" aria-hidden="true"></span><b>${esc(m.title)}</b></button>`).join("")}</div></section>` : ""}
         ${(state.tvShorts || []).length ? `<section class="w-row w-shorts" data-group="shorts" data-row="ytshorts"><div class="w-row-head"><h2>Rashtrix Shorts</h2><a class="link-gold" href="${withLang("/shorts")}">All shorts →</a></div><div class="w-rail">${state.tvShorts.slice(0, 30).map(v => `<a class="w-short" href="${withLang(`/shorts?v=${encodeURIComponent(v.id)}`)}"><span class="w-short-face"><img src="${esc(v.thumb || `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`)}" alt="" loading="lazy"></span><b data-no-tr>${esc(v.title)}</b></a>`).join("")}</div></section>` : ""}
-        ${films.length ? wRow("latest", "Rashtrix videos", films.slice(0, 14), ` data-group="videos"`) : ""}
-        ${others.length ? `<section class="w-row" data-group="other" data-row="other"><div class="w-row-head"><h2>Audio, images and more</h2><span class="meta">${others.length}</span></div><div class="media-grid">${others.map(m => `<article class="glass media-card" id="m-${esc(m.id)}">${mediaEmbed(m)}<div class="body"><span class="kicker">${esc(m.category || m.mediaType)}</span><h3>${esc(m.title)}</h3>${m.description ? `<p>${esc(m.description)}</p>` : ""}${shareBtn(m.title, mediaUrl(m))}</div></article>`).join("")}</div></section>` : ""}
+        <div id="progRows" style="display:contents">${progRows()}</div>
       </div><div id="wResults" class="w-results" hidden></div>
       ${!films.length && !sh.length && !others.length && !state.tvProg ? `<div class="skeleton" style="height:200px;margin-top:20px"></div>` : ""}`}
     </div></div>`;
@@ -2002,10 +2000,8 @@ const progSegs = () => { const S = state.tvProg?.segs || {}; return SEG_ORDER.fi
 const avoDesk = x => PROG_DESKS.find(([, , f]) => f(x.desk))?.[0] || "more";
 function progChips() {
   const P = state.tvProg, out = [["all", "All"]];
-  if (P?.bulletin?.length) out.push(["bulletin", "Bulletins"]);
-  for (const [k, l] of PROG_DESKS) if ((P?.avo || []).some(x => avoDesk(x) === k)) out.push([`avo:${k}`, l]);
-  if (progSegs().length) out.push(["seg", "Segments"]);
   if (shorts().length || (state.tvShorts || []).length) out.push(["shorts", "Shorts"]);
+  for (const [k, l] of PROG_DESKS) if ((P?.avo || []).some(x => avoDesk(x) === k)) out.push([`avo:${k}`, l]);
   return out;
 }
 const progTime = t => { try { return digits(new Date(t).toLocaleTimeString("en-GB", { ...IST, hour: "2-digit", minute: "2-digit" })); } catch { return ""; } };
@@ -2019,21 +2015,11 @@ function progRows() {
   const P = state.tvProg; if (!P) return "";
   const row = (group, title, cards) => cards.length ? `<section class="w-row" data-group="${esc(group)}"><div class="w-row-head"><h2>${esc(tr(title))}</h2><span class="meta">${digits(String(cards.length))}</span></div><div class="w-rail">${cards.join("")}</div></section>` : "";
   const out = [];
-  // The bulletins: the latest full bulletin (two minutes, at :00 and :30) and the latest quick one (:15, :45).
-  if (P.bulletin.length) {
-    const now = Date.now(), Q = 900e3, q = Math.floor(now / Q) * Q, full = q - (Math.floor(q / Q) % 2 ? Q : 0), quick = q - (Math.floor(q / Q) % 2 ? 0 : Q);
-    const img = (P.bulletin.find(b => b.image) || {}).image;
-    out.push(row("bulletin", "News bulletins", [
-      progCard("bulletin", `full:${full}`, { img, kick: `${tr("Bulletin")} · ${progTime(full)}`, title: "সংবাদ বুলেটিন", dur: 120, label: "সংবাদ বুলেটিন" }),
-      progCard("bulletin", `quick:${quick}`, { img: (P.bulletin.filter(b => b.image)[1] || {}).image || img, kick: `${tr("Bulletin")} · ${progTime(quick)}`, title: "খবর সংক্ষেপে", dur: 65, label: "খবর সংক্ষেপে" })]));
-  }
   // The AVO news stories, by desk, newest first.
   for (const [k, l] of [...PROG_DESKS, ["more", "More news"]]) {
     const xs = P.avo.filter(x => avoDesk(x) === k).sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0)).slice(0, 20);
     out.push(row(`avo:${k}`, k === "more" ? l : `News now: ${l}`, xs.map(x => progCard("avo", x.id, { img: (x.images || [])[0]?.src, kick: `${tr(DESK_LABEL(x.desk))} · ${progTime(x.at)}`, title: x.title, dur: Math.round(Math.max(8, (x.secs || 20) + 2)), label: DESK_BN_APP[x.desk] || x.title }))));
   }
-  // The segments.
-  out.push(row("seg", "Segments", progSegs().map(n => progCard("seg", n, { img: ((P.segs[n] || [])[0] || {}).img, kick: tr("Segment"), title: P.segNames[n] || n, label: P.segNames[n] || n }))));
   return out.join("");
 }
 const DESK_LABEL = d => d || "News";

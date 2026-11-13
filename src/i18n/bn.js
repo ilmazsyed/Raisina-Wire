@@ -1395,4 +1395,5 @@ export default {
   "Rashtrix videos": "রাষ্ট্রিক্সের ভিডিও",
   "This programme is not available right now. Try again later.": "অনুষ্ঠানটি এখন দেখানো যাচ্ছে না। পরে আবার চেষ্টা করুন।",
   "The vertical channel: short videos, headlines and the news as it happens, around the clock.": "খাড়া চ্যানেল: ছোট ভিডিও, শিরোনাম আর এই মুহূর্তের খবর, সারাদিন সারারাত।",
+  "Shorts and the news stories from Rashtrix TV.": "শর্টস আর রাষ্ট্রিক্স টিভির খবর।",
 };
