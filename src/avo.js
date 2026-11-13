@@ -94,9 +94,12 @@ export async function avoFromBreaking(env, br) {
     .bind(id, String(br.text).slice(0, 300), "Breaking", "bengal", 99, JSON.stringify(sentencesOf(br.text).length ? sentencesOf(br.text) : [String(br.text)]), "new", istDay(), new Date().toISOString()).run().catch(() => {});
 }
 
+// Stories read as written (not from their report): the desk's own, breaking news typed in the
+// control room, and a wire story the desk has edited.
+const OWN = ["manual", "breaking", "edited"];
 // Voice and pictures for a chosen story.
 async function prepare(env, row, sex) {
-  const own = row.origin === "manual" || row.origin === "breaking" || row.article_id.startsWith("brk:");
+  const own = OWN.includes(row.origin) || row.article_id.startsWith("brk:");
   const brief = own ? (JSON.parse(row.script || "[]").join(" ") || row.title) : "";
   const a = own ? { id: row.article_id, title: row.title, dek: "", body: brief, published_at: row.published_at } : await env.DB.prepare("SELECT id, title, dek, body, published_at FROM articles WHERE id=?").bind(row.article_id).first();
   if (!a) { await env.DB.prepare("UPDATE avo_stories SET status='failed' WHERE article_id=?").bind(row.article_id).run(); return; }
@@ -207,10 +210,10 @@ export function screenStory(r) {
     voice: j(r.voice, "[]").map(k => `/api/tv/voice/${k}.mp3`), secs: r.secs,
     // (a story never yet judged under the picture rules shows none; one waiting to be judged again
     // keeps the photos it was given)
-    images: (r.origin !== "manual" && (r.img_v || 0) < 4 && !j(r.img_log, "[]").length ? [] : j(r.images, "[]")).map((x, i) => ({ src: /^\/(media|brand)\//.test(x.url || "") ? x.url : `/api/tv/aimg/${encodeURIComponent(r.article_id)}/${i}`, credit: x.credit || "" })), at: r.published_at, origin: r.origin || "auto", score: r.score || 0,
+    images: (!OWN.includes(r.origin) && (r.img_v || 0) < 4 && !j(r.img_log, "[]").length ? [] : j(r.images, "[]")).map((x, i) => ({ src: /^\/(media|brand)\//.test(x.url || "") ? x.url : `/api/tv/aimg/${encodeURIComponent(r.article_id)}/${i}${r.prepared_at ? `?v=${Date.parse(r.prepared_at) || 0}` : ""}`, credit: x.credit || "" })), at: r.published_at, origin: r.origin || "auto", score: r.score || 0,
     places: placesIn(`${r.title} ${j(r.script, "[]").slice(0, 2).join(" ")}`), topic: topicOf(`${r.title} ${j(r.script, "[]").slice(0, 2).join(" ")}`),
     imgLog: j(r.img_log, "[]"),
-    upd: !!(r.prepared_at && r.created_at && Date.parse(r.prepared_at) - Date.parse(String(r.created_at).replace(" ", "T") + "Z") > 15 * 60e3),
+    upd: (r.origin || "auto") === "auto" && !!(r.prepared_at && r.created_at && Date.parse(r.prepared_at) - Date.parse(String(r.created_at).replace(" ", "T") + "Z") > 15 * 60e3),
     // The explainer look (src/engine.js exSlides): West Bengal, Kolkata and India politics, the world
     // and Bangladesh. Other stories keep the AVO's own look.
     ex: bulletinRank(r.desk, `${r.title} ${j(r.script, "[]").slice(0, 2).join(" ")}`) <= 2 || ["World"].includes(r.desk) || /বাংলাদেশ|ঢাকা/.test(r.title || ""),
@@ -243,14 +246,14 @@ export async function avoPlayed(env, b, outputOk) {
   return { ok: true };
 }
 
-// The producer's AVO log: the last two days' stories with every airing.
+// The producer's AVO log: every story made in the last seven days, with every airing.
 export async function avoLog(env) {
-  const { results } = await env.DB.prepare("SELECT * FROM avo_stories WHERE created_at>=datetime('now','-2 days') ORDER BY created_at DESC LIMIT 150").all();
-  const plays = (await env.DB.prepare("SELECT article_id, channel, at FROM avo_plays WHERE at>=? ORDER BY at DESC LIMIT 2000").bind(new Date(Date.now() - 2 * 864e5).toISOString()).all()).results;
+  const { results } = await env.DB.prepare("SELECT * FROM avo_stories WHERE created_at>=datetime('now','-7 days') ORDER BY created_at DESC LIMIT 500").all();
+  const plays = (await env.DB.prepare("SELECT article_id, channel, at FROM avo_plays WHERE at>=? ORDER BY at DESC LIMIT 5000").bind(new Date(Date.now() - 7 * 864e5).toISOString()).all()).results;
   const by = new Map(); plays.forEach(p => { if (!by.has(p.article_id)) by.set(p.article_id, []); by.get(p.article_id).push({ ch: p.channel, at: p.at }); });
   const day = istDay(), today = results.filter(r => r.day === day && (r.origin || "auto") === "auto");
   const count = Object.fromEntries(Object.keys(QUOTA).map(k => [k, today.filter(r => r.region === k).length]));
-  return { quota: QUOTA, today: count, daily: AVO_DAILY, stories: results.map(r => ({ ...screenStory(r), labelsSet: (() => { try { return JSON.parse(r.labels || "null"); } catch { return null; } })(), status: r.status, origin: r.origin || "auto", createdBy: r.created_by || "", findMore: !!r.find_more, given: r.origin === "manual" ? (() => { try { return JSON.parse(r.images || "[]"); } catch { return []; } })() : [], score: r.score, aired: r.aired, views: r.views, lastAired: r.last_aired, createdAt: r.created_at, nImages: (() => { try { return JSON.parse(r.images || "[]").length; } catch { return 0; } })(), plays: by.get(r.article_id) || [], inRotation: r.status === "ready" && Date.parse(r.published_at) >= Date.now() - AVO_HOURS * 3600e3 && r.aired < AVO_MAX_AIRED })) };
+  return { quota: QUOTA, today: count, daily: AVO_DAILY, stories: results.map(r => ({ ...screenStory(r), labelsSet: (() => { try { return JSON.parse(r.labels || "null"); } catch { return null; } })(), status: r.status, origin: r.origin || "auto", createdBy: r.created_by || "", findMore: !!r.find_more, given: (() => { try { return JSON.parse(r.images || "[]"); } catch { return []; } })(), score: r.score, aired: r.aired, views: r.views, lastAired: r.last_aired, createdAt: r.created_at, nImages: (() => { try { return JSON.parse(r.images || "[]").length; } catch { return 0; } })(), plays: by.get(r.article_id) || [], inRotation: r.status === "ready" && Date.parse(r.published_at) >= Date.now() - AVO_HOURS * 3600e3 && r.aired < AVO_MAX_AIRED })) };
 }
 
 // The AVO Story Desk (control room): a story written by hand. Headline, a brief to be read (up to
@@ -258,12 +261,12 @@ export async function avoLog(env) {
 // desk. It is voiced and given its pictures like any other (within the minute), skips the daily
 // quota, and stays in rotation for six hours or four airings.
 const DESK_OK = ["Kolkata", "West Bengal", "India", "Probashi Bangali", "World", "Sports", "Entertainment", "Lifestyle", "Breaking"];
-function cleanManual(b) {
+function cleanManual(b, max = 450) {
   const title = String(b.title || "").replace(/\s+/g, " ").trim().slice(0, 200);
   const brief = String(b.brief || "").replace(/\s+/g, " ").trim();
   if (!title) throw new Error("Write the headline.");
   if (brief.length < 20) throw new Error("Write the brief to be read (at least a sentence).");
-  if (brief.length > 450) throw new Error("The brief is longer than 450 characters.");
+  if (brief.length > max) throw new Error(`The brief is longer than ${max} characters.`);
   const images = (Array.isArray(b.images) ? b.images : []).map(x => ({ url: String(x?.url || "").trim(), credit: String(x?.credit || "").replace(/\s+/g, " ").trim().slice(0, 120) }))
     .filter(x => /^(https:\/\/|\/media\/)/.test(x.url)).slice(0, 8)
     .map(x => ({ url: x.url, credit: x.credit ? (x.credit.startsWith("ছবি") ? x.credit : `ছবি: ${x.credit}`) : "" }));
@@ -279,7 +282,7 @@ export async function avoManualAdd(env, b, by) {
   return { ok: true, id };
 }
 export async function avoManualEdit(env, id, b) {
-  const row = await env.DB.prepare("SELECT origin FROM avo_stories WHERE article_id=?").bind(id).first();
+  const row = await env.DB.prepare("SELECT origin, status FROM avo_stories WHERE article_id=?").bind(id).first();
   if (!row) throw new Error("No such story.");
   // Any story can be relabelled (desk and weight for the running order's variety rules).
   if (b.labels !== undefined && Object.keys(b).length === 1) {
@@ -293,11 +296,15 @@ export async function avoManualEdit(env, id, b) {
     await env.DB.prepare(`UPDATE avo_stories SET status=? WHERE article_id=? AND status IN ('ready','off')`).bind(b.off ? "off" : "ready", id).run();
     return { ok: true };
   }
-  if (row.origin !== "manual") throw new Error("Only hand-written stories can be edited.");
-  const m = cleanManual(b), lines = sentencesOf(m.brief).length ? sentencesOf(m.brief) : [m.brief];
-  // Edited: voiced and pictured again, with the airings so far kept.
-  await env.DB.prepare("UPDATE avo_stories SET title=?, desk=?, region=?, script=?, images=?, find_more=?, voice='[]', secs=0, status='new' WHERE article_id=?")
-    .bind(m.title, m.desk, m.region, JSON.stringify(lines), JSON.stringify(m.images), m.findMore ? 1 : 0, id).run();
+  // Any story can be edited: headline, the words read, pictures, region and desk. A wire story the
+  // desk edits is read as written from then on ("edited"). It is voiced and pictured again within a
+  // minute and goes back on air (in rotation afresh: six hours or four airings from now; its
+  // airings so far stay in its log). A pulled story stays off until its report is put back.
+  if (row.status === "pulled") throw new Error("This story is pulled. Put it back first.");
+  const m = cleanManual(b, row.origin === "manual" ? 450 : 900), lines = sentencesOf(m.brief).length ? sentencesOf(m.brief) : [m.brief];
+  const origin = row.origin === "manual" || row.origin === "breaking" ? row.origin : "edited";
+  await env.DB.prepare("UPDATE avo_stories SET title=?, desk=?, region=?, script=?, images=?, find_more=?, origin=?, voice='[]', secs=0, status='new', published_at=?, aired=0, img_v=4 WHERE article_id=?")
+    .bind(m.title, m.desk, m.region, JSON.stringify(lines), JSON.stringify(m.images), m.findMore ? 1 : 0, origin, new Date().toISOString(), id).run();
   return { ok: true };
 }
 export async function avoManualDelete(env, id) {
@@ -306,4 +313,27 @@ export async function avoManualDelete(env, id) {
   if (row.origin !== "manual") throw new Error("Only hand-written stories can be deleted; take others out of rotation instead.");
   await env.DB.prepare("DELETE FROM avo_stories WHERE article_id=?").bind(id).run();
   return { ok: true };
+}
+
+// Any published story sent to the AVO engine by hand (the Stories list, the app's story tools, the
+// AVO desk): made from its report like the wire's own (its words and checked news photos), outside
+// the daily quota, and on air within a minute or two. A story already made is made again from its
+// report now and goes back on air. A pulled story is refused.
+export async function avoFromArticle(env, id, by) {
+  const a = await env.DB.prepare("SELECT id, title, dek, body, category, tags, status, pulled_at, published_at FROM articles WHERE id=? OR slug=?").bind(id, id).first();
+  if (!a) throw new Error("Story not found.");
+  if (a.status !== "published" || a.pulled_at) throw new Error("Only a published story can go on air.");
+  const now = new Date().toISOString(), row = await env.DB.prepare("SELECT origin, status FROM avo_stories WHERE article_id=?").bind(a.id).first();
+  if (row?.status === "pulled") throw new Error("This story is pulled. Put it back first.");
+  const lines = avoScript(a).lines;
+  if (row) {
+    // Made again from the report (a desk-edited one keeps its edited words and pictures).
+    const own = OWN.includes(row.origin);
+    await env.DB.prepare(`UPDATE avo_stories SET ${own ? "" : "title=?, script=?, origin='sent', images='[]', img_v=4, "}voice='[]', secs=0, status='new', published_at=?, aired=0 WHERE article_id=?`)
+      .bind(...(own ? [] : [a.title, JSON.stringify(lines)]), now, a.id).run();
+    return { ok: true, id: a.id, again: true };
+  }
+  await env.DB.prepare("INSERT INTO avo_stories (article_id,title,desk,region,score,script,status,day,published_at,origin,created_by) VALUES (?,?,?,?,?,?,'new',?,?,'sent',?)")
+    .bind(a.id, a.title, a.category, regionOf(a), 60, JSON.stringify(lines), istDay(), now, String(by || "").slice(0, 80)).run();
+  return { ok: true, id: a.id };
 }

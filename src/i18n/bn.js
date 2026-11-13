@@ -1406,4 +1406,12 @@ export default {
   "Tap Share, then Add to Home Screen.": "শেয়ার-এ চাপুন, তারপর ‘অ্যাড টু হোম স্ক্রিন’।",
   "Already installed. Open it from your home screen.": "অ্যাপ ইনস্টল করা আছে। হোম স্ক্রিন থেকে খুলুন।",
   "Install": "ইনস্টল",
+  "Send to AVO": "এভিও-তে পাঠান",
+  "Sent to AVO. On air within a minute or two.": "এভিও-তে পাঠানো হয়েছে। এক-দু’মিনিটের মধ্যে সম্প্রচারে যাবে।",
+  "Send a story to AVO": "এভিও-তে খবর পাঠান",
+  "Make again": "আবার তৈরি করুন",
+  "Add pictures": "ছবি দিন",
+  "Save and put on air": "সেভ করে সম্প্রচারে দিন",
+  "In rotation": "সম্প্রচারে",
+  "NO PICTURES": "ছবি নেই",
 };
