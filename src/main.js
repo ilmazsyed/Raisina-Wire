@@ -388,6 +388,7 @@ async function route({ restoreY = null } = {}) {
   stopListening();
   if (!["watch", "tv"].includes(r.page) && tvInstance) { tvInstance.destroy(); tvInstance = null; }
   if (r.page !== "home" && homeTV) { homeTV.destroy(); homeTV = null; }
+  if (r.page !== "home" && homeTVv) { homeTVv.destroy(); homeTVv = null; }
   if (r.page !== "shorts" && shortsObserver) { shortsObserver.disconnect(); shortsObserver = null; }
   if (["home", "editions", "search", "author", "edition", "article", "tag", "my", "desk", "briefs", "live"].includes(r.page)) {
     await Promise.race([Promise.all([articlesReady, writersReady]), new Promise(res => setTimeout(res, 1200))]);
@@ -467,10 +468,12 @@ function viewHome() {
     <section id="liveBanner" class="band-tight" aria-label="Live coverage" hidden></section>
     <div class="lead-grid">
       ${side.length ? `<section class="side-stack" aria-label="More top stories"><div class="kicker">Top stories</div>
-        ${side.map(e => `<a class="side-item" href="${edHref(e)}"><div class="thumb">${pic(e)}</div><span class="kicker">${newTag(e)}${esc(e.category)}</span><h3>${esc(e.title)}</h3><span class="meta">${ago(e.publishedAt)}</span></a>`).join("")}
+        ${side.map(e => `<a class="side-item side-text" href="${edHref(e)}"><span class="kicker">${newTag(e)}${esc(e.category)}</span><h3>${esc(e.title)}</h3><span class="meta">${ago(e.publishedAt)}</span></a>`).join("")}
       </section>` : ""}
       <div class="lead-mid"><section class="lead-carousel" id="leadCarousel" aria-roledescription="carousel" aria-label="Latest stories"></section>
-        <section class="home-live" aria-label="Rashtrix TV"><div class="hl-head"><b><span class="dot-live"></span><span data-no-tr>LIVE TV</span></b><a class="link-gold" href="${withLang("/watch")}">Watch full screen →</a></div><div class="hl-player" id="homeTV" data-no-tr></div></section></div>
+        <section class="home-live" aria-label="Rashtrix TV"><div class="hl-head"><b><span class="dot-live"></span><span data-no-tr>LIVE TV</span></b><a class="link-gold" href="${withLang("/watch")}">Watch full screen →</a></div><div class="hl-player" id="homeTV" data-no-tr></div></section>
+        <section class="home-live home-live-v" aria-label="Rashtrix Shorts"><div class="hlv"><div class="hl-player hl-v" id="homeTVv" data-no-tr></div>
+          <div class="hlv-info"><b class="hlv-live"><span class="dot-live"></span><span data-no-tr>LIVE</span></b><h3>Rashtrix Shorts</h3><p>The vertical channel: short videos, headlines and the news as it happens, around the clock.</p><a class="btn btn-red" href="${withLang("/watch?ch=v")}">Watch full screen →</a></div></div></section></div>
       <div class="latest-col"><section id="shortsRail" class="shorts-rail" aria-label="Shorts" hidden></section>
       <aside class="live-rail glass" aria-label="Latest news"><div class="live-title"><b><span class="dot-live"></span>Latest</b><a class="link-gold" href="/live" style="font-size:13px">All →</a></div><div id="rail"></div></aside></div>
     </div>
@@ -2065,13 +2068,16 @@ async function playProg(kind, id) {
 }
 // Rashtrix TV in the app: the channel's own player (not the YouTube page of the stream).
 const tvChannel = () => store.get("rw-tv-ch", "h") === "v" ? "v" : "h";
-let tvInstance = null, homeTV = null, tvHost = null, tvHostCh = "";
+let tvInstance = null, homeTV = null, homeTVv = null, tvHost = null, tvHostCh = "";
 // The home page's live player (desktop): Rashtrix TV, muted until its sound button is tapped.
 function mountHomeTV() {
-  homeTV?.destroy(); homeTV = null;
-  const host = $("#homeTV"); if (!host) return;
-  if (!matchMedia("(min-width: 1181px)").matches) { host.closest(".home-live").hidden = true; return; }
+  homeTV?.destroy(); homeTV = null; homeTVv?.destroy(); homeTVv = null;
+  const host = $("#homeTV"), hostV = $("#homeTVv"); if (!host) return;
+  // Rashtrix TV from tablet size up; Rashtrix Shorts beside it on laptops and desktops (muted).
+  if (!matchMedia("(min-width: 761px)").matches) { host.closest(".home-live").hidden = true; hostV && (hostV.closest(".home-live").hidden = true); return; }
   homeTV = mountTV(host, { channel: "h", muted: true, tapUnmute: false });
+  if (hostV && matchMedia("(min-width: 1181px)").matches) homeTVv = mountTV(hostV, { channel: "v", muted: true, tapUnmute: false });
+  else if (hostV) hostV.closest(".home-live").hidden = true;
 }
 function mountWatchTV() {
   const host = $("#tvWatch"); if (!host) return;

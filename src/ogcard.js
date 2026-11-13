@@ -17,14 +17,18 @@ import { bulletinRank } from "./labels.js";
 const SITE_SLUG = "__site";
 async function siteData(env) {
   const since = new Date(Date.now() - 6 * 3600e3).toISOString();
-  const { results } = await env.DB.prepare("SELECT title, dek, category, published_at FROM articles WHERE status='published' AND lang='bn' AND pulled_at IS NULL AND published_at>=? AND published_at<=? ORDER BY published_at DESC LIMIT 40")
+  const { results } = await env.DB.prepare("SELECT id, title, dek, category, published_at FROM articles WHERE status='published' AND lang='bn' AND pulled_at IS NULL AND published_at>=? AND published_at<=? ORDER BY published_at DESC LIMIT 40")
     .bind(since, new Date().toISOString()).all().catch(() => ({ results: [] }));
   // The top headlines in the channel's order (West Bengal politics first), newest first within it.
-  const heads = results.map(r => ({ t: r.title, p: bulletinRank(r.category, `${r.title} ${r.dek || ""}`), at: r.published_at }))
-    .sort((a, b) => a.p - b.p || String(b.at).localeCompare(String(a.at))).map(x => x.t).slice(0, 3);
-  // On the screen: the newest AVO story's first checked photo, else the studio.
-  const avo = await env.DB.prepare("SELECT article_id FROM avo_stories WHERE status='ready' AND json_array_length(images)>0 AND published_at>=? ORDER BY published_at DESC LIMIT 1").bind(since).first().catch(() => null);
-  return { headlines: heads, photo: avo ? `/api/tv/aimg/${encodeURIComponent(avo.article_id)}/0` : "/brand/studio-wide.webp" };
+  const top = results.map(r => ({ id: r.id, t: r.title, p: bulletinRank(r.category, `${r.title} ${r.dek || ""}`), at: r.published_at }))
+    .sort((a, b) => a.p - b.p || String(b.at).localeCompare(String(a.at))).slice(0, 3);
+  // On the screen: the top headline's OWN checked photo (its AVO story's, else its bulletin
+  // picture), never another story's; without one, the studio.
+  const id = top[0]?.id;
+  const avo = id ? await env.DB.prepare("SELECT article_id FROM avo_stories WHERE article_id=? AND json_array_length(images)>0").bind(id).first().catch(() => null) : null;
+  const bimg = id && !avo ? await env.DB.prepare("SELECT article_id FROM bulletin_images WHERE article_id=? AND url<>''").bind(id).first().catch(() => null) : null;
+  const photo = avo ? `/api/tv/aimg/${encodeURIComponent(id)}/0` : bimg ? `/api/tv/bimg/${encodeURIComponent(id)}` : "/brand/studio-wide.webp";
+  return { headlines: top.map(x => x.t), photo };
 }
 // The card's version (its time), for the address pages give it: share previews are cached by
 // address, so a new picture gets a new one.
