@@ -2071,3 +2071,33 @@ html.standalone,html.standalone body{overscroll-behavior-y:none}
   header.wrap .nameplate-tag p.tagline{font-size:14px;line-height:1.35}
   header.wrap .mast-rule{grid-row:3}
 }
+
+/* The app and alerts offers: a small card at the foot of the screen, never a full-screen sheet. */
+.nudge[hidden]{display:none!important}
+.nudge{position:fixed;z-index:120;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(380px,calc(100vw - 24px));
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;column-gap:12px;row-gap:10px;align-items:center;padding:14px 12px 12px 14px;border-radius:18px;
+  background:linear-gradient(160deg,rgba(26,20,20,.97),rgba(12,10,12,.97));color:#f4efe6;border:1px solid rgba(201,162,39,.38);
+  box-shadow:0 18px 40px -16px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  animation:nudgeIn .42s cubic-bezier(.2,.8,.2,1) both}
+@keyframes nudgeIn{from{opacity:0;transform:translate(-50%,18px)}to{opacity:1;transform:translate(-50%,0)}}
+@media(prefers-reduced-motion:reduce){.nudge{animation:none}}
+@media(min-width:761px){.nudge{left:auto;right:22px;bottom:22px;transform:none;animation-name:nudgeInR}}
+@keyframes nudgeInR{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.nudge-icon{width:46px;height:46px;border-radius:12px;flex:none}
+.nudge-icon.app{box-shadow:0 0 0 1px rgba(201,162,39,.45)}
+.nudge-icon.bell{display:grid;place-items:center;background:radial-gradient(circle at 30% 25%,#c9a227,#8a6a12);color:#1a1208}
+.nudge-icon.bell svg{width:22px;height:22px}
+.nudge-copy{min-width:0}
+.nudge-copy h2{margin:0;font:700 15px/1.3 var(--serif);color:#fff;letter-spacing:.1px}
+.nudge-copy p{margin:3px 0 0;font:400 12.5px/1.45 var(--serif);color:rgba(244,239,230,.68)}
+.nudge-x{align-self:start;width:28px;height:28px;margin:-4px -2px 0 0;display:grid;place-items:center;border:0;border-radius:50%;background:transparent;color:rgba(244,239,230,.55);cursor:pointer}
+.nudge-x:hover{background:rgba(255,255,255,.08);color:#fff}
+.nudge-x svg{width:14px;height:14px}
+.nudge-actions{grid-column:1/-1;display:flex;justify-content:flex-end;align-items:center;gap:6px}
+.nudge-actions [hidden]{display:none}
+.nudge-later{border:0;background:transparent;color:rgba(244,239,230,.7);font:600 13px/1 var(--serif);padding:10px 12px;border-radius:999px;cursor:pointer}
+.nudge-later:hover{color:#fff;background:rgba(255,255,255,.06)}
+.nudge-go{border:0;cursor:pointer;padding:10px 18px;border-radius:999px;font:700 13.5px/1 var(--serif);color:#fff;background:linear-gradient(180deg,#c20a0a,#9a0404);box-shadow:0 6px 16px -8px rgba(194,10,10,.8),inset 0 1px 0 rgba(255,255,255,.18)}
+.nudge-go:hover{filter:brightness(1.08)}
+.nudge .nudge-actions{display:flex;flex-direction:row;grid-template-columns:none;justify-content:flex-end;align-items:center;gap:6px;margin:0;padding:0}
+.nudge .nudge-actions button{width:auto;min-width:0;min-height:0;height:auto;margin:0;flex:none}

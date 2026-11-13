@@ -1346,4 +1346,12 @@ export default {
   "Shorts from Rashtrix.": "राष्ट्रिक्स के शॉर्ट्स।",
   "Watch more videos on YouTube": "यूट्यूब पर और वीडियो देखें",
   "Shorts and the news stories from Rashtrix TV.": "शॉर्ट्स और राष्ट्रिक्स टीवी की खबरें।",
+  "Breaking news alerts": "ब्रेकिंग न्यूज़ अलर्ट",
+  "Only the big stories. Turn off any time.": "सिर्फ बड़ी खबरें। कभी भी बंद करें।",
+  "Get the Rashtrix app": "राष्ट्रिक्स ऐप लें",
+  "Faster, works offline, no app store.": "तेज़, ऑफ़लाइन भी चले, ऐप स्टोर की ज़रूरत नहीं।",
+  "Or install from your browser menu.": "या ब्राउज़र मेनू से इंस्टॉल करें।",
+  "Tap Share, then Add to Home Screen.": "शेयर दबाएँ, फिर ‘ऐड टु होम स्क्रीन’।",
+  "Already installed. Open it from your home screen.": "ऐप इंस्टॉल है। होम स्क्रीन से खोलें।",
+  "Install": "इंस्टॉल",
 };
