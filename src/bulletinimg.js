@@ -7,6 +7,7 @@
 // Runs in the minute cron, a few stories at a time; each story is looked up once (again after
 // twelve hours if nothing was found). The app loads the pictures through /api/tv/bimg/<id>, so
 // publishers that refuse other sites' pages still show.
+import { proxyImage } from "./imgproxy.js";
 import { imageTerms } from "./wiredesk.js";
 
 const UA = "RashtrixTV/1.0 (bulletin pictures; https://rashtrix.live)";
@@ -143,12 +144,10 @@ export async function bulletinImages(env, n = 3) {
 }
 
 // GET /api/tv/bimg/<article id>: the bulletin picture, fetched once and cached at the edge.
-export async function bulletinImageRoute(env, id) {
+export async function bulletinImageRoute(env, id, request) {
   const row = await env.DB.prepare("SELECT url FROM bulletin_images WHERE article_id=? AND url<>''").bind(id).first().catch(() => null);
   if (!row) return new Response("Not found", { status: 404 });
-  const r = await fetch(row.url, { headers: { "user-agent": BROWSER_UA, accept: "image/*" }, cf: { cacheTtl: 86400, cacheEverything: true }, signal: AbortSignal.timeout(10000) }).catch(() => null);
-  if (!r?.ok || !/^image\//.test(r.headers.get("content-type") || "")) return Response.redirect(row.url, 302);
-  return new Response(r.body, { headers: { "content-type": r.headers.get("content-type"), "cache-control": "public, max-age=86400" } });
+  return proxyImage(request, row.url);
 }
 
 // Several clean photographs for one story (the AVO engine wants four or more): every usable

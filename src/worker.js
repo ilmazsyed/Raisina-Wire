@@ -1240,10 +1240,10 @@ async function api(request, env, ctx) {
   // ---- The Watch page's videos: the channels' YouTube videos, each filed under a desk from its
   // title (long videos from the horizontal channel, Shorts from the vertical one).
   // The bulletin's pictures and the newsreader's lines.
-  { const m = url.pathname.match(/^\/api\/tv\/bimg\/([^/]+)$/); if (m && request.method === "GET") return bulletinImageRoute(env, decodeURIComponent(m[1])); }
+  { const m = url.pathname.match(/^\/api\/tv\/bimg\/([^/]+)$/); if (m && request.method === "GET") return bulletinImageRoute(env, decodeURIComponent(m[1]), request); }
   { const m = url.pathname.match(/^\/api\/tv\/voice\/([0-9a-f]{20,64})\.mp3$/); if (m && request.method === "GET") return voiceRoute(env, m[1]); }
   // The AVO engine (src/avo.js): a story's pictures, and each time a story goes out.
-  { const m = url.pathname.match(/^\/api\/tv\/aimg\/([^/]+)\/(\d{1,2})$/); if (m && request.method === "GET") return avoImageRoute(env, decodeURIComponent(m[1]), m[2]); }
+  { const m = url.pathname.match(/^\/api\/tv\/aimg\/([^/]+)\/(\d{1,2})$/); if (m && request.method === "GET") return avoImageRoute(env, decodeURIComponent(m[1]), m[2], request); }
   // Video-start diagnostics: each screen reports how long a video took to start after its turn
   // (whether it was loaded in advance, the player's states with their timings, the kind of device).
   // No personal data; the last 60 are kept, to find what holds a video back on real phones.

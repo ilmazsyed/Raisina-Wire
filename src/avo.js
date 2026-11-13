@@ -16,6 +16,7 @@
 //   the model unavailable, the stricter free rules). A story with fewer than two is told in motion
 //   graphics on the screens (its icon, map, figure and sentences).
 // - A story leaves the rotation when it is six hours old or has been on air four times.
+import { proxyImage } from "./imgproxy.js";
 import { wholeSentences, sentencesIn, noDots } from "./sentences.js";
 import { readLine, voiceKey, tvVoice, voiceRate, voiceBudget, chargeVoice } from "./bulletinvoice.js";
 import { synthesize, sha256, ttsEnabled } from "./tts.js";
@@ -219,13 +220,11 @@ export function screenStory(r) {
 }
 
 // GET /api/tv/aimg/<id>/<n>: one of a story's pictures, fetched once and cached at the edge.
-export async function avoImageRoute(env, id, n) {
+export async function avoImageRoute(env, id, n, request) {
   const row = await env.DB.prepare("SELECT images FROM avo_stories WHERE article_id=?").bind(id).first().catch(() => null);
   let url = ""; try { url = JSON.parse(row?.images || "[]")[Number(n)]?.url || ""; } catch { /* none */ }
   if (!url) return new Response("Not found", { status: 404 });
-  const r = await fetch(url, { headers: { "user-agent": "Mozilla/5.0 (compatible; RashtrixTV/1.0)", accept: "image/*" }, cf: { cacheTtl: 86400, cacheEverything: true }, signal: AbortSignal.timeout(10000) }).catch(() => null);
-  if (!r?.ok || !/^image\//.test(r.headers.get("content-type") || "")) return Response.redirect(url, 302);
-  return new Response(r.body, { headers: { "content-type": r.headers.get("content-type"), "cache-control": "public, max-age=86400" } });
+  return proxyImage(request, url);
 }
 
 // POST /api/tv/avo/played {id, ch, key?}: a story went out. From the broadcast output (with its
