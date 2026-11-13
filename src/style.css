@@ -2055,3 +2055,19 @@ html.standalone,html.standalone body{overscroll-behavior-y:none}
   .side-stack{grid-area:side}
   .latest-col .live-rail{grid-area:rail;align-self:start}
 }
+
+/* Watch: more on the Rashtrix YouTube channel. */
+.w-yt{display:flex;justify-content:center;margin:26px 0 8px}
+.w-yt-btn{display:inline-flex;align-items:center;gap:10px;padding:12px 22px;border-radius:999px;background:var(--ink,#111);color:var(--paper,#fff)!important;font:700 15px/1.2 var(--serif);text-decoration:none;box-shadow:0 8px 20px -12px rgba(0,0,0,.5)}
+.w-yt-btn:hover{opacity:.9}
+
+/* Phones: the tools get their own row above the logo and the tagline, so nothing overlaps. */
+@media(max-width:560px){
+  header.wrap{grid-template-columns:minmax(0,1fr);row-gap:6px}
+  header.wrap .utility-right{grid-column:1;grid-row:1;display:flex;align-items:center;justify-content:flex-end;width:100%;min-width:0}
+  header.wrap .utility-right>.live-tv-btn{margin-right:auto}
+  header.wrap .nameplate{grid-column:1;grid-row:2}
+  header.wrap .nameplate-tag{display:block}
+  header.wrap .nameplate-tag p.tagline{font-size:14px;line-height:1.35}
+  header.wrap .mast-rule{grid-row:3}
+}
