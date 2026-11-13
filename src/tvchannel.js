@@ -305,6 +305,8 @@ export async function tvState(env, ch) {
   const value = {
     channel: ch, on: s.on, serverTime: Date.now(),
     live: live || null,
+    // The live split from the Breaking desk (the realtime state carries it too).
+    split: live ? await liveSplit(env, ch).catch(() => null) : null,
     schedule: s.on ? schedule : [],
     breaking: s.breaking && Date.now() - Date.parse(s.breaking.at) < (s.breaking.seconds + 90) * 1000 ? s.breaking : null,
     lband: ch === "h" ? s.lband : null,
@@ -363,4 +365,14 @@ export async function copyImage(env, url, userId) {
   const key = crypto.randomUUID().replace(/-/g, "").slice(0, 20), ext = mime.split("/")[1].replace("jpeg", "jpg");
   await env.DB.prepare("INSERT INTO images (id,mime,data,bytes,alt,uploaded_by) VALUES (?,?,?,?,?,?)").bind(key, mime, bytes.buffer, bytes.length, "TV promo", userId || null).run();
   return `/media/${key}.${ext}`;
+}
+
+// The Breaking desk's live split for a channel: on, with the pointers' sets put live (src/worker.js).
+async function liveSplit(env, ch) {
+  const r = await env.DB.prepare("SELECT value FROM settings WHERE key='tv:livedesk'").first();
+  if (!r) return null;
+  const d = JSON.parse(r.value || "{}");
+  if (!d.split?.[ch]) return null;
+  const sets = (d.sets || []).filter(x => x.live).map(x => (x.points || []).map(t => String(t || "").trim()).filter(Boolean).slice(0, 3)).filter(x => x.length);
+  return { on: true, every: d.every || 10, sets, title: d.title || "" };
 }

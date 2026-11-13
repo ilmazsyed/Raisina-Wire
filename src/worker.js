@@ -1335,6 +1335,23 @@ async function api(request, env, ctx) {
         return json({ stories: results.map(r => ({ id: r.id, title: r.title, desk: r.category, kind: r.kind, at: r.published_at, avo: r.avo || "" })) }, 200, { "cache-control": "no-store" });
       }
       if (first === "avo" && request.method === "GET") return json(await avoLog(env), 200, { "cache-control": "no-store" });
+      // ---- The Breaking desk (breaking.html): every breaking goes out from here, and the live split.
+      if (first === "desk" && request.method === "GET") return json(await breakingDesk(env), 200, { "cache-control": "no-store" });
+      if (first === "desk" && second === "breaking" && request.method === "POST") {
+        const chs = (Array.isArray(b.channels) ? b.channels : CHANNELS).filter(c => CHANNELS.includes(c));
+        if (!chs.length) return err("Choose a channel.");
+        let br = null;
+        try { for (const ch of chs) { br = await setBreaking(env, ch, b); await ctlCommand(env, ch, "breaking", br ? br : { clear: true }, user.display_name || user.email, "breaking").catch(() => {}); } }
+        catch (e) { return err(e.message); }
+        // One AVO story for the breaking (not one per channel), and the desk's log.
+        if (br) await avoFromBreaking(env, br).catch(() => {});
+        await deskLog(env, { act: br ? "breaking" : "clear", text: br?.text || "", channels: chs, seconds: br?.seconds || 0, by: user.display_name || user.email, at: new Date().toISOString() });
+        await audit(env, user, br ? "tv.breaking" : "tv.breaking.clear", "tv", chs.join(","), br || {});
+        return done({ ok: true, breaking: br });
+      }
+      if (first === "desk" && second === "live" && request.method === "PUT") {
+        try { return done(await saveLiveDesk(env, b, user)); } catch (e) { return err(e.message); }
+      }
       // The AVO Story Desk: write, edit, take out of rotation, delete.
       if (first === "avo" && second === "send" && request.method === "POST") { try { const out = await avoFromArticle(env, String(b.id || ""), user.display_name || user.email); await audit(env, user, "avo.send", "avo", out.id, {}); clearTvCache(); return json(out); } catch (e) { return err(e.message); } }
       if (first === "avo" && !second && request.method === "POST") { try { const out = await avoManualAdd(env, b, user.display_name || user.email); await audit(env, user, "avo.add", "avo", out.id, { title: b.title }); return json(out); } catch (e) { return err(e.message); } }
@@ -1910,3 +1927,54 @@ export default {
     return new Response("Rashtrix assets are not built. Run npm run build.", { status: 503 });
   }
 };
+
+/* ---------- The Breaking desk (breaking.html, src/breakingdesk.js) ----------
+   Every breaking goes out from here (both channels or one), with its log. The live desk: the
+   YouTube lives (add one, cut it on air, back to the running order), and the live split: the live
+   at 60 and the desk's pointers at 40 (up to 24, in eight sets of three, each set put live or
+   taken off; the sets on air take turns on screen). Pointers and the split are kept in settings
+   (key tv:livedesk) and sent to each channel's realtime state, so a change is on screen in a second. */
+async function deskSettings(env, key, fallback) {
+  const r = await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(key).first().catch(() => null);
+  try { return r ? JSON.parse(r.value) : fallback; } catch { return fallback; }
+}
+async function putDeskSettings(env, key, v) {
+  await env.DB.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(key, JSON.stringify(v)).run();
+}
+async function deskLog(env, row) {
+  const log = await deskSettings(env, "tv:breaklog", []);
+  log.unshift(row); await putDeskSettings(env, "tv:breaklog", log.slice(0, 40));
+}
+const LIVE_DESK = { sets: [], every: 10, split: { h: false, v: false } };
+async function liveDesk(env) {
+  const d = await deskSettings(env, "tv:livedesk", LIVE_DESK);
+  return { ...LIVE_DESK, ...d, split: { ...LIVE_DESK.split, ...(d.split || {}) } };
+}
+// What goes on screen: the sets put live, each of up to three pointers.
+const liveSets = d => (d.sets || []).filter(x => x.live).map(x => (x.points || []).map(t => String(t || "").trim()).filter(Boolean).slice(0, 3)).filter(x => x.length);
+async function breakingDesk(env) {
+  const [desk, log, lives, h, v] = await Promise.all([liveDesk(env), deskSettings(env, "tv:breaklog", []),
+    env.DB.prepare("SELECT id, channel, yt_id, title, live_now, on_air, live_video, last_error, last_refresh FROM tv_sources WHERE kind='live' AND active=1 ORDER BY created_at DESC").all().then(r => r.results).catch(() => []),
+    tvSettings(env, "h"), tvSettings(env, "v")]);
+  const cur = s => s.breaking && Date.now() - Date.parse(s.breaking.at) < (s.breaking.seconds + 90) * 1000 ? s.breaking : null;
+  return { desk, log, lives, breaking: { h: cur(h), v: cur(v) } };
+}
+async function saveLiveDesk(env, b, user) {
+  const d = await liveDesk(env);
+  if (b.sets !== undefined) {
+    if (!Array.isArray(b.sets)) throw new Error("Pointers are missing.");
+    const sets = b.sets.slice(0, 8).map((x, i) => ({ id: String(x?.id || `s${i + 1}`).slice(0, 20), live: !!x?.live,
+      points: (Array.isArray(x?.points) ? x.points : []).slice(0, 3).map(t => String(t || "").replace(/\s+/g, " ").trim().slice(0, 160)) }));
+    if (sets.reduce((n, x) => n + x.points.filter(Boolean).length, 0) > 24) throw new Error("At most 24 pointers.");
+    d.sets = sets;
+  }
+  if (b.every !== undefined) d.every = Math.max(6, Math.min(30, Math.round(Number(b.every) || 10)));
+  if (b.title !== undefined) d.title = String(b.title || "").replace(/\s+/g, " ").trim().slice(0, 80);
+  if (b.split) for (const ch of CHANNELS) if (b.split[ch] !== undefined) d.split[ch] = !!b.split[ch];
+  await putDeskSettings(env, "tv:livedesk", d);
+  const sets = liveSets(d), by = user.display_name || user.email;
+  for (const ch of CHANNELS) await ctlCommand(env, ch, "split", d.split[ch] ? { on: true, every: d.every, sets, title: d.title || "" } : { on: false }, by, "split").catch(() => {});
+  await audit(env, user, "tv.livedesk", "tv", "", { split: d.split, sets: sets.length });
+  clearTvCache();
+  return { ok: true, desk: d };
+}

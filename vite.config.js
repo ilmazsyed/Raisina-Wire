@@ -46,7 +46,8 @@ export default defineConfig({
         guest: resolve(import.meta.dirname, "guest.html"),
         onair: resolve(import.meta.dirname, "onair.html"),
         prompter: resolve(import.meta.dirname, "prompter.html"),
-        avodesk: resolve(import.meta.dirname, "avodesk.html")
+        avodesk: resolve(import.meta.dirname, "avodesk.html"),
+        breaking: resolve(import.meta.dirname, "breaking.html")
       }
     }
   }

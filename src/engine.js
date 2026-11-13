@@ -430,7 +430,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       <div class="tvp-bg"><i class="dots"></i><i class="arc a1"></i><i class="arc a2"></i><i class="sheen"></i></div>
       ${mode === "app" ? `<div class="tvp-ytlayer" hidden><div class="tvs-ytwrap"><div class="tvs-yt"></div></div><div class="tvp-shield"></div></div>` : ""}
       <div class="tvp-stage"></div>
-      <div class="tvp-lbl"></div><div class="tvp-gfx"></div><div class="tvp-ovl"></div><div class="tvp-cd" hidden></div><div class="tvp-tease" hidden></div><div class="tvp-promo" hidden></div><div class="tvp-cm" hidden></div>
+      <div class="tvp-lbl"></div><div class="tvp-split" hidden></div><div class="tvp-gfx"></div><div class="tvp-ovl"></div><div class="tvp-cd" hidden></div><div class="tvp-tease" hidden></div><div class="tvp-promo" hidden></div><div class="tvp-cm" hidden></div>
       <div class="tv-bug tv-bug-fixed"><img src="${LOGO}" alt=""></div>
       <div class="tv-mkt" hidden><span class="mkt-label" data-no-tr>MARKETS</span><div class="mkt-track"></div></div>
       <div class="tvp-standby" hidden><img src="${LOGO}" alt=""><b>অনুষ্ঠান একটু পরেই</b><small>আমাদের সঙ্গে থাকুন</small></div>
@@ -1972,7 +1972,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     marketTicker(channel === "h" && L.ticker !== false && (!fullGfx || exOn) && sc && !sc.off && !sc.standby && sc.layout !== "lband");
     // The automatic L-band is decided here, before any early return: a graphic, a stand-by or an
     // empty scene that cuts in while it is showing takes it off at once (it used to stay frozen).
-    autoLband(sc, !!sc && !sc.off && !sc.standby && !fullGfx && !!(sc.sources || []).length && !sc.graphic && sc.layout !== "lband" && (sc.sources || []).length === 1 && sc.layout !== "pip", L);
+    autoLband(sc, !!sc && !sc.off && !sc.standby && !fullGfx && !!(sc.sources || []).length && !sc.graphic && sc.layout !== "lband" && (sc.sources || []).length === 1 && sc.layout !== "pip" && !splitOf(sc), L);
+    const sp = splitOf(sc); drawSplit(sp);
     if (!sc || sc.off || sc.standby || mode === "scene" && !sc.sources?.length && !sc.graphic) { put(".tvp-gfx", ""); put(".tvp-ovl", ""); return; }
     // The explainer AVO keeps the tickers running under it (the headlines and, on Rashtrix TV, the markets).
     if (exOn) {
@@ -1983,7 +1984,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     // Full-screen graphics (the bulletin, promos): LIVE and the clock stay on screen.
     if (fullGfx && channel === "h") { put(".tvp-gfx", dtBar(L, s)); put(".tvp-ovl", ""); return; }
     if (fullGfx) { put(".tvp-gfx", `<div class="tv-liveclock">${L.live ? `<span class="tv-live"><i></i>LIVE</span>` : ""}${L.clock ? `<span class="tv-clock">${ist()}</span>` : ""}</div>`); put(".tvp-ovl", ""); return; }
-    const isVideo = (sc.sources || []).length && !sc.graphic, lband = sc.layout === "lband";
+    // (in the live split the pointers take the place of the name strap and the ad box)
+    const isVideo = (sc.sources || []).length && !sc.graphic, lband = sc.layout === "lband" || !!sp;
     const ticker = [...(c.ticker || []), ...(sc.ticker || []), ...(L.weather && s.weather ? [s.weather] : []), ...(s.ticker || [])];
     const strap = c.lower && L.lower ? c.lower : sc.lower && L.lower ? sc.lower : null;
     if (channel === "h") {
@@ -1995,7 +1997,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     } else {
       const flash = s.band || (s.headlines || [])[st.flash % Math.max(1, (s.headlines || []).length)]?.text || "";
       gfx = `
-        ${isVideo && L.lower ? `<div class="v-flash"><i class="vf-wipe"></i><span>${strap ? "রাষ্ট্রিক্স" : s.band ? "রাষ্ট্রিক্স" : "শিরোনাম"}</span><b>${esc(strap ? `${strap.name}${strap.title ? ` · ${strap.title}` : ""}` : flash)}</b></div>` : ""}
+        ${isVideo && L.lower && !sp ? `<div class="v-flash"><i class="vf-wipe"></i><span>${strap ? "রাষ্ট্রিক্স" : s.band ? "রাষ্ট্রিক্স" : "শিরোনাম"}</span><b>${esc(strap ? `${strap.name}${strap.title ? ` · ${strap.title}` : ""}` : flash)}</b></div>` : ""}
         ${L.live ? `<div class="tv-live v"><i></i>LIVE</div>` : ""}${L.clock ? `<div class="tv-clock v">${ist()}</div>` : ""}
         ${L.ticker ? `<div class="tv-ticker v"><span class="tk-label">খবর</span><div class="tk-track">${tickerHTML(ticker)}</div></div>` : ""}`;
     }
@@ -2007,6 +2009,30 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
 
     put(".tvp-gfx", gfx); put(".tvp-ovl", ovl);
     fillAds();
+  }
+  /* ---------- the live split (Breaking desk) ----------
+     A YouTube live on air with the split on: the live at 60 (left on Rashtrix TV, top on Shorts)
+     and the desk's pointers at 40, three at a time; the sets put live take turns on screen. */
+  function splitOf(sc) {
+    const sp = st.ctl?.split || st.tv?.split;
+    if (!sp?.on || !sc || sc.off || sc.standby || !String(sc.key || "").startsWith("live:")) return null;
+    return sp;
+  }
+  function drawSplit(sp) {
+    const layer = $(".tvp-split"); if (!layer) return;
+    stage.classList.toggle("split-on", !!sp);
+    if (!sp) { layer.hidden = true; if (layer.innerHTML) layer.innerHTML = ""; return; }
+    layer.hidden = false;
+    const sets = (sp.sets || []).filter(x => x.length), every = Math.max(6, sp.every || 10);
+    const k = sets.length ? Math.floor(now() / (every * 1000)) % sets.length : 0;
+    const first = sets.slice(0, k).reduce((n, x) => n + x.length, 0);
+    const title = sp.title || st.tv?.live?.title || "";
+    // The panel comes in once and stays; only the pointers inside change (each set slides in).
+    if (!layer.querySelector(".sp-panel")) { layer.innerHTML = `<div class="sp-panel"><div class="sp-head"><span class="sp-live"><i></i>সরাসরি</span><b>আপডেট</b><span class="sp-count"></span></div><div class="sp-body"></div></div><div class="sp-tl"></div>`; layer.__html = null; ["sp-count", "sp-body", "sp-tl"].forEach(c => { layer.querySelector(`.${c}`).__html = null; }); }
+    put(".tvp-split .sp-count", sets.length > 1 ? `${bnDigits(k + 1)}/${bnDigits(sets.length)}` : "");
+    put(".tvp-split .sp-body", sets.length ? `<ol class="sp-list" data-k="${k}">${sets[k].map((t, i) => `<li style="--n:${i}"><span class="sp-no">${bnDigits(first + i + 1)}</span><p>${esc(t)}</p></li>`).join("")}</ol>
+      ${sets.length > 1 ? `<div class="sp-bar"><i style="animation-duration:${every}s"></i></div>` : ""}` : `<div class="sp-wait">আপডেট আসছে…</div>`);
+    put(".tvp-split .sp-tl", title ? `<div class="sp-title"><span>LIVE</span><b>${esc(title)}</b></div>` : "");
   }
   function autoLband(sc, video, L) {
     const cfg = st.tv?.lbandAuto, layer = $(".tvp-lbl");

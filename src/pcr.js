@@ -225,7 +225,7 @@ async function dump() { await cmd("dump"); toast("DUMP: the outputs threw away t
     </div><div class="tbar"><button class="btn red take" id="take" data-cmd="take">TAKE</button><button class="btn green auto" id="auto" data-cmd="auto">AUTO</button><p class="muted" style="max-width:150px;font-size:12px">TAKE puts preview on air. AUTO goes back to the rundown (or the running order).</p></div></div>
   </section><aside class="side">
     <div class="panel ap-panel"><button class="ap-switch" id="apSwitch" type="button"><i></i><span><b>AUTOPILOT</b><small id="apState">…</small></span></button></div>
-    <div class="panel" data-open><h2>Breaking in now</h2><div class="stack"><input id="brText" placeholder="Breaking headline (Bengali)" data-no-tr><div class="row"><label>Seconds<input id="brSec" type="number" value="20" min="5" max="60" style="width:70px"></label><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="brMusic" checked> Music</label><button class="btn red" id="brGo">Breaking in now</button><button class="btn" id="brClear">Clear</button></div><div id="breakNow"></div></div></div>
+    <div class="panel" data-open><h2>Breaking</h2><div class="stack"><div id="breakNow"></div><a class="btn red" href="/breaking.html">Breaking desk</a><p class="muted" style="font-size:12px;margin:0">Breaking news, the lives and the live split go out from the Breaking desk.</p></div></div>
     <div class="panel" data-open><h2>Rundown</h2><div id="rdTitle"></div><div class="countdown">—</div><p class="muted" id="rdLeft" style="text-align:center;margin:0 0 6px"></p>
       <div class="row" style="margin-bottom:6px"><button class="btn sm" id="rdPrev">◀ Prev (B)</button><button class="btn sm" id="rdNext">Next ▶ (N)</button><button class="btn sm" id="rdSkip">Skip (K)</button><button class="btn sm" id="rdAuto">Auto advance</button><button class="btn sm" id="rdStop">Stop</button><a class="btn sm" href="/producer.html">Producer</a></div><div class="rdlist"></div></div>
     <div class="panel"><h2>Delay and safety</h2><div class="row"><label>Broadcast delay<select id="delay">${Array.from({ length: 11 }, (_, i) => `<option value="${i}" data-no-tr>${digits(i)} s</option>`).join("")}</select></label><button class="btn red dump" id="dump" title="Shift+D">DUMP</button><button class="btn amber" id="standby" title="Shift+S">Standby slate</button></div>
@@ -245,8 +245,6 @@ async function dump() { await cmd("dump"); toast("DUMP: the outputs threw away t
   $("#lowerShow").onclick = () => { const name = $("#lowerName").value.trim() || S.pv.lower?.name; if (!name) return toast("Type a name for the strap.", true); cmd("lower", { name, title: $("#lowerTitle").value.trim() || (name === S.pv.lower?.name ? S.pv.lower.title : "") }); };
   $("#lowerClear").onclick = () => cmd("lower", {});
   $("#tickerSet").onclick = () => cmd("ticker", { lines: $("#ticker").value.split("\n").map(x => x.trim()).filter(Boolean) });
-  $("#brGo").onclick = () => { const text = $("#brText").value.trim(); if (!text) return toast("Write the breaking headline.", true); cmd("breaking", { text, seconds: Number($("#brSec").value), music: $("#brMusic").checked }); };
-  $("#brClear").onclick = () => cmd("breaking", { clear: true });
   $("#delay").onchange = e => cmd("delay", { seconds: Number(e.target.value) });
   $("#dump").onclick = dump;
   $("#standby").onclick = () => cmd("standby", { on: !S.ctl?.standby?.on });
