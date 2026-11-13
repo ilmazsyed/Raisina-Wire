@@ -2,7 +2,7 @@
 // Every source is public and keyless. Nothing is fabricated: a failed source is reported
 // as unavailable and simply contributes no items.
 
-const UA = "Mozilla/5.0 (compatible; RashtrixWire/1.0; +https://www.rashtrix.live)";
+const UA = "Mozilla/5.0 (compatible; RashtrixWire/1.0; +https://rashtrix.live)";
 
 // Small per-isolate cache so bursts of visitors share one upstream fetch.
 const memo = new Map();
@@ -178,7 +178,7 @@ export async function extractReadable(response) {
   };
 }
 
-const READER_UA = "Mozilla/5.0 (compatible; RashtrixWire/1.0; +https://www.rashtrix.live)";
+const READER_UA = "Mozilla/5.0 (compatible; RashtrixWire/1.0; +https://rashtrix.live)";
 // The wire desk reads a source story for its facts only. The text is used to write a new report
 // in our own words and is never shown to readers; it is capped and kept out of every API answer.
 export async function sourceText(raw, { maxChars = 6000 } = {}) {

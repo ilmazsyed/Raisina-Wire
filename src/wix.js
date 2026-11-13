@@ -9,8 +9,14 @@
 import { parseFeed, plain, extractReadable, categorize, scriptLang, decodeEntities } from "./feeds.js";
 import { textHash } from "./store.js";
 
-const UA = "Mozilla/5.0 (compatible; RashtrixImport/1.0; +https://www.rashtrix.live)";
-const base = env => String(env.WIX_SITE || "https://www.rashtrix.live").replace(/\/+$/, "");
+const UA = "Mozilla/5.0 (compatible; RashtrixImport/1.0; +https://rashtrix.live)";
+// The Wix site to read: WIX_SITE (the Wix site's own address). Empty, or an address that is this
+// app's own (rashtrix.live now serves this app), and the import is off: it never reads itself.
+const base = env => {
+  const b = String(env.WIX_SITE || "").trim().replace(/\/+$/, ""); if (!b) return "";
+  try { const h = new URL(b).hostname.replace(/^www\./, ""), own = env.SITE_URL ? new URL(env.SITE_URL).hostname.replace(/^www\./, "") : ""; if (h === own || h.endsWith(".workers.dev")) return ""; } catch { return ""; }
+  return b;
+};
 const now = () => new Date().toISOString();
 const get = (url, accept = "text/html,application/xhtml+xml") => fetch(url, { headers: { "user-agent": UA, accept }, redirect: "follow", signal: AbortSignal.timeout(12000) });
 const setting = async (env, k, d) => (await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(k).first())?.value ?? d;
@@ -85,6 +91,7 @@ async function savePost(env, versions) {
 // New posts from the RSS feed. Items in different languages with the same publication time are
 // one post; posts without their text in the feed are read from their page.
 export async function syncWixFeed(env, { force = false } = {}) {
+  if (!base(env)) return { off: true };
   const last = await setting(env, "wix_feed_at", "");
   if (!force && last && Date.now() - Date.parse(last) < 9.5 * 60e3) return { skipped: true };
   await put(env, "wix_feed_at", now());
@@ -112,6 +119,7 @@ export async function syncWixFeed(env, { force = false } = {}) {
 
 // Older posts, from the post sitemap: a few each run until every post is in.
 export async function backfillWix(env, { perRun = 3 } = {}) {
+  if (!base(env)) return { off: true };
   if ((await setting(env, "wix_backfill", "on")) === "done") return { done: true };
   let queue = JSON.parse(await setting(env, "wix_backfill_queue", "null") || "null");
   if (!queue) {
@@ -153,7 +161,7 @@ export async function wixStatus(env) {
     setting(env, "wix_feed_result", ""), setting(env, "wix_error", ""), setting(env, "wix_backfill_queue", "null"), setting(env, "wix_backfill_total", "0"), setting(env, "wix_backfill", "on")
   ]);
   let lastFeed = null; try { lastFeed = JSON.parse(feed); } catch { /* none yet */ }
-  return { site: base(env), imported: n.n, lastFeed, lastError: err, backfill: state === "done" ? "done" : "running", backfillLeft: (JSON.parse(left || "null") || []).length, backfillTotal: Number(total) };
+  return { site: base(env) || "Import off (no Wix address set)", off: !base(env), imported: n.n, lastFeed, lastError: err, backfill: state === "done" ? "done" : "running", backfillLeft: (JSON.parse(left || "null") || []).length, backfillTotal: Number(total) };
 }
 export async function restartWixBackfill(env) {
   await env.DB.batch(["wix_backfill", "wix_backfill_queue"].map(k => env.DB.prepare("DELETE FROM settings WHERE key=?").bind(k)));

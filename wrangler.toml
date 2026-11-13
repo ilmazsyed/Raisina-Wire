@@ -46,9 +46,11 @@ ADMIN_EMAIL = "ilmazsyed@gmail.com"
 # The app's public address, used in canonical links, sitemaps, the RSS feed and social cards.
 # Page visits to the workers.dev address are redirected here. Leave empty until the domain is
 # connected (the workers.dev address is used meanwhile).
-SITE_URL = ""
+SITE_URL = "https://rashtrix.live"
 # Rashtrix's Wix blog, imported and kept in sync (src/wix.js).
-WIX_SITE = "https://www.rashtrix.live"
+# The Wix blog to import from (its own address, e.g. https://name.wixsite.com/site). Empty = the
+# import is off: rashtrix.live is now this app, no longer the Wix site.
+WIX_SITE = ""
 # The wire desk (src/wiredesk.js): needs the GEMINI_API_KEY secret (Google AI Studio, free tier).
 # Models in order of choice. The free tier counts each model separately: Flash-Lite about 500
 # requests a day each, Flash 20. When one is used up for the day the desk moves to the next.

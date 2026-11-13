@@ -15,7 +15,7 @@ Build brief and phases: `rashtrix/BRIEF.md`. Built so far: **Phase 1** (the Beng
   (`src/i18n/bn.js`, `src/i18n/hi.js`; English text is the key).
 - **Five desks:** Kolkata, West Bengal, India, Probashi Bangali, World (`/desk/<name>`), plus
   **Latest** (`/live`, every story newest first) and **Briefs** (`/briefs`).
-- **Rashtrix's own articles from www.rashtrix.live** (`src/wix.js`). New posts come from the Wix
+- **Rashtrix's own articles from the Wix blog** (`src/wix.js`; off until `WIX_SITE` is set to the Wix site's own address). New posts come from the Wix
   blog RSS (`/blog-feed.xml`) every ten minutes; all older posts are read from the post sitemap a
   few a minute until every post is in. Wix's English, Bengali and Hindi versions of a post become
   one story (Bengali, with English and Hindi versions). Photos are kept. Control room → **Wix import**.
@@ -204,7 +204,10 @@ You need a Cloudflare account. Do these once, in order.
    Services → Credentials → **Create API key**, restricted to Text-to-Speech. Then
    `npx wrangler secret put GOOGLE_TTS_API_KEY`.
 7. **Your domain:** add it to the Worker in Cloudflare (Worker → Settings → Domains & Routes) and set
-   `SITE_URL` in `wrangler.toml` to it, then deploy again.
+   `SITE_URL` in `wrangler.toml` to it, then deploy again. The app is at **https://rashtrix.live**; page
+   visits to the workers.dev copy and to www.rashtrix.live (once added to the Worker) go there. The Wix
+   import reads `WIX_SITE`, the Wix site's own address (e.g. `https://name.wixsite.com/site`); it is empty,
+   so the import is off, now that rashtrix.live is this app.
 8. **Grievance Officer:** fill in `GRIEVANCE` at the top of `src/legal.js` (name, email, phone,
    address) before launch; until then the pages say the details are coming.
 

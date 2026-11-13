@@ -16,7 +16,7 @@ import { bnLine, tidyLine } from "./bnline.js";
 import { parseFeed, sourceText, categorize, DESKS, PLACE_DESKS, SUBJECT_DESKS, subjectDesk, placeDesk, scriptLang } from "./feeds.js";
 import { textHash, splitTags } from "./store.js";
 
-const UA = "Mozilla/5.0 (compatible; RashtrixWire/1.0; +https://www.rashtrix.live)";
+const UA = "Mozilla/5.0 (compatible; RashtrixWire/1.0; +https://rashtrix.live)";
 const id = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
 const setting = async (env, key, fallback) => (await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(key).first())?.value ?? fallback;
