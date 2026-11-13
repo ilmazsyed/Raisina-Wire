@@ -441,12 +441,13 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const $ = s => stage.querySelector(s);
   // Text on screen is never cut with a "…": a headline or line set in a box of a few lines (CSS
   // line-clamp) that runs longer is set smaller, step by step, until it fits whole.
-  const fitQ = new Set();
+  const fitQ = new Set(), FIT_SEL = "p,h1,h2,h3,blockquote,.lt-text,.lb-bottom>b,.v-flash b,.nu-set li span,.avo-info li span";
   const fitText = roots => {
     for (const r of roots) {
       if (!r.isConnected) continue;
-      for (const el of [r, ...r.querySelectorAll("*")]) {
-        if (!(el instanceof HTMLElement) || !el.textContent.trim() || el.children.length > 40) continue;
+      if (r.closest?.(".tvp-gfx,.tvp-split,.tvp-lbl,.tvp-ovl")) continue;
+      for (const el of r.matches?.(FIT_SEL) ? [r] : r.querySelectorAll(FIT_SEL)) {
+        if (!(el instanceof HTMLElement) || !el.textContent.trim()) continue;
         const cs = getComputedStyle(el); if (!cs.webkitLineClamp || cs.webkitLineClamp === "none") continue;
         // Each box is fitted once for its text, always from its own type size (never compounding),
         // and never below three quarters of it; a box not laid out yet (or mid-animation, less
@@ -1497,7 +1498,30 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         const shares = [...bins.values()].map(v => v / n).sort((a, b) => b - a), used = shares.filter(v => v > 0.01).length;
         return shares[0] > 0.72 || (shares[0] > 0.45 && used <= 4);
       } catch { return false; } };
-      const preload = x => (x.images || []).forEach(i => { if (imgState.has(i.src)) return; imgState.set(i.src, "loading"); const im = new Image(); im.referrerPolicy = "no-referrer"; im.onload = () => imgState.set(i.src, im.naturalWidth >= 320 && !logoCard(im) ? "ok" : "bad"); im.onerror = () => imgState.set(i.src, "bad"); im.src = i.src; });
+      // In the app (phones) each picture is shrunk to the screen's size once and kept as a small
+      // copy, one at a time: a news photo can be 4000 pixels wide, and several of those decoded
+      // at once made phones close the page (it went white and reloaded).
+      const small = st.smallImg ||= new Map();
+      const preload = x => (x.images || []).forEach(i => {
+        if (small.has(i.src)) { const s = small.get(i.src); if (s) { i.orig = i.src; i.src = s; } return; }
+        if (imgState.has(i.src)) return; imgState.set(i.src, "loading");
+        if (mode === "app" && window.createImageBitmap) { shrinkQ(i.src, channel === "v" ? 1080 : 1280).then(r => { small.set(i.src, r?.url || ""); imgState.set(i.src, r && r.w >= 320 && !r.logo ? "ok" : "bad"); if (r?.url) imgState.set(r.url, imgState.get(i.src)); }); return; }
+        const im = new Image(); im.referrerPolicy = "no-referrer"; im.onload = () => imgState.set(i.src, im.naturalWidth >= 320 && !logoCard(im) ? "ok" : "bad"); im.onerror = () => imgState.set(i.src, "bad"); im.src = i.src; });
+      // A story's pictures, each as its small copy once that is made (the app).
+      const imgsOf = x => (x.images || []).map(i => { const sm = small.get(i.orig || i.src); if (sm && i.src !== sm) { i.orig = i.orig || i.src; i.src = sm; } return i; });
+      const shrinkQ = (src, W) => (st.shrinkChain = (st.shrinkChain || Promise.resolve()).then(async () => {
+        try {
+          const r = await fetch(src, { referrerPolicy: "no-referrer" }); if (!r.ok) return null;
+          const bmp = await createImageBitmap(await r.blob()), w = bmp.width;
+          const k = Math.min(1, W / w), c = document.createElement("canvas"); c.width = Math.round(w * k); c.height = Math.round(bmp.height * k);
+          c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height); bmp.close?.();
+          const logo = logoCard(c), blob = await new Promise(ok => c.toBlob(ok, "image/jpeg", 0.84)); c.width = c.height = 0;
+          if (!blob) return null;
+          // (old copies are let go: at most 40 kept)
+          if (small.size > 40) { const [k0, u0] = small.entries().next().value; small.delete(k0); if (u0) URL.revokeObjectURL(u0); }
+          return { url: URL.createObjectURL(blob), w, logo };
+        } catch { return null; }
+      }));
       list.forEach(preload);
       // The slides of a story: its photographs, and to keep it lively (and to make up four when
       // photos are few) the channel's animated cards: BREAKING NEWS, a Bengali infographic with a
@@ -1512,7 +1536,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // its sentences lighting up as they are read (and its one photo, if it has one).
       const graphic = x => !(x.images || []).length;
       const gSlides = x => {
-        const P = (x.images || []).filter(i => imgState.get(i.src) === "ok"), f = factOf(x), out = [{ brk: 1 }];
+        const P = imgsOf(x).filter(i => imgState.get(i.src) === "ok"), f = factOf(x), out = [{ brk: 1 }];
         if (P[0]) out.push({ img: P[0] });
         out.push({ g: "head" });
         if ((x.places || []).length) out.push({ g: "map" });
@@ -1526,7 +1550,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const slidesOf = x => {
         if (x.ex) return exSlides(x);
         if (graphic(x)) return gSlides(x);
-        const P = (x.images || []).filter(i => imgState.get(i.src) === "ok").slice(0, 6);
+        const P = imgsOf(x).filter(i => imgState.get(i.src) === "ok").slice(0, 6);
         const ex = [{ brk: 1 }], f = factOf(x), pts = pointsOf(x);
         if (f) ex.unshift({ fact: f });
         if (pts.length >= 2) ex.push({ pts });
@@ -1543,7 +1567,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         while (out.length < 4) out.push({ brk: 2 + out.length });
         return out.slice(0, 7);
       };
-      const bgOf = x => (x.images || []).find(i => imgState.get(i.src) === "ok");
+      const bgOf = x => imgsOf(x).find(i => imgState.get(i.src) === "ok");
       const gHTML = (x, sl, d) => {
         const icon = SOTH_ICONS[x.topic] || SOTH_ICONS.news, pl = x.places || [], tone = { head: 1, map: 3, stat: 2, type: 0, split: 2 }[sl.g] ?? 0;
         const beat = sl.g === "head" ? `<div class="so-beat so-head"><div class="so-ico">${icon}<i></i><i></i></div><div class="so-hd"><span class="so-tag red">${x.upd ? "নতুন তথ্য" : "এইমাত্র"}</span><span class="so-tag">${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span><h1>${soWords(x.title, d * 0.6, pl)}</h1></div></div>`
@@ -1578,7 +1602,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         return null;
       };
       const exSlides = x => {
-        const P = (x.images || []).filter(i => imgState.get(i.src) === "ok").slice(0, 3), f = factOf(x), q = quoteOf(x), vs = versusOf(x);
+        const P = imgsOf(x).filter(i => imgState.get(i.src) === "ok").slice(0, 3), f = factOf(x), q = quoteOf(x), vs = versusOf(x);
         const lines = (x.lines || []).slice(1).filter(l => l !== q?.line && !(f && l.startsWith(f.line.replace(/…$/, "")))).map(l => exShort(l, 120));
         const out = [{ ex: "head" }];
         if (P[0]) out.push({ ex: "clip", img: P[0], n: 0 });
@@ -1653,7 +1677,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           if (!tok.src && Date.now() < (st.breakUntil || 0)) setTimeout(() => play(i + 1), Math.max(500, st.breakUntil - Date.now())); }); };
         play(0);
       };
-      list.forEach(x => (x.voice || []).forEach(u => voiceBuf(u)));
+      list.slice(0, mode === "app" ? 2 : list.length).forEach(x => (x.voice || []).forEach(u => voiceBuf(u)));
       let shownK = -1, shownS = -1;
       const slideN = new Map();
       const drawA = () => {
@@ -1772,7 +1796,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       };
       // Every story's reading is loaded as the bulletin opens, so each starts the moment its
       // story comes in.
-      list.forEach(x => x.voice && voiceBuf(x.voice));
+      list.slice(0, mode === "app" ? 3 : list.length).forEach(x => x.voice && voiceBuf(x.voice));
       const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = e < 5 ? -2 : e < intro || !list.length ? -1 : Math.max(0, plan.findLastIndex(p => e >= p.at)); if (k === shown) return; const first = shown === -9; shown = k;
         const paint = () => { el.innerHTML = k === -2 ? identHTML() : k < 0 ? opening() : story(list[k], k); speak(k >= 0 ? list[k] : null); st.resumeVoice = () => { if (el.isConnected && k >= 0) speak(list[k]); }; };
         if (first || !el.isConnected) return paint();
@@ -1847,7 +1871,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   };
   const playLink = (id, box) => { const url = st.tv?.links?.[id]; if (!url || st.muted || !st.audio) return; setTimeout(() => voiceBuf(url).then(buf => { if (!buf || st.muted || (box && !box.isConnected)) return; voPlay(buf, 1.2, null, { yieldTo: true }); }), 600); };
   const voiceBuf = url => { if (!st.audio) return Promise.resolve(null);
-    if (!voiceCache.has(url)) { if (voiceCache.size > 24) voiceCache.delete(voiceCache.keys().next().value);
+    if (!voiceCache.has(url)) { if (voiceCache.size > (mode === "app" ? 6 : 24)) voiceCache.delete(voiceCache.keys().next().value);
       voiceCache.set(url, fetch(url).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status)).then(b => new Promise((ok, no) => st.audio.decodeAudioData(b, ok, no))).catch(() => { voiceCache.delete(url); return null; })); }
     return voiceCache.get(url); };
   // The weather and market screens' shared pieces, in the channel's look: a heading (red chip,
