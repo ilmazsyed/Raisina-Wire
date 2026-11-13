@@ -322,3 +322,13 @@ dialog::backdrop { background: #000a; }
 .bd-pt{flex-direction:row!important;align-items:flex-start;gap:8px!important}
 .bd-pt>span{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:7px;background:#b8860b;color:#111;font-weight:800;font-size:13px}
 .bd-pt textarea{flex:1;font:600 15px/1.4 "Noto Serif Bengali",serif;resize:vertical}
+
+.bd-lines{display:flex;flex-direction:column;gap:8px}
+.bd-line{flex-direction:row!important;align-items:flex-start;gap:8px!important}
+.bd-line>span{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--red);color:#fff;font-weight:800}
+.bd-line textarea{flex:1;font:700 18px/1.4 "Noto Serif Bengali",serif}
+.bd-media{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px dashed var(--line);border-radius:10px}
+.bd-mprev{display:flex;align-items:center;gap:10px;min-width:0}
+.bd-mprev img{width:120px;height:68px;object-fit:cover;border-radius:6px}
+.bd-mprev small{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-prog{height:6px;border-radius:3px;background:var(--line);overflow:hidden}.bd-prog i{display:block;height:100%;width:0;background:var(--green)}

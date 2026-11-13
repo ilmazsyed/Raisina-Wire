@@ -89,7 +89,7 @@ export async function avoFromBreaking(env, br) {
   if (!br?.text) return;
   const id = `brk:${Date.parse(br.at) || Date.now()}`;
   await env.DB.prepare("INSERT OR IGNORE INTO avo_stories (article_id,title,desk,region,score,script,status,day,published_at,origin) VALUES (?,?,?,?,?,?,?,?,?,'breaking')")
-    .bind(id, String(br.text).slice(0, 300), "Breaking", "bengal", 99, JSON.stringify(sentencesOf(br.text).length ? sentencesOf(br.text) : [String(br.text)]), "new", istDay(), new Date().toISOString()).run().catch(() => {});
+    .bind(id, String(br.text).slice(0, 300), "Breaking", "bengal", 99, JSON.stringify((br.lines || [br.text]).flatMap(l => sentencesOf(l).length ? sentencesOf(l) : [String(l)])), "new", istDay(), new Date().toISOString()).run().catch(() => {});
   return id;
 }
 

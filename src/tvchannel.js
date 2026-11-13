@@ -82,10 +82,12 @@ export async function saveTvSettings(env, ch, b) {
   return s;
 }
 export async function newOutputKey(env, ch) { const s = await tvSettings(env, ch); s.key = randomKey(); await putSettings(env, ch, s); return s.key; }
+
+export { breakingOf } from "./breakingof.js";
+import { breakingOf } from "./breakingof.js";
 export async function setBreaking(env, ch, b) {
   const s = await tvSettings(env, ch);
-  s.breaking = b?.clear ? null : { text: clean(b?.text, 160), at: now(), seconds: int(b?.seconds, 8, 60, 20), music: b?.music !== false };
-  if (s.breaking && !s.breaking.text) throw new Error("Write the breaking headline.");
+  s.breaking = b?.clear ? null : { ...breakingOf(b), at: now() };
   await putSettings(env, ch, s);
   return s.breaking;
 }
@@ -307,7 +309,7 @@ export async function tvState(env, ch) {
     // The live split from the Breaking desk (the realtime state carries it too).
     split: live ? await liveSplit(env, ch).catch(() => null) : null,
     schedule: s.on ? schedule : [],
-    breaking: s.breaking && Date.now() - Date.parse(s.breaking.at) < (s.breaking.seconds + 90) * 1000 ? s.breaking : null,
+    breaking: s.breaking && Date.now() - Date.parse(s.breaking.at) < ((s.breaking.total || s.breaking.seconds) + 90) * 1000 ? s.breaking : null,
     lband: ch === "h" ? s.lband : null,
     // The horizontal channel's automatic L-band during videos: every 40 seconds, for 7 seconds.
     lbandAuto: ch === "h" ? { on: s.lbandAuto?.on !== false, every: s.lbandAuto?.every || 40, seconds: s.lbandAuto?.seconds || 10 } : null, lowerThird: s.lowerThird || "", band: s.band || "", appStream: s.appStream || null,

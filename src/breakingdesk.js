@@ -10,37 +10,75 @@ import { shell, api, toast, fail, esc, $, $$, istClock } from "./crshell.js";
 import { mountTV } from "./engine.js";
 import { digits } from "./i18n.js";
 
-const S = { d: null, sets: [], dirty: false, mon: {} };
+const S = { d: null, sets: [], dirty: false, mon: {}, lines: [""], media: null };
 const CH = { h: "Rashtrix TV", v: "Rashtrix Shorts" };
 const SETS = 8, PER = 3, MAX = 24;
 const blankSets = () => Array.from({ length: SETS }, (_, i) => ({ id: `s${i + 1}`, live: false, points: ["", "", ""] }));
 const when = t => { try { return istClock(Date.parse(t), false); } catch { return ""; } };
 
+async function uploadImage(file) {
+  const bmp = await createImageBitmap(file);
+  for (const [max, q] of [[1920, .86], [1600, .8], [1400, .72]]) {
+    const k = Math.min(1, max / bmp.width), w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
+    const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(bmp, 0, 0, w, h);
+    const blob = await new Promise(r => c.toBlob(r, "image/webp", q));
+    if (blob && blob.size < 1_700_000) {
+      const r = await fetch("/api/admin/images", { method: "POST", headers: { "content-type": blob.type, "x-image-width": String(w), "x-image-height": String(h) }, body: blob });
+      const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || "Upload failed."); return d.url;
+    }
+  }
+  throw new Error("This picture is too large even after compression.");
+}
+async function uploadVideo(file, bar) {
+  const start = await api("/api/admin/clips", { method: "POST", body: { title: `Breaking: ${file.name.replace(/\.\w+$/, "")}`, filename: file.name, size: file.size, mime: file.type, duration: 0 } });
+  const parts = [], n = Math.ceil(file.size / start.partSize); bar.hidden = false;
+  try {
+    for (let i = 0; i < n; i++) {
+      const blob = file.slice(i * start.partSize, (i + 1) * start.partSize); let tries = 0, out;
+      while (true) { try { out = await api(`/api/admin/clips/${start.id}/part/${i + 1}`, { method: "PUT", body: blob, raw: true }); break; } catch (e) { if (++tries > 3) throw e; await new Promise(r => setTimeout(r, 1500 * tries)); } }
+      parts.push(out.part); $("i", bar).style.width = `${Math.round((i + 1) / n * 100)}%`;
+    }
+    return (await api(`/api/admin/clips/${start.id}/complete`, { method: "POST", body: { parts } })).url;
+  } catch (e) { await api(`/api/admin/clips/${start.id}/abort`, { method: "POST" }).catch(() => {}); throw e; }
+  finally { setTimeout(() => { bar.hidden = true; }, 800); }
+}
+
 function drawBreak() {
   const d = S.d, on = Object.entries(d.breaking || {}).filter(([, b]) => b);
   $(".bd-break").innerHTML = `<h2>Break in now</h2>
     ${on.length ? `<div class="bd-onair"><span class="tag red">BREAKING ON AIR</span>${on.map(([ch, b]) => `<span><b data-no-tr>${esc(b.text)}</b> <small class="muted">${CH[ch]} · ${when(b.at)}</small></span>`).join("")}</div>` : ""}
-    <label>Breaking headline (Bengali, up to 160 characters)<textarea id="bText" rows="3" maxlength="160" data-no-tr placeholder="ব্রেকিং শিরোনাম লিখুন"></textarea><small class="muted" id="bCount"></small></label>
+    <div class="bd-lines">${S.lines.map((t, i) => `<label class="bd-line"><span>${digits(i + 1)}</span><textarea rows="2" maxlength="160" data-bl="${i}" data-no-tr placeholder="${i ? "পরের লাইন (ঐচ্ছিক)" : "ব্রেকিং শিরোনাম লিখুন"}">${esc(t)}</textarea>${i ? `<button class="btn sm" type="button" data-blrm="${i}" aria-label="Remove">✕</button>` : ""}</label>`).join("")}</div>
+    <div class="row" style="flex-wrap:wrap">${S.lines.length < 5 ? `<button class="btn sm" type="button" id="bAdd">+ Add a line</button>` : ""}<small class="muted">${digits(S.lines.length)} / ${digits(5)} lines · read back to back, each for the seconds chosen</small></div>
+    <div class="bd-media"><b>Picture or video (optional)</b>
+      ${S.media ? `<div class="bd-mprev">${S.media.kind === "image" ? `<img src="${esc(S.media.url)}" alt="">` : `<span class="tag">${S.media.kind === "yt" ? "YOUTUBE" : "VIDEO"}</span>`}<small data-no-tr>${esc(S.media.url)}</small><button class="btn sm red" type="button" id="bMx">Remove</button></div>` : ""}
+      <div class="row" style="flex-wrap:wrap"><label class="btn sm">Upload picture<input type="file" id="bImg" accept="image/*" hidden></label><label class="btn sm">Upload video (plays muted)<input type="file" id="bVid" accept="video/mp4,video/webm,video/quicktime" hidden></label></div>
+      <div class="row"><input id="bLink" placeholder="or paste a picture, video or YouTube link (https://…)" style="flex:1" data-no-tr><button class="btn sm" type="button" id="bLinkAdd">Add link</button></div>
+      <div class="bd-prog" id="bProg" hidden><i></i></div></div>
     <div class="row" style="flex-wrap:wrap;gap:14px">
       <label class="chk"><input type="checkbox" id="bH" checked> Rashtrix TV</label>
       <label class="chk"><input type="checkbox" id="bV" checked> Rashtrix Shorts</label>
       <label class="chk"><input type="checkbox" id="bMusic" checked> Music</label>
-      <label style="flex-direction:row;align-items:center;gap:6px">Seconds<select id="bSec"><option>10</option><option>15</option><option selected>20</option><option>30</option><option>45</option><option>60</option></select></label>
+      <label style="flex-direction:row;align-items:center;gap:6px">Seconds per line<select id="bSec"><option>10</option><option>15</option><option selected>20</option><option>30</option><option>45</option><option>60</option></select></label>
     </div>
     <div class="row"><button class="btn red bd-fire" id="bGo">Break in</button><button class="btn" id="bClear">Clear breaking</button></div>
     <p class="muted" style="margin:0">It goes on every screen of the channels chosen at once, and is read as an AVO story within a minute.</p>
-    <details ${d.log?.length ? "open" : ""}><summary class="muted">Breaking log (${digits(d.log?.length || 0)})</summary><ul class="bd-log">${(d.log || []).map(x => `<li><small class="muted">${when(x.at)} · ${(x.channels || []).map(c => CH[c]).join(", ")} · ${esc(x.by || "")}</small>${x.act === "clear" ? `<span class="muted">Cleared</span>` : `<b data-no-tr>${esc(x.text)}</b>${x.avoId ? (x.avoDeleted ? `<small class="muted">AVO deleted</small>` : `<span><button class="btn sm red" data-delavo="${esc(x.avoId)}">Delete its AVO</button></span>`) : ""}`}</li>`).join("") || `<li class="muted">Nothing yet.</li>`}</ul></details>`;
-  const t = $("#bText"), count = () => { $("#bCount").textContent = `${digits(t.value.trim().length)} / ${digits(160)}`; };
-  t.oninput = count; count();
+    <details ${d.log?.length ? "open" : ""}><summary class="muted">Breaking log (${digits(d.log?.length || 0)})</summary><ul class="bd-log">${(d.log || []).map(x => `<li><small class="muted">${when(x.at)} · ${(x.channels || []).map(c => CH[c]).join(", ")} · ${esc(x.by || "")}</small>${x.act === "clear" ? `<span class="muted">Cleared</span>` : `<b data-no-tr>${esc(x.text)}</b>${x.media ? ` <span class="tag">${x.media === "yt" ? "YOUTUBE" : x.media.toUpperCase()}</span>` : ""}${x.avoId ? (x.avoDeleted ? `<small class="muted">AVO deleted</small>` : `<span><button class="btn sm red" data-delavo="${esc(x.avoId)}">Delete its AVO</button></span>`) : ""}`}</li>`).join("") || `<li class="muted">Nothing yet.</li>`}</ul></details>`;
+  $$("[data-bl]").forEach(t => t.oninput = () => { S.lines[+t.dataset.bl] = t.value; });
+  $$("[data-blrm]").forEach(b => b.onclick = () => { S.lines.splice(+b.dataset.blrm, 1); drawBreak(); });
+  $("#bAdd")?.addEventListener("click", () => { if (S.lines.length < 5) { S.lines.push(""); drawBreak(); $(`[data-bl="${S.lines.length - 1}"]`)?.focus(); } });
+  $("#bMx")?.addEventListener("click", () => { S.media = null; drawBreak(); });
+  $("#bLinkAdd").onclick = () => { const u = $("#bLink").value.trim(); if (!/^https:\/\//.test(u)) return toast("Paste a link that starts with https://", true); S.media = { kind: /youtube\.com|youtu\.be/.test(u) ? "yt" : /\.(mp4|webm|mov|m3u8)(\?|$)/i.test(u) ? "video" : "image", url: u }; drawBreak(); };
+  $("#bImg").onchange = async e => { const f = e.target.files[0]; if (!f) return; try { toast("Uploading the picture…"); S.media = { kind: "image", url: await uploadImage(f) }; drawBreak(); } catch (err) { fail(err); } };
+  $("#bVid").onchange = async e => { const f = e.target.files[0]; if (!f) return; try { S.media = { kind: "video", url: await uploadVideo(f, $("#bProg")) }; toast("Video uploaded."); drawBreak(); } catch (err) { fail(err); } };
   $$("[data-delavo]").forEach(b => b.onclick = async () => { if (!confirm("Delete this breaking's AVO story for good? It goes off air at once.")) return;
     try { await api(`/api/admin/tv/desk/avo/${encodeURIComponent(b.dataset.delavo)}`, { method: "DELETE" }); toast("AVO deleted for good."); load(); } catch (e) { fail(e); } });
   const chans = () => [...($("#bH").checked ? ["h"] : []), ...($("#bV").checked ? ["v"] : [])];
   $("#bGo").onclick = async () => {
-    const text = t.value.trim(), chs = chans();
-    if (!text) return toast("Write the breaking headline.", true);
+    const lines = S.lines.map(x => String(x || "").trim()).filter(Boolean), chs = chans();
+    if (!lines.length) return toast("Write the breaking headline.", true);
     if (!chs.length) return toast("Choose a channel.", true);
     if (!confirm("Break in on every screen now?")) return;
-    try { await api("/api/admin/tv/desk/breaking", { method: "POST", body: { text, seconds: Number($("#bSec").value), music: $("#bMusic").checked, channels: chs } }); toast("Breaking news is going out to every screen."); t.value = ""; load(); } catch (e) { fail(e); }
+    try { await api("/api/admin/tv/desk/breaking", { method: "POST", body: { lines, text: lines[0], seconds: Number($("#bSec").value), music: $("#bMusic").checked, channels: chs, media: S.media } }); toast("Breaking news is going out to every screen."); S.lines = [""]; S.media = null; load(); } catch (e) { fail(e); }
   };
   $("#bClear").onclick = async () => { const chs = chans(); if (!chs.length) return toast("Choose a channel.", true); try { await api("/api/admin/tv/desk/breaking", { method: "POST", body: { clear: true, channels: chs } }); toast("Cleared."); load(); } catch (e) { fail(e); } };
 }

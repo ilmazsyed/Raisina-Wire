@@ -1581,3 +1581,19 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 /* In the app (phones) the explainer's blurred picture behind its cards is left out: a second copy
    of every photo, blurred, was heavy for a phone's memory. */
 .tvp-app .ex-bgimg{display:none}
+
+/* Breaking: several lines read back to back, and a picture or video with it. */
+.br-line{animation:brline .55s cubic-bezier(.2,.8,.2,1) both}
+@keyframes brline{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+.br-dots{display:inline-flex;gap:10px;margin-left:22px;vertical-align:middle}
+.br-dots i{width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.35);transition:background .3s,transform .3s}
+.br-dots i.on{background:#fff;transform:scale(1.25)}
+.br-media{position:absolute;inset:0;overflow:hidden;background:#000}
+.br-media img,.br-media video,.br-media iframe{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border:0}
+.br-media iframe{pointer-events:none}
+.br-media img{animation:exkb 20s linear both}
+.tv-breaking.has-media .br-slash{background:linear-gradient(100deg,rgba(170,4,4,.96) 0 46%,rgba(120,8,18,.82) 58%,rgba(0,0,0,.08) 78%,transparent 100%)}
+.tv-breaking.has-media .br-in{right:760px}
+.br-v .br-media{position:relative;inset:auto;height:760px;margin:-60px -60px 10px;flex:none}
+.br-v .br-media i{position:absolute;inset:auto 0 0 0;height:180px;background:linear-gradient(transparent,var(--red))}
+.br-v .br-dots{margin:0}

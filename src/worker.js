@@ -1345,7 +1345,7 @@ async function api(request, env, ctx) {
         catch (e) { return err(e.message); }
         // One AVO story for the breaking (not one per channel), and the desk's log.
         const avoId = br ? await avoFromBreaking(env, br).catch(() => "") : "";
-        await deskLog(env, { act: br ? "breaking" : "clear", text: br?.text || "", channels: chs, seconds: br?.seconds || 0, by: user.display_name || user.email, at: new Date().toISOString(), avoId: avoId || "" });
+        await deskLog(env, { act: br ? "breaking" : "clear", text: br ? br.lines.join(" · ") : "", media: br?.media?.kind || "", channels: chs, seconds: br?.seconds || 0, by: user.display_name || user.email, at: new Date().toISOString(), avoId: avoId || "" });
         await audit(env, user, br ? "tv.breaking" : "tv.breaking.clear", "tv", chs.join(","), br || {});
         return done({ ok: true, breaking: br });
       }
@@ -1963,7 +1963,7 @@ async function breakingDesk(env) {
   const [desk, log, lives, h, v] = await Promise.all([liveDesk(env), deskSettings(env, "tv:breaklog", []),
     env.DB.prepare("SELECT id, channel, yt_id, title, live_now, on_air, live_video, last_error, last_refresh FROM tv_sources WHERE kind='live' AND active=1 ORDER BY created_at DESC").all().then(r => r.results).catch(() => []),
     tvSettings(env, "h"), tvSettings(env, "v")]);
-  const cur = s => s.breaking && Date.now() - Date.parse(s.breaking.at) < (s.breaking.seconds + 90) * 1000 ? s.breaking : null;
+  const cur = s => s.breaking && Date.now() - Date.parse(s.breaking.at) < ((s.breaking.total || s.breaking.seconds) + 90) * 1000 ? s.breaking : null;
   return { desk, log, lives, breaking: { h: cur(h), v: cur(v) } };
 }
 async function saveLiveDesk(env, b, user) {
