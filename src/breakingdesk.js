@@ -29,9 +29,11 @@ function drawBreak() {
     </div>
     <div class="row"><button class="btn red bd-fire" id="bGo">Break in</button><button class="btn" id="bClear">Clear breaking</button></div>
     <p class="muted" style="margin:0">It goes on every screen of the channels chosen at once, and is read as an AVO story within a minute.</p>
-    <details ${d.log?.length ? "open" : ""}><summary class="muted">Breaking log (${digits(d.log?.length || 0)})</summary><ul class="bd-log">${(d.log || []).map(x => `<li><small class="muted">${when(x.at)} · ${(x.channels || []).map(c => CH[c]).join(", ")} · ${esc(x.by || "")}</small>${x.act === "clear" ? `<span class="muted">Cleared</span>` : `<b data-no-tr>${esc(x.text)}</b>`}</li>`).join("") || `<li class="muted">Nothing yet.</li>`}</ul></details>`;
+    <details ${d.log?.length ? "open" : ""}><summary class="muted">Breaking log (${digits(d.log?.length || 0)})</summary><ul class="bd-log">${(d.log || []).map(x => `<li><small class="muted">${when(x.at)} · ${(x.channels || []).map(c => CH[c]).join(", ")} · ${esc(x.by || "")}</small>${x.act === "clear" ? `<span class="muted">Cleared</span>` : `<b data-no-tr>${esc(x.text)}</b>${x.avoId ? (x.avoDeleted ? `<small class="muted">AVO deleted</small>` : `<span><button class="btn sm red" data-delavo="${esc(x.avoId)}">Delete its AVO</button></span>`) : ""}`}</li>`).join("") || `<li class="muted">Nothing yet.</li>`}</ul></details>`;
   const t = $("#bText"), count = () => { $("#bCount").textContent = `${digits(t.value.trim().length)} / ${digits(160)}`; };
   t.oninput = count; count();
+  $$("[data-delavo]").forEach(b => b.onclick = async () => { if (!confirm("Delete this breaking's AVO story for good? It goes off air at once.")) return;
+    try { await api(`/api/admin/tv/desk/avo/${encodeURIComponent(b.dataset.delavo)}`, { method: "DELETE" }); toast("AVO deleted for good."); load(); } catch (e) { fail(e); } });
   const chans = () => [...($("#bH").checked ? ["h"] : []), ...($("#bV").checked ? ["v"] : [])];
   $("#bGo").onclick = async () => {
     const text = t.value.trim(), chs = chans();
