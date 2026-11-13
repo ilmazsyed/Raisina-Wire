@@ -1233,7 +1233,7 @@ async function ownerMenu(slug) {
   const live = x.status === "published" && !x.pulled;
   const btn = (act, label, cls = "") => `<button type="button" class="own-act ${cls}" data-own="${act}">${esc(tr(label))}</button>`;
   document.body.insertAdjacentHTML("beforeend", `<dialog class="own-sheet" id="ownSheet"><div class="own-head"><span class="kicker">${esc(tr("Story tools"))}</span><b data-no-tr lang="${esc(x.lang || "bn")}">${esc(x.title)}</b></div>
-    <div class="own-acts">${btn("edit", "Edit story")}${btn("versions", "Earlier versions")}${btn("no-pictures", "Remove pictures")}${live ? btn("top", "Move to the top") + btn("breaking", "Breaking on TV") + btn("alert", x.alertState === "sent" ? "Alert sent" : "Send alert", x.alertState === "sent" ? "off" : "") : ""}${OWN_LANGS.filter(l => l !== (x.lang || "bn")).map(l => (x.hiddenLangs || []).includes(l) ? btn(`show-${l}`, OWN_LANG_LABEL[l][1]) : btn(`hide-${l}`, OWN_LANG_LABEL[l][0])).join("")}${live ? btn("pull", "Pull the story", "warn") : btn("restore", "Put it back")}${btn("delete", "Delete for good", "danger")}${live ? btn("brief", "Add to my next brief") : ""}${btn("mybrief", "Open Desk Brief")}</div>
+    <div class="own-acts">${btn("edit", "Edit story")}${btn("versions", "Earlier versions")}${btn("no-pictures", "Remove pictures")}${live ? btn("top", "Move to the top") + btn("avo", "Send to AVO") + btn("breaking", "Breaking on TV") + btn("alert", x.alertState === "sent" ? "Alert sent" : "Send alert", x.alertState === "sent" ? "off" : "") : ""}${OWN_LANGS.filter(l => l !== (x.lang || "bn")).map(l => (x.hiddenLangs || []).includes(l) ? btn(`show-${l}`, OWN_LANG_LABEL[l][1]) : btn(`hide-${l}`, OWN_LANG_LABEL[l][0])).join("")}${live ? btn("pull", "Pull the story", "warn") : btn("restore", "Put it back")}${btn("delete", "Delete for good", "danger")}${live ? btn("brief", "Add to my next brief") : ""}${btn("mybrief", "Open Desk Brief")}</div>
     <button type="button" class="own-cancel" data-own="close">${esc(tr("Cancel"))}</button></dialog>`);
   const dlg = document.getElementById("ownSheet");
   dlg.addEventListener("click", e => {
@@ -1282,7 +1282,7 @@ async function ownerVersions(x) {
 }
 const OWN_ASK = { pull: "Pull this story from the site and TV?", delete: "Delete this story for good? It cannot be undone.", "no-pictures": "Remove this story's pictures from the site and TV?",
   breaking: "Put it on TV as breaking news?", alert: "Send a push alert for this story to every subscriber?" };
-const OWN_DONE = { pull: "Story pulled from the site and TV.", restore: "The story is back.", delete: "Story deleted.", "no-pictures": "Pictures removed.", top: "Moved to the top.", breaking: "On TV as breaking news.", alert: "Alert sent." };
+const OWN_DONE = { pull: "Story pulled from the site and TV.", restore: "The story is back.", delete: "Story deleted.", "no-pictures": "Pictures removed.", top: "Moved to the top.", avo: "Sent to AVO. On air within a minute or two.", breaking: "On TV as breaking news.", alert: "Alert sent." };
 async function ownerDo(slug, action) {
   if (OWN_ASK[action] && !confirm(tr(OWN_ASK[action]))) return;
   try { await ownerAPI(slug, action, action === "delete" ? { confirm: "DELETE" } : {}); }

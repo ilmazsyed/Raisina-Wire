@@ -40,7 +40,7 @@ import m0037 from "../migrations/0037_hidden_langs.sql";
 import m0038 from "../migrations/0038_photo_checks.sql";
 import { bulletinImages, bulletinImageRoute } from "./bulletinimg.js";
 import { prepareBulletinVoices, prepareLinks, voiceRoute } from "./bulletinvoice.js";
-import { avoStep, avoImageRoute, avoPlayed, avoLog, avoFromBreaking, avoManualAdd, avoManualEdit, avoManualDelete } from "./avo.js";
+import { avoStep, avoImageRoute, avoPlayed, avoLog, avoFromBreaking, avoManualAdd, avoManualEdit, avoManualDelete, avoFromArticle, avoScript } from "./avo.js";
 import { marketBrief } from "./markets.js";
 import { ogRoute, renderCards, renderSiteCard } from "./ogcard.js";
 import { indexNow } from "./indexnow.js";
@@ -1016,8 +1016,10 @@ async function api(request, env, ctx) {
         env.DB.prepare("DELETE FROM translations WHERE kind='article' AND ref=? AND model IN ('gemini','indictrans2')").bind(c.id),
         log(pub ? "correct" : "edit", note, pub)
       ]);
-      // TV reads the new text: an automatic AVO story is made afresh from it.
+      // TV reads the new text: an automatic AVO story is made afresh from it (one sent by hand is
+      // read again from the new text).
       await env.DB.prepare("DELETE FROM avo_stories WHERE article_id=? AND origin='auto'").bind(c.id).run().catch(() => {});
+      await env.DB.prepare("UPDATE avo_stories SET title=?, script=?, voice='[]', status='new' WHERE article_id=? AND origin='sent' AND status<>'pulled'").bind(title, JSON.stringify(avoScript({ ...c, title, dek, body }).lines), c.id).run().catch(() => {});
       await audit(env, user, "owner.edit", "article", c.id, { title, note });
       return ok();
     }
@@ -1091,6 +1093,10 @@ async function api(request, env, ctx) {
       for (const ch of CHANNELS) await setBreaking(env, ch, { text: c.title, seconds: 20, music: true });
       await audit(env, user, "owner.breaking", "article", c.id, { title: c.title });
       return ok();
+    }
+    if (action === "avo") {
+      try { const r = await avoFromArticle(env, c.id, user.display_name || user.email); await audit(env, user, "owner.avo", "article", c.id, { title: c.title }); return ok(r); }
+      catch (e) { return err(e.message); }
     }
     if (action === "alert") {
       if (c.alert_state === "sent") return err("An alert for this story has already gone out.");
@@ -1321,8 +1327,16 @@ async function api(request, env, ctx) {
       }
       const [first, second, third] = parts;
       // The AVO engine's log for the producer: stories, their state and every airing.
+      // The stories that can be sent to the AVO engine: the newest published ones (a search finds older).
+      if (first === "avo" && second === "stories" && request.method === "GET") {
+        const q = String(url.searchParams.get("q") || "").trim().slice(0, 80);
+        const { results } = await env.DB.prepare(`SELECT a.id, a.title, a.category, a.kind, a.published_at, v.status AS avo FROM articles a LEFT JOIN avo_stories v ON v.article_id=a.id
+          WHERE a.status='published' AND a.pulled_at IS NULL AND a.lang='bn' ${q ? "AND (a.title LIKE ? OR a.dek LIKE ?)" : ""} ORDER BY a.published_at DESC LIMIT 60`).bind(...(q ? [`%${q}%`, `%${q}%`] : [])).all();
+        return json({ stories: results.map(r => ({ id: r.id, title: r.title, desk: r.category, kind: r.kind, at: r.published_at, avo: r.avo || "" })) }, 200, { "cache-control": "no-store" });
+      }
       if (first === "avo" && request.method === "GET") return json(await avoLog(env), 200, { "cache-control": "no-store" });
       // The AVO Story Desk: write, edit, take out of rotation, delete.
+      if (first === "avo" && second === "send" && request.method === "POST") { try { const out = await avoFromArticle(env, String(b.id || ""), user.display_name || user.email); await audit(env, user, "avo.send", "avo", out.id, {}); clearTvCache(); return json(out); } catch (e) { return err(e.message); } }
       if (first === "avo" && !second && request.method === "POST") { try { const out = await avoManualAdd(env, b, user.display_name || user.email); await audit(env, user, "avo.add", "avo", out.id, { title: b.title }); return json(out); } catch (e) { return err(e.message); } }
       if (first === "avo" && second && request.method === "PUT") { try { await avoManualEdit(env, second, b); await audit(env, user, "avo.edit", "avo", second, { off: b.off }); clearTvCache(); return json({ ok: true }); } catch (e) { return err(e.message); } }
       if (first === "avo" && second && request.method === "DELETE") { try { await avoManualDelete(env, second); await audit(env, user, "avo.delete", "avo", second, {}); clearTvCache(); return json({ ok: true }); } catch (e) { return err(e.message); } }
