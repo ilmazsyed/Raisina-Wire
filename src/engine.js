@@ -2119,19 +2119,30 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   }
   function showBreaking(b) {
     // A short BREAKING NEWS card first, then the story.
-    voStop(); st.breakUntil = Date.now() + (2 + (Number(b.seconds) || 20)) * 1000 + 400;
+    voStop(); st.breakUntil = Date.now() + (2 + (Number(b.total) || Number(b.seconds) || 20)) * 1000 + 400;
+    // (a new breaking replaces one still on screen)
+    clearTimeout(st.brT); stage.querySelectorAll(".tv-breaking,.tv-intro").forEach(x => x.remove());
     const intro = document.createElement("div"); intro.className = "tv-intro"; intro.innerHTML = introCard(true); stage.append(intro);
     if (b.music && !st.muted) breakingSting(st.audio, Math.min(b.seconds, 8));
-    setTimeout(() => { intro.remove(); showBreakingStory(b); }, 2000);
+    st.brT = setTimeout(() => { intro.remove(); showBreakingStory(b); }, 2000);
   }
+  // The breaking: its lines one after another (each for b.seconds), with its picture, muted video
+  // or YouTube video (muted) behind, if it has one.
   function showBreakingStory(b) {
-    const el = document.createElement("div"); el.className = "tv-breaking";
+    const lines = (b.lines?.length ? b.lines : [b.text]).filter(Boolean), m = b.media, per = Math.max(5, Number(b.seconds) || 20);
+    const media = !m ? "" : m.kind === "yt" ? `<div class="br-media"><iframe src="https://www.youtube.com/embed/${esc(m.id)}?autoplay=1&mute=1&controls=0&loop=1&playlist=${esc(m.id)}&playsinline=1&modestbranding=1&rel=0" allow="autoplay; encrypted-media" title=""></iframe><i></i></div>`
+      : m.kind === "video" ? `<div class="br-media"><video src="${esc(m.url)}" autoplay muted loop playsinline></video><i></i></div>`
+      : `<div class="br-media"><img src="${esc(m.url)}" alt="" referrerpolicy="no-referrer"><i></i></div>`;
+    const dots = lines.length > 1 ? `<span class="br-dots">${lines.map((_, i) => `<i data-i="${i}"></i>`).join("")}</span>` : "";
+    const el = document.createElement("div"); el.className = `tv-breaking${m ? " has-media" : ""}`;
     el.innerHTML = channel === "h"
-      ? `<div class="br-slash"></div><div class="br-in"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(b.text)}</b><img src="${LOGO}" alt=""></div><div class="br-bar"></div>`
-      : vJacket(`<div class="br-v"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(b.text)}</b></div>`, "এইমাত্র পাওয়া খবর");
+      ? `${media}<div class="br-slash"></div><div class="br-in"><span class="br-tag">এইমাত্র পাওয়া খবর</span>${dots}<b class="br-line"></b>${m ? "" : `<img src="${LOGO}" alt="">`}</div><div class="br-bar"></div>`
+      : vJacket(`<div class="br-v">${media}<span class="br-tag">এইমাত্র পাওয়া খবর</span>${dots}<b class="br-line"></b></div>`, "এইমাত্র পাওয়া খবর");
     stage.append(el);
+    const show = i => { const t = el.querySelector(".br-line"); if (!t) return; t.textContent = lines[i]; t.style.animation = "none"; void t.offsetWidth; t.style.animation = ""; el.querySelectorAll(".br-dots i").forEach((d, j) => d.classList.toggle("on", j === i)); };
+    show(0); lines.slice(1).forEach((_, i) => setTimeout(() => el.isConnected && show(i + 1), per * 1000 * (i + 1)));
     st.current?.slots.forEach(s => s.setMuted(true));
-    setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 600); st.current?.slots.forEach(s => s.setMuted(st.muted)); }, b.seconds * 1000);
+    setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 600); st.current?.slots.forEach(s => s.setMuted(st.muted)); }, per * lines.length * 1000);
   }
 
   /* ---------- the clock ---------- */

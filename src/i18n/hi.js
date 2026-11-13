@@ -1382,4 +1382,10 @@ export default {
   "Take all off air": "सब ऑन एयर से हटाएँ",
   "Delete its AVO": "इसका एवीओ हटाएँ",
   "AVO deleted": "एवीओ हटाया गया",
+  "+ Add a line": "+ एक और लाइन",
+  "Seconds per line": "हर लाइन के सेकंड",
+  "Picture or video (optional)": "तस्वीर या वीडियो (वैकल्पिक)",
+  "Upload picture": "तस्वीर अपलोड",
+  "Upload video (plays muted)": "वीडियो अपलोड (बिना आवाज़)",
+  "Add link": "लिंक जोड़ें",
 };

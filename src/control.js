@@ -1,3 +1,4 @@
+import { breakingOf } from "./breakingof.js";
 // Realtime control for Rashtrix TV: one Durable Object per channel ("ctl:h", "ctl:v") and one per
 // live-studio room ("room:<id>"). Screens connect over WebSocket and get every change in about a
 // second: the OBS/vMix outputs, the PCR, the producer, the app's players and the studio's guests.
@@ -122,9 +123,8 @@ export class TvControl {
       case "lower": s.lower = a && a.name ? { name: String(a.name).slice(0, 80), title: String(a.title || "").slice(0, 120) } : null; break;
       case "ticker": s.ticker = (a.lines || []).map(x => String(x).slice(0, 160)).filter(Boolean).slice(0, 20); break;
       case "breaking": {
-        s.breaking = a.clear ? null : { text: String(a.text || "").slice(0, 160), music: a.music !== false, seconds: Math.max(5, Math.min(60, Number(a.seconds) || 20)), at: a.at && !isNaN(Date.parse(a.at)) ? a.at : iso() };
-        if (s.breaking && !s.breaking.text) throw new Error("Write the breaking headline.");
-        if (s.breaking) await this.asrun({ label: s.breaking.text, graphic: { kind: "breaking" }, dur: s.breaking.seconds }, "breaking");
+        s.breaking = a.clear ? null : { ...breakingOf(a), at: a.at && !isNaN(Date.parse(a.at)) ? a.at : iso() };
+        if (s.breaking) await this.asrun({ label: s.breaking.lines.join(" · "), graphic: { kind: "breaking" }, dur: s.breaking.total }, "breaking");
         break;
       }
       // The live split (Breaking desk): a YouTube live at 60, the desk's pointers at 40, in sets of

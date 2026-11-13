@@ -1434,4 +1434,10 @@ export default {
   "Take all off air": "সব সম্প্রচার থেকে সরান",
   "Delete its AVO": "এর এভিও মুছুন",
   "AVO deleted": "এভিও মোছা হয়েছে",
+  "+ Add a line": "+ আরেকটি লাইন",
+  "Seconds per line": "প্রতি লাইনে সেকেন্ড",
+  "Picture or video (optional)": "ছবি বা ভিডিও (ঐচ্ছিক)",
+  "Upload picture": "ছবি আপলোড",
+  "Upload video (plays muted)": "ভিডিও আপলোড (শব্দ ছাড়া চলবে)",
+  "Add link": "লিংক দিন",
 };
