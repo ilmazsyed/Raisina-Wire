@@ -119,6 +119,21 @@ YOUTUBE_API_KEY`.
 - **Map outlines:** Natural Earth (public domain), via the `world-atlas` package, pre-converted in `public/tv/map-*.json`.
 - **Check the running order:** `npm run build && NODE_PATH=$(npm root -g) npm run sim -- --at 20:00 --minutes 30` plays the autopilot at speed with the live data and prints it.
 
+### Breaking desk (`/breaking.html`)
+
+Every breaking goes out from the **Breaking desk** (control room → TV → Breaking desk). TV channels,
+the PCR and the app's story tools no longer have their own breaking button.
+
+- **Break in now:** write the headline, choose Rashtrix TV, Rashtrix Shorts or both, the seconds and
+  music, and press Break in. It goes on every screen at once and is read as one AVO story. Clear
+  breaking takes it off. The desk keeps a log of the last 40 breakings and clears.
+- **Lives:** paste a YouTube live link, cut it on air, or go back to the running order.
+- **Live split 60:40:** turn the split on for a channel. While a YouTube live is on air there, the live
+  plays at 60 (left on Rashtrix TV, top on Shorts) and the desk's pointers at 40. There are up to
+  24 pointers in eight sets of three. Each set is put live or taken off, and the sets on air take turns
+  on screen (6–30 seconds each). Changes are on screen within a second. The pointers are kept in
+  `settings` (`tv:livedesk`) and sent to each channel's realtime state (`split`).
+
 ## Phase 3: bulletin producer and PCR
 
 - **Realtime control** (`src/control.js`): each channel has a Durable Object that holds what is on

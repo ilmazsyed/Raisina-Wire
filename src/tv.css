@@ -1504,3 +1504,47 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .nn.v .nn-word{flex-direction:column;gap:24px;font-size:190px}
 .nn.v .nn-bn{font-size:64px}
 .nn.v .nn-bar{width:80%}
+
+/* ---------- The live split (Breaking desk): the live at 60, the desk's pointers at 40 ---------- */
+.tvp.split-on{background:radial-gradient(120% 90% at 85% 20%,#5a0b10 0%,#2a0508 45%,#120204 100%)}
+.tvp-split{position:absolute;inset:0;z-index:5;pointer-events:none}
+.tvp-split[hidden]{display:none}
+.tvp-h .tvp-ytlayer,.tvp-h .tvp-stage .tvp-scene,.tvp-v .tvp-ytlayer,.tvp-v .tvp-stage .tvp-scene{transform-origin:0 0;transition:transform .7s cubic-bezier(.2,.8,.2,1)}
+.tvp-h.split-on .tvp-ytlayer,.tvp-h.split-on .tvp-stage .tvp-scene{transform:translate(40px,196px) scale(.6)}
+.tvp-v.split-on .tvp-ytlayer,.tvp-v.split-on .tvp-stage .tvp-scene{transform:translate(0,-420px)}
+.tvp-h.split-on .tvp-stage .tvp-scene,.tvp-h.split-on .tvp-ytlayer{box-shadow:0 0 0 4px rgba(212,160,23,.85),0 30px 60px rgba(0,0,0,.55);border-radius:4px}
+.sp-panel{position:absolute;display:flex;flex-direction:column;gap:18px;padding:26px 28px 24px;border-radius:22px;color:#fff;
+  background:linear-gradient(170deg,rgba(28,6,9,.92),rgba(12,2,4,.94));border:2px solid rgba(212,160,23,.55);box-shadow:0 30px 70px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.08);
+  animation:spin .7s cubic-bezier(.2,.8,.2,1) both}
+.tvp-h .sp-panel{left:1220px;top:196px;width:660px;height:794px}
+.tvp-v .sp-panel{left:40px;right:40px;top:880px;height:830px}
+@keyframes spin{from{opacity:0;transform:translateX(60px)}to{opacity:1;transform:none}}
+.tvp-v .sp-panel{animation-name:spinv}
+@keyframes spinv{from{opacity:0;transform:translateY(60px)}to{opacity:1;transform:none}}
+.sp-head{display:flex;align-items:center;gap:14px;padding-bottom:16px;border-bottom:2px solid rgba(212,160,23,.45)}
+.sp-live{display:inline-flex;align-items:center;gap:10px;padding:6px 16px;border-radius:8px;background:var(--red);font:800 28px/1 "Hind Siliguri",sans-serif}
+.sp-live i{width:12px;height:12px;border-radius:50%;background:#fff;animation:sppulse 1.2s ease-in-out infinite}
+@keyframes sppulse{50%{opacity:.3;transform:scale(.7)}}
+.sp-head b{font:800 34px/1 "Noto Serif Bengali",serif;color:var(--gold)}
+.sp-count{margin-left:auto;font:700 26px/1 "Hind Siliguri",sans-serif;color:rgba(255,255,255,.7)}
+.sp-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:22px;flex:1}
+.sp-list li{display:flex;gap:18px;align-items:flex-start;animation:spli .6s calc(.15s + var(--n,0)*.18s) cubic-bezier(.2,.8,.2,1) both}
+@keyframes spli{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+.sp-no{flex:none;display:grid;place-items:center;width:58px;height:58px;border-radius:14px;background:linear-gradient(180deg,#e0b13a,#b8860b);color:#1a0d02;font:800 30px/1 "Hind Siliguri",sans-serif;box-shadow:0 6px 16px rgba(0,0,0,.35)}
+.sp-list p{margin:0;font:700 34px/1.38 "Noto Serif Bengali",serif;color:#fff;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.tvp-v .sp-list p{font-size:38px}
+.sp-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.14);overflow:hidden}
+.sp-bar i{display:block;height:100%;background:var(--gold);transform-origin:0 50%;animation:spbar linear both}
+@keyframes spbar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.sp-wait{margin:auto;font:700 34px "Noto Serif Bengali",serif;color:rgba(255,255,255,.65)}
+.sp-title{position:absolute;display:flex;align-items:stretch;border-radius:10px;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,.45);animation:spli .6s .3s both}
+.tvp-h .sp-title{left:40px;top:860px;max-width:1152px}
+.tvp-v .sp-title{left:40px;right:40px;top:770px}
+.sp-title span{display:grid;place-items:center;padding:0 16px;background:var(--red);color:#fff;font:800 24px/1 Montserrat,sans-serif;letter-spacing:1px}
+.sp-title b{padding:12px 20px;background:rgba(255,255,255,.96);color:#111;font:700 30px/1.25 "Noto Serif Bengali",serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* (the split: viewers' comments wait while the pointers are up; on Shorts only the live's own
+   16:9 band shows, above the pointers) */
+.tvp.split-on .tvp-cm{display:none!important}
+.tvp-v.split-on .tvp-ytlayer,.tvp-v.split-on .tvp-stage .tvp-scene{clip-path:inset(656px 0 656px 0);box-shadow:none}
+.sp-body{flex:1;display:flex;flex-direction:column;gap:18px;min-height:0}
+.tvp.split-on .tvp-ovl .cm-box{display:none}

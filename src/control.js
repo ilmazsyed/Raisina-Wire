@@ -25,7 +25,7 @@ const DEFAULT = {
   transition: { type: "mix", ms: 600 },
   layers: { bug: true, live: true, clock: true, lower: true, ticker: true, ad: true, weather: true },
   lower: null, breaking: null, delay: 0, dumpAt: 0, standby: { on: false, auto: false, reason: "" },
-  overlay: { poll: null, results: null, comments: null }, sponsor: null, ticker: [], version: 0, updatedAt: 0
+  overlay: { poll: null, results: null, comments: null }, sponsor: null, ticker: [], split: null, version: 0, updatedAt: 0
 };
 
 export class TvControl {
@@ -127,6 +127,10 @@ export class TvControl {
         if (s.breaking) await this.asrun({ label: s.breaking.text, graphic: { kind: "breaking" }, dur: s.breaking.seconds }, "breaking");
         break;
       }
+      // The live split (Breaking desk): a YouTube live at 60, the desk's pointers at 40, in sets of
+      // three that take turns on screen.
+      case "split": s.split = a && a.on ? { on: true, every: Math.max(6, Math.min(30, Math.round(Number(a.every) || 10))), title: String(a.title || "").slice(0, 80),
+          sets: (Array.isArray(a.sets) ? a.sets : []).slice(0, 8).map(x => (Array.isArray(x) ? x : []).map(t => String(t || "").slice(0, 160)).filter(Boolean).slice(0, 3)).filter(x => x.length) } : null; break;
       case "delay": s.delay = Math.max(0, Math.min(10, Math.round(Number(a.seconds) || 0))); break;
       case "dump": s.dumpAt = now(); s.standby = { on: true, auto: false, reason: "dump" }; await this.asrun({ label: "DUMP", graphic: { kind: "standby" } }, "dump"); break;
       case "standby": s.standby = { on: !!a.on, auto: !!a.auto, reason: String(a.reason || "").slice(0, 120) }; if (a.on) await this.asrun({ label: "Standby", graphic: { kind: "standby" } }, "standby"); break;
