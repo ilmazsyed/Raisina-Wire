@@ -47,7 +47,8 @@ export default defineConfig({
         onair: resolve(import.meta.dirname, "onair.html"),
         prompter: resolve(import.meta.dirname, "prompter.html"),
         avodesk: resolve(import.meta.dirname, "avodesk.html"),
-        breaking: resolve(import.meta.dirname, "breaking.html")
+        breaking: resolve(import.meta.dirname, "breaking.html"),
+        progdesk: resolve(import.meta.dirname, "progdesk.html")
       }
     }
   }
