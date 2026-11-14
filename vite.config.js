@@ -48,7 +48,8 @@ export default defineConfig({
         prompter: resolve(import.meta.dirname, "prompter.html"),
         avodesk: resolve(import.meta.dirname, "avodesk.html"),
         breaking: resolve(import.meta.dirname, "breaking.html"),
-        progdesk: resolve(import.meta.dirname, "progdesk.html")
+        progdesk: resolve(import.meta.dirname, "progdesk.html"),
+        adsdesk: resolve(import.meta.dirname, "adsdesk.html")
       }
     }
   }

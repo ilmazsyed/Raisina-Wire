@@ -790,7 +790,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       el.innerHTML = `<video playsinline autoplay ${mute() ? "muted" : ""}></video><div class="tvp-shield"></div>${src.kind === "guest" && src.name ? `<span class="tvs-name"><b>${esc(src.name)}</b>${src.title ? `<small>${esc(src.title)}</small>` : ""}</span>` : ""}`;
       const v = el.querySelector("video"); let extra = null, last = 0, lastT = Date.now();
       v.muted = mute();
-      if (src.kind === "clip") { v.src = src.url; v.addEventListener("loadedmetadata", () => { v.currentTime = (src.in || 0) + offset; v.play().catch(() => {}); }, { once: true }); }
+      // A clip starts with sound only where the browser allows it; refused, it starts muted at once
+      // (never sitting paused), and takes its sound with the viewer's tap like every video.
+      if (src.kind === "clip") { v.src = src.url; v.addEventListener("loadedmetadata", () => { v.currentTime = (src.in || 0) + offset; v.play().catch(() => { v.muted = true; v.play().catch(() => {}); }); }, { once: true }); }
       if (src.kind === "hls") playHls(v, src.url, st.ctl?.delay || 0).then(x => { extra = x; v.play().catch(() => {}); }).catch(() => {});
       if (src.kind === "whep") playWhep(v, src.url).then(x => { extra = x; }).catch(() => {});
       if (src.kind === "guest") {
@@ -808,6 +810,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       slot.setMuted = m => { v.muted = m || !isMain; };
       slot.stalled = () => { if (v.currentTime !== last) { last = v.currentTime; lastT = Date.now(); } return src.kind !== "clip" && Date.now() - lastT > 10000; };
       slot.playing = () => !v.paused && v.readyState >= 2;
+      slot.ended = () => v.ended;
     } else if (src.kind === "fb" && src.url) {   // a Facebook live video, through Facebook's player
       el.innerHTML = `<iframe src="https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(src.url)}&show_text=false&autoplay=true&mute=${mute() ? 1 : 0}&width=1280" allow="autoplay; encrypted-media; fullscreen" allowfullscreen title=""></iframe><div class="tvp-shield"></div>`;
     } else if (src.kind === "vdo" && src.url) {
@@ -1065,8 +1068,12 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const len = (it.dur - (it.in || 0)) * 1000, still = Date.now() - (st.ytMovedAt || 0) > 20000;
       // (an AVO block waits for its bytes to play in full: src/engine.js byteStep)
       const extra = st.avoExtra && st.avoExtra.start === q.seg?.start ? st.avoExtra.ms : 0;
-      const done = it.type === "video"
+      // An ad plays whole too: a YouTube ad like a video; an uploaded one until its file has ended
+      // (or 20 seconds past its length, when it will not play).
+      const clipEnded = it.type === "ad" && !!it.url && !!st.current?.slots?.some(s => s.src?.kind === "clip" && s.src.url === it.url && s.ended?.());
+      const done = it.type === "video" || (it.type === "ad" && it.ytId)
         ? ytEnded || (age > len + 20000 && still) || age > len * 2 + 600e3
+        : it.type === "ad" ? clipEnded || age > it.dur * 1000 + 20000
         : age >= it.dur * 1000 + extra;
       if (!done) return q.seg;
     }
@@ -1092,6 +1099,20 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     }
     // A quarter whose bulletin could not start in time is let go.
     if ((st.tv?.bulletin || []).length && !q.bDone.includes(slot) && t - slot >= 11 * 60e3) q.bDone = [...q.bDone.slice(-8), slot];
+    // An ad break (the Ad library desk, src/ads.js): the ads due now play one after another, in the
+    // break after the item on air has ended, never over it.
+    if (!q.adQueue?.length) q.adQueue = adsDue(t, q);
+    if (q.adQueue.length) {
+      if (q.item?.type === "upnext") q.resume = q.item.video;
+      const a = q.adQueue.shift(); q.n++;
+      q.item = { type: "ad", id: a.id, ytId: a.ytId, url: a.url, dur: a.dur }; q.start = t;
+      q.seg = { type: "ad", id: a.id, title: a.title, ytId: a.ytId, url: a.url, dur: a.dur, start: t, in: 0, sting: true, n: q.n };
+      adAired(a);
+      const nextAd = q.adQueue[0];
+      const after = loop.slice(q.i).concat(loop.slice(0, q.i)).find(x => x.type === "video");
+      st.preWant = nextAd?.ytId ? { id: nextAd.ytId, at: 0 } : after ? { id: after.ytId, at: 0 } : null;
+      return q.seg;
+    }
     // A poll or its result whose time has come, when the item on air is done.
     const pd = pollDue(t, q);
     if (pd) {
@@ -1178,6 +1199,10 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const seg = continuitySeg(); if (!seg) return { layout: "graphic", graphic: { kind: "headlines" }, key: "c:none" };
     const transition = seg.sting ? { type: "stinger", ms: 1200 } : { type: "mix", ms: 500 };
     if (seg.type === "video") return { layout: "full", sources: [{ kind: "yt", id: seg.ytId, in: seg.in || 0, title: seg.line || seg.title }], label: seg.line || seg.title, startAt: seg.start, key: `c:${seg.ytId}:${seg.start}`, transition };
+    // An ad: full screen, clean (no jacket over it).
+    if (seg.type === "ad") return seg.ytId
+      ? { layout: "full", sources: [{ kind: "yt", id: seg.ytId, in: 0, title: seg.title }], label: seg.title, startAt: seg.start, key: `c:ad:${seg.start}`, transition, full: true, ad: true }
+      : { layout: "full", sources: [{ kind: "clip", url: seg.url }], label: seg.title, startAt: seg.start, dur: seg.dur, key: `c:ad:${seg.start}`, transition, full: true, ad: true };
     if (seg.type === "poll") return { layout: "graphic", graphic: { kind: "poll", id: seg.id, res: seg.res }, startAt: seg.start, dur: seg.dur, key: `c:poll:${seg.start}`, transition, full: true };
     if (seg.type === "seg") return { layout: "graphic", graphic: { kind: "seg", name: seg.name, head: seg.head || 4, items: seg.items }, startAt: seg.start, dur: seg.dur, key: `c:seg:${seg.start}`, transition, full: true };
     if (seg.type === "flash") return { layout: "graphic", graphic: { kind: "flash", n: seg.n || 0 }, startAt: seg.start, dur: seg.dur, key: `c:flash:${seg.start}`, transition };
@@ -1296,6 +1321,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     stage.classList.toggle("lband", sc?.layout === "lband");
     stage.classList.toggle("vid", !sc?.graphic && sc?.layout === "full" && (sc?.sources || []).length === 1);
     stage.classList.toggle("full-gfx", !!sc?.full || sc?.graphic?.kind === "promo" || sc?.graphic?.kind === "ads");
+    // An ad: clean, with nothing of the channel's over it (it carries its own branding).
+    stage.classList.toggle("ad-on", !!sc?.ad);
     stage.classList.toggle("wx-on", ["weather", "market"].includes(sc?.graphic?.kind));
     if (sc?.graphic?.kind !== "avo") stage.classList.remove("ex-on", "byte-on");
   }
@@ -1348,6 +1375,37 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   function deskOf(x) { return x?.origin === "breaking" || String(x?.id || "").startsWith("brk:") ? "খবর" : DESK_BN[x?.desk] || x?.desk || "খবর"; }
   // A bulletin or segment the broadcast output has aired, recorded once for the Segment & bulletin
   // desk (src/progs.js), where it can be edited and played again.
+  // The ads due now on this screen (the Ad library desk, src/ads.js), at most three in a break:
+  //  - forced ones (once each, within 20 minutes of being forced);
+  //  - those set for a time of day (India time) that has come in the last 20 minutes;
+  //  - those on rotation, n times in every 30 minutes (from :00 and :30): the k-th play falls due
+  //    k × 30/n minutes into the half hour, never sooner than half that gap after the last one, and
+  //    not in a viewer's first minute (the app opens on the news, not an ad).
+  function adsDue(t, q) {
+    const list = st.tv?.ads || []; if (!list.length) return [];
+    q.adLog ||= {}; q.adDone ||= []; q.t0 ||= t;
+    const day0 = t - ((t + 19800e3) % 864e5), md = Math.floor(((t + 19800e3) % 864e5) / 60e3);
+    const mins = x => { const m = /^(\d{2}):(\d{2})$/.exec(x || ""); return m ? +m[1] * 60 + +m[2] : -1; };
+    const inWin = a => { const f = mins(a.from), e = mins(a.to); if (f < 0 || e < 0 || f === e) return true; return f < e ? md >= f && md < e : md >= f || md < e; };
+    const forced = [], timed = [], rot = [];
+    for (const a of list) {
+      if (a.force && t >= a.force - 5000 && t - a.force < 20 * 60e3 && !q.adDone.includes(`f:${a.id}:${a.force}`)) { forced.push({ ...a, key: `f:${a.id}:${a.force}` }); continue; }
+      const at = (a.times || []).filter(x => mins(x) >= 0).map(x => day0 + mins(x) * 60e3).find(x => t >= x && t - x < 20 * 60e3 && !q.adDone.includes(`t:${a.id}:${x}`));
+      if (at) { timed.push({ ...a, key: `t:${a.id}:${at}` }); continue; }
+      if (a.per30 > 0 && inWin(a) && t - q.t0 > 60e3) {
+        const log = (q.adLog[a.id] || []).filter(x => x > t - 2 * 3600e3), win = Math.floor(t / 1800e3) * 1800e3, gap = 1800e3 / a.per30;
+        const c = log.filter(x => x >= win).length, last = log[log.length - 1] || 0;
+        if (c < a.per30 && t >= win + c * gap && t - last >= gap / 2) rot.push({ ...a, key: "" });
+      }
+    }
+    return [...forced, ...timed, ...rot].filter((a, i, all) => all.findIndex(x => x.id === a.id) === i).slice(0, 3);
+  }
+  // An ad starting: noted on this screen (its rotation count), and, from the broadcast output, counted.
+  function adAired(a) {
+    const q = st.seq; if (!q) return;
+    (q.adLog[a.id] ||= []).push(now()); if (a.key) q.adDone = [...q.adDone.slice(-40), a.key];
+    if (output) fetch("/api/tv/ad/played", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ch: channel, key, id: a.id }) }).catch(() => {});
+  }
   function progRecord(kind, name, slot, items, short, title = "") {
     const k = `${channel}:${kind}:${name}:${slot}`; st.progSent ||= new Set(); if (st.progSent.has(k)) return; st.progSent.add(k);
     fetch("/api/tv/prog/played", { method: "POST", headers: { "content-type": "application/json" }, keepalive: false,
