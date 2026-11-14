@@ -61,6 +61,31 @@ async function uploadClip(file, bar, title) {
   finally { setTimeout(() => { bar.hidden = true; $("i", bar).style.width = "0"; }, 800); }
 }
 
+// The clips already uploaded (newest first): use one in this story (as a video or a byte), play
+// it, delete it, or clear every clip older than a day.
+async function pickClip(use) {
+  const d = document.createElement("dialog"); d.className = "ad-clips";
+  d.innerHTML = `<div class="stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3 style="margin:0">Uploaded clips</h3><button class="btn red" type="button" id="cOld">Delete clips older than 24 hours</button></div>
+    <p class="muted" style="margin:0" id="cUse"></p><div class="ad-cl" id="cList"><p class="muted">Loading…</p></div><div class="row"><button class="btn" type="button" data-close>Close</button></div></div>`;
+  document.body.append(d); d.showModal(); $("[data-close]", d).onclick = () => d.close(); d.addEventListener("close", () => d.remove());
+  const age = t => { const h = (Date.now() - Date.parse(String(t).replace(" ", "T") + (/[zZ+]/.test(t) ? "" : "Z"))) / 3600e3; return h < 1 ? `${digits(Math.max(1, Math.round(h * 60)))} min ago` : h < 48 ? `${digits(Math.round(h))} h ago` : `${digits(Math.round(h / 24))} days ago`; };
+  const draw = async () => {
+    let L; try { L = await api("/api/admin/clips"); } catch (e) { $("#cList", d).innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
+    const ready = L.clips.filter(c => c.status === "ready");
+    $("#cUse", d).textContent = `${ready.length} clips · ${(L.usedBytes / 1073741824).toFixed(2)} GB of 10 GB used`;
+    $("#cList", d).innerHTML = ready.map(c => `<div class="ad-clip"><video src="${esc(c.url)}#t=1" preload="metadata" muted playsinline></video><div class="ad-cmeta"><b data-no-tr>${esc(c.title)}</b><small class="muted">${c.duration ? mmss(c.duration) + " · " : ""}${digits((c.bytes / 1048576).toFixed(1))} MB · ${age(c.created_at)}</small></div>
+      <div class="row" style="gap:6px"><button class="btn sm green" type="button" data-cuse="${esc(c.id)}">Use</button><button class="btn sm" type="button" data-cplay="${esc(c.id)}">▶</button><button class="btn sm red" type="button" data-cdel="${esc(c.id)}">Delete</button></div></div>`).join("") || `<p class="muted">No clips uploaded yet.</p>`;
+    $$("[data-cuse]", d).forEach(b => b.onclick = () => { use(ready.find(c => c.id === b.dataset.cuse)); d.close(); toast("Clip added. Save the story to put it on air."); });
+    $$("[data-cplay]", d).forEach(b => b.onclick = () => { const v = b.closest(".ad-clip").querySelector("video"); v.controls = true; v.muted = false; v.play().catch(() => {}); });
+    $$("[data-cdel]", d).forEach(b => b.onclick = async () => { if (!confirm("Delete this clip from storage? Stories that use it lose it.")) return; try { await api(`/api/admin/clips/${b.dataset.cdel}`, { method: "DELETE" }); draw(); } catch (e) { fail(e); } });
+  };
+  $("#cOld", d).onclick = async () => {
+    if (!confirm("Delete every clip older than 24 hours from storage? Clips used by AVO stories still on air are kept.")) return;
+    try { const r = await api("/api/admin/clips/cleanup", { method: "POST", body: { hours: 24 } }); toast(`${r.deleted} clips deleted (${(r.freedBytes / 1048576).toFixed(0)} MB freed)${r.spared ? `; ${r.spared} kept for stories on air` : ""}.`); draw(); } catch (e) { fail(e); }
+  };
+  draw();
+}
+
 function drawForm() {
   const F = $(".ad-form"), e = S.edit, MAXF = maxFor(e);
   F.innerHTML = `<h2>${e ? "Edit AVO story" : "New AVO story"}</h2>${e ? `<p class="muted" style="margin:0">Saved changes are voiced and pictured again within a minute, and the story goes back on air (in rotation for six hours or four airings from now).${e.origin !== "manual" ? " From then on it is read as written here, not from its report." : ""}</p>` : ""}
@@ -72,13 +97,13 @@ function drawForm() {
       <div class="ad-pics">${S.images.map((x, i) => `<div class="ad-pic"><img src="${esc(x.url)}" alt=""><input data-credit="${i}" placeholder="Credit (e.g. Rashtrix / photographer)" value="${esc(x.credit || "")}" data-no-tr><div class="row"><button class="btn sm" data-left="${i}" ${i ? "" : "disabled"}>◀</button><button class="btn sm" data-right="${i}" ${i < S.images.length - 1 ? "" : "disabled"}>▶</button><button class="btn sm red" data-rm="${i}">Remove</button></div></div>`).join("")}</div>
       <div class="row"><label class="btn">Upload pictures<input type="file" id="fFiles" accept="image/*" multiple hidden></label><input id="fLink" placeholder="or paste a picture link (https://…)" style="flex:1"><button class="btn" id="fAddLink">Add link</button></div>
       <label style="flex-direction:row;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="fMore" ${e ? (e.findMore ? "checked" : "") : "checked"}> Find more pictures automatically when there are fewer than four</label></div>
-    <div class="ad-vids"><b>Videos</b> <small class="muted">(links only, nothing is uploaded; shown like the pictures, muted, and only when added)</small>
+    <div class="ad-vids"><b>Videos</b> <small class="muted">(upload one, use one already uploaded, or paste a link; shown like the pictures, muted, and only when added)</small>
       ${S.videos.map((v, i) => `<div class="row ad-vrow"><span class="tag">${/youtu/.test(v) ? "YOUTUBE" : /^\/clips\//.test(v) ? "UPLOADED" : "VIDEO"}</span><small data-no-tr style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${/^\/clips\//.test(v) ? "Uploaded video" : esc(v)}</small><button class="btn sm red" type="button" data-vrm="${i}">Remove</button></div>`).join("")}
-      ${S.videos.length < 6 ? `<div class="row"><label class="btn">Upload video<input type="file" id="fVidFile" accept="video/mp4,video/quicktime,video/webm" hidden></label><input id="fVid" placeholder="or a YouTube or video link (https://…)" style="flex:1" data-no-tr><button class="btn" type="button" id="fVidAdd">Add video</button></div>` : ""}</div>
+      ${S.videos.length < 6 ? `<div class="row" style="flex-wrap:wrap"><label class="btn">Upload video<input type="file" id="fVidFile" accept="video/mp4,video/quicktime,video/webm" hidden></label><button class="btn" type="button" id="fVidPick">Uploaded clips</button><input id="fVid" placeholder="or a YouTube or video link (https://…)" style="flex:1;min-width:220px" data-no-tr><button class="btn" type="button" id="fVidAdd">Add video</button></div>` : ""}</div>
     <div class="ad-byte"><b>Plays as</b>
       <div class="row ad-seg"><button type="button" class="btn ${S.byteMode === "avo" ? "on" : ""}" data-bm="avo">AVO only</button><button type="button" class="btn ${S.byteMode === "byte" ? "on" : ""}" data-bm="byte">AVO + byte</button></div>
       ${S.byteMode === "byte" ? `<p class="muted" style="margin:0">After the reading, the bytes play in full, one after another, with the Rashtrix wipe between them and the person's name on screen.</p>
-      ${S.bytes.map((b, i) => `<div class="ad-brow"><span class="ad-bn">${digits(i + 1)}</span><div class="stack" style="flex:1;gap:6px"><div class="row" style="gap:6px;flex-wrap:nowrap"><input data-bf="url" data-bi="${i}" value="${esc(b.url || "")}" placeholder="Byte video link (YouTube or https://…mp4), or upload" style="flex:1;min-width:0" data-no-tr><label class="btn sm">Upload<input type="file" data-bup="${i}" accept="video/mp4,video/quicktime,video/webm" hidden></label></div>
+      ${S.bytes.map((b, i) => `<div class="ad-brow"><span class="ad-bn">${digits(i + 1)}</span><div class="stack" style="flex:1;gap:6px"><div class="row" style="gap:6px;flex-wrap:nowrap"><input data-bf="url" data-bi="${i}" value="${esc(b.url || "")}" placeholder="Byte video link (YouTube or https://…mp4), or upload" style="flex:1;min-width:0" data-no-tr><label class="btn sm">Upload<input type="file" data-bup="${i}" accept="video/mp4,video/quicktime,video/webm" hidden></label><button class="btn sm" type="button" data-bpick="${i}">Uploaded</button></div>
         <div class="row" style="gap:6px"><input data-bf="name" data-bi="${i}" value="${esc(b.name || "")}" placeholder="Name (on screen)" style="flex:2" data-no-tr><input data-bf="title" data-bi="${i}" value="${esc(b.title || "")}" placeholder="Title (e.g. মুখ্যমন্ত্রী)" style="flex:2" data-no-tr><input data-bf="secs" data-bi="${i}" value="${esc(mmss(b.secs))}" placeholder="Length m:ss" style="width:110px" title="Empty: the YouTube video's own length"></div></div><button class="btn sm red" type="button" data-brm="${i}">✕</button></div>`).join("")}
       ${S.bytes.length < 3 ? `<button class="btn" type="button" id="fByteAdd">+ Add a byte</button>` : ""}
       ${S.bytes.length ? `<label style="flex-direction:row;align-items:center;gap:8px">Bytes to play<select id="fByteN">${S.bytes.map((_, i) => `<option value="${i + 1}" ${S.byteCount === i + 1 ? "selected" : ""}>${digits(i + 1)}</option>`).join("")}</select></label>` : ""}` : ""}</div>
@@ -100,6 +125,8 @@ function drawForm() {
     try { const r = await uploadClip(f, $("#fProg"), `AVO: ${$("#fTitle").value.trim() || f.name}`); S.videos.push(r.url); toast("Video uploaded."); drawForm(); } catch (err) { fail(err); } });
   $$("[data-bup]").forEach(x => x.onchange = async e => { const f = e.target.files[0]; if (!f) return; const i = +x.dataset.bup; keep(); toast("Uploading the byte…");
     try { const r = await uploadClip(f, $("#fProg"), `Byte: ${S.bytes[i].name || f.name}`); Object.assign(S.bytes[i], { url: r.url, secs: r.secs || S.bytes[i].secs }); toast("Byte uploaded."); drawForm(); } catch (err) { fail(err); } });
+  $("#fVidPick")?.addEventListener("click", () => { keep(); pickClip(c => { S.videos.push(c.url); drawForm(); }); });
+  $$("[data-bpick]").forEach(b => b.onclick = () => { const i = +b.dataset.bpick; keep(); pickClip(c => { Object.assign(S.bytes[i], { url: c.url, secs: c.duration || S.bytes[i].secs }); drawForm(); }); });
   $("#fVidAdd")?.addEventListener("click", () => { const u = $("#fVid").value.trim(); if (!/^https:\/\//.test(u)) return toast("Paste a link that starts with https://"); keep(); S.videos.push(u); drawForm(); });
   $$("[data-bm]").forEach(b => b.onclick = () => { keep(); S.byteMode = b.dataset.bm; if (S.byteMode === "byte" && !S.bytes.length) S.bytes.push({ url: "", name: "", title: "", secs: 0 }); drawForm(); });
   $$("[data-bf]").forEach(x => x.oninput = () => { const b = S.bytes[+x.dataset.bi]; b[x.dataset.bf] = x.dataset.bf === "secs" ? secsOf(x.value) : x.value; });

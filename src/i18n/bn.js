@@ -1457,4 +1457,8 @@ export default {
   "Upload video": "ভিডিও আপলোড",
   "Upload": "আপলোড",
   "Uploaded video": "আপলোড করা ভিডিও",
+  "Uploaded clips": "আপলোড করা ক্লিপ",
+  "Uploaded": "আপলোড করা",
+  "Use": "ব্যবহার করুন",
+  "Delete clips older than 24 hours": "২৪ ঘণ্টার পুরনো ক্লিপ মুছুন",
 };

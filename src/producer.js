@@ -327,12 +327,16 @@ function dialog(html) { const d = document.createElement("dialog"); d.innerHTML 
 async function loadClips() { try { S.clips = (await api("/api/admin/clips")).clips; S.clipsInfo = null; } catch (e) { S.clips = []; S.clipsInfo = e.message; } }
 async function clipsDialog() {
   await loadClips();
-  const d = dialog(`<h3>Clips library</h3><p class="muted">MP4 (H.264) plays everywhere. Clips are kept in Cloudflare R2 (10 GB free) and deleted after 30 days unused unless marked “keep”.</p>
+  const d = dialog(`<div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3 style="margin:0">Clips library</h3><button class="btn red" type="button" id="cOld">Delete clips older than 24 hours</button></div><p class="muted">MP4 (H.264) plays everywhere. Clips are kept in Cloudflare R2 (10 GB free) and deleted after 30 days unused unless marked “keep”.</p>
     ${S.clipsInfo ? `<p class="tag amber">${esc(S.clipsInfo)}</p>` : `<div class="grid2"><label>Upload a video<input type="file" id="cf" accept="video/mp4,video/quicktime,video/webm"></label><label>Or paste a Google Drive link<span class="row"><input id="cd" placeholder="https://drive.google.com/file/d/…" style="flex:1"><button class="btn" id="cdGo">Copy</button></span></label></div><div class="bar" hidden><i></i></div><div class="clips-list"></div>`}`);
   const draw = () => { const L = $(".clips-list", d); if (!L) return; L.innerHTML = S.clips.map(c => `<div class="clip"><div><b data-no-tr>${esc(c.title)}</b><br><small>${digits((c.bytes / 1048576).toFixed(1))} MB${c.status === "ready" ? "" : ` · ${c.status}`}${c.keep ? " · Keep" : ""}</small></div><div class="row"><a class="btn sm" href="${esc(c.url)}" target="_blank">Play</a><button class="btn sm" data-keep="${c.id}">${c.keep ? "Unkeep" : "Keep"}</button><button class="btn sm" data-del="${c.id}">Delete</button></div></div>`).join("") || `<p class="muted">No clips yet.</p>`;
     $$("[data-keep]", L).forEach(b => b.onclick = async () => { const c = S.clips.find(x => x.id === b.dataset.keep); await api(`/api/admin/clips/${c.id}`, { method: "PUT", body: { keep: !c.keep } }).catch(fail); await loadClips(); draw(); });
     $$("[data-del]", L).forEach(b => b.onclick = async () => { if (!confirm("Delete this clip from storage?")) return; await api(`/api/admin/clips/${b.dataset.del}`, { method: "DELETE" }).catch(fail); await loadClips(); draw(); }); };
   draw();
+  $("#cOld", d)?.addEventListener("click", async () => {
+    if (!confirm("Delete every clip older than 24 hours from storage? Clips used by AVO stories still on air are kept.")) return;
+    try { const r = await api("/api/admin/clips/cleanup", { method: "POST", body: { hours: 24 } }); toast(`${r.deleted} clips deleted (${(r.freedBytes / 1048576).toFixed(0)} MB freed)${r.spared ? `; ${r.spared} kept for stories on air` : ""}.`); await loadClips(); draw(); } catch (x) { fail(x); }
+  });
   $("#cf", d)?.addEventListener("change", async e => { const file = e.target.files[0]; if (!file) return; try { await uploadClip(file, $(".bar", d)); await loadClips(); draw(); toast("Uploaded."); } catch (x) { fail(x); } e.target.value = ""; });
   $("#cdGo", d)?.addEventListener("click", async () => { try { toast("Copying from Drive… (large videos take a while)"); await api("/api/admin/clips/drive", { method: "POST", body: { url: $("#cd", d).value, title: "Drive clip" } }); await loadClips(); draw(); toast("Copied."); } catch (x) { fail(x); } });
 }
