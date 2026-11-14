@@ -1402,4 +1402,7 @@ export default {
   "AVO + byte": "एवीओ + बाइट",
   "+ Add a byte": "+ बाइट जोड़ें",
   "Bytes to play": "कितनी बाइट चलेंगी",
+  "Upload video": "वीडियो अपलोड",
+  "Upload": "अपलोड",
+  "Uploaded video": "अपलोड किया वीडियो",
 };
