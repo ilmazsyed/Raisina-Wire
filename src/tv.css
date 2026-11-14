@@ -1610,3 +1610,29 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .avo-byte.v .byte-super{left:40px;right:40px;bottom:420px}
 .byte-n{position:absolute;right:60px;top:60px;padding:6px 16px;border-radius:8px;background:rgba(0,0,0,.6);color:#fff;font:700 28px "Hind Siliguri",sans-serif}
 .byte-n{top:150px}
+
+/* AVO byte from YouTube: the player is taller than the frame, so its title (top) and logo (bottom)
+   fall outside; it waits behind the studio wipe until it plays. The tickers stay on (byte-on). */
+.avo-byte iframe.byte-yt{top:-14%;height:128%}
+.avo-byte.v iframe.byte-yt{top:-8%;height:116%}
+.avo-byte.wait iframe{opacity:0}
+.avo-byte iframe{transition:opacity .3s}
+.tvp-stinger.tvp-studiowipe.out{opacity:0;transition:opacity .4s}
+.tvp.byte-on .byte-super{bottom:170px}
+.tvp.byte-on .avo-byte.v .byte-super{bottom:440px}
+
+/* Breaking with a video: the video plays full screen and the breaking text sits over it, in a
+   band at the bottom (no red screen over the picture). */
+.tv-breaking.has-vid{background:#000}
+.tv-breaking.has-vid .br-media i{position:absolute;inset:auto 0 0 0;height:62%;background:linear-gradient(transparent,rgba(0,0,0,.55) 40%,rgba(0,0,0,.85))}
+.tv-breaking.has-vid .br-slash{display:none}
+.tv-breaking.has-vid .br-in{left:70px;right:70px;top:auto;bottom:90px;transform:none;text-shadow:0 3px 18px rgba(0,0,0,.6)}
+.tv-breaking.has-vid .br-tag{background:var(--red);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.tv-breaking.has-vid .br-in>b{margin-top:22px;padding:18px 30px;background:rgba(170,4,4,.92);border-left:12px solid #fff;border-radius:6px;font-size:66px;line-height:1.3;box-shadow:0 14px 36px rgba(0,0,0,.4)}
+.tv-breaking.has-vid .br-bar{height:20px}
+.tv-breaking.has-vid .br-v{background:#000;justify-content:flex-end;padding:60px 50px 120px}
+.tv-breaking.has-vid .br-v .br-media{position:absolute;inset:0;height:auto;margin:0}
+.tv-breaking.has-vid .br-v .br-media i{height:65%;background:linear-gradient(transparent,rgba(0,0,0,.6) 40%,rgba(0,0,0,.9))}
+.tv-breaking.has-vid .br-v>*:not(.br-media){position:relative}
+.tv-breaking.has-vid .br-v b{padding:20px 26px;background:rgba(170,4,4,.92);border-left:10px solid #fff;border-radius:6px;font-size:64px}
+.tv-breaking.has-vid .br-v .br-tag{background:var(--red);color:#fff}

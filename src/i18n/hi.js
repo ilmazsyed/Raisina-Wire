@@ -1409,4 +1409,9 @@ export default {
   "Uploaded": "अपलोड की गई",
   "Use": "इस्तेमाल करें",
   "Delete clips older than 24 hours": "24 घंटे से पुरानी क्लिप हटाएँ",
+  "In rotation now": "अभी प्रसारण में",
+  "Being made": "बन रही है",
+  "Done (out of rotation)": "प्रसारण पूरा",
+  "Paused": "रुकी हुई",
+  "Failed or pulled": "विफल या हटाई गई",
 };
