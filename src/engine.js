@@ -727,14 +727,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   }
   // The next video is loaded into the one player while the flash or the "up next" card is on
   // (the player is invisible then), so it plays the moment its turn comes, without a wait.
-  // The last second and a half of the "up next" card: the video loaded behind it starts playing,
+  // The last four seconds of the "up next" card: the video loaded behind it starts playing,
   // muted and unseen, so that when its turn comes it is already running (its decoder warm, its
   // first seconds buffered) and the card hands over at once. Its turn then takes it back to its
   // start, which is already loaded.
   function preRoll() {
     const q = st.seq, y = st.yt;
     if (!q || q.item?.type !== "upnext" || !y?.ready || st.ytOwner || !y.pre || y.pre !== q.item.video?.ytId || y.rolling === y.pre) return;
-    if (now() - q.start < (q.item.dur - 1.5) * 1000) return;
+    // (four seconds before the card ends: Safari and iPhones take up to three to get a video moving)
+    if (now() - q.start < Math.max(0.5, q.item.dur - 4) * 1000) return;
     y.rolling = y.pre; y.preloading = false;
     try { y.player.mute(); y.player.playVideo(); } catch { /* none */ }
   }
