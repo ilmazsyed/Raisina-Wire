@@ -428,7 +428,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const [W, H] = SIZE[channel];
   host.innerHTML = `<div class="tvp-fit"><div class="tvp tvp-${channel}${mode === "app" ? " tvp-app" : ""}" style="width:${W}px;height:${H}px">
       <div class="tvp-bg"><i class="dots"></i><i class="arc a1"></i><i class="arc a2"></i><i class="sheen"></i></div>
-      ${mode === "app" ? `<div class="tvp-ytlayer" hidden><div class="tvs-ytwrap"><div class="tvs-yt"></div></div><div class="tvp-shield"></div></div>` : ""}
+      ${mode === "app" ? `<div class="tvp-ytlayer" hidden><div class="tvs-ytwrap"><div class="tvs-yt"></div></div><div class="tvp-ythold on"><img alt=""><i class="tvp-ytspin"></i></div><div class="tvp-shield"></div></div>` : ""}
       <div class="tvp-stage"></div>
       <div class="tvp-lbl"></div><div class="tvp-split" hidden></div><div class="tvp-gfx"></div><div class="tvp-ovl"></div><div class="tvp-cd" hidden></div><div class="tvp-tease" hidden></div><div class="tvp-promo" hidden></div><div class="tvp-cm" hidden></div>
       <div class="tv-bug tv-bug-fixed"><img src="${LOGO}" alt=""></div>
@@ -526,6 +526,25 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (st.current?.box?.isConnected) st.resumeVoice?.();
   };
   const firstTouch = () => { wake(); if (st.muted) unmute(); };
+  if (mode === "app") {
+    const touched = () => { st.gestureAt = Date.now(); keepAwake(); };
+    ["pointerdown", "keydown", "touchend"].forEach(ev => document.addEventListener(ev, touched, { passive: true, capture: true }));
+    st.offGesture = () => ["pointerdown", "keydown", "touchend"].forEach(ev => document.removeEventListener(ev, touched, { capture: true }));
+  }
+  // The screen stays on while the channel plays in the app (the watch page, full screen or not):
+  // a phone no longer dims and locks in the middle of the programme.
+  async function keepAwake() {
+    if (mode !== "app" || !tapUnmute || !st.alive || document.hidden || st.wake || !navigator.wakeLock) return;
+    try { st.wake = await navigator.wakeLock.request("screen"); st.wake.addEventListener("release", () => { st.wake = null; }); } catch { st.wake = null; }
+  }
+  const onVisible = () => {
+    if (document.hidden || !st.alive) return;
+    keepAwake(); wake();
+    // Back on screen (a phone unlocked, the app reopened): the video on air plays on at once.
+    const y = st.yt; if (st.ytOwner && y?.ready && y.state !== 1) { try { if (!canSound()) y.player.mute(); y.player.playVideo(); } catch { /* none */ } }
+  };
+  document.addEventListener("visibilitychange", onVisible);
+  keepAwake();
   // A player that starts muted on purpose (the home page's) waits for its own sound button.
   if (mode === "app" && tapUnmute) { ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.addEventListener(ev, firstTouch, { passive: true })); }
   if (mode === "app" && st.muted && soundBtn) soundBtn.hidden = false;
@@ -554,12 +573,26 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   soundBtn?.addEventListener("click", unmute);
   // A browser that will not start a YouTube video with sound: only the videos are muted (a tap on
   // the sound button brings them back); the channel's music, the newsreader and the stings go on.
-  const soundOff = () => { st.ytMuted = true; if (soundBtn) soundBtn.hidden = false; };
+  const soundOff = () => { st.ytMuted = true; st.ytMutedAt = Date.now(); if (soundBtn) soundBtn.hidden = false; };
+  // May a YouTube video start with sound? Only after the viewer has touched the page (browsers
+  // refuse sound before that, and the video then stalls on YouTube's red play button); after the
+  // sound was refused, only once the viewer has touched the page again.
+  const canSound = () => !st.muted && (navigator.userActivation ? navigator.userActivation.hasBeenActive : !!st.gestureAt) && (!st.ytMuted || (st.gestureAt || 0) > (st.ytMutedAt || 0));
+  // The holding frame over the YouTube player: the video's still (or the studio) with a soft
+  // spinner, from the moment a video is loaded until it really plays, and again whenever it pauses
+  // or stalls, so YouTube's red play button, its pause sign and a black frame never show.
+  let holdT = 0;
+  const ytHold = (on, delay = 0) => {
+    const h = host.querySelector(".tvp-ythold"); if (!h) return;
+    clearTimeout(holdT);
+    const set = () => { h.classList.toggle("on", on); if (on) { const id = st.nowYt?.id, im = h.querySelector("img"), u = id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : STUDIO_WIDE; if (im.dataset.u !== u) { im.dataset.u = u; im.src = u; } } };
+    delay ? (holdT = setTimeout(set, delay)) : set();
+  };
   // Some phones (iPhone in Low Power Mode) start a YouTube video only from a tap inside it: the
   // cover over it is lifted, with a hint, until it plays. The one player then plays every video.
   // The YouTube player never keeps the focus (a focused player shows its own pause button).
   const unfocusYt = () => { host.querySelectorAll("iframe").forEach(f => { f.tabIndex = -1; if (document.activeElement === f) f.blur(); }); try { if (document.activeElement?.tagName === "IFRAME") { document.activeElement.blur(); window.focus(); } } catch { /* none */ } };
-  const needTap = on => { if (on && st.yt) st.yt.cleared = false; host.querySelector(".tvp-ytlayer")?.classList.toggle("tap", on); host.querySelector(".tvp")?.classList.toggle("yt-tap", on); if (tapHint) tapHint.hidden = !on; };
+  const needTap = on => { if (on) ytHold(false); host.querySelector(".tvp-ytlayer")?.classList.toggle("tap", on); host.querySelector(".tvp")?.classList.toggle("yt-tap", on); if (tapHint) tapHint.hidden = !on; };
 
   /* like and share (app) */
   const likeBtn = host.querySelector(".tvp-like"), shareBtn = host.querySelector(".tvp-share");
@@ -593,6 +626,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     el.classList.add("tvs-shared");
     el.innerHTML = `<img class="tvs-poster" src="https://i.ytimg.com/vi/${esc(src.id)}/hqdefault.jpg" alt="" onerror="this.hidden=true">`;
     st.ytOwner = token; st.ytPoster = el; st.nowYt = { id: src.id, title: src.title || "" }; layer.hidden = false; layer.classList.remove("pre"); showLike();
+    if (st.yt?.state !== 1 || st.yt?.pre !== src.id) ytHold(true);
     const load = () => {
       const y = st.yt;
       if (!y?.ready || st.ytOwner !== token) return;
@@ -600,8 +634,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (mode === "app" && !st.ytDiag) { st.ytDiag = { t0: Date.now(), preAgo: y.preAt ? Date.now() - y.preAt : -1, rolled: y.rolling === src.id, pre: y.pre === src.id, preState: y.state, muted: !!st.muted, seq: [] }; setTimeout(() => sendDiag(), 8000); }
       try {
         y.ended = false;
-        if (y.pre === src.id) { y.pre = null; y.preloading = false; y.rolling = null; let at = 0; try { at = y.player.getCurrentTime() || 0; } catch { /* none */ } if (Math.abs(at - start) > 0.6) y.player.seekTo(start, true); st.muted ? y.player.mute() : (y.player.unMute(), diagMark(91)); y.player.playVideo(); }
-        else { y.pre = null; y.player.loadVideoById({ videoId: src.id, startSeconds: start }); st.muted || st.ytMuted ? y.player.mute() : y.player.unMute(); }
+        if (y.pre === src.id) { y.pre = null; y.preloading = false; y.rolling = null; let at = 0; try { at = y.player.getCurrentTime() || 0; } catch { /* none */ } if (Math.abs(at - start) > 0.6) y.player.seekTo(start, true); canSound() ? (st.ytMuted = false, y.player.unMute(), diagMark(91)) : y.player.mute(); y.player.playVideo(); }
+        else { y.pre = null; y.player.loadVideoById({ videoId: src.id, startSeconds: start }); canSound() ? (st.ytMuted = false, y.player.unMute()) : y.player.mute(); }
+        if (!canSound() && !st.muted && soundBtn) soundBtn.hidden = false;
       } catch { /* none */ }
       checkStart();
     };
@@ -610,9 +645,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // Not moving after 0.6 s (a phone that will not start a video with sound without a tap in it):
       // it goes on silently at once, with the "tap for sound" button, rather than holding the
       // picture; later, a nudge, then a request to tap.
-      setTimeout(() => { const y = st.yt; if (!st.alive || st.ytOwner !== token || !y?.ready || [1, 3].includes(y.state)) return; diagMark(92); try { if (!st.muted && !st.ytMuted) { soundOff(); y.player.mute(); } y.player.playVideo(); } catch { /* none */ } }, 600);
-      setTimeout(() => { const y = st.yt; if (!st.alive || st.ytOwner !== token || !y?.ready || [1, 3].includes(y.state)) return; diagMark(93); try { y.player.mute(); y.player.playVideo(); } catch { /* none */ } }, 1800);
-      setTimeout(() => { const y = st.yt; if (st.alive && st.ytOwner === token && y && ![1, 3].includes(y.state)) { diagMark(94); needTap(true); } }, 4000);
+      setTimeout(() => { const y = st.yt; if (!st.alive || st.ytOwner !== token || !y?.ready || [1, 3].includes(y.state)) return; diagMark(92); try { if (!st.muted && !st.ytMuted) { soundOff(); y.player.mute(); } y.player.playVideo(); } catch { /* none */ } }, 1500);
+      setTimeout(() => { const y = st.yt; if (!st.alive || st.ytOwner !== token || !y?.ready || [1, 3].includes(y.state)) return; diagMark(93); try { y.player.mute(); y.player.playVideo(); } catch { /* none */ } }, 3200);
+      setTimeout(() => { const y = st.yt; if (st.alive && st.ytOwner === token && y && ![1, 3].includes(y.state)) { diagMark(94); needTap(true); } }, 6000);
     };
     st.ytLoad = load;
     loadYT().then(YT => {
@@ -638,7 +673,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     st.yt = { state: -1, since: Date.now(), ready: false, pre: early ? id : null, preloading: early };
     if (early) layer.classList.add("pre");
     st.yt.player = new YT.Player(layer.querySelector(".tvs-yt"), { width: "100%", height: "100%", videoId: id,
-      playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, cc_load_policy: 0, playsinline: 1, fs: 0, autoplay: 1, mute: early || st.muted || st.ytMuted ? 1 : 0, start, origin: location.origin },
+      playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, cc_load_policy: 0, playsinline: 1, fs: 0, autoplay: 1, mute: early || !canSound() ? 1 : 0, start, origin: location.origin },
       events: {
         onReady: e => {
           st.yt.ready = true;
@@ -651,13 +686,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           // A video loaded in advance waits, paused and buffered, until its turn.
           if (st.yt.preloading && !st.ytOwner) { if (e.data === 1) { e.target.pauseVideo(); st.yt.preloading = false; } return; }
           if (e.data === 2 && st.ytOwner && !st.muted && !st.ytMuted && st.ytDiag && Date.now() - st.ytDiag.t0 < 6000) { diagMark(95); soundOff(); try { e.target.mute(); e.target.playVideo(); } catch { /* none */ } }
+          if (st.ytOwner && !layer.classList.contains("tap")) { if (e.data === 1) ytHold(false, 250); else if (e.data === 3) ytHold(true, 700); else ytHold(true); }
           if (e.data === 0) st.yt.ended = true; ytMaskState(layer, e.data, e.data === 1 && !!st.ytPoster?.querySelector(".tvs-poster")); if (e.data === 1) {
-            // Started by a tap inside the player (a phone that asks for one): YouTube then keeps its
-            // own pause button over the picture, so the video is quietly reloaded at the same
-            // second, which clears it (the player, once tapped, plays on by itself).
-            const tapped = layer.classList.contains("tap");
             liftPoster(st.ytPoster); needTap(false); noCaptions(e.target); unfocusYt();
-            if (tapped && !st.yt.cleared) { st.yt.cleared = true; setTimeout(() => { try { const p = e.target, id = p.getVideoData?.()?.video_id, at = p.getCurrentTime?.() || 0; if (id && st.yt.state === 1) p.loadVideoById({ videoId: id, startSeconds: at + 0.3 }); } catch { /* none */ } }, 700); }
           }
         },
         onError: () => { st.yt.state = 0; st.yt.ended = true; }
@@ -2412,7 +2443,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   loadTv().then(tick); connect(); poll();
   const timers = [setInterval(loadTv, 15000), setInterval(tick, 500), setInterval(() => { st.flash++; }, 8000), setInterval(poll, 5000), setInterval(heartbeat, 5000)];
   return {
-    destroy() { if (keepOrder && st.seq) RUNNING[channel] = { seq: st.seq, tv: st.tv, ctl: st.ctl, skew: st.skew, at: Date.now() }; st.alive = false; st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null; try { st.audio?.close(); } catch { /* closed */ } document.removeEventListener("fullscreenchange", fsChange); document.removeEventListener("webkitfullscreenchange", fsChange); document.documentElement.classList.remove("tvp-fs-lock"); ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
+    destroy() { if (keepOrder && st.seq) RUNNING[channel] = { seq: st.seq, tv: st.tv, ctl: st.ctl, skew: st.skew, at: Date.now() }; st.alive = false; document.removeEventListener("visibilitychange", onVisible); st.offGesture?.(); try { st.wake?.release(); } catch { /* none */ } st.wake = null; st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null; try { st.audio?.close(); } catch { /* closed */ } document.removeEventListener("fullscreenchange", fsChange); document.removeEventListener("webkitfullscreenchange", fsChange); document.documentElement.classList.remove("tvp-fs-lock"); ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
     unmute, setScene(sc) { fixedScene = sc; tick(); }, get state() { return st.ctl; }, sceneDur: () => fixedScene?.graphic?.items || fixedScene?.graphic?.kind !== "seg" ? fixedScene?.dur || 0 : 0
   };
 }

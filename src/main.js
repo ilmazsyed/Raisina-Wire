@@ -403,6 +403,7 @@ function wireEmpty() {
 // Rashtrix's own stories (with photos) lead; the wire desk's rewrites and briefs run in the
 // latest-news stream as text. Then a section per desk.
 function viewHome() {
+  stashHomeTV();
   const all = stories().sort((x, y) => (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0));
   if (!all.length && !(state.coverageAll || []).length) { $("#view").innerHTML = `<div class="wrap home"><section id="liveBanner" class="band-tight" hidden></section>${articlesSettled ? `<div class="empty" style="margin-top:30px">No stories yet.</div>` : `<div class="skeleton" style="height:420px;margin-top:20px"></div>`}</div>`; renderLiveBanner(); return; }
   // The top-stories column keeps the desk's own stories (with photos); the carousel beside it
@@ -1942,7 +1943,26 @@ function viewWatch() {
 const tvChannel = () => store.get("rw-tv-ch", "h") === "v" ? "v" : "h";
 let tvInstance = null, homeTV = null, homeTVv = null, tvHost = null, tvHostCh = "";
 // The home page's live player (desktop): Rashtrix TV, muted until its sound button is tapped.
+// The home page is drawn again when new stories come in: its live players are kept playing
+// (moved aside and back, where the browser can move a player without reloading it) rather than
+// started again from black.
+let homeStash = null;
+function stashHomeTV() {
+  homeStash = null;
+  const h = $("#homeTV"), v = $("#homeTVv");
+  if (!homeTV || !h?.isConnected || !document.body.moveBefore) return;
+  const box = document.createElement("div"); box.hidden = true; document.body.append(box);
+  try { box.moveBefore(h, null); if (homeTVv && v?.isConnected) box.moveBefore(v, null); homeStash = { box, h, v: homeTVv && v?.isConnected ? v : null }; } catch { box.remove(); }
+}
 function mountHomeTV() {
+  const S = homeStash; homeStash = null;
+  if (S && homeTV) {
+    const nh = $("#homeTV"), nv = $("#homeTVv");
+    try {
+      if (nh && matchMedia("(min-width: 761px)").matches) { nh.parentNode.moveBefore(S.h, nh); nh.remove(); if (S.v && nv) { nv.parentNode.moveBefore(S.v, nv); nv.remove(); } else if (nv) nv.closest(".home-live").hidden = true; S.box.remove(); return; }
+    } catch { /* drawn afresh below */ }
+    S.box.remove();
+  }
   homeTV?.destroy(); homeTV = null; homeTVv?.destroy(); homeTVv = null;
   const host = $("#homeTV"), hostV = $("#homeTVv"); if (!host) return;
   // Rashtrix TV from tablet size up; Rashtrix Shorts beside it on laptops and desktops (muted).
