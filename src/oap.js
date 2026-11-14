@@ -17,6 +17,27 @@ export const MUSIC = { promo: "upnext", info: "headlines", market: "market", com
 export const KINDS = { promo: "Show promo", info: "News infographic", market: "Market price board", commodity: "Daily commodity prices", weather: "Weather board", tile: "Tile graphic" };
 export const SKIES = { sun: "Sunny", partly: "Partly cloudy", cloud: "Cloudy", rain: "Rain", storm: "Thunderstorm", fog: "Fog" };
 
+// Where the channel's jacket sits over a graphic on air (measured from the player: src/engine.js,
+// src/tv.css), in percent of the frame (x, y, w, h). Graphics keep these places clear (only the
+// background shows there), so the logo, the LIVE dock with the clock, the reel's headline box and
+// the ticker never sit on top of words or pictures.
+export const JACKET = {
+  h: [["LIVE · clock", 0, 0, 21, 11.5], ["Logo", 89, 0, 11, 19.5], ["Ticker", 0, 92, 100, 8]],
+  v: [["Headline · LIVE · clock", 0, 0, 58, 22], ["Logo", 85, 0, 15, 10.5], ["Ticker", 0, 95.5, 100, 4.5]]
+};
+// The clear area: content starts below the top of the jacket and ends above the ticker.
+const TOP = V => V ? 1920 * .23 : 1080 * .13, FOOT = (V, H, u) => (V ? H * .955 : H * .92) - 86 * u;
+// The jacket's places drawn over the preview (never into the video).
+export function guides(ctx, orient) {
+  const V = orient === "v", W = V ? 1080 : 1920, H = V ? 1920 : 1080;
+  ctx.save(); ctx.setLineDash([14, 10]); ctx.lineWidth = 3; ctx.font = "700 26px 'Hind Siliguri', sans-serif"; ctx.textBaseline = "top";
+  for (const [name, x, y, w, h] of JACKET[V ? "v" : "h"]) {
+    const X = x / 100 * W, Y = y / 100 * H, Ww = w / 100 * W, Hh = h / 100 * H;
+    ctx.fillStyle = "rgba(0,200,255,.18)"; ctx.fillRect(X, Y, Ww, Hh); ctx.strokeStyle = "rgba(0,220,255,.95)"; ctx.strokeRect(X + 2, Y + 2, Ww - 4, Hh - 4);
+    ctx.fillStyle = "#fff"; ctx.fillText(name, X + 12, Y + 10);
+  }
+  ctx.restore();
+}
 const BN = "'Hind Siliguri', 'Noto Serif Bengali', sans-serif", SERIF = "'Noto Serif Bengali', 'Hind Siliguri', serif", LAT = "Montserrat, 'Hind Siliguri', sans-serif";
 const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
 const pr = (t, a, b) => clamp((t - a) / Math.max(1e-6, b - a));
@@ -108,7 +129,7 @@ function words(ctx, lines, x, y, lh, t, at, span, color, align = "left") {
 }
 // The channel strip at the foot: the logo's gold line, the channel's name and the date.
 function footer(ctx, S, W, H, u, t, V, label) {
-  const h = 70 * u, y = H - h - (V ? 120 * u : 46 * u), p = eo(pr(t, .3, 1));
+  const h = 70 * u, y = FOOT(V, H, u) + 16 * u, p = eo(pr(t, .3, 1));
   ctx.save(); ctx.globalAlpha = p;
   ctx.fillStyle = S.line; ctx.fillRect(60 * u, y, (W - 120 * u) * p, 3 * u);
   font(ctx, 800, 26 * u, LAT); ctx.fillStyle = S.gold; ctx.textBaseline = "top"; ctx.fillText("RASHTRIX 24×7 NEWS", 60 * u, y + 18 * u);
@@ -150,7 +171,7 @@ function promo(ctx, s, A, W, H, u, V, t, D) {
   if (!media(ctx, A.media, 0, 0, W, H, t, D, { zoom: .14 })) {
     backdrop(ctx, S, W, H, t, A.map);
     // No picture: the channel's emblem: gold rings turning round the full logo, large.
-    const cx = V ? W / 2 : W * .76, cy = V ? H * .26 : H * .46, R = (V ? 300 : 330) * u, p = eo(pr(t, .5, 1.6));
+    const cx = V ? W / 2 : W * .74, cy = V ? H * .38 : H * .5, R = (V ? 260 : 300) * u, p = eo(pr(t, .5, 1.6));
     ctx.save(); ctx.globalAlpha = p; ctx.translate(cx, cy);
     for (let i = 0; i < 4; i++) {
       ctx.save(); ctx.rotate((i % 2 ? -1 : 1) * t * (.25 + i * .1) + i); ctx.strokeStyle = i % 2 ? S.acc : S.gold; ctx.lineWidth = (6 - i) * u; ctx.globalAlpha = p * (.75 - i * .14);
@@ -165,7 +186,7 @@ function promo(ctx, s, A, W, H, u, V, t, D) {
   g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, S === STYLES.paper ? "rgba(251,247,239,.92)" : "rgba(10,2,3,.86)");
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   specks(ctx, S, W, H, t);
-  const x = V ? 70 * u : 110 * u, maxW = V ? W - 140 * u : W * .6, top = V ? H * .5 : H * .3;
+  const x = V ? 70 * u : 110 * u, maxW = V ? W - 140 * u : W * .6, top = V ? H * .56 : H * .3;
   kickerTab(ctx, S, s.kicker, x, top, u, t, .6);
   const T = fitText(ctx, s.title, maxW, (V ? 120 : 130) * u, 2, 800, SERIF);
   ctx.textBaseline = "top"; words(ctx, T.lines, x, top + 80 * u, T.px * 1.22, t, .9, .8, S.ink);
@@ -177,28 +198,26 @@ function promo(ctx, s, A, W, H, u, V, t, D) {
     ctx.fillStyle = S === STYLES.gold ? "#1a0405" : "#1a0405"; ctx.textBaseline = "middle"; ctx.fillText(s.when, 30 * u, 40 * u); ctx.restore(); y += 100 * u;
   }
   if (s.host) { font(ctx, 600, 36 * u); ctx.save(); ctx.globalAlpha = eo(pr(t, 2.8, 3.4)); ctx.fillStyle = S.sub; ctx.textBaseline = "top"; ctx.fillText(s.host, x, y); ctx.restore(); }
-  const lh = (V ? 150 : 130) * u; if (A.media?.el) logo(ctx, A.logo, W - lh * .7 - 50 * u, 46 * u, lh, eo(pr(t, .4, 1)));
 }
 
 function info(ctx, s, A, W, H, u, V, t, D) {
   const S = A.S; backdrop(ctx, S, W, H, t, A.map); specks(ctx, S, W, H, t);
   const pad = V ? 70 * u : 100 * u, hasPic = !!A.media?.el;
-  logo(ctx, A.logo, W - 100 * u - 40 * u, 40 * u, 140 * u, eo(pr(t, .4, 1)));
-  kickerTab(ctx, S, s.kicker, pad, V ? 200 * u : 70 * u, u, t, .5);
+  kickerTab(ctx, S, s.kicker, pad, TOP(V), u, t, .5);
   const tw = V ? W - pad * 2 : (hasPic ? W * .56 : W - pad * 2 - 160 * u);
   const T = fitText(ctx, s.title, tw, (V ? 82 : 72) * u, 3, 800, SERIF); ctx.textBaseline = "top";
-  const ty = (V ? 200 : 70) * u + 72 * u; words(ctx, T.lines, pad, ty, T.px * 1.24, t, .8, .7, S.ink);
+  const ty = TOP(V) + 72 * u; words(ctx, T.lines, pad, ty, T.px * 1.24, t, .8, .7, S.ink);
   let y = ty + T.lines.length * T.px * 1.24 + 36 * u;
   // the picture: a framed panel (right, or under the title when vertical)
   if (hasPic) {
-    const pw = V ? W - pad * 2 : W * .3, ph = V ? 560 * u : H * .52, px = V ? pad : W - pad - pw, py = V ? y : 250 * u, p = eo(pr(t, 1, 1.8));
+    const pw = V ? W - pad * 2 : W * .3, ph = V ? 480 * u : FOOT(V, H, u) - 20 * u - Math.max(250 * u, y), px = V ? pad : W - pad - pw, py = V ? y : Math.max(250 * u, y), p = eo(pr(t, 1, 1.8));
     ctx.save(); ctx.globalAlpha = p; ctx.translate(0, (1 - p) * 40 * u); rrect(ctx, px, py, pw, ph, 14 * u); ctx.clip(); media(ctx, A.media, px, py, pw, ph, t, D); ctx.restore();
     ctx.save(); ctx.globalAlpha = p; ctx.strokeStyle = S.gold; ctx.lineWidth = 4 * u; rrect(ctx, px, py, pw, ph, 14 * u); ctx.stroke(); ctx.restore();
     if (V) y += ph + 40 * u;
   }
   // the figures: bars that grow, the numbers counting up
   const rows = (s.rows || []).filter(r => r.label || r.value).slice(0, 6), max = Math.max(1, ...rows.map(r => Math.abs(num(r.value)) || 0));
-  const area = V ? H - y - 260 * u : H - y - 160 * u, rh = Math.min(120 * u, area / Math.max(1, rows.length)), bw = (V ? W - pad * 2 : (hasPic ? W * .56 : W - pad * 2)) ;
+  const area = FOOT(V, H, u) - 20 * u - y, rh = Math.min(120 * u, area / Math.max(1, rows.length)), bw = (V ? W - pad * 2 : (hasPic ? W * .56 : W - pad * 2)) ;
   rows.forEach((r, i) => {
     const at = 1.4 + i * .35, p = eo(pr(t, at, at + .9)), yy = y + i * rh, n = num(r.value);
     font(ctx, 700, Math.min(36 * u, rh * .34)); ctx.fillStyle = S.sub; ctx.textBaseline = "top"; ctx.globalAlpha = eo(pr(t, at - .2, at + .3)); ctx.fillText(r.label || "", pad, yy); ctx.globalAlpha = 1;
@@ -216,14 +235,13 @@ function info(ctx, s, A, W, H, u, V, t, D) {
 function board(ctx, s, A, W, H, u, V, t, D, kind) {
   const S = A.S; backdrop(ctx, S, W, H, t, A.map); specks(ctx, S, W, H, t);
   const pad = V ? 60 * u : 100 * u;
-  logo(ctx, A.logo, W - 100 * u - 40 * u, 40 * u, 140 * u, eo(pr(t, .4, 1)));
-  kickerTab(ctx, S, s.kicker || (kind === "market" ? "বাজার" : kind === "weather" ? "আবহাওয়া" : "বাজারদর"), pad, V ? 200 * u : 60 * u, u, t, .5);
+  kickerTab(ctx, S, s.kicker || (kind === "market" ? "বাজার" : kind === "weather" ? "আবহাওয়া" : "বাজারদর"), pad, TOP(V), u, t, .5);
   const T = fitText(ctx, s.title, V ? W - pad * 2 : W - pad * 2 - 200 * u, (V ? 84 : 70) * u, 2, 800, SERIF); ctx.textBaseline = "top";
-  const ty = (V ? 200 : 60) * u + 70 * u; words(ctx, T.lines, pad, ty, T.px * 1.2, t, .8, .6, S.ink);
+  const ty = TOP(V) + 70 * u; words(ctx, T.lines, pad, ty, T.px * 1.2, t, .8, .6, S.ink);
   let y = ty + T.lines.length * T.px * 1.2 + (s.date ? 0 : 30 * u);
   if (s.date) { font(ctx, 600, 34 * u); ctx.fillStyle = S.gold; ctx.globalAlpha = eo(pr(t, 1.2, 1.7)); ctx.fillText(s.date, pad, y + 6 * u); ctx.globalAlpha = 1; y += 70 * u; }
   const rows = (s.rows || []).filter(r => Object.values(r).some(Boolean)).slice(0, kind === "commodity" ? 10 : 8);
-  const bottom = V ? H - 260 * u : H - 150 * u, rh = Math.min(V ? 200 * u : 128 * u, (bottom - y) / Math.max(1, rows.length)), gap = rh * .12, w = W - pad * 2;
+  const bottom = FOOT(V, H, u) - 16 * u, rh = Math.min(V ? 200 * u : 128 * u, (bottom - y) / Math.max(1, rows.length)), gap = rh * .12, w = W - pad * 2;
   // weather in two columns when horizontal and many
   const cols = kind === "weather" && !V && rows.length > 4 ? 2 : 1, cw = (w - (cols - 1) * 30 * u) / cols, perCol = Math.ceil(rows.length / cols), rH = cols > 1 ? Math.min(150 * u, (bottom - y) / perCol) : rh;
   rows.forEach((r, i) => {
@@ -248,8 +266,8 @@ function board(ctx, s, A, W, H, u, V, t, D, kind) {
       ctx.textAlign = "right"; font(ctx, 800, fs * 1.02, LAT); ctx.fillStyle = S.ink;
       const chW = ch ? (V ? 230 : 260) * u : 0; ctx.fillText(val || "", x + cw - 34 * u - chW, mid);
       if (ch) {
-        const col = sg > 0 ? "#22c55e" : sg < 0 ? "#ff4d4d" : S.sub; font(ctx, 800, fs * .8, LAT); ctx.fillStyle = col; ctx.fillText(String(ch).replace(/^[▲▼↑↓]\s*/, ""), x + cw - 34 * u, mid);
-        if (sg) arrow(ctx, x + cw - 34 * u - chW * .82, mid, fs * .28, sg > 0, col);
+        const col = sg > 0 ? "#22c55e" : sg < 0 ? "#ff4d4d" : S.sub; const cht = String(ch).replace(/^[▲▼↑↓]\s*/, ""); let cf = fs * .8; font(ctx, 800, cf, LAT); while (ctx.measureText(cht).width > chW - fs * .9 && cf > fs * .4) { cf *= .92; font(ctx, 800, cf, LAT); } ctx.fillStyle = col; ctx.fillText(cht, x + cw - 34 * u, mid);
+        if (sg) arrow(ctx, x + cw - 34 * u - chW + fs * .42, mid, fs * .28, sg > 0, col);
       }
       ctx.textAlign = "left";
     }
@@ -262,7 +280,7 @@ function tile(ctx, s, A, W, H, u, V, t, D) {
   const S = A.S; backdrop(ctx, S, W, H, t, A.map); specks(ctx, S, W, H, t);
   const hasPic = !!A.media?.el, pad = V ? 60 * u : 90 * u;
   // the picture tile: in from the side (horizontal) or the top (vertical), framed in gold
-  const pw = V ? W - pad * 2 : W * .46, ph = V ? H * .42 : H - 220 * u, px = V ? pad : pad, py = V ? 170 * u : 110 * u;
+  const pw = V ? W - pad * 2 : W * .46, py = TOP(V), ph = V ? H * .3 : FOOT(V, H, u) - 24 * u - py, px = pad;
   if (hasPic) {
     const p = eo(pr(t, .5, 1.3));
     ctx.save(); ctx.translate(V ? 0 : (1 - p) * -W * .3, V ? (1 - p) * -H * .2 : 0); ctx.globalAlpha = p;
@@ -270,14 +288,13 @@ function tile(ctx, s, A, W, H, u, V, t, D) {
     ctx.strokeStyle = S.gold; ctx.lineWidth = 5 * u; ctx.stroke(); ctx.restore();
   }
   const tx = hasPic && !V ? pad + pw + 70 * u : pad, tw = hasPic && !V ? W - tx - pad : W - pad * 2;
-  let y = hasPic ? (V ? py + ph + 60 * u : 170 * u) : (V ? H * .3 : H * .26);
+  let y = hasPic ? (V ? py + ph + 60 * u : TOP(V) + 30 * u) : (V ? H * .3 : H * .26);
   kickerTab(ctx, S, s.kicker, tx, y, u, t, .9); y += 82 * u;
   const T = fitText(ctx, s.title, tw, (V ? 92 : 84) * u, 3, 800, SERIF); ctx.textBaseline = "top";
   words(ctx, T.lines, tx, y, T.px * 1.24, t, 1.1, .8, S.ink); y += T.lines.length * T.px * 1.24 + 24 * u;
   ctx.save(); ctx.fillStyle = S.gold; ctx.fillRect(tx, y, 160 * u * eo(pr(t, 1.8, 2.4)), 5 * u); ctx.restore(); y += 34 * u;
   if (s.text) { const B = fitText(ctx, s.text, tw, 44 * u, V ? 6 : 5, 500); ctx.textBaseline = "top"; words(ctx, B.lines, tx, y, B.px * 1.42, t, 2, 1.2, S.sub); y += B.lines.length * B.px * 1.42 + 20 * u; }
   if (s.byline) { font(ctx, 700, 36 * u); ctx.save(); ctx.globalAlpha = eo(pr(t, 3, 3.5)); ctx.fillStyle = S.hi; ctx.textBaseline = "top"; ctx.fillText(`— ${s.byline}`, tx, y); ctx.restore(); }
-  logo(ctx, A.logo, W - 100 * u - 40 * u, 40 * u, 140 * u, eo(pr(t, .4, 1)));
   footer(ctx, S, W, H, u, t, V, s.note);
 }
 
