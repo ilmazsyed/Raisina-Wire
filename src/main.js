@@ -207,7 +207,7 @@ function renderShell() {
       <nav class="lang-foot" id="langFoot" data-no-tr aria-label="Language">${languageLinks()}</nav>
     </div>
     <nav class="legal-links" aria-label="Legal">${LEGAL_ORDER.map(([k, t]) => `<a href="/${k}">${t}</a>`).join("")}</nav>
-    <p class="copyright">© ${new Date().getFullYear()} Rashtrix 24×7 News. All rights reserved. Wire reports are written by the Rashtrix wire desk with AI assistance from several published reports; see the Disclaimer.</p>
+    <p class="copyright">© ${new Date().getFullYear()} Rashtrix 24×7 News. All rights reserved.</p>
   </div></footer>
   <div class="modal-backdrop hidden" id="modalBackdrop"><section class="modal glass" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <button class="modal-close" id="modalClose" type="button" aria-label="Close">×</button>
@@ -639,7 +639,7 @@ async function viewStory(r) {
     <div class="reader-byline"><a href="/author/${w.key}" class="byline-link"><img src="${w.photo}" alt="" class="${w.isDesk ? "desk" : ""}"><span><b>${esc(w.name)}</b><span class="muted" style="display:block;font-size:13px">${esc(w.role)}</span></span></a><span class="grow"></span><span class="meta">${a.publishedAt ? editionDate(a.publishedAt) + " · " + clock(a.publishedAt) : "Not yet published"}${isWire(a) ? "" : ` · ${Math.max(1, Math.round(words / 200))} min read`}</span></div>
     ${a.videoUrl ? `<figure class="reader-hero reader-video"><video controls playsinline preload="metadata" src="${esc(a.videoUrl)}"${hero ? ` poster="${esc(hero)}"` : ""}></video>${a.heroCaption ? `<figcaption>${esc(a.heroCaption)}</figcaption>` : ""}</figure>` : hero ? `<figure class="reader-hero">${img(hero, a.heroCaption || "")}${a.heroCaption ? `<figcaption>${esc(a.heroCaption)}</figcaption>` : ""}</figure>` : ""}
     <div class="prose${isWire(a) ? "" : " dropcap"}" data-no-tr>${blocks.length ? proseHTML(blocks, { pull: isWire(a) ? "" : pullQuote(blocks) }) : `<p>This story could not be loaded.</p>`}</div>
-    ${isWire(a) ? `<p class="wire-note">${ICON_INFO}<span>Written by the Rashtrix wire desk with AI assistance from several published reports, checked against each other. <a href="/disclaimer">How we write wire reports</a> · <a href="/corrections">Report an error</a></span></p>` : ""}
+    ${isWire(a) ? `<p class="wire-note">${ICON_INFO}<span><a href="/disclaimer">How we write wire reports</a> · <a href="/corrections">Report an error</a></span></p>` : ""}
     ${(a.tags || []).length ? `<div class="story-tags"><span class="meta">Topics</span>${a.tags.map((t, i) => `<a class="tag-chip" href="/tag/${tagSlug(t)}">${esc(a.tagLabels?.[i] || t)}</a>`).join("")}</div>` : ""}
     ${shareBlock(a.title, a.href)}
     ${(a.corrections || []).length > 1 ? `<details class="corrections-log"><summary>Earlier corrections</summary><ul>${a.corrections.slice(1).map(c => `<li>${esc(c.note)} <time>${esc(String(c.at).slice(0, 16).replace("T", " "))}</time></li>`).join("")}</ul></details>` : ""}
