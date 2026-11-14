@@ -8,7 +8,11 @@ import { shell, api, toast, fail, esc, $, $$, fmt, istDay } from "./crshell.js";
 import { mountTV } from "./engine.js";
 import { digits } from "./i18n.js";
 
-const S = { list: [], quota: {}, today: {}, daily: 45, edit: null, images: [], rundowns: [], filter: "all", send: [], sendQ: "" };
+const S = { list: [], quota: {}, today: {}, daily: 45, edit: null, images: [], rundowns: [], filter: "all", send: [], sendQ: "", videos: [], bytes: [], byteMode: "avo", byteCount: 1 };
+const secsOf = v => { const p = String(v || "").trim().split(":").map(Number); if (p.some(isNaN)) return 0; return p.reduce((a, x) => a * 60 + x, 0); };
+const mmss = n => n ? `${Math.floor(n / 60)}:${String(Math.round(n % 60)).padStart(2, "0")}` : "";
+// An AVO story's length on air: its reading, then its bytes (with the wipe before each).
+export const avoDur = x => Math.ceil((x.secs > 0 ? Math.max(8, x.secs + 2) : 20) + 4 + (x.bytes || []).reduce((n, b) => n + 1.2 + (Number(b.secs) || 30), 0));
 const REGION = { bengal: "Bengal & Kolkata", india: "India", neighbours: "Bangladesh, USA, China, Russia, South Asia", world: "World" };
 const DESKS = { Kolkata: "কলকাতা", "West Bengal": "রাজ্য", India: "দেশ", "Probashi Bangali": "প্রবাসী বাঙালি", World: "বিশ্ব", Sports: "খেলা", Entertainment: "বিনোদন", Lifestyle: "লাইফস্টাইল", Breaking: "এইমাত্র" };
 const DK = { kolkata: "Kolkata", bengal: "Bengal", india: "India", bangladesh: "Bangladesh", world: "World", sports: "Sports", business: "Business", other: "Other" };
@@ -48,6 +52,16 @@ function drawForm() {
       <div class="ad-pics">${S.images.map((x, i) => `<div class="ad-pic"><img src="${esc(x.url)}" alt=""><input data-credit="${i}" placeholder="Credit (e.g. Rashtrix / photographer)" value="${esc(x.credit || "")}" data-no-tr><div class="row"><button class="btn sm" data-left="${i}" ${i ? "" : "disabled"}>◀</button><button class="btn sm" data-right="${i}" ${i < S.images.length - 1 ? "" : "disabled"}>▶</button><button class="btn sm red" data-rm="${i}">Remove</button></div></div>`).join("")}</div>
       <div class="row"><label class="btn">Upload pictures<input type="file" id="fFiles" accept="image/*" multiple hidden></label><input id="fLink" placeholder="or paste a picture link (https://…)" style="flex:1"><button class="btn" id="fAddLink">Add link</button></div>
       <label style="flex-direction:row;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="fMore" ${e ? (e.findMore ? "checked" : "") : "checked"}> Find more pictures automatically when there are fewer than four</label></div>
+    <div class="ad-vids"><b>Videos</b> <small class="muted">(links only, nothing is uploaded; shown like the pictures, muted, and only when added)</small>
+      ${S.videos.map((v, i) => `<div class="row ad-vrow"><span class="tag">${/youtu/.test(v) ? "YOUTUBE" : "VIDEO"}</span><small data-no-tr style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(v)}</small><button class="btn sm red" type="button" data-vrm="${i}">Remove</button></div>`).join("")}
+      ${S.videos.length < 6 ? `<div class="row"><input id="fVid" placeholder="YouTube or video link (https://…)" style="flex:1" data-no-tr><button class="btn" type="button" id="fVidAdd">Add video</button></div>` : ""}</div>
+    <div class="ad-byte"><b>Plays as</b>
+      <div class="row ad-seg"><button type="button" class="btn ${S.byteMode === "avo" ? "on" : ""}" data-bm="avo">AVO only</button><button type="button" class="btn ${S.byteMode === "byte" ? "on" : ""}" data-bm="byte">AVO + byte</button></div>
+      ${S.byteMode === "byte" ? `<p class="muted" style="margin:0">After the reading, the bytes play in full, one after another, with the Rashtrix wipe between them and the person's name on screen.</p>
+      ${S.bytes.map((b, i) => `<div class="ad-brow"><span class="ad-bn">${digits(i + 1)}</span><div class="stack" style="flex:1;gap:6px"><input data-bf="url" data-bi="${i}" value="${esc(b.url || "")}" placeholder="Byte video link (YouTube or https://…mp4)" data-no-tr>
+        <div class="row" style="gap:6px"><input data-bf="name" data-bi="${i}" value="${esc(b.name || "")}" placeholder="Name (on screen)" style="flex:2" data-no-tr><input data-bf="title" data-bi="${i}" value="${esc(b.title || "")}" placeholder="Title (e.g. মুখ্যমন্ত্রী)" style="flex:2" data-no-tr><input data-bf="secs" data-bi="${i}" value="${esc(mmss(b.secs))}" placeholder="Length m:ss" style="width:110px" title="Empty: the YouTube video's own length"></div></div><button class="btn sm red" type="button" data-brm="${i}">✕</button></div>`).join("")}
+      ${S.bytes.length < 3 ? `<button class="btn" type="button" id="fByteAdd">+ Add a byte</button>` : ""}
+      ${S.bytes.length ? `<label style="flex-direction:row;align-items:center;gap:8px">Bytes to play<select id="fByteN">${S.bytes.map((_, i) => `<option value="${i + 1}" ${S.byteCount === i + 1 ? "selected" : ""}>${digits(i + 1)}</option>`).join("")}</select></label>` : ""}` : ""}</div>
     <div class="row"><button class="btn green" id="fSave">${e ? "Save and put on air" : "Make the AVO story"}</button>${e ? `<button class="btn" id="fCancel">Cancel</button>` : ""}<span class="muted" id="fNote"></span></div>`;
   const brief = $("#fBrief"), count = () => { const n = brief.value.trim().length; $("#fCount").textContent = `${digits(n)} / ${digits(MAXF)} characters`; $("#fCount").style.color = n > MAXF ? "#ff6b6b" : ""; };
   brief.oninput = count; count();
@@ -59,14 +73,25 @@ function drawForm() {
     for (const f of files) { try { S.images.push({ url: await upload(f), credit: "" }); } catch (err) { toast(err.message); } }
     drawForm(); };
   $("#fAddLink").onclick = () => { const u = $("#fLink").value.trim(); if (!/^https:\/\//.test(u)) return toast("Paste a link that starts with https://"); keep(); S.images.push({ url: u, credit: "" }); drawForm(); };
-  $("#fCancel")?.addEventListener("click", () => { S.edit = null; S.images = []; drawForm(); });
+  $("#fCancel")?.addEventListener("click", () => { S.edit = null; S.images = []; S.videos = []; S.bytes = []; S.byteMode = "avo"; S.byteCount = 1; drawForm(); });
+  $$("[data-vrm]").forEach(b => b.onclick = () => { keep(); S.videos.splice(+b.dataset.vrm, 1); drawForm(); });
+  $("#fVidAdd")?.addEventListener("click", () => { const u = $("#fVid").value.trim(); if (!/^https:\/\//.test(u)) return toast("Paste a link that starts with https://"); keep(); S.videos.push(u); drawForm(); });
+  $$("[data-bm]").forEach(b => b.onclick = () => { keep(); S.byteMode = b.dataset.bm; if (S.byteMode === "byte" && !S.bytes.length) S.bytes.push({ url: "", name: "", title: "", secs: 0 }); drawForm(); });
+  $$("[data-bf]").forEach(x => x.oninput = () => { const b = S.bytes[+x.dataset.bi]; b[x.dataset.bf] = x.dataset.bf === "secs" ? secsOf(x.value) : x.value; });
+  $$("[data-brm]").forEach(b => b.onclick = () => { keep(); S.bytes.splice(+b.dataset.brm, 1); S.byteCount = Math.min(S.byteCount, Math.max(1, S.bytes.length)); drawForm(); });
+  $("#fByteAdd")?.addEventListener("click", () => { keep(); S.bytes.push({ url: "", name: "", title: "", secs: 0 }); S.byteCount = S.bytes.length; drawForm(); });
+  $("#fByteN")?.addEventListener("change", e => { S.byteCount = Number(e.target.value); });
   $("#fSave").onclick = save;
   // Keep what is typed while the pictures redraw.
   function keep() { S.draft = { title: $("#fTitle").value, brief: brief.value, region: $("#fRegion").value, desk: $("#fDesk").value, more: $("#fMore").checked }; }
   if (S.draft) { $("#fTitle").value = S.draft.title; brief.value = S.draft.brief; $("#fRegion").value = S.draft.region; $("#fDesk").value = S.draft.desk; $("#fMore").checked = S.draft.more; S.draft = null; count(); }
 }
 async function save() {
-  const body = { title: $("#fTitle").value.trim(), brief: $("#fBrief").value.trim(), region: $("#fRegion").value, desk: $("#fDesk").value, findMore: $("#fMore").checked, images: S.images };
+  const bytes = S.bytes.filter(b => String(b.url || "").trim());
+  if (S.byteMode === "byte" && !bytes.length) return toast("Add a byte link, or choose AVO only.");
+  if (bytes.some(b => !/^https:\/\//.test(b.url.trim()))) return toast("Each byte needs a link that starts with https://");
+  const body = { title: $("#fTitle").value.trim(), brief: $("#fBrief").value.trim(), region: $("#fRegion").value, desk: $("#fDesk").value, findMore: $("#fMore").checked, images: S.images,
+    videos: S.videos, bytes, byteMode: S.byteMode, byteCount: Math.min(S.byteCount, bytes.length || 1) };
   if (!body.title) return toast("Write the headline.");
   if (body.brief.length < 20) return toast("Write the brief to be read.");
   if (body.brief.length > maxFor(S.edit)) return toast(`The brief is longer than ${maxFor(S.edit)} characters.`);
@@ -74,7 +99,7 @@ async function save() {
     if (S.edit) await api(`/api/admin/tv/avo/${encodeURIComponent(S.edit.id)}`, { method: "PUT", body });
     else await api("/api/admin/tv/avo", { method: "POST", body });
     toast(S.edit ? "Saved. It is made again and goes on air within a minute or two." : "Made. It is voiced and goes into rotation within a minute.");
-    S.edit = null; S.images = []; drawForm(); load();
+    S.edit = null; S.images = []; S.videos = []; S.bytes = []; S.byteMode = "avo"; S.byteCount = 1; drawForm(); load();
   } catch (e) { fail(e); }
 }
 
@@ -87,7 +112,7 @@ function drawList() {
     <p class="muted">From the wire today: ${Object.entries(S.quota).map(([k, q]) => `${REGION[k]} ${digits(S.today[k] || 0)}/${digits(q)}`).join(" · ")} (of ${digits(S.daily)} a day). Desk stories don't count against these. A story stays in rotation for 6 hours or 4 airings.</p>
     <div class="ad-stories">${shown.map(x => `<div class="ad-story${noPics(x) ? " nopic" : ""}">
       <div class="ad-thumbs">${(x.images.length ? x.images.slice(0, 4) : [{ src: "/partners/calibrex-mark.svg" }]).map(i => `<img src="${esc(i.src)}" alt="">`).join("")}</div>
-      <div class="ad-body"><div class="row" style="gap:6px;flex-wrap:wrap"><span class="tag ${x.origin === "manual" ? "amber" : x.origin === "breaking" ? "red" : ""}">${ORIGIN[x.origin] || "Wire"}</span>${noPics(x) ? '<span class="tag red">NO PICTURES</span>' : ""}${x.status === "ready" ? (x.inRotation ? '<span class="tag green">IN ROTATION</span>' : '<span class="tag">DONE</span>') : x.status === "off" ? '<span class="tag">PAUSED</span>' : x.status === "new" ? '<span class="tag amber">PREPARING</span>' : '<span class="tag red">FAILED</span>'}<small class="muted">${esc(REGION[x.region] || x.region)} · ${esc(DESKS[x.desk] || x.desk)} · ${t(x.createdAt + "Z")}${x.createdBy ? ` · ${esc(x.createdBy)}` : ""}</small></div>
+      <div class="ad-body"><div class="row" style="gap:6px;flex-wrap:wrap"><span class="tag ${x.origin === "manual" ? "amber" : x.origin === "breaking" ? "red" : ""}">${ORIGIN[x.origin] || "Wire"}</span>${noPics(x) ? '<span class="tag red">NO PICTURES</span>' : ""}${(x.videos || []).length ? `<span class="tag">${digits(x.videos.length)} VIDEO</span>` : ""}${(x.bytes || []).length ? `<span class="tag amber">+ ${digits(x.bytes.length)} BYTE</span>` : ""}${x.status === "ready" ? (x.inRotation ? '<span class="tag green">IN ROTATION</span>' : '<span class="tag">DONE</span>') : x.status === "off" ? '<span class="tag">PAUSED</span>' : x.status === "new" ? '<span class="tag amber">PREPARING</span>' : '<span class="tag red">FAILED</span>'}<small class="muted">${esc(REGION[x.region] || x.region)} · ${esc(DESKS[x.desk] || x.desk)} · ${t(x.createdAt + "Z")}${x.createdBy ? ` · ${esc(x.createdBy)}` : ""}</small></div>
         <b data-no-tr>${esc(x.title)}</b>
         <small class="muted">Voice: ${x.voice.length ? `${x.sex === "m" ? "male" : "female"}, ${digits(Math.round(x.secs))} s` : "none yet"} · pictures ${digits(x.nImages)} · on air ${digits(x.aired)}×${x.plays.length ? ` (${x.plays.slice(0, 6).map(p => `${t(p.at)} ${p.ch === "h" ? "TV" : "Shorts"}`).join(", ")})` : ""} · app views ${digits(x.views)}</small>
         <details><summary class="muted">Script</summary><p data-no-tr>${x.lines.map(esc).join(" ")}</p></details>
@@ -100,13 +125,13 @@ function drawList() {
   $$("[data-prev]").forEach(b => b.onclick = () => preview(find(b.dataset.prev)));
   $$("[data-listen]").forEach(b => b.onclick = () => listen(find(b.dataset.listen)));
   $$("[data-rdsel]").forEach(sel => sel.onchange = async () => { const x = find(sel.dataset.rdsel), rd = sel.value; if (!rd) return;
-    const story = { id: x.id, title: x.title, desk: x.desk, region: x.region, sex: x.sex, lines: x.lines, voice: x.voice, secs: x.secs, images: x.images, at: x.at };
-    try { await api(`/api/admin/rundowns/${rd}/items`, { method: "POST", body: { type: "avo", title: x.title.slice(0, 200), duration: Math.ceil((x.secs > 0 ? Math.max(8, x.secs + 2) : 20) + 4), data: { story, avoId: x.id } } }); toast("Added to the rundown."); } catch (e) { fail(e); } sel.value = ""; });
+    const story = { id: x.id, title: x.title, desk: x.desk, region: x.region, sex: x.sex, lines: x.lines, voice: x.voice, secs: x.secs, images: x.images, videos: x.videos, bytes: x.bytes, at: x.at };
+    try { await api(`/api/admin/rundowns/${rd}/items`, { method: "POST", body: { type: "avo", title: x.title.slice(0, 200), duration: avoDur(x), data: { story, avoId: x.id } } }); toast("Added to the rundown."); } catch (e) { fail(e); } sel.value = ""; });
   $$("[data-off]").forEach(b => b.onclick = async () => { try { await api(`/api/admin/tv/avo/${encodeURIComponent(b.dataset.off)}`, { method: "PUT", body: { off: b.dataset.v === "1" } }); toast(b.dataset.v === "1" ? "Taken out of rotation." : "Back in rotation."); load(); } catch (e) { fail(e); } });
   const relabel = async (id, part) => { const x = find(id); const cur = { dk: x.dk, weight: x.weight, ...(x.labelsSet || {}) }; try { await api(`/api/admin/tv/avo/${encodeURIComponent(id)}`, { method: "PUT", body: { labels: { ...cur, ...part } } }); toast("Relabelled."); } catch (e) { fail(e); } };
   $$("[data-dk]").forEach(b => b.onchange = () => relabel(b.dataset.dk, { dk: b.value }));
   $$("[data-wt]").forEach(b => b.onchange = () => relabel(b.dataset.wt, { weight: b.value }));
-  $$("[data-edit]").forEach(b => b.onclick = () => { const x = find(b.dataset.edit); S.edit = x; S.images = (x.given || []).map(g => ({ url: g.url, credit: g.credit || "" })); drawForm(); window.scrollTo({ top: 0, behavior: "smooth" });
+  $$("[data-edit]").forEach(b => b.onclick = () => { const x = find(b.dataset.edit); S.edit = x; S.images = (x.given || []).map(g => ({ url: g.url, credit: g.credit || "" })); S.videos = (x.videosSet || []).map(v => v.url); S.bytes = (x.bytesSet || []).map(b => ({ url: b.url, name: b.name || "", title: b.title || "", secs: b.secs || 0 })); S.byteMode = x.byteMode || "avo"; S.byteCount = x.byteCount || 1; drawForm(); window.scrollTo({ top: 0, behavior: "smooth" });
     if (b.dataset.pics) setTimeout(() => { $(".ad-pics")?.parentElement?.scrollIntoView({ block: "center", behavior: "smooth" }); $("#fFiles")?.click(); }, 250); });
   $$("[data-del]").forEach(b => b.onclick = async () => { if (!confirm("Delete this AVO story for good? It goes off air at once and is not made again.")) return; try { await api(`/api/admin/tv/avo/${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" }); toast("Deleted for good."); load(); } catch (e) { fail(e); } });
 }

@@ -1396,4 +1396,10 @@ export default {
   "24 to 48 hours ago": "24 से 48 घंटे पहले",
   "48 to 72 hours ago": "48 से 72 घंटे पहले",
   "News bulletin": "न्यूज़ बुलेटिन",
+  "Add video": "वीडियो जोड़ें",
+  "Plays as": "कैसे चलेगा",
+  "AVO only": "सिर्फ़ एवीओ",
+  "AVO + byte": "एवीओ + बाइट",
+  "+ Add a byte": "+ बाइट जोड़ें",
+  "Bytes to play": "कितनी बाइट चलेंगी",
 };

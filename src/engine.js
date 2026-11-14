@@ -734,6 +734,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       slot.setMuted = m => { v.muted = m || !isMain; };
       slot.stalled = () => { if (v.currentTime !== last) { last = v.currentTime; lastT = Date.now(); } return src.kind !== "clip" && Date.now() - lastT > 10000; };
       slot.playing = () => !v.paused && v.readyState >= 2;
+    } else if (src.kind === "fb" && src.url) {   // a Facebook live video, through Facebook's player
+      el.innerHTML = `<iframe src="https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(src.url)}&show_text=false&autoplay=true&mute=${mute() ? 1 : 0}&width=1280" allow="autoplay; encrypted-media; fullscreen" allowfullscreen title=""></iframe><div class="tvp-shield"></div>`;
     } else if (src.kind === "vdo" && src.url) {
       el.innerHTML = `<iframe src="${esc(src.url)}" allow="autoplay; camera; microphone; fullscreen" title=""></iframe><div class="tvp-shield"></div>${src.name ? `<span class="tvs-name"><b>${esc(src.name)}</b></span>` : ""}`;
     } else if (src.kind === "image" && src.url) {
@@ -764,8 +766,11 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // AVO stories: how often this viewer (or this output) has seen each, kept on the device.
   // Each AVO story stays on screen exactly as long as its reading (plus a breath either side);
   // a story with no recording yet gets the time it takes to read its lines at news pace.
-  const avoLen = x => { const v = Number(x?.secs) || 0; if (v > 0) return Math.max(8, Math.round((v + 0.15 * Math.max(0, (x.voice?.length || 1) - 1) + 2) * 10) / 10);
+  const avoVoiceLen = x => { const v = Number(x?.secs) || 0; if (v > 0) return Math.max(8, Math.round((v + 0.15 * Math.max(0, (x.voice?.length || 1) - 1) + 2) * 10) / 10);
     const n = (x?.lines || []).join(" ").length || String(x?.title || "").length; return Math.max(10, Math.min(40, Math.round(n / 14))); };
+  // (AVO + byte: each byte plays in full after the reading, the Rashtrix wipe before it)
+  const BYTE_WIPE = 1.2, bytesLen = x => (x?.bytes || []).reduce((n, b) => n + BYTE_WIPE + Math.max(3, Number(b.secs) || 30), 0);
+  const avoLen = x => Math.round((avoVoiceLen(x) + bytesLen(x)) * 10) / 10;
   // Every AVO block opens with the NEWS NOW sting (four seconds), then its stories.
   const AVO_INTRO = 4;
   const avoTotal = L => L.length ? AVO_INTRO + L.reduce((n, x) => n + avoLen(x), 0) : 0;
@@ -1085,7 +1090,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   }
   function continuityScene() {
     const s = st.tv; if (!s) return null;
-    if (s.live) return { layout: "full", sources: [{ kind: "yt", id: s.live.ytId }], label: s.live.title, key: `live:${s.live.ytId}` };
+    if (s.live) return { layout: "full", sources: [String(s.live.ytId).startsWith("fb:") ? { kind: "fb", url: String(s.live.ytId).slice(3) } : { kind: "yt", id: s.live.ytId }], label: s.live.title, key: `live:${s.live.ytId}` };
     const seg = continuitySeg(); if (!seg) return { layout: "graphic", graphic: { kind: "headlines" }, key: "c:none" };
     const transition = seg.sting ? { type: "stinger", ms: 1200 } : { type: "mix", ms: 500 };
     if (seg.type === "video") return { layout: "full", sources: [{ kind: "yt", id: seg.ytId, in: seg.in || 0, title: seg.line || seg.title }], label: seg.line || seg.title, startAt: seg.start, key: `c:${seg.ytId}:${seg.start}`, transition };
@@ -1516,7 +1521,11 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         if (mode === "app" && window.createImageBitmap) { shrinkQ(i.src, channel === "v" ? 1080 : 1280).then(r => { small.set(i.src, r?.url || ""); imgState.set(i.src, r && r.w >= 320 && !r.logo ? "ok" : "bad"); if (r?.url) imgState.set(r.url, imgState.get(i.src)); }); return; }
         const im = new Image(); im.referrerPolicy = "no-referrer"; im.onload = () => imgState.set(i.src, im.naturalWidth >= 320 && !logoCard(im) ? "ok" : "bad"); im.onerror = () => imgState.set(i.src, "bad"); im.src = i.src; });
       // A story's pictures, each as its small copy once that is made (the app).
-      const imgsOf = x => (x.images || []).map(i => { const sm = small.get(i.orig || i.src); if (sm && i.src !== sm) { i.orig = i.orig || i.src; i.src = sm; } return i; });
+      const imgsOf = x => [...(x.videos || []).map(v => { const src = v.kind === "yt" ? `yt:${v.id}` : v.url; imgState.set(src, "ok"); return { src, video: v, credit: "" }; }), ...(x.images || []).map(i => { const sm = small.get(i.orig || i.src); if (sm && i.src !== sm) { i.orig = i.orig || i.src; i.src = sm; } return i; })];
+      // A picture, or a video added by hand (muted, looping, never clickable).
+      const mediaTag = i => !i?.video ? `<img src="${esc(i?.src || "")}" alt="" referrerpolicy="no-referrer">`
+        : i.video.kind === "yt" ? `<iframe class="avo-vid" src="https://www.youtube.com/embed/${esc(i.video.id)}?autoplay=1&mute=1&controls=0&loop=1&playlist=${esc(i.video.id)}&playsinline=1&rel=0&modestbranding=1" allow="autoplay; encrypted-media" title=""></iframe>`
+        : `<video class="avo-vid" src="${esc(i.video.url)}" autoplay muted loop playsinline></video>`;
       const shrinkQ = (src, W) => (st.shrinkChain = (st.shrinkChain || Promise.resolve()).then(async () => {
         try {
           const r = await fetch(src, { referrerPolicy: "no-referrer" }); if (!r.ok) return null;
@@ -1575,7 +1584,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         while (out.length < 4) out.push({ brk: 2 + out.length });
         return out.slice(0, 7);
       };
-      const bgOf = x => imgsOf(x).find(i => imgState.get(i.src) === "ok");
+      const bgOf = x => imgsOf(x).find(i => !i.video && imgState.get(i.src) === "ok");
       const gHTML = (x, sl, d) => {
         const icon = SOTH_ICONS[x.topic] || SOTH_ICONS.news, pl = x.places || [], tone = { head: 1, map: 3, stat: 2, type: 0, split: 2 }[sl.g] ?? 0;
         const beat = sl.g === "head" ? `<div class="so-beat so-head"><div class="so-ico">${icon}<i></i><i></i></div><div class="so-hd"><span class="so-tag red">${x.upd ? "নতুন তথ্য" : "এইমাত্র"}</span><span class="so-tag">${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span><h1>${soWords(x.title, d * 0.6, pl)}</h1></div></div>`
@@ -1640,8 +1649,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         const back = bg && sl.ex !== "clip" && sl.ex !== "close" ? `<img class="ex-bgimg" src="${esc(bg.src)}" alt="" referrerpolicy="no-referrer">` : "";
         const kick = t => `<span class="ex-kick">${t}</span>`;
         const body = sl.ex === "head" ? `<div class="ex-head">${kick(`${desk} · ${x.upd ? "নতুন তথ্য" : sl.close ? "এক নজরে" : "এইমাত্র"}`)}<h1>${exWords(x.title, d * 0.55, pl)}</h1></div>`
-          : sl.ex === "clip" ? `<figure class="ex-clip" style="--tilt:${[-2.2, 1.8, -1.2][sl.n] || -2}deg"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"><i class="tape a"></i><i class="tape b"></i><i class="sweep"></i><b class="ex-stamp">${esc(pl[0]?.name || DESK_BN[x.desk] || "খবর")}</b></figure>`
-          : sl.ex === "close" ? `<div class="ex-full"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"><i class="ex-fade"></i><div class="ex-fullt">${kick(desk)}<h2>${exWords(x.title, d * 0.5, pl)}</h2></div></div>`
+          : sl.ex === "clip" ? `<figure class="ex-clip" style="--tilt:${[-2.2, 1.8, -1.2][sl.n] || -2}deg">${mediaTag(sl.img)}<i class="tape a"></i><i class="tape b"></i><i class="sweep"></i><b class="ex-stamp">${esc(pl[0]?.name || DESK_BN[x.desk] || "খবর")}</b></figure>`
+          : sl.ex === "close" ? `<div class="ex-full">${mediaTag(sl.img)}<i class="ex-fade"></i><div class="ex-fullt">${kick(desk)}<h2>${exWords(x.title, d * 0.5, pl)}</h2></div></div>`
           : sl.ex === "num" ? `<div class="ex-num">${kick(`${desk} · সংখ্যায়`)}<div class="ex-fig"><b class="num" data-to="${sl.f.n}" data-dec="${sl.f.dec ? 1 : 0}">০</b><em>${esc(sl.f.unit)}</em></div><p>${esc(exShort(sl.f.line, 120))}</p></div>`
           : sl.ex === "vs" ? `<div class="ex-vs">${kick(`${desk} · তুলনায়`)}<div class="ex-vsrow"><div class="a"><b class="num" data-to="${sl.vs.a.n}" data-dec="${sl.vs.a.dec ? 1 : 0}">০</b><em>${esc(sl.vs.a.unit)}</em></div><i class="ex-arrow"></i><div class="b"><b class="num" data-to="${sl.vs.b.n}" data-dec="${sl.vs.b.dec ? 1 : 0}">০</b><em>${esc(sl.vs.b.unit)}</em></div></div><p>${esc(sl.vs.line)}</p></div>`
           : sl.ex === "quote" ? `<div class="ex-quote"><div class="ex-paper"><span class="ex-src">${esc(sl.q.who ? `${sl.q.who} · ${exDate()}` : exDate())}</span><blockquote>“${exWords(sl.q.text, d * 0.85, [])}”</blockquote></div></div>`
@@ -1653,9 +1662,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         if (sl.ex) return exHTML(x, sl, d);
         if (sl.g) return gHTML(x, sl, d);
         const desk = esc(DESK_BN[x.desk] || x.desk || "খবর");
-        if (sl.img && sl.fx === "duo") return `<div class="avo-slide fx-duo"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"><i class="duo"></i><b class="avo-big">${esc(x.title)}</b></div>`;
-        if (sl.img && sl.fx === "split") return `<div class="avo-slide fx-split"><div class="sp a"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"></div><div class="sp b"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"></div><i class="sp-line"></i></div>`;
-        if (sl.img) return `<div class="avo-slide"><img src="${esc(sl.img.src)}" alt="" referrerpolicy="no-referrer"></div>`;
+        if (sl.img && sl.fx === "duo") return `<div class="avo-slide fx-duo">${mediaTag(sl.img)}<i class="duo"></i><b class="avo-big">${esc(x.title)}</b></div>`;
+        if (sl.img && sl.fx === "split") return `<div class="avo-slide fx-split"><div class="sp a">${mediaTag(sl.img)}</div><div class="sp b">${mediaTag(sl.img)}</div><i class="sp-line"></i></div>`;
+        if (sl.img) return `<div class="avo-slide">${mediaTag(sl.img)}</div>`;
         if (sl.fact) return `<div class="avo-slide"><div class="avo-info fact"><span class="lbl">${desk} · সংখ্যায়</span><div class="fig"><b class="num" data-to="${sl.fact.n}" data-dec="${sl.fact.dec ? 1 : 0}">০</b><em>${esc(sl.fact.unit)}</em></div><p>${esc(sl.fact.line)}</p><i class="rule"></i></div></div>`;
         if (sl.pts) return `<div class="avo-slide"><div class="avo-info pts"><span class="lbl">মূল তথ্য</span><ol>${sl.pts.map((p, i) => `<li style="--i:${i}"><i>${bnDigits(i + 1)}</i><span>${esc(p)}</span></li>`).join("")}</ol></div></div>`;
         const bg = bgOf(x);
@@ -1674,6 +1683,24 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         <small class="avo-credit"></small>
         <div class="avo-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${lens[j]}s"></i>`).join("")}</div></div>`;
       // The newsreader: the story's recordings one after the other, through the music's sound engine.
+      // AVO + byte: after the reading, each byte in turn, the Rashtrix wipe before it; the person's
+      // name (and title) on screen; the reading and the music stop while a byte plays.
+      const byteStep = (x, k, t) => {
+        const bl = x.bytes; let bi = 0, acc = 0;
+        while (bi < bl.length - 1 && t >= acc + BYTE_WIPE + Math.max(3, Number(bl[bi].secs) || 30)) { acc += BYTE_WIPE + Math.max(3, Number(bl[bi].secs) || 30); bi++; }
+        const bkey = `${at0}:${k}:${bi}`; if (st.byteKey === bkey && el.querySelector(".avo-byte")) return;
+        st.byteKey = bkey; shownS = -1;
+        voStop(); st.voice?.pause?.(); st.voice = null; st.bed?.(); st.bed = null;
+        const w = document.createElement("div"); w.className = "tvp-stinger tvp-studiowipe";
+        w.innerHTML = `<div class="sw-full"><img src="${channel === "v" ? STUDIO_SQUARE : STUDIO_WIDE}" alt=""><i class="sw-shine"></i></div><i class="sw-edge"></i>`;
+        stage.append(w); if (!st.muted && st.audio && (mode === "app" || output)) stingerSound(st.audio);
+        const b = bl[bi], quiet = st.muted || (mode !== "app" && !output);
+        const media = b.kind === "yt" ? `<iframe src="https://www.youtube.com/embed/${esc(b.id)}?autoplay=1&mute=${quiet ? 1 : 0}&controls=0&playsinline=1&rel=0&modestbranding=1" allow="autoplay; encrypted-media" title=""></iframe>`
+          : `<video src="${esc(b.url)}" autoplay playsinline ${quiet ? "muted" : ""}></video>`;
+        setTimeout(() => { if (!el.isConnected || st.byteKey !== bkey) return;
+          el.innerHTML = `<div class="avo-byte${channel === "v" ? " v" : ""}">${media}<div class="byte-super"><span class="bs-tag"><i class="lt-pulse"></i>বক্তব্য</span><span class="bs-who">${b.name ? `<b>${esc(b.name)}</b>` : ""}${b.title ? `<small>${esc(b.title)}</small>` : ""}</span></div>${bl.length > 1 ? `<span class="byte-n">${bnDigits(bi + 1)}/${bnDigits(bl.length)}</span>` : ""}</div>`; }, 550);
+        setTimeout(() => w.remove(), 1400);
+      };
       const speakAvo = x => {
         st.voice?.pause(); st.voice = null;
         if (!x?.voice?.length || st.muted || (mode !== "app" && !output) || !st.audio) return;
@@ -1708,18 +1735,20 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         // A story with few pictures has fewer, longer slides rather than the BREAKING card again; the
         // count is fixed when the story goes on screen, so the slide times never shift under it.
         const real = slidesOf(x).filter((sl, i) => !(sl.brk && i > 0));
-        const into = e - starts[k], cap = Math.max(2, Math.min(7, Math.floor(lens[k] / 4.5))), want = Math.max(2, Math.min(cap, real.length));
+        const into = e - starts[k], vlen = avoVoiceLen(x);
+        if ((x.bytes || []).length && into >= vlen) { byteStep(x, k, into - vlen); return; }
+        const cap = Math.max(2, Math.min(7, Math.floor(vlen / 4.5))), want = Math.max(2, Math.min(cap, real.length));
         // A picture that finishes loading may add a slide, only when that leaves the slide on screen as it is.
-        if (!slideN.has(k) || (want > slideN.get(k) && (shownS < 0 || Math.floor(into / (lens[k] / want)) === shownS))) slideN.set(k, want);
+        if (!slideN.has(k) || (want > slideN.get(k) && (shownS < 0 || Math.floor(into / (vlen / want)) === shownS))) slideN.set(k, want);
         const nS = slideN.get(k), slides = x.ex && real.length > nS ? [...real.slice(0, nS - 1), real[real.length - 1]] : real.slice(0, nS);
         while (slides.length < nS) slides.push({ brk: 2 + slides.length });
-        const si = Math.min(slides.length - 1, Math.max(0, Math.floor(into / (lens[k] / slides.length))));
+        const si = Math.min(slides.length - 1, Math.max(0, Math.floor(into / (vlen / slides.length))));
         if (k !== shownK) {
           const first = shownK < 0; shownK = k; shownS = -1;
           // A fresh frame always gets its first slide (a slide drawn into the old frame during the
           // wipe must not count, or the new story stays black until its second slide).
           stage.classList.toggle("ex-on", !!x.ex);
-          const paint = () => { el.innerHTML = storyHTML(x, k); shownS = -1; speakAvo(x); st.resumeVoice = () => { if (el.isConnected) speakAvo(x); }; drawA(); };
+          const paint = () => { el.innerHTML = storyHTML(x, k); shownS = -1; st.byteKey = ""; if (!st.bed) startBed(st.current?.scene); speakAvo(x); st.resumeVoice = () => { if (el.isConnected) speakAvo(x); }; drawA(); };
           // Each story is logged: an airing from the broadcast output, a view from the app or site.
           const logKey = `${x.id}@${Math.round(at0 + starts[k] * 1000)}`;
           if ((mode === "app" || output) && !avoLogged.has(logKey)) { avoLogged.add(logKey); markAvoSeen(x.id); fetch("/api/tv/avo/played", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: x.id, ch: channel, key: output ? key : "" }), keepalive: true }).catch(() => {}); }

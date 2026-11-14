@@ -225,7 +225,7 @@ export async function playlistTitle(env, id) {
 export async function refreshSources(env, { force = false, channel = null } = {}) {
   if (!ytReady(env)) return { skipped: "YOUTUBE_API_KEY not set" };
   await trySeed(env).catch(() => {});
-  const { results } = await env.DB.prepare(`SELECT * FROM tv_sources WHERE active=1 ${channel ? "AND channel=?" : ""} ORDER BY last_refresh`).bind(...(channel ? [channel] : [])).all();
+  const { results } = await env.DB.prepare(`SELECT * FROM tv_sources WHERE active=1 AND yt_id NOT LIKE 'fb:%' ${channel ? "AND channel=?" : ""} ORDER BY last_refresh`).bind(...(channel ? [channel] : [])).all();
   let done = 0, failed = 0;
   for (const src of results) {
     if (!force && src.last_refresh && Date.now() - Date.parse(src.last_refresh) < 9.5 * 60e3) continue;
