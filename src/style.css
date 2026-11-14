@@ -2111,3 +2111,49 @@ html.standalone,html.standalone body{overscroll-behavior-y:none}
   .modal input{font-size:16px;min-height:48px}
 }
 body.auth-open .tvp-fit{pointer-events:none}
+
+/* ---------- Header on phones (Nov 2026, second pass): wider screens keep the earlier layout ---------- */
+.live-circ{display:none}
+header.wrap .nameplate-tag p.tagline.brand-line{display:none}
+header.wrap .nameplate-tag p.tagline-sub{margin:0;font:700 21px/1.3 "Noto Serif Bengali",serif;color:var(--maroon,#A43F44);letter-spacing:0;text-transform:none}
+@media(max-width:760px){
+  /* LIVE TV: a red circle with the TV mark, LIVE blinking inside it; before the language menu. */
+  header .live-tv-btn{display:none!important}
+  .live-circ{flex:none;display:inline-grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--red);color:#fff!important;text-decoration:none;box-shadow:0 6px 16px -8px rgba(170,4,4,.7);position:relative}
+  .live-circ:before{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid rgba(170,4,4,.45);animation:lvring 1.8s ease-out infinite}
+  .live-circ .lv-icon{width:24px;height:21px;display:block}
+  .live-circ .lv-word{font:900 7.6px/1 Montserrat,var(--sans);letter-spacing:.3px;fill:#fff;animation:lvblink 1.1s steps(1,end) infinite}
+  /* The logo large on the left, from the top of the header down; the tools on its right in the
+     first row; the brand line (black) and the old line (smaller) under them. */
+  header.wrap{grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;column-gap:12px;row-gap:6px;align-items:center}
+  header.wrap .nameplate{display:contents}
+  header.wrap .nameplate-link{grid-column:1;grid-row:1/3;align-self:center}
+  header.wrap .mast-logo{height:108px}
+  header.wrap .utility-right{grid-column:2;grid-row:1;justify-self:end;width:auto}
+  header.wrap .nameplate-tag{grid-column:2;grid-row:2;display:block;min-width:0;align-self:start}
+  header.wrap .nameplate-tag p.tagline.brand-line{display:block;margin:0;font:800 20px/1.25 "Noto Serif Bengali",serif;color:var(--ink,#111);letter-spacing:0;text-transform:none;max-width:none}
+  header.wrap .nameplate-tag p.tagline-sub{font-size:12.5px;margin-top:2px}
+  header.wrap .mast-rule{grid-column:1/-1;grid-row:3}
+  /* Dark mode: the brand line in white with a gold tint; the old line in gold. */
+  :root[data-theme=dark] header.wrap .nameplate-tag p.tagline.brand-line{color:#fff6df;background:linear-gradient(180deg,#ffffff 0%,#fff3d1 55%,#f2c14e 130%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 0 18px rgba(242,193,78,.18);padding-bottom:.2em;margin-bottom:-.2em}
+  :root[data-theme=dark] header.wrap .nameplate-tag p.tagline-sub{color:#e0b85a}
+  /* The swipe cards: the first is the live channel, playing. */
+  .lc-card.lc-tv{padding:0;background:#0b0b0e;border-top:4px solid var(--red)}
+  .lc-tvhead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:#fff}
+  :root[data-theme=dark] .lc-tvhead{background:#151a26}
+  .lc-tvhead b{display:inline-flex;align-items:center;gap:8px;font:800 14px Montserrat,var(--sans);letter-spacing:.08em;color:var(--red)}
+  .lc-tvhead a{font-size:13px}
+  .lc-tv .hl-player{flex:1;min-height:0;display:flex;align-items:center}
+  .lc-tv .hl-player>*{width:100%}
+}
+@media(max-width:440px){
+  .live-circ{width:34px;height:34px}
+  header.wrap .mast-logo{height:98px}
+  header.wrap .nameplate-tag{display:block}
+  header.wrap .nameplate-tag p.tagline.brand-line{font-size:17px}
+  header.wrap .nameplate-tag p.tagline-sub{font-size:11.5px}
+}
+@keyframes lvblink{0%,60%{opacity:1}61%,100%{opacity:.15}}
+@keyframes lvring{0%{transform:scale(.9);opacity:.9}100%{transform:scale(1.25);opacity:0}}
+@media(prefers-reduced-motion:reduce){.live-circ .lv-word,.live-circ:before{animation:none}}
+.tagline-sub .tl-part{display:inline-block;white-space:nowrap}

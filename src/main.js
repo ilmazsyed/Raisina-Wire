@@ -163,6 +163,7 @@ function renderShell() {
       <div class="utility-left"><span id="today"></span><button class="fresh-btn" id="freshBtn" type="button" data-action="refresh-all" aria-label="Refresh the news">${ICON_REFRESH}<span id="freshText">Updated just now</span></button></div>
       <div class="utility-right">
         <a class="live-tv-btn" href="/watch" aria-label="LIVE TV" data-no-tr><span class="live-dot" aria-hidden="true"></span><span class="live-word">LIVE</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2.5" y="6" width="19" height="13" rx="2"/><path d="M8 2.5l4 3.5 4-3.5"/></svg><span class="live-tv-word">TV</span></a>
+        <a class="live-circ" href="/watch" aria-label="LIVE TV" title="LIVE TV" data-no-tr><svg class="lv-icon" viewBox="0 0 32 28" aria-hidden="true"><path d="M11 2l5 4 5-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="6.5" width="28" height="19" rx="4" fill="none" stroke="currentColor" stroke-width="2.2"/><text x="16" y="19.6" text-anchor="middle" class="lv-word">LIVE</text></svg></a>
         <details class="lang-menu" id="langMenu"><summary class="icon-btn lang-btn" aria-label="Language" title="Language">${ICON_GLOBE}<span lang="${lang}">${LANGUAGES[lang].short}</span></summary>
           <div class="lang-pop glass" id="langPop" data-no-tr role="menu">${languageLinks()}</div></details>
         <button class="icon-btn" type="button" data-action="theme" aria-label="Switch between light and dark" title="Light or dark"><svg class="i-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg><svg class="i-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
@@ -175,7 +176,7 @@ function renderShell() {
     </div>
     <div class="masthead" id="masthead">
       <div class="nameplate"><a class="nameplate-link" href="/" aria-label="Rashtrix 24×7 News home">${fullLogo("mast-logo")}</a>
-        <div class="nameplate-tag"><p class="tagline" lang="bn" data-no-tr>${BRAND.tagline.split("।").map((x, i, all) => `<span class="tl-part">${x.trim()}${i < all.length - 1 ? " ।" : ""}</span>`).join(" ")}</p><p class="tag-sub"><span class="l">Kolkata</span> <span class="l">·</span> <span class="l">West Bengal</span> <span class="l">·</span> <span class="l">India</span> <span class="l">·</span> <span class="l">World</span></p></div></div>
+        <div class="nameplate-tag"><p class="tagline brand-line" lang="bn" data-no-tr>${BRAND.line.split(", ").map((x, i, all) => `<span class="tl-part">${x}${i < all.length - 1 ? "," : ""}</span>`).join(" ")}</p><p class="tagline-sub" lang="bn" data-no-tr>${BRAND.tagline.split("।").map((x, i, all) => `<span class="tl-part">${x.trim()}${i < all.length - 1 ? " ।" : ""}</span>`).join(" ")}</p><p class="tag-sub"><span class="l">Kolkata</span> <span class="l">·</span> <span class="l">West Bengal</span> <span class="l">·</span> <span class="l">India</span> <span class="l">·</span> <span class="l">World</span></p></div></div>
       <span class="mast-rule" aria-hidden="true"></span>
     </div>
   </header>
@@ -424,7 +425,7 @@ function viewHome() {
         ${side.map(e => `<a class="side-item side-text" href="${edHref(e)}"><span class="kicker">${newTag(e)}${esc(e.category)}</span><h3>${esc(e.title)}</h3><span class="meta">${ago(e.publishedAt)}</span></a>`).join("")}
       </section>` : ""}
       <div class="lead-mid"><section class="lead-carousel" id="leadCarousel" aria-roledescription="carousel" aria-label="Latest stories"></section>
-        <section class="home-live" aria-label="Rashtrix TV"><div class="hl-head"><b><span class="dot-live"></span><span data-no-tr>LIVE TV</span></b><a class="link-gold" href="${withLang("/watch")}">Watch full screen →</a></div><div class="hl-player" id="homeTV" data-no-tr></div></section>
+        ${isPhone() ? "" : `<section class="home-live" aria-label="Rashtrix TV"><div class="hl-head"><b><span class="dot-live"></span><span data-no-tr>LIVE TV</span></b><a class="link-gold" href="${withLang("/watch")}">Watch full screen →</a></div><div class="hl-player" id="homeTV" data-no-tr></div></section>`}
         <section class="home-live home-live-v" aria-label="Rashtrix Shorts"><div class="hlv"><div class="hl-player hl-v" id="homeTVv" data-no-tr></div>
           <div class="hlv-info"><b class="hlv-live"><span class="dot-live"></span><span data-no-tr>LIVE</span></b><h3>Rashtrix Shorts</h3><p>The vertical channel: short videos, headlines and the news as it happens, around the clock.</p><a class="btn btn-red" href="${withLang("/watch?ch=v")}">Watch full screen →</a></div></div></section></div>
       <div class="latest-col"><section id="shortsRail" class="shorts-rail" aria-label="Shorts" hidden></section>
@@ -442,6 +443,8 @@ function viewHome() {
 }
 // The swipe cards at the top: seven compact text cards, no photos. Running live coverage comes
 // first, headed by its newest update; then the wire's own reports and briefs, newest first.
+// Phones (the layout under 761 px): the header's LIVE circle, and the live channel as the first swipe card.
+const isPhone = () => !matchMedia("(min-width: 761px)").matches;
 function renderLeadCarousel(skip = state.leadSkip || new Set()) {
   state.leadSkip = skip;
   const host = $("#leadCarousel"); if (!host) return;
@@ -452,14 +455,26 @@ function renderLeadCarousel(skip = state.leadSkip || new Set()) {
   const wire = stories().filter(isWire).filter(e => !skip.has(e.id)).sort((x, y) => (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0))
     .map(e => ({ href: edHref(e), title: e.title, dek: e.dek, desk: e.category, kind: kindLabel(e), at: e.publishedAt }));
   const cards = [...live, ...wire].slice(0, 7);
-  host.hidden = !cards.length;
-  host.innerHTML = cards.length ? `<div class="lc-track" id="lcTrack" tabindex="0">${cards.map((c, i) => `<article class="lc-card lc-mini glass${c.live ? " lc-live" : ""}" aria-roledescription="slide" aria-label="${digits(i + 1)} / ${digits(cards.length)}"><a class="lc-link" href="${c.href}">
+  // The first card is the live channel itself (Rashtrix TV, playing, muted); the wire's cards follow.
+  // A redraw keeps that card (and its player) where it is and only replaces the cards after it.
+  const withTV = isPhone(), tvCard = withTV ? document.getElementById("lcTvCard") : null, base = withTV ? 1 : 0;
+  const one = (c, i) => `<article class="lc-card lc-mini glass${c.live ? " lc-live" : ""}" aria-roledescription="slide" aria-label="${digits(i + 1)} / ${digits(cards.length + base)}"><a class="lc-link" href="${c.href}">
       <div class="lc-meta">${c.live ? `<span class="tag tag-live"><i class="dot-live"></i>Live</span><span class="kicker" data-no-tr>${esc(c.cov)}</span>` : `<span class="tag tag-red">${esc(c.desk)}</span>${c.kind ? `<span class="kicker">${c.kind}</span>` : ""}`}<span class="lc-ago">${c.at ? ago(c.at) : ""}</span></div>
-      <h${i ? 2 : 1} class="lc-title" ${c.live ? "data-no-tr" : ""}>${esc(c.title)}</h${i ? 2 : 1}>${c.dek ? `<p class="lc-dek">${esc(c.dek)}</p>` : ""}</a></article>`).join("")}</div>
-    <div class="lc-nav"><button class="carousel-btn" type="button" data-action="lead-step" data-dir="-1" aria-label="Previous story">‹</button><span class="lc-dots" id="lcDots">${cards.map((_, i) => `<i class="${i ? "" : "on"}"></i>`).join("")}</span><span class="lc-count" id="lcCount">${digits(1)} / ${digits(cards.length)}</span><button class="carousel-btn" type="button" data-action="lead-step" data-dir="1" aria-label="Next story">›</button></div>` : "";
+      <h${i ? 2 : 1} class="lc-title" ${c.live ? "data-no-tr" : ""}>${esc(c.title)}</h${i ? 2 : 1}>${c.dek ? `<p class="lc-dek">${esc(c.dek)}</p>` : ""}</a></article>`;
+  const n = cards.length + base;
+  const nav = `<div class="lc-nav"><button class="carousel-btn" type="button" data-action="lead-step" data-dir="-1" aria-label="Previous story">‹</button><span class="lc-dots" id="lcDots">${Array.from({ length: n }, (_, i) => `<i class="${i ? "" : "on"}"></i>`).join("")}</span><span class="lc-count" id="lcCount">${digits(1)} / ${digits(n)}</span><button class="carousel-btn" type="button" data-action="lead-step" data-dir="1" aria-label="Next story">›</button></div>`;
+  if (tvCard && tvCard.isConnected && tvCard.closest("#leadCarousel") === host) {
+    while (tvCard.nextSibling) tvCard.nextSibling.remove();
+    tvCard.insertAdjacentHTML("afterend", cards.map((c, i) => one(c, i + base)).join(""));
+    host.querySelector(".lc-nav")?.remove(); host.insertAdjacentHTML("beforeend", nav);
+  } else {
+    const tv = withTV ? `<article class="lc-card lc-tv glass" id="lcTvCard" aria-roledescription="slide" aria-label="Rashtrix TV"><div class="lc-tvhead"><b><span class="dot-live"></span><span data-no-tr>LIVE TV</span></b><a class="link-gold" href="${withLang("/watch")}">Watch full screen →</a></div><div class="hl-player" id="homeTV" data-no-tr></div></article>` : "";
+    host.innerHTML = n ? `<div class="lc-track" id="lcTrack" tabindex="0">${tv}${cards.map((c, i) => one(c, i + base)).join("")}</div>${nav}` : "";
+  }
+  host.hidden = !n;
   // The dots and the count follow the card in view.
   const track = document.getElementById("lcTrack");
-  if (track) track.addEventListener("scroll", () => {
+  if (track && !track.dataset.watch) track.dataset.watch = "1", track.addEventListener("scroll", () => {
     const list = track.children; if (!list.length) return;
     const i = Math.min(Math.round(track.scrollLeft / (list[0].offsetWidth + 16)), list.length - 1);
     document.querySelectorAll("#lcDots i").forEach((d, k) => d.classList.toggle("on", k === i));
@@ -1959,14 +1974,14 @@ function mountHomeTV() {
   if (S && homeTV) {
     const nh = $("#homeTV"), nv = $("#homeTVv");
     try {
-      if (nh && matchMedia("(min-width: 761px)").matches) { nh.parentNode.moveBefore(S.h, nh); nh.remove(); if (S.v && nv) { nv.parentNode.moveBefore(S.v, nv); nv.remove(); } else if (nv) nv.closest(".home-live").hidden = true; S.box.remove(); return; }
+      if (nh) { nh.parentNode.moveBefore(S.h, nh); nh.remove(); if (S.v && nv) { nv.parentNode.moveBefore(S.v, nv); nv.remove(); } else if (nv) nv.closest(".home-live").hidden = true; S.box.remove(); return; }
     } catch { /* drawn afresh below */ }
     S.box.remove();
   }
   homeTV?.destroy(); homeTV = null; homeTVv?.destroy(); homeTVv = null;
   const host = $("#homeTV"), hostV = $("#homeTVv"); if (!host) return;
-  // Rashtrix TV from tablet size up; Rashtrix Shorts beside it on laptops and desktops (muted).
-  if (!matchMedia("(min-width: 761px)").matches) { host.closest(".home-live").hidden = true; hostV && (hostV.closest(".home-live").hidden = true); return; }
+  // Rashtrix TV (muted): on phones the first of the swipe cards, on wider screens under them;
+  // Rashtrix Shorts beside it on laptops and desktops.
   homeTV = mountTV(host, { channel: "h", muted: true, tapUnmute: false });
   if (hostV && matchMedia("(min-width: 1181px)").matches) homeTVv = mountTV(hostV, { channel: "v", muted: true, tapUnmute: false });
   else if (hostV) hostV.closest(".home-live").hidden = true;
