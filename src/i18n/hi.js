@@ -1541,4 +1541,5 @@ export default {
   "The video is ready.": "वीडियो तैयार है।",
   "This browser cannot make videos. Use Chrome or Edge on a computer.": "इस ब्राउज़र में वीडियो नहीं बनते। कंप्यूटर पर क्रोम या एज इस्तेमाल करें।",
   "This file cannot be read as a picture or a video.": "यह फ़ाइल तस्वीर या वीडियो के रूप में नहीं पढ़ी जा सकती।",
+  "Show jacket guides": "जैकेट की जगह दिखाएँ",
 };

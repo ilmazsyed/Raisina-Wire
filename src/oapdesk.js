@@ -6,7 +6,7 @@
 // this computer.
 import { shell, toast, fail, esc, $, $$ } from "./crshell.js";
 import { digits } from "./i18n.js";
-import { draw, sizeOf, STYLES, MUSIC, KINDS, SKIES } from "./oap.js";
+import { draw, guides, sizeOf, STYLES, MUSIC, KINDS, SKIES } from "./oap.js";
 import { newsBed } from "./engine.js";
 
 const FIELDS = {
@@ -46,6 +46,7 @@ function form() {
       <label>Shape<select id="oOr"><option value="h" ${S.orient === "h" ? "selected" : ""}>Horizontal 16:9 (1920×1080)</option><option value="v" ${S.orient === "v" ? "selected" : ""}>Vertical 9:16 (1080×1920)</option></select></label>
       <label>Length <b data-no-tr id="oDurV">${digits(S.dur)} s</b><input type="range" id="oDur" min="5" max="60" step="1" value="${S.dur}"></label>
       <label class="row" style="gap:6px;align-items:center"><input type="checkbox" id="oMus" ${S.music ? "checked" : ""}> <span>Music</span></label>
+      <label class="row" style="gap:6px;align-items:center" title="Where the channel's logo, LIVE dock and ticker sit on air. Graphics keep these places clear. The guides are never in the video."><input type="checkbox" id="oGuide" ${S.guides !== false ? "checked" : ""}> <span>Show jacket guides</span></label>
       <label>Music mood<select id="oMood" ${S.music ? "" : "disabled"}><option value="">Matches the graphic</option>${["headlines", "upnext", "market", "weather", "avo", "bulletin"].map(m => `<option value="${m}" ${S.mood === m ? "selected" : ""}>${{ headlines: "Headlines", upnext: "Promo", market: "Markets", weather: "Weather", avo: "Calm", bulletin: "Bulletin" }[m]}</option>`).join("")}</select></label></div>
     <div><small class="muted">Style</small><div class="row" style="gap:8px;flex-wrap:wrap;margin-top:4px">${Object.entries(STYLES).map(([k, s]) => `<button type="button" class="oap-sw ${S.style === k ? "on" : ""}" data-style="${k}" title="${s.name}"><i style="background:linear-gradient(135deg,${s.bg[1]},${s.bg[0]} 60%,${s.bg[2]})"><b style="background:${s.acc}"></b><b style="background:${s.gold}"></b></i><span>${s.name}</span></button>`).join("")}</div></div>
     ${FIELDS[S.kind].map(([k, l]) => `<label>${l}${k === "text" ? `<textarea rows="3" data-f="${k}" data-no-tr>${esc(d[k] || "")}</textarea>` : `<input data-f="${k}" value="${esc(d[k] || "")}" data-no-tr>`}</label>`).join("")}
@@ -74,6 +75,7 @@ function bind() {
   $("#oOr").onchange = e => { S.orient = e.target.value; save(); page(); };
   $("#oDur").oninput = e => { S.dur = +e.target.value; $("#oDurV").textContent = `${digits(S.dur)} s`; save(); };
   $("#oMus").onchange = e => { S.music = e.target.checked; re(); };
+  $("#oGuide").onchange = e => { S.guides = e.target.checked; save(); };
   $("#oMood").onchange = e => { S.mood = e.target.value; save(); };
   const d = S.data[S.kind];
   $$("[data-f]").forEach(i => i.oninput = () => { d[i.dataset.f] = i.value; save(); });
@@ -103,7 +105,7 @@ let t0 = performance.now(), raf = 0, recording = false;
 function restart() { t0 = performance.now(); if (A.media?.video) { A.media.el.currentTime = 0; A.media.el.play().catch(() => {}); } }
 function frame() {
   const c = $("#oCan");
-  if (c && !recording) { const t = ((performance.now() - t0) / 1000) % (S.dur + .8); draw(c.getContext("2d"), spec(), A, Math.min(t, S.dur)); }
+  if (c && !recording) { const t = ((performance.now() - t0) / 1000) % (S.dur + .8); const g = c.getContext("2d"); draw(g, spec(), A, Math.min(t, S.dur)); if (S.guides !== false) guides(g, S.orient); }
   raf = requestAnimationFrame(frame);
 }
 
