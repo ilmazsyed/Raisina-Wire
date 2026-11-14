@@ -1,3 +1,4 @@
+import { itemScene } from "./scenes.js";
 import { cached, categorize, DESKS } from "./feeds.js";
 import { bulletinRank } from "./labels.js";
 import { runWireDesk, wireDeskReport, saveWireSettings, wireSettings, fetchSources, groupItems, writeJob, quota, videoHeadlines, refileSubjects } from "./wiredesk.js";
@@ -42,7 +43,7 @@ import m0037 from "../migrations/0037_hidden_langs.sql";
 import m0038 from "../migrations/0038_photo_checks.sql";
 import { bulletinImages, bulletinImageRoute } from "./bulletinimg.js";
 import { prepareBulletinVoices, prepareLinks, voiceRoute } from "./bulletinvoice.js";
-import { avoStep, avoImageRoute, avoPlayed, avoLog, avoFromBreaking, avoManualAdd, avoManualEdit, avoManualDelete, avoFromArticle, avoScript } from "./avo.js";
+import { avoStep, avoImageRoute, avoPlayed, avoLog, avoFromBreaking, avoManualAdd, avoManualEdit, avoManualDelete, avoFromArticle, avoScript, screenStory } from "./avo.js";
 import { marketBrief } from "./markets.js";
 import { ogRoute, renderCards, renderSiteCard } from "./ogcard.js";
 import { indexNow } from "./indexnow.js";
@@ -1362,6 +1363,19 @@ async function api(request, env, ctx) {
         try { return done(await saveLiveDesk(env, b, user)); } catch (e) { return err(e.message); }
       }
       // The AVO Story Desk: write, edit, take out of rotation, delete.
+      // Play an AVO story now: on the channels chosen it goes on air at once (the NEWS NOW sting,
+      // the story, its bytes), then the channel goes back to autopilot.
+      if (first === "avo" && second && third === "play" && request.method === "POST") {
+        const row = await env.DB.prepare("SELECT * FROM avo_stories WHERE article_id=?").bind(second).first();
+        if (!row || !["ready", "off"].includes(row.status)) return err("This AVO story is not ready yet.");
+        const story = screenStory(row), chs = (Array.isArray(b.channels) ? b.channels : CHANNELS).filter(c => CHANNELS.includes(c));
+        if (!chs.length) return err("Choose a channel.");
+        const dur = Math.ceil((story.secs > 0 ? Math.max(8, story.secs + 2) : 20) + 4 + (story.bytes || []).reduce((n, x) => n + 1.2 + (Number(x.secs) || 30), 0));
+        const item = { id: `avo-now:${second}`, type: "avo", title: story.title, dur, scene: itemScene({ type: "avo", title: story.title, duration: dur, data: { story, avoId: second } }) };
+        for (const ch of chs) await ctlCommand(env, ch, "rundown.load", { rundown: { id: `avo-now:${second}:${Date.now()}`, title: `AVO: ${story.title}`.slice(0, 120), items: [item] }, index: 0, auto: true }, user.display_name || user.email, "avo-now");
+        await audit(env, user, "avo.playnow", "avo", second, { channels: chs });
+        return done({ ok: true, seconds: dur });
+      }
       if (first === "avo" && second === "send" && request.method === "POST") { try { const out = await avoFromArticle(env, String(b.id || ""), user.display_name || user.email); await audit(env, user, "avo.send", "avo", out.id, {}); clearTvCache(); return json(out); } catch (e) { return err(e.message); } }
       if (first === "avo" && !second && request.method === "POST") { try { const out = await avoManualAdd(env, b, user.display_name || user.email); await audit(env, user, "avo.add", "avo", out.id, { title: b.title }); return json(out); } catch (e) { return err(e.message); } }
       if (first === "avo" && second && request.method === "PUT") { try { await avoManualEdit(env, second, b); await audit(env, user, "avo.edit", "avo", second, { off: b.off }); clearTvCache(); return json({ ok: true }); } catch (e) { return err(e.message); } }
