@@ -44,6 +44,24 @@ export async function handleClips(request, env, url, user, { json, err, audit })
     await env.DB.prepare("INSERT INTO clips (id,title,r2_key,mime,bytes,duration,source,status,upload_id,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(cid, String(b.title || b.filename || "Clip").slice(0, 160), key, mime, Number(b.size) || 0, Number(b.duration) || 0, "upload", "uploading", up.uploadId, user.id).run();
     return ok({ id: cid, partSize: PART });
   }
+  // By hand: every clip older than `hours` (24) goes from storage, except those an AVO story still on
+  // air (ready, paused or being made, from the last day) uses as a video or a byte.
+  if (id === "cleanup" && m === "POST") {
+    const b = await request.json().catch(() => ({})), hours = Math.max(1, Math.min(24 * 90, Number(b.hours) || 24));
+    const since = new Date(Date.now() - 24 * 3600e3).toISOString(), cut = new Date(Date.now() - hours * 3600e3).toISOString().replace("T", " ").slice(0, 19);
+    const used = new Set(), { results: avo } = await env.DB.prepare("SELECT videos, bytes FROM avo_stories WHERE status IN ('ready','off','new') AND published_at>=?").bind(since).all().catch(() => ({ results: [] }));
+    const arr = t => { try { const x = JSON.parse(t || "[]"); return Array.isArray(x) ? x : []; } catch { return []; } };
+    for (const r of avo) for (const v of [...arr(r.videos), ...arr(r.bytes)]) { const u = typeof v === "string" ? v : v?.url || ""; if (/^\/clips\//.test(u)) used.add(u.slice(1)); }
+    const { results: old } = await env.DB.prepare("SELECT id, r2_key, bytes, status, upload_id FROM clips WHERE created_at < ? OR (created_at LIKE '%T%' AND created_at < ?)").bind(cut, cut.replace(" ", "T")).all();
+    let n = 0, freed = 0, spared = 0;
+    for (const x of old) {
+      if (used.has(x.r2_key)) { spared++; continue; }
+      if (x.status !== "ready" && x.upload_id) await env.CLIPS.resumeMultipartUpload(x.r2_key, x.upload_id).abort().catch(() => {});
+      await env.CLIPS.delete(x.r2_key).catch(() => {}); await env.DB.prepare("DELETE FROM clips WHERE id=?").bind(x.id).run(); n++; if (x.status === "ready") freed += x.bytes || 0;
+    }
+    await audit("clip.cleanup", "clip", "", { hours, deleted: n, freed });
+    return ok({ deleted: n, freedBytes: freed, spared });
+  }
   const c = await env.DB.prepare("SELECT * FROM clips WHERE id=?").bind(id).first();
   if (!c && id !== "drive") return err("Clip not found.", 404);
   if (sub === "part" && m === "PUT") {   // one part of the file

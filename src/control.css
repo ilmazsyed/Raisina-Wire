@@ -356,3 +356,11 @@ dialog::backdrop { background: #000a; }
 .ad-seg .btn.on{background:var(--red);border-color:var(--red);color:#fff}
 .ad-brow{display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid var(--line);border-radius:10px}
 .ad-bn{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:7px;background:#b8860b;color:#111;font-weight:800}
+
+.ad-clips{width:min(760px,96vw)}
+.ad-cl{display:flex;flex-direction:column;gap:8px;max-height:62vh;overflow:auto}
+.ad-clip{display:flex;align-items:center;gap:12px;padding:8px;border:1px solid var(--line);border-radius:10px}
+.ad-clip video{flex:none;width:150px;height:84px;object-fit:cover;border-radius:6px;background:#000}
+.ad-cmeta{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.ad-cmeta b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:640px){.ad-clip{flex-wrap:wrap}.ad-clip video{width:100%;height:auto;aspect-ratio:16/9}}

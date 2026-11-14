@@ -1405,4 +1405,8 @@ export default {
   "Upload video": "वीडियो अपलोड",
   "Upload": "अपलोड",
   "Uploaded video": "अपलोड किया वीडियो",
+  "Uploaded clips": "अपलोड की गई क्लिप",
+  "Uploaded": "अपलोड की गई",
+  "Use": "इस्तेमाल करें",
+  "Delete clips older than 24 hours": "24 घंटे से पुरानी क्लिप हटाएँ",
 };
