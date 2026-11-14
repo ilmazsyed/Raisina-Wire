@@ -1221,15 +1221,45 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // The news backdrop behind the bulletin and segment cards, faded: the world in dots, the
   // newsrooms lit up with lines from Kolkata, a turning globe, signal rings and NEWS in outline.
   const DECO_CITIES = [["কলকাতা", 88.4, 22.6, 1], ["দিল্লি", 77.2, 28.6], ["ঢাকা", 90.4, 23.8], ["লন্ডন", -0.1, 51.5], ["নিউ ইয়র্ক", -74, 40.7], ["বেজিং", 116.4, 39.9], ["দুবাই", 55.3, 25.3], ["মস্কো", 37.6, 55.8], ["সিডনি", 151.2, -33.9], ["নাইরোবি", 36.8, -1.3]];
-  function newsDeco() {
-    const P = (lon, lat) => [(lon + 180) / 360 * 1920, (84 - lat) / 142 * 900], [kx, ky] = P(88.4, 22.6);
-    const arcs = DECO_CITIES.slice(1).map(([, lon, lat], i) => { const [x, y] = P(lon, lat), mx = (kx + x) / 2, my = Math.min(ky, y) - Math.abs(x - kx) * 0.22 - 30; return `<path d="M${kx.toFixed(0)} ${ky.toFixed(0)} Q${mx.toFixed(0)} ${my.toFixed(0)} ${x.toFixed(0)} ${y.toFixed(0)}" style="--i:${i}"/>`; }).join("");
-    const pins = DECO_CITIES.map(([n, lon, lat, home], i) => { const [x, y] = P(lon, lat); return `<i class="nd-pin${home ? " home" : ""}" style="left:${(x / 19.2).toFixed(2)}%;top:${(y / 9).toFixed(2)}%;--i:${i}"><b>${n}</b></i>`; }).join("");
-    return `<div class="nd" aria-hidden="true"><div class="nd-words" data-no-tr><b>NEWS</b><b>NEWS</b><b>NEWS</b></div>
-      <div class="nd-map"><img src="/brand/worldmap-dots.webp" alt=""><svg viewBox="0 0 1920 900" preserveAspectRatio="none">${arcs}</svg>${pins}</div>
-      <svg class="nd-globe" viewBox="-110 -110 220 220"><circle r="100"/><ellipse rx="100" ry="34"/><ellipse rx="100" ry="70"/><line x1="-100" x2="100"/><g class="spin"><ellipse rx="34" ry="100"/><ellipse rx="70" ry="100"/><line y1="-100" y2="100"/></g></svg>
-      <div class="nd-sig"><i></i><i></i><i></i></div><i class="nd-scan"></i></div>`;
+  function newsDeco(theme = "bulletin") {
+    const P = (lon, lat) => [(lon + 180) / 360 * 1920, (84 - lat) / 142 * 900];
+    const T = { world: "world", bangladesh: "asia", kolkata10: "asia", city: "asia", sports: "sports", entertainment: "film", lifestyle: "life", numbers: "chart", markets: "chart", onthisday: "time", weather: "weather", soth: "radar" }[theme] || "world";
+    const words = `<div class="nd-words" data-no-tr><b>NEWS</b><b>NEWS</b><b>NEWS</b></div><i class="nd-scan"></i>`;
+    let art = "";
+    if (T === "world" || T === "asia") {
+      const home = P(88.4, 22.6), cities = T === "asia" ? DECO_CITIES.filter(c => c[1] > 60 && c[1] < 100) : DECO_CITIES;
+      const arcs = cities.filter(c => !c[3]).map(([, lon, lat], i) => { const [x, y] = P(lon, lat), mx = (home[0] + x) / 2, my = Math.min(home[1], y) - Math.abs(x - home[0]) * 0.22 - (T === "asia" ? 8 : 30); return `<path d="M${home[0].toFixed(0)} ${home[1].toFixed(0)} Q${mx.toFixed(0)} ${my.toFixed(0)} ${x.toFixed(0)} ${y.toFixed(0)}" style="--i:${i}"/>`; }).join("");
+      const pins = cities.map(([n, lon, lat, h], i) => { const [x, y] = P(lon, lat); return `<i class="nd-pin${h ? " home" : ""}" style="left:${(x / 19.2).toFixed(2)}%;top:${(y / 9).toFixed(2)}%;--i:${i}"><b>${n}</b></i>`; }).join("");
+      art = `<div class="nd-map"><div class="nd-pan"><img src="/brand/worldmap-dots.webp" alt=""><svg viewBox="0 0 1920 900" preserveAspectRatio="none">${arcs}</svg>${pins}</div></div>
+        <svg class="nd-globe" viewBox="-110 -110 220 220"><circle r="100"/><ellipse rx="100" ry="34"/><ellipse rx="100" ry="70"/><line x1="-100" x2="100"/><g class="spin"><ellipse rx="34" ry="100"/><ellipse rx="70" ry="100"/><line y1="-100" y2="100"/></g></svg>
+        <div class="nd-sig"><i></i><i></i><i></i></div>`;
+    } else if (T === "sports") {
+      art = `<svg class="nd-field" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid slice"><rect x="60" y="60" width="1080" height="580" rx="6"/><line x1="600" y1="60" x2="600" y2="640"/><circle cx="600" cy="350" r="95"/><rect x="60" y="210" width="150" height="280"/><rect x="990" y="210" width="150" height="280"/><circle cx="600" cy="350" r="5" class="dot"/></svg>
+        <div class="nd-track"><i></i><i></i><i></i><i></i></div><i class="nd-ball"></i><div class="nd-sig r"><i></i><i></i><i></i></div>`;
+    } else if (T === "film") {
+      const holes = Array.from({ length: 24 }, () => "<i></i>").join("");
+      art = `<div class="nd-strip a"><div>${holes}${holes}</div></div><div class="nd-strip b"><div>${holes}${holes}</div></div>
+        <i class="nd-beam l"></i><i class="nd-beam r"></i>${Array.from({ length: 14 }, (_, i) => `<i class="nd-star" style="left:${(i * 37 + 11) % 97}%;top:${(i * 53 + 7) % 90}%;--i:${i}"></i>`).join("")}`;
+    } else if (T === "life") {
+      art = Array.from({ length: 14 }, (_, i) => `<i class="nd-bub" style="left:${(i * 29 + 5) % 96}%;--s:${60 + (i * 37) % 160}px;--t:${14 + (i * 7) % 12}s;--i:${i}"></i>`).join("") + `<svg class="nd-leaf" viewBox="0 0 200 200"><path d="M100 10 C170 40 190 120 100 190 C10 120 30 40 100 10 Z M100 20 L100 185"/></svg>`;
+    } else if (T === "chart") {
+      art = `<svg class="nd-chart" viewBox="0 0 1600 700" preserveAspectRatio="none"><g class="grid">${Array.from({ length: 9 }, (_, i) => `<line x1="0" x2="1600" y1="${70 * i + 50}" y2="${70 * i + 50}"/>`).join("")}${Array.from({ length: 17 }, (_, i) => `<line y1="0" y2="700" x1="${100 * i}" x2="${100 * i}"/>`).join("")}</g>
+        <path class="ln" d="M0 520 L100 480 L200 500 L300 420 L400 440 L500 360 L600 390 L700 300 L800 330 L900 250 L1000 280 L1100 210 L1200 240 L1300 170 L1400 200 L1500 130 L1600 150"/>
+        ${Array.from({ length: 14 }, (_, i) => { const x = 60 + i * 110, h = 40 + (i * 37) % 90, y = 560 - (i * 23) % 200 - h; return `<g class="cdl ${i % 3 ? "up" : "dn"}" style="--i:${i}"><line x1="${x}" x2="${x}" y1="${y - 20}" y2="${y + h + 20}"/><rect x="${x - 14}" y="${y}" width="28" height="${h}"/></g>`; }).join("")}</svg>
+        <div class="nd-digits" data-no-tr>${Array.from({ length: 12 }, (_, i) => `<b style="left:${(i * 31 + 4) % 95}%;--i:${i}">${"০১২৩৪৫৬৭৮৯%৳₹"[i % 13]}</b>`).join("")}</div>`;
+    } else if (T === "time") {
+      art = `<svg class="nd-clock" viewBox="-110 -110 220 220"><circle r="100"/><circle r="92" class="thin"/>${Array.from({ length: 12 }, (_, i) => `<line y1="-92" y2="-80" transform="rotate(${i * 30})"/>`).join("")}<line class="hh" y2="-50"/><line class="mm" y2="-78"/><circle r="4" class="dot"/></svg>
+        <div class="nd-cal">${Array.from({ length: 35 }, (_, i) => `<i style="--i:${i}">${"০১২৩৪৫৬৭৮৯"[(i + 1) % 10]}</i>`).join("")}</div><i class="nd-sepia"></i>`;
+    } else if (T === "weather") {
+      art = `<svg class="nd-sun" viewBox="-110 -110 220 220"><circle r="40"/><g class="rays">${Array.from({ length: 12 }, (_, i) => `<line y1="-58" y2="-90" transform="rotate(${i * 30})"/>`).join("")}</g></svg>
+        ${[0, 1, 2, 3].map(i => `<svg class="nd-cloud" style="--i:${i};top:${10 + i * 20}%" viewBox="0 0 200 100"><path d="M40 80 Q10 80 15 60 Q15 38 45 42 Q55 15 90 22 Q120 5 140 35 Q180 30 180 60 Q185 82 155 80 Z"/></svg>`).join("")}
+        <div class="nd-rain">${Array.from({ length: 30 }, (_, i) => `<i style="left:${(i * 37) % 100}%;--i:${i}"></i>`).join("")}</div>`;
+    } else if (T === "radar") {
+      art = `<div class="nd-radar"><i class="r1"></i><i class="r2"></i><i class="r3"></i><i class="sweep"></i><i class="blip" style="--x:30%;--y:40%"></i><i class="blip" style="--x:65%;--y:28%;--i:1"></i><i class="blip" style="--x:55%;--y:70%;--i:2"></i></div><div class="nd-map"><div class="nd-pan"><img src="/brand/worldmap-dots.webp" alt=""></div></div>`;
+    }
+    return `<div class="nd nd-t-${T}" aria-hidden="true">${words}${art}</div>`;
   }
+
   // The desk's name in Bengali (an AVO made from a breaking: খবর, not এইমাত্র).
   function deskOf(x) { return x?.origin === "breaking" || String(x?.id || "").startsWith("brk:") ? "খবর" : DESK_BN[x?.desk] || x?.desk || "খবর"; }
   // A bulletin or segment the broadcast output has aired, recorded once for the Segment & bulletin
@@ -1357,7 +1387,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       let at = 0; screens.forEach(x => { x.d *= scale; x.at = at; at += x.d; });
       let shownM = -1;
       const drawM = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = Math.max(0, screens.findLastIndex(x => e >= x.at)); if (k === shownM) return; const first = shownM < 0; shownM = k;
-        const paint = () => { el.innerHTML = `<div class="seg mk${channel === "v" ? " v" : ""}"><i class="bs-bg"></i>${newsDeco()}<i class="bs-glow"></i>${screens[k].h()}${k > 0 && k < screens.length - 1 ? segStrap("MARKET UPDATE", "বাজারের খবর", screens, k) : ""}</div>`; };
+        const paint = () => { el.innerHTML = `<div class="seg mk${channel === "v" ? " v" : ""}"><i class="bs-bg"></i>${newsDeco("markets")}<i class="bs-glow"></i>${screens[k].h()}${k > 0 && k < screens.length - 1 ? segStrap("MARKET UPDATE", "বাজারের খবর", screens, k) : ""}</div>`; };
         if (first || !el.isConnected) return paint();
         const w = document.createElement("div"); w.className = "bs-wipe mk-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
         stage.append(w); if (!st.muted) whoosh(st.audio);
@@ -1389,7 +1419,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         : `<div class="sg-screen">${segHead(ZONE[x.zone][0], ZONE[x.zone][1], st.tv?.weatherAt)}<div class="sg-row n${x.c.length}">${x.c.map(card).join("")}</div></div>`;
       let shownW = -1;
       const drawW = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = Math.max(0, screens.findLastIndex(x => e >= x.at)); if (k === shownW) return; const first = shownW < 0; shownW = k;
-        const paint = () => { el.innerHTML = `<div class="seg wx${channel === "v" ? " v" : ""}"><i class="bs-bg"></i>${newsDeco()}<i class="bs-glow"></i>${screenHTML(screens[k])}${k > 0 && k < screens.length - 1 ? segStrap("WEATHER UPDATE", "আবহাওয়ার খবর", screens, k) : ""}</div>`; };
+        const paint = () => { el.innerHTML = `<div class="seg wx${channel === "v" ? " v" : ""}"><i class="bs-bg"></i>${newsDeco("weather")}<i class="bs-glow"></i>${screenHTML(screens[k])}${k > 0 && k < screens.length - 1 ? segStrap("WEATHER UPDATE", "আবহাওয়ার খবর", screens, k) : ""}</div>`; };
         if (first || !el.isConnected) return paint();
         const w = document.createElement("div"); w.className = "bs-wipe wx-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
         stage.append(w); if (!st.muted) whoosh(st.audio);
@@ -1480,7 +1510,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         return `<div class="sx-item${x.img ? " has-img" : ""}"><div class="sx-num">${bnDigits(i + 1)}</div><div class="sx-body"><span class="sx-lbl">${esc(DESK_BN[x.d] || x.d || "খবর")}</span><h2>${esc(x.t)}</h2>${x.line && x.line !== x.t ? `<p>${esc(x.line)}</p>` : ""}</div>${x.img ? `<div class="sx-img"><img src="${esc(x.img)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')"></div>` : ""}</div>`;
       };
       const score = name === "sports" && st.tv?.segs?.score ? `<div class="sx-score"><span>স্কোর</span><b>${esc(st.tv.segs.score)}</b></div>` : "";
-      el.innerHTML = `<div class="sx sx-${esc(name)}${v}"><i class="sx-bg"></i>${newsDeco()}<div class="sx-stage"></div>
+      el.innerHTML = `<div class="sx sx-${esc(name)}${v}"><i class="sx-bg"></i>${newsDeco(name)}<div class="sx-stage"></div>
         <div class="sx-title"><small>রাষ্ট্রিক্স ২৪×৭</small><b>${esc(title)}</b><span>${esc(kick)}</span><i></i></div>${score}
         <div class="sx-strap"><b>${esc(title)}</b><div class="sx-steps">${items.map((x, j) => `<i style="--d:${x.d0}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div></div>`;
       let shownI = -1, tok = {};
