@@ -557,7 +557,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const soundOff = () => { st.ytMuted = true; if (soundBtn) soundBtn.hidden = false; };
   // Some phones (iPhone in Low Power Mode) start a YouTube video only from a tap inside it: the
   // cover over it is lifted, with a hint, until it plays. The one player then plays every video.
-  const needTap = on => { host.querySelector(".tvp-ytlayer")?.classList.toggle("tap", on); host.querySelector(".tvp")?.classList.toggle("yt-tap", on); if (tapHint) tapHint.hidden = !on; };
+  // The YouTube player never keeps the focus (a focused player shows its own pause button).
+  const unfocusYt = () => { host.querySelectorAll("iframe").forEach(f => { f.tabIndex = -1; if (document.activeElement === f) f.blur(); }); try { if (document.activeElement?.tagName === "IFRAME") { document.activeElement.blur(); window.focus(); } } catch { /* none */ } };
+  const needTap = on => { if (on && st.yt) st.yt.cleared = false; host.querySelector(".tvp-ytlayer")?.classList.toggle("tap", on); host.querySelector(".tvp")?.classList.toggle("yt-tap", on); if (tapHint) tapHint.hidden = !on; };
 
   /* like and share (app) */
   const likeBtn = host.querySelector(".tvp-like"), shareBtn = host.querySelector(".tvp-share");
@@ -649,7 +651,14 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           // A video loaded in advance waits, paused and buffered, until its turn.
           if (st.yt.preloading && !st.ytOwner) { if (e.data === 1) { e.target.pauseVideo(); st.yt.preloading = false; } return; }
           if (e.data === 2 && st.ytOwner && !st.muted && !st.ytMuted && st.ytDiag && Date.now() - st.ytDiag.t0 < 6000) { diagMark(95); soundOff(); try { e.target.mute(); e.target.playVideo(); } catch { /* none */ } }
-          if (e.data === 0) st.yt.ended = true; ytMaskState(layer, e.data, e.data === 1 && !!st.ytPoster?.querySelector(".tvs-poster")); if (e.data === 1) { liftPoster(st.ytPoster); needTap(false); noCaptions(e.target); }
+          if (e.data === 0) st.yt.ended = true; ytMaskState(layer, e.data, e.data === 1 && !!st.ytPoster?.querySelector(".tvs-poster")); if (e.data === 1) {
+            // Started by a tap inside the player (a phone that asks for one): YouTube then keeps its
+            // own pause button over the picture, so the video is quietly reloaded at the same
+            // second, which clears it (the player, once tapped, plays on by itself).
+            const tapped = layer.classList.contains("tap");
+            liftPoster(st.ytPoster); needTap(false); noCaptions(e.target); unfocusYt();
+            if (tapped && !st.yt.cleared) { st.yt.cleared = true; setTimeout(() => { try { const p = e.target, id = p.getVideoData?.()?.video_id, at = p.getCurrentTime?.() || 0; if (id && st.yt.state === 1) p.loadVideoById({ videoId: id, startSeconds: at + 0.3 }); } catch { /* none */ } }, 700); }
+          }
         },
         onError: () => { st.yt.state = 0; st.yt.ended = true; }
       } });
