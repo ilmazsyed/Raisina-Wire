@@ -1414,4 +1414,5 @@ export default {
   "Done (out of rotation)": "प्रसारण पूरा",
   "Paused": "रुकी हुई",
   "Failed or pulled": "विफल या हटाई गई",
+  "IN ROTATION · TOP-UP": "प्रसारण में · पूरक",
 };
