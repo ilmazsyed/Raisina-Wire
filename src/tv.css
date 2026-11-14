@@ -139,6 +139,8 @@ body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 .lbv-bottom b{font:700 50px/1.25 "Noto Serif Bengali",serif}.lbv-bottom p{margin:0;font:600 30px/1.3 "Hind Siliguri",sans-serif;border-top:1px solid rgba(255,255,255,.3);padding-top:10px}
 .tv-breaking.static{position:absolute;animation:none}
 .full-gfx .tvp-ovl{display:none}
+/* An ad from the Ad library desk: full screen and clean (no clock, bug, ticker or teaser over it). */
+.tvp.ad-on .tvp-gfx,.tvp.ad-on .tvp-lbl,.tvp.ad-on .tvp-promo,.tvp.ad-on .tvp-tease,.tvp.ad-on .tvp-cm,.tvp.ad-on .tvp-cd{display:none!important}
 /* overlays: poll bar, results, comments */
 .tvp-ovl{position:absolute;inset:0;z-index:7;pointer-events:none}
 .poll-bar{position:absolute;left:56px;right:440px;bottom:96px;padding:16px 22px;border-radius:14px;background:rgba(255,255,255,.96);box-shadow:0 14px 30px rgba(0,0,0,.3);border-top:5px solid var(--red)}

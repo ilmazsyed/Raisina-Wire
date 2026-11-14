@@ -5,6 +5,7 @@ import { avoForScreens } from "./avo.js";
 import { labelsOf, bulletinRank } from "./labels.js";
 import { segmentsData, clockOf, SEG_NAMES } from "./segments.js";
 import { bnLine } from "./bnline.js";
+import { adsOnAir } from "./ads.js";
 // Rashtrix TV, Phase 2: two channels, each on or off, each with its own secret output address
 // for OBS / vMix.
 //   h  horizontal 1920×1080: long videos, with the full designable jacket (bug, LIVE, clock,
@@ -328,6 +329,9 @@ export async function tvState(env, ch) {
     // when every fresh video has played within the hour, before anything repeats.
     evergreen: s.on ? evergreen : [],
     segs, clock: clockOf(s), segNames: SEG_NAMES,
+    // The channel's ads and brand films (the Ad library desk, src/ads.js): each played in a break,
+    // never over what is on air.
+    ads: s.on ? await adsOnAir(env, ch).catch(() => []) : [],
     // Viewers' comments the desk approved in the last twelve hours, for the autopilot's comment box.
     comments: s.on ? (await env.DB.prepare("SELECT author, text, platform FROM viewer_comments WHERE status='approved' AND at >= datetime('now','-12 hours') ORDER BY at DESC LIMIT 10").all().catch(() => ({ results: [] }))).results : [],
     // The voice-over links that are recorded (src/bulletinvoice.js LINKS).

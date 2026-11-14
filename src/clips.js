@@ -3,6 +3,7 @@
 // with byte ranges (players seek). Clips not marked "keep" are deleted after CLIP_RETENTION_DAYS
 // (default 30) without use, so storage stays inside the free 10 GB. MP4 (H.264) plays everywhere.
 import { driveId } from "./tvchannel.js";
+import { adClips } from "./ads.js";
 
 const PART = 20 * 1024 * 1024;   // upload part size (R2 needs at least 5 MB except the last)
 const now = () => new Date().toISOString();
@@ -52,6 +53,8 @@ export async function handleClips(request, env, url, user, { json, err, audit })
     const used = new Set(), { results: avo } = await env.DB.prepare("SELECT videos, bytes FROM avo_stories WHERE status IN ('ready','off','new') AND published_at>=?").bind(since).all().catch(() => ({ results: [] }));
     const arr = t => { try { const x = JSON.parse(t || "[]"); return Array.isArray(x) ? x : []; } catch { return []; } };
     for (const r of avo) for (const v of [...arr(r.videos), ...arr(r.bytes)]) { const u = typeof v === "string" ? v : v?.url || ""; if (/^\/clips\//.test(u)) used.add(u.slice(1)); }
+    // (and every clip an ad in the Ad library uses)
+    for (const k of await adClips(env)) used.add(k);
     const { results: old } = await env.DB.prepare("SELECT id, r2_key, bytes, status, upload_id FROM clips WHERE created_at < ? OR (created_at LIKE '%T%' AND created_at < ?)").bind(cut, cut.replace(" ", "T")).all();
     let n = 0, freed = 0, spared = 0;
     for (const x of old) {
