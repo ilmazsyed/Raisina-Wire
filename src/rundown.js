@@ -2,6 +2,8 @@
 // day, the midnight (India time) archive with its as-run log, and proof-of-play reports.
 // Rundowns are kept for ARCHIVE_DAYS (default 90) and then deleted.
 import { ITEM_TYPES, itemScene, itemDuration, timings } from "./scenes.js";
+import { screenStory } from "./avo.js";
+import { CLOCK_DEFAULT, SEG_NAMES } from "./segments.js";
 
 const now = () => new Date().toISOString();
 export const istDay = (t = Date.now()) => new Date(t + 5.5 * 3600e3).toISOString().slice(0, 10);
@@ -22,6 +24,12 @@ function cleanData(type, d = {}) {
   if (type === "headlines") { s("title", 80); s("lines", 2000); }
   if (type === "lband") { s("text", 160); s("lines", 2000); if (d.source) out.source = { kind: String(d.source.kind || "").slice(0, 12), id: String(d.source.id || "").slice(0, 64), url: String(d.source.url || "").slice(0, 800) }; }
   if (type === "promo" || type === "slate") { s("image", 800); s("text", 160); }
+  // An AVO story: its id (the story is read afresh from the AVO engine when it goes on air) and a
+  // copy of it for the producer's screen and in case the story is gone.
+  if (type === "avo") { s("avoId", 80); if (d.story && typeof d.story === "object") { const j = JSON.stringify(d.story); if (j.length < 60000) out.story = JSON.parse(j); } }
+  // The channel's fixed items (the clock's bulletins and segments), placed at their time.
+  if (type === "bulletin") { out.short = !!d.short; s("at", 5); out.fixed = !!d.fixed; }
+  if (type === "segment") { out.name = SEG_NAMES[d.name] ? d.name : "world"; s("at", 5); out.fixed = !!d.fixed; }
   if (type === "adbreak") out.items = (Array.isArray(d.items) ? d.items : []).slice(0, 20).map(x => ({ image: String(x.image || "").slice(0, 800), seconds: Math.max(3, Math.min(120, Number(x.seconds) || 10)), sponsorId: String(x.sponsorId || "").slice(0, 64) || null }));
   return out;
 }
@@ -38,7 +46,69 @@ export async function getRundown(env, id) {
 // The rundown in the form the control room puts on air: each item with its scene.
 export async function rundownForAir(env, id) {
   const r = await getRundown(env, id); if (!r) return null;
-  return { id: r.id, title: r.title, items: r.items.filter(i => i.status !== "skipped").map(i => ({ id: i.id, type: i.type, title: i.title, dur: itemDuration(i), scene: itemScene(i) })) };
+  // AVO stories are read afresh from the engine (their voice and checked pictures as they are now).
+  const ids = r.items.filter(i => i.type === "avo" && i.status !== "skipped").map(i => i.data.avoId || i.data.story?.id).filter(Boolean);
+  const fresh = new Map();
+  if (ids.length) (await env.DB.prepare(`SELECT * FROM avo_stories WHERE article_id IN (${ids.map(() => "?").join(",")}) AND status<>'deleted'`).bind(...ids).all().catch(() => ({ results: [] }))).results.forEach(x => fresh.set(x.article_id, screenStory(x)));
+  return { id: r.id, title: r.title, items: r.items.filter(i => i.status !== "skipped").map(i => {
+    if (i.type === "avo") { const st = fresh.get(i.data.avoId || i.data.story?.id); if (st) i = { ...i, data: { ...i.data, story: st } }; }
+    return { id: i.id, type: i.type, title: i.title, dur: itemDuration(i), scene: itemScene(i) };
+  }).filter(i => i.type !== "avo" || i.scene.graphic?.stories?.length) };
+}
+
+// ---- The channel's fixed items in a rundown: the bulletins at :00 and :30 (two minutes) and :15
+// and :45 (the quick one), and the clock's segments (slot a at :08/:38, b at :22/:52, c after the
+// quick bulletins), at their times within the rundown's slot. They keep their place by time as
+// stories are moved, and can be skipped or put back.
+const FIXED_LEN = { full: 120, short: 65, seg: 70, soth: 75 };
+function clockItems(r) {
+  const [hh, mm] = String(r.slot_start || "").split(":").map(Number);
+  if (!Number.isFinite(hh)) return [];
+  const start = hh * 60 + (mm || 0), out = [], part = h => h >= 23 || h < 6 ? "late" : h < 10 ? "morning" : h < 17 ? "day" : "prime";
+  for (let t = start; t < start + Math.min(720, r.slot_minutes); t++) {
+    const m = t % 60, h = Math.floor(t / 60) % 24, at = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`, off = (t - start) * 60, c = CLOCK_DEFAULT[part(h)], half = Math.floor(t / 30);
+    const seg = (slot, list) => { const name = list[(slot === "c" ? Math.floor(t / 15) : half) % list.length]; if (name) out.push({ type: "segment", at, off: off + (slot === "c" ? 1 : 0), title: SEG_NAMES[name] || name, duration: name === "soth" ? FIXED_LEN.soth : FIXED_LEN.seg, data: { name, at, fixed: true } }); };
+    if (m % 15 === 0) { const short = m % 30 !== 0; out.push({ type: "bulletin", at, off, title: short ? "খবর সংক্ষেপে" : "সংবাদ বুলেটিন", duration: short ? FIXED_LEN.short : FIXED_LEN.full, data: { short, at, fixed: true } }); if (short) seg("c", c.c); }
+    if (m === 8 || m === 38) seg("a", c.a);
+    if (m === 22 || m === 52) seg("b", c.b);
+  }
+  return out;
+}
+export async function ensureFixed(env, id) {
+  const r = await env.DB.prepare("SELECT * FROM rundowns WHERE id=?").bind(id).first(); if (!r) return 0;
+  const { results } = await env.DB.prepare("SELECT * FROM rundown_items WHERE rundown_id=? ORDER BY pos, created_at").bind(id).all();
+  const items = results.map(rowItem), want = clockItems(r), key = x => `${x.type}|${x.data.at}|${x.data.name || ""}`;
+  const have = new Map(items.filter(i => i.data.fixed).map(i => [key(i), i]));
+  const stmts = [];
+  // Fixed items no longer in the slot go; new ones are added (kept ones keep their skip state).
+  for (const [k, i] of have) if (!want.some(w => key(w) === k)) { stmts.push(env.DB.prepare("DELETE FROM rundown_items WHERE id=?").bind(i.id)); have.delete(k); }
+  const fixed = want.map(w => { const old = have.get(key(w)); if (old) return { ...old, off: w.off }; const nid = crypto.randomUUID(); stmts.push(env.DB.prepare("INSERT INTO rundown_items (id,rundown_id,pos,type,title,duration,data,script) VALUES (?,?,?,?,?,?,?,?)").bind(nid, id, 0, w.type, w.title, w.duration, JSON.stringify(w.data), "")); return { id: nid, type: w.type, duration: w.duration, data: w.data, off: w.off }; });
+  // The order: the stories in their order, each fixed item where its time falls.
+  const stories = items.filter(i => !i.data.fixed), order = []; let t = 0, k = 0;
+  for (const st of stories) { while (k < fixed.length && fixed[k].off <= t) { order.push(fixed[k].id); t += fixed[k].status === "skipped" ? 0 : fixed[k].duration; k++; } order.push(st.id); t += st.status === "skipped" ? 0 : itemDuration(st); }
+  while (k < fixed.length) order.push(fixed[k++].id);
+  order.forEach((x, i) => stmts.push(env.DB.prepare("UPDATE rundown_items SET pos=? WHERE id=?").bind(i, x)));
+  if (stmts.length) await env.DB.batch(stmts);
+  return want.length;
+}
+
+// ---- Rundowns sent to the PCR (the minute cron): each goes on air at its start time (the channel
+// leaves autopilot), from the top with auto-advance; when it ends the channel goes back to
+// autopilot by itself (src/control.js), unless the next rundown sent to the PCR starts then.
+export async function rundownCues(env, control) {
+  const today = istDay(), nowMs = Date.now();
+  const { results } = await env.DB.prepare("SELECT id, channel, title, day, slot_start, slot_minutes FROM rundowns WHERE status='working' AND pcr_sent_at IS NOT NULL AND pcr_aired_at IS NULL AND day=? AND slot_start<>''").bind(today).all().catch(() => ({ results: [] }));
+  let aired = 0;
+  for (const r of results) {
+    const at = Date.parse(`${r.day}T${r.slot_start}:00+05:30`);
+    if (!(at <= nowMs)) continue;
+    if (nowMs > at + Math.max(5, r.slot_minutes) * 60e3) { await env.DB.prepare("UPDATE rundowns SET pcr_aired_at='missed' WHERE id=?").bind(r.id).run(); continue; }
+    const air = await rundownForAir(env, r.id);
+    if (!air?.items.length) { await env.DB.prepare("UPDATE rundowns SET pcr_aired_at='empty' WHERE id=?").bind(r.id).run(); continue; }
+    await control(r.channel, "rundown.load", { rundown: air, index: 0, auto: true });
+    await env.DB.prepare("UPDATE rundowns SET pcr_aired_at=? WHERE id=?").bind(now(), r.id).run(); aired++;
+  }
+  return { aired };
 }
 
 async function makeFromTemplate(env, t, day, userId = null) {
@@ -98,14 +168,28 @@ export async function handleRundowns(request, env, url, user, { json, err, audit
       const id2 = crypto.randomUUID();
       await env.DB.prepare("INSERT INTO rundowns (id,channel,day,title,slot_start,slot_minutes,created_by) VALUES (?,?,?,?,?,?,?)").bind(id2, CH.includes(b.channel) ? b.channel : "h", /^\d{4}-\d{2}-\d{2}$/.test(b.day || "") ? b.day : istDay(), title, /^\d{2}:\d{2}$/.test(b.slotStart || "") ? b.slotStart : "", Math.max(1, Math.min(720, Number(b.slotMinutes) || 30)), user.id).run();
       await audit("rundown.create", "rundown", id2, { title });
+      await ensureFixed(env, id2).catch(() => {});
       return ok({ id: id2 });
     }
-    const r = await env.DB.prepare("SELECT * FROM rundowns WHERE id=?").bind(id).first();
+    if (id === "library" && method === "GET") {
+    const ch = CH.includes(url.searchParams.get("channel")) ? url.searchParams.get("channel") : "h", since = new Date(Date.now() - 72 * 3600e3).toISOString();
+    const vids = (await env.DB.prepare("SELECT i.yt_id, i.title, i.duration, i.thumb, i.published_at FROM tv_items i WHERE i.channel=? AND i.excluded=0 AND i.playable=1 AND i.published_at>=? ORDER BY i.published_at DESC LIMIT 200").bind(ch, since).all().catch(() => ({ results: [] }))).results;
+    const avo = (await env.DB.prepare("SELECT * FROM avo_stories WHERE status='ready' AND published_at>=? ORDER BY published_at DESC LIMIT 200").bind(since).all().catch(() => ({ results: [] }))).results;
+    return json({ videos: vids.map(v => ({ ytId: v.yt_id, title: v.title, dur: v.duration, thumb: v.thumb, at: v.published_at })), avo: avo.map(x => ({ ...screenStory(x), at: x.published_at })) }, 200, { "cache-control": "no-store" });
+  }    const r = await env.DB.prepare("SELECT * FROM rundowns WHERE id=?").bind(id).first();
     if (!r) return err("Rundown not found.", 404);
     if (!sub && method === "GET") return json({ rundown: await getRundown(env, id) }, 200, { "cache-control": "no-store" });
     if (r.status === "archived" && method !== "GET" && sub !== "copy") return err("This rundown is archived. Make a copy to use it again.");
+    // Sent to the PCR (or taken back): on air by itself at its start time.
+    if (sub === "pcr" && method === "PUT") {
+      if (b.sent && !/^\d{2}:\d{2}$/.test(r.slot_start || "")) return err("Give the rundown a start time first.");
+      await env.DB.prepare("UPDATE rundowns SET pcr_sent_at=?, pcr_aired_at=NULL, updated_at=? WHERE id=?").bind(b.sent ? now() : null, now(), id).run();
+      await audit(b.sent ? "rundown.pcr" : "rundown.pcr.off", "rundown", id, { title: r.title, at: r.slot_start }); return ok();
+    }
+    if (sub === "fixed" && method === "POST") { const n = await ensureFixed(env, id); await refresh(id); return ok({ fixed: n }); }
     if (!sub && method === "PUT") {
       await env.DB.prepare("UPDATE rundowns SET title=?,slot_start=?,slot_minutes=?,channel=?,updated_at=? WHERE id=?").bind(clean(b.title ?? r.title, 120) || r.title, b.slotStart !== undefined ? (/^\d{2}:\d{2}$/.test(b.slotStart) ? b.slotStart : "") : r.slot_start, b.slotMinutes ? Math.max(1, Math.min(720, Number(b.slotMinutes) || 30)) : r.slot_minutes, CH.includes(b.channel) ? b.channel : r.channel, now(), id).run();
+      if (b.slotStart !== undefined || b.slotMinutes !== undefined) await ensureFixed(env, id).catch(() => {});
       await refresh(id); return ok();
     }
     if (!sub && method === "DELETE") { await env.DB.batch([env.DB.prepare("DELETE FROM rundown_items WHERE rundown_id=?").bind(id), env.DB.prepare("DELETE FROM rundowns WHERE id=?").bind(id)]); await audit("rundown.delete", "rundown", id, { title: r.title }); return ok(); }
@@ -124,6 +208,8 @@ export async function handleRundowns(request, env, url, user, { json, err, audit
       const ids = (b.ids || []).map(String);
       await env.DB.batch(ids.map((x, i) => env.DB.prepare("UPDATE rundown_items SET pos=? WHERE id=? AND rundown_id=?").bind(i, x, id)));
       await env.DB.prepare("UPDATE rundowns SET updated_at=? WHERE id=?").bind(now(), id).run();
+      // (the fixed items keep their place by time as the stories move around them)
+      await ensureFixed(env, id).catch(() => {});
       await refresh(id); return ok();
     }
     if (sub === "onair" && method === "POST") {   // put the rundown on air (from item `index`)
@@ -152,6 +238,8 @@ export async function handleRundowns(request, env, url, user, { json, err, audit
     }
     return err("Not found.", 404);
   }
+  // The library: the channel's YouTube videos and the AVO stories of the last three days.
+
   if (p[0] === "templates") {
     const id = p[1];
     if (!id && method === "GET") { const { results } = await env.DB.prepare("SELECT id,channel,title,slot_start,slot_minutes,weekdays,active,json_array_length(items) AS items FROM rundown_templates ORDER BY channel, slot_start").all(); return json({ templates: results }, 200, { "cache-control": "no-store" }); }

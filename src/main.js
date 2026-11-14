@@ -2142,8 +2142,8 @@ async function loadCommunity() {
 
 /* ---------- Accounts ---------- */
 let authMode = "login";
-function openAuth(mode = "register") { setAuthMode(mode); $("#modalBackdrop").classList.remove("hidden"); $("#authForm input[name=email]").focus(); }
-function closeAuth() { $("#modalBackdrop").classList.add("hidden"); }
+function openAuth(mode = "register") { setAuthMode(mode); document.body.classList.add("auth-open"); $("#modalBackdrop").classList.remove("hidden"); $("#authForm input[name=email]").focus(); }
+function closeAuth() { document.body.classList.remove("auth-open"); $("#modalBackdrop").classList.add("hidden"); }
 function setAuthMode(mode) {
   authMode = mode;
   $("#modalTitle").textContent = mode === "login" ? "Welcome back." : "Make the world make sense.";

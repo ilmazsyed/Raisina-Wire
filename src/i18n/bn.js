@@ -1440,4 +1440,12 @@ export default {
   "Upload picture": "ছবি আপলোড",
   "Upload video (plays muted)": "ভিডিও আপলোড (শব্দ ছাড়া চলবে)",
   "Add link": "লিংক দিন",
+  "Library": "লাইব্রেরি",
+  "Send to PCR": "পিসিআর-এ পাঠান",
+  "Take back from the PCR": "পিসিআর থেকে ফেরান",
+  "Place bulletins & segments": "বুলেটিন ও সেগমেন্ট বসান",
+  "Last 24 hours": "গত ২৪ ঘণ্টা",
+  "24 to 48 hours ago": "২৪ থেকে ৪৮ ঘণ্টা আগে",
+  "48 to 72 hours ago": "৪৮ থেকে ৭২ ঘণ্টা আগে",
+  "News bulletin": "সংবাদ বুলেটিন",
 };

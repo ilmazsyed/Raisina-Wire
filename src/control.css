@@ -332,3 +332,21 @@ dialog::backdrop { background: #000a; }
 .bd-mprev img{width:120px;height:68px;object-fit:cover;border-radius:6px}
 .bd-mprev small{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bd-prog{height:6px;border-radius:3px;background:var(--line);overflow:hidden}.bd-prog i{display:block;height:100%;width:0;background:var(--green)}
+
+/* Producer: move buttons, fixed items, Send to PCR, the library. */
+.items .mv{display:inline-flex;flex-direction:column;gap:2px}
+.items .mv button{border:1px solid var(--line);background:var(--panel2,#1c2230);color:inherit;border-radius:5px;width:30px;height:22px;line-height:1;font-size:11px;cursor:pointer}
+.items .mv button:disabled{opacity:.3;cursor:default}
+.items tr.fixed{background:rgba(212,160,23,.08)}
+.items tr.fixed td:first-child{text-align:center}
+.rd-pcr{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px}
+.rd-pcr.on{border-color:var(--red);background:rgba(170,4,4,.1)}
+.lib{display:flex;flex-direction:column;gap:14px;max-height:62vh;overflow:auto}
+.lib h4{margin:0 0 6px}
+.lib .clip img{width:120px;height:68px;object-fit:cover;border-radius:6px}
+.lib-tabs .btn.on{outline:2px solid currentColor;outline-offset:-2px}
+@media (pointer:coarse){.items .mv button{width:40px;height:30px;font-size:13px}}
+.lib .clip{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center;gap:12px;padding:8px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px}
+.lib .clip>img{flex:none}
+.lib .clip>div{flex:1;min-width:0;text-align:left}
+.lib .clip>.btn{flex:none;width:auto}
