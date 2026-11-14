@@ -1,12 +1,15 @@
 // The Rashtrix promo (video ad, made outside the site): its voice-over, recorded once by the cron in
-// the channel's chosen male newsreader voice (AVO desk > Newsreader voice) at an unhurried pace,
+// the channel's chosen male newsreader voice (AVO desk > Newsreader voice) at pace 1.2, a sentence at a time,
 // kept in tts_audio and served at /api/tv/voice/<key>.mp3 like every other recording
-// (key = sha256(`<voice>|ad1|<rate>|<line>`), first 40 characters). A few hundred characters of the
+// (key = sha256(`<voice>|ad2|<rate>|<sentence>`), first 40 characters). A few hundred characters of the
 // month's free allowance, once.
 import { synthesize, sha256, ttsEnabled } from "./tts.js";
 import { tvVoice, voiceBudget, chargeVoice } from "./bulletinvoice.js";
 
-export const AD_RATE = 1.0;
+export const AD_RATE = 1.2;
+// Each sentence (ending in ।, ? or !) is recorded on its own, so the ad's mix can hold a real pause
+// after every full stop and question; commas stay inside a sentence as short breaths.
+export const adSentences = line => line.split(/(?<=[।?!])\s+/).filter(Boolean);
 export const AD_LINES = [
   "খবর শুধু দেখার নয়। পড়ারও।",
   "আমরা একটা অদ্ভুত সময়ে বাস করছি।",
@@ -35,8 +38,8 @@ export const AD_LINES = [
 export async function adVoiceover(env) {
   if (!ttsEnabled(env)) return { skipped: "no key" };
   const voice = tvVoice(env, "m"); let made = 0;
-  for (const line of AD_LINES) {
-    const key = (await sha256(`${voice}|ad1|${AD_RATE}|${line}`)).slice(0, 40);
+  for (const line of AD_LINES.flatMap(adSentences)) {
+    const key = (await sha256(`${voice}|ad2|${AD_RATE}|${line}`)).slice(0, 40);
     if (await env.DB.prepare("SELECT 1 FROM tts_audio WHERE key=?").bind(key).first()) continue;
     if (await voiceBudget(env) < line.length + 1000) break;
     const audio = await synthesize(env, line, voice, "bn-IN", AD_RATE);
