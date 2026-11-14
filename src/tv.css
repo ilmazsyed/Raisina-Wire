@@ -1741,3 +1741,37 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tvp-bb.v .bb-line.long{font-size:40px}
 .tvp-bb.v .bb-wipe b{font-size:96px}
 .tvp.bb-on .tv-ticker.v{visibility:hidden}
+
+/* ---- The news backdrop (bulletin and segment cards), faded under everything ---- */
+.nd{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.nd-map{position:absolute;left:-2%;right:-2%;top:50%;aspect-ratio:1920/900;transform:translateY(-50%);animation:nddrift 60s ease-in-out infinite alternate}
+.nd-map>img{position:absolute;inset:0;width:100%;height:100%;opacity:.11}
+.nd-map svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.nd-map path{fill:none;stroke:#f2c14e;stroke-width:2;stroke-opacity:.28;stroke-dasharray:8 10;animation:ndflow 3s linear infinite;animation-delay:calc(var(--i) * -.4s)}
+.nd-pin{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#ff4d4d;opacity:.5;box-shadow:0 0 0 0 rgba(255,77,77,.6);animation:ndping 2.6s ease-out infinite;animation-delay:calc(var(--i) * .33s)}
+.nd-pin.home{width:18px;height:18px;margin:-9px 0 0 -9px;background:#f2c14e;opacity:.7}
+.nd-pin b{position:absolute;left:18px;top:-8px;white-space:nowrap;font:700 20px "Hind Siliguri",sans-serif;color:#fff;opacity:.35}
+.nd-globe{position:absolute;right:-90px;bottom:-110px;width:560px;height:560px;opacity:.07;fill:none;stroke:#fff;stroke-width:1.4}
+.nd-globe .spin{animation:ndspin 24s linear infinite;transform-origin:0 0}
+.nd-words{position:absolute;inset:-10% -10%;display:flex;flex-direction:column;justify-content:space-around;transform:rotate(-8deg)}
+.nd-words b{font:900 260px/1 Montserrat,sans-serif;letter-spacing:.2em;color:transparent;-webkit-text-stroke:2px rgba(255,255,255,.035);white-space:nowrap}
+.nd-words b:nth-child(2){padding-left:30%}
+.nd-sig{position:absolute;left:60px;top:60px;width:150px;height:150px;opacity:.12}
+.nd-sig i{position:absolute;inset:0;border-radius:50%;border:3px solid #fff;animation:ndsig 3s ease-out infinite}
+.nd-sig i:nth-child(2){animation-delay:1s}.nd-sig i:nth-child(3){animation-delay:2s}
+.nd-scan{position:absolute;left:0;right:0;top:0;height:30%;background:linear-gradient(transparent,rgba(255,255,255,.035),transparent);animation:ndscan 7s linear infinite}
+@keyframes nddrift{from{transform:translate(-1.5%,-50%)}to{transform:translate(1.5%,-50%)}}
+@keyframes ndflow{to{stroke-dashoffset:-36}}
+@keyframes ndping{0%{box-shadow:0 0 0 0 rgba(255,77,77,.55)}80%,100%{box-shadow:0 0 0 22px rgba(255,77,77,0)}}
+@keyframes ndspin{to{transform:rotateY(360deg)}}
+@keyframes ndsig{0%{transform:scale(.2);opacity:1}100%{transform:scale(1);opacity:0}}
+@keyframes ndscan{from{transform:translateY(-100%)}to{transform:translateY(400%)}}
+/* (under the cards' own content: painted just above the card's background) */
+.nb,.bs,.sx,.seg{isolation:isolate}
+.nd{z-index:-1}
+.bs-bg,.sx-bg{z-index:-2}
+.v .nd-map,.nb.v .nd-map,.bs.v .nd-map,.sx.v .nd-map{left:-30%;right:-30%;top:34%}
+.v .nd-globe{width:460px;height:460px}
+.v .nd-words b{font-size:200px}
+/* the app on phones: lighter (no moving lines or turning globe) */
+.tvp-app .nd-map path,.tvp-app .nd-globe .spin,.tvp-app .nd-scan{animation:none}
