@@ -1466,4 +1466,5 @@ export default {
   "Done (out of rotation)": "সম্প্রচার শেষ",
   "Paused": "স্থগিত",
   "Failed or pulled": "ব্যর্থ বা সরানো",
+  "IN ROTATION · TOP-UP": "সম্প্রচারে · পূরণ",
 };
