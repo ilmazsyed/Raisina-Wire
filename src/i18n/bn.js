@@ -1454,4 +1454,7 @@ export default {
   "AVO + byte": "এভিও + বাইট",
   "+ Add a byte": "+ বাইট যোগ করুন",
   "Bytes to play": "কটি বাইট চলবে",
+  "Upload video": "ভিডিও আপলোড",
+  "Upload": "আপলোড",
+  "Uploaded video": "আপলোড করা ভিডিও",
 };
