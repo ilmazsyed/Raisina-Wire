@@ -12,7 +12,7 @@ const main = $("main");
 const TYPE_ADD = Object.entries(ITEM_TYPES);
 const SOURCE_KINDS = { continuity: "Running order", yt: "YouTube video", clip: "App clip", guest: "Studio guest", hls: "HLS stream", whep: "WebRTC (WHEP) stream", vdo: "VDO.Ninja view link", image: "Picture" };
 const DEFAULTS = { video: 120, clip: 60, live: 300, breaking: 20, headlines: 40, lband: 60, promo: 15, adbreak: 60, slate: 10, bulletin: 120, segment: 70 };
-const avoDur = x => Math.ceil((x.secs > 0 ? Math.max(8, x.secs + 2) : 20) + 4 + (x.bytes || []).reduce((n, b) => n + 1.2 + (Number(b.secs) || 30), 0));
+const avoDur = x => Math.ceil((x.secs > 0 ? Math.max(8, x.secs + 2) : 20) + 4 + (x.bytes || []).reduce((n, b) => n + 1.2 + (Number(b.secs) || 30) + 4, 0));
 const SEGS = { city: "শহরের খবর", kolkata10: "কলকাতা ১০", bangladesh: "বাংলাদেশ ডেস্ক", world: "এক মিনিটে বিশ্ব", numbers: "সংখ্যায় আজ", sports: "খেলার খবর", entertainment: "বিনোদন", lifestyle: "জীবনধারা", onthisday: "আজকের দিনে", soth: "এই ঘণ্টার বড় খবর" };
 
 async function loadList() {

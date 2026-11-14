@@ -664,7 +664,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         let t = 0, s = -1; try { t = y.player.getCurrentTime() || 0; s = y.player.getPlayerState(); } catch { /* none */ }
         const moving = s === 1 && t > w.lastT + 0.04; w.lastT = Math.max(w.lastT, t);
         if (moving) {
-          w.since = 0; w.n = 0;
+          w.since = 0; w.n = 0; st.ytMovedAt = Date.now();
           if (Date.now() - (st.tapDone || 0) < 2000) w.tapped = true;
           if (layer.classList.contains("tap")) { w.tapped = true; needTap(false); if (WEBKIT) st.ytUnlocked = st.ytUnlocked || !st.muted && !y.player.isMuted?.(); }
           // (after a tap YouTube shows its own buttons for a few seconds: still covered then)
@@ -783,6 +783,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       slot.setMuted = m => { try { m || !isMain ? player?.mute() : player?.unMute(); } catch { /* none */ } };
       slot.stalled = () => state === 3 && Date.now() - since > 10000;
       slot.playing = () => state === 1;
+      slot.ended = () => state === 0;
+      const moved = setInterval(() => { if (!el.isConnected) { clearInterval(moved); return; } if (state === 1 && isMain) st.ytMovedAt = Date.now(); }, 1000);
     } else if (["clip", "hls", "whep", "guest"].includes(src.kind)) {
       el.innerHTML = `<video playsinline autoplay ${mute() ? "muted" : ""}></video><div class="tvp-shield"></div>${src.kind === "guest" && src.name ? `<span class="tvs-name"><b>${esc(src.name)}</b>${src.title ? `<small>${esc(src.title)}</small>` : ""}</span>` : ""}`;
       const v = el.querySelector("video"); let extra = null, last = 0, lastT = Date.now();
@@ -1055,9 +1057,16 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     }
     if (q.item) {
       const it = q.item, age = t - q.start;
+      // A video is over only when it has played to its end (YouTube says so), never by the clock:
+      // the time it took to load or buffer is never cut from its end. Only a video that has not
+      // moved for 20 seconds past its length (it will not play) gives way.
+      const ytEnded = (st.yt?.ended && st.nowYt?.id === it.ytId) || !!st.current?.slots?.some(s => s.src?.kind === "yt" && s.src.id === it.ytId && s.ended?.());
+      const len = (it.dur - (it.in || 0)) * 1000, still = Date.now() - (st.ytMovedAt || 0) > 20000;
+      // (an AVO block waits for its bytes to play in full: src/engine.js byteStep)
+      const extra = st.avoExtra && st.avoExtra.start === q.seg?.start ? st.avoExtra.ms : 0;
       const done = it.type === "video"
-        ? (st.yt?.ended && st.nowYt?.id === it.ytId) || age > (it.dur - (it.in || 0) + 45) * 1000 || (!st.yt && age > (it.dur - (it.in || 0)) * 1000)
-        : age >= it.dur * 1000;
+        ? ytEnded || (age > len + 20000 && still) || age > len * 2 + 600e3
+        : age >= it.dur * 1000 + extra;
       if (!done) return q.seg;
     }
     // The bulletin block: the bulletin, then what follows it (each when the one before has ended).
@@ -1627,6 +1636,18 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       st.resumeVoice = () => { if (el.isConnected && shownI >= 0) say(items[shownI]); };
     } else if (g.kind === "avo") {   // the AVO Breaking Engine: each story 30 seconds, read over its pictures
       const list = (g.stories || []).filter(Boolean), at0 = sc.startAt || now();
+      // Every byte plays in full: the block's clock (lag) stops while a byte loads and while it runs
+      // past its planned length, and jumps on when it ends early.
+      let lag = 0, lastTick = Date.now();
+      const byteClock = () => {
+        const dt = Math.min(1000, Date.now() - lastTick); lastTick = Date.now();
+        const r = st.byteRun; if (!r || r.at0 !== at0 || st.byteKey !== r.key || !el.querySelector(".avo-byte")) return;
+        const pos = (now() - at0 - lag) / 1000 - AVO_INTRO - r.base;
+        if (!r.started) { if (Date.now() - r.t0 < 15000) lag += dt; }
+        else if (r.ended) { if (r.end - pos > 0.8) lag -= (r.end - pos - 0.3) * 1000; r.done = true; }
+        else if (pos >= r.end - 0.3 && Date.now() - r.t0 < 15 * 60e3) lag += dt;
+        st.avoExtra = { start: sc.startAt, ms: lag };
+      };
       const lens = list.map(avoLen), starts = lens.map((_, i) => lens.slice(0, i).reduce((a, b) => a + b, 0));
       // Pictures are loaded in advance and shown only once they have really loaded (a picture
       // that fails never shows as a black screen); the channel's text cards make up four.
@@ -1826,6 +1847,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         while (bi < bl.length - 1 && t >= acc + BYTE_WIPE + Math.max(3, Number(bl[bi].secs) || 30)) { acc += BYTE_WIPE + Math.max(3, Number(bl[bi].secs) || 30); bi++; }
         const bkey = `${at0}:${k}:${bi}`; if (st.byteKey === bkey && el.querySelector(".avo-byte")) return;
         st.byteKey = bkey; shownS = -1;
+        // (this byte on the story's clock: from after its wipe to its planned end)
+        const run = st.byteRun = { key: bkey, at0, base: starts[k] + avoVoiceLen(x), end: acc + BYTE_WIPE + Math.max(3, Number(bl[bi].secs) || 30), started: false, ended: false, t0: Date.now() };
         voStop(); st.voice?.pause?.(); st.voice = null; st.bed?.(); st.bed = null;
         const w = document.createElement("div"); w.className = "tvp-stinger tvp-studiowipe";
         w.innerHTML = `<div class="sw-full"><img src="${channel === "v" ? STUDIO_SQUARE : STUDIO_WIDE}" alt=""><i class="sw-shine"></i></div><i class="sw-edge"></i>`;
@@ -1841,6 +1864,10 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         const hold = `<div class="byte-hold"><img src="${channel === "v" ? STUDIO_SQUARE : STUDIO_WIDE}" alt=""><i class="sw-shine"></i></div>`;
         setTimeout(() => { if (!el.isConnected || st.byteKey !== bkey) return;
           el.innerHTML = `<div class="avo-byte${channel === "v" ? " v" : ""}${playing ? "" : " wait"}">${media}${b.kind === "yt" ? hold : ""}<div class="byte-super"><span class="bs-tag"><i class="lt-pulse"></i>বক্তব্য</span><span class="bs-who">${b.name ? `<b>${esc(b.name)}</b>` : ""}${b.title ? `<small>${esc(b.title)}</small>` : ""}</span></div>${bl.length > 1 ? `<span class="byte-n">${bnDigits(bi + 1)}/${bnDigits(bl.length)}</span>` : ""}<div class="avo-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>${calm(x) ? "বিস্তারিত" : "এই মুহূর্তে"}</small></span><span class="lt-text">${esc(x.title)}</span></div></div>`;
+          const fv = el.querySelector(".avo-byte video");
+          // (a finished byte rests on the studio picture, never on its last frame or a black screen)
+          const over = () => { const bx = el.querySelector(".avo-byte"); if (bx) { bx.style.backgroundImage = `url(${channel === "v" ? STUDIO_SQUARE : STUDIO_WIDE})`; bx.classList.add("over"); } };
+          if (fv) { fv.addEventListener("playing", () => { run.started = true; }); fv.addEventListener("ended", () => { run.ended = true; over(); }); fv.addEventListener("error", () => { run.started = true; run.ended = true; over(); }); }
           const f = el.querySelector("iframe.byte-yt"); if (!f) return;
           const box = el.querySelector(".avo-byte"), cmd = (func, args = []) => { try { f.contentWindow.postMessage(JSON.stringify({ event: "command", func, args, id: bkey, channel: "widget" }), "*"); } catch { /* fine */ } };
           let heard = false, state = -1, showT = 0, nudged = 0;
@@ -1851,6 +1878,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           const onMsg = e => { if (e.source !== f.contentWindow) return; let d; try { d = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch { return; }
             heard = true; const s = d?.event === "onStateChange" ? d.info : d?.event === "infoDelivery" && d.info && "playerState" in d.info ? d.info.playerState : undefined;
             if (s === undefined || s === state) return; state = s;
+            if (s === 1) run.started = true; if (s === 0 && run.started) { run.ended = true; over(); }
             if (s === 1) go(); else if (playing && [0, 2, 3, -1].includes(s)) { cover(true); if ((s === 2 || s === -1) && Date.now() >= (st.breakUntil || 0)) cmd("playVideo"); } };
           window.addEventListener("message", onMsg);
           const off = () => { if (!el.isConnected || st.byteKey !== bkey) { window.removeEventListener("message", onMsg); return true; } return false; };
@@ -1882,7 +1910,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const drawA = () => {
         if (!el.isConnected && st.current) return;
         // The NEWS NOW sting first (AVO_INTRO seconds), then the stories.
-        const e0 = (now() - at0) / 1000;
+        byteClock();
+        const e0 = (now() - at0 - lag) / 1000;
         if (e0 < AVO_INTRO && shownK < 0) {
           if (!el.querySelector(".nn")) {
             el.innerHTML = `<div class="nn${channel === "v" ? " v" : ""}"><i class="nn-bg"></i><i class="nn-bar a"></i><i class="nn-bar b"></i><i class="nn-bar c"></i><i class="nn-flash"></i>
@@ -2413,7 +2442,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (!curVideo || sc?.key === cur.key || !onOrder(sc?.key) || !onOrder(cur.key)) return sc;
     const y = st.yt, startedAt = cur.drawnAt || 0;
     // Still playing (or loading in its first minute): keep it on.
-    if (y && !y.ended && ([1, 3].includes(y.state) || ([-1, 5].includes(y.state) && Date.now() - startedAt < 60e3 && !host.querySelector(".tvp.yt-tap")))) return cur.scene;
+    if (y && !y.ended && ([1, 3].includes(y.state) || Date.now() - (st.ytMovedAt || 0) < 8000 || Date.now() < (st.breakUntil || 0) + 3000 || ([-1, 5].includes(y.state) && Date.now() - startedAt < 60e3 && !host.querySelector(".tvp.yt-tap")))) return cur.scene;
     // Finished: if the order now says another video, the headline flash comes first.
     if (sc?.sources?.some(x => x.kind === "yt") && !sc.graphic) {
       st.localScene = { layout: "graphic", graphic: { kind: "flash", n: Math.floor(Date.now() / 10e3) }, startAt: now(), dur: 10, key: `local:flash:${Date.now()}`, transition: { type: "stinger", ms: 1200 } };

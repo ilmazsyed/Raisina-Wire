@@ -1396,7 +1396,7 @@ async function api(request, env, ctx) {
         if (!row || !["ready", "off"].includes(row.status)) return err("This AVO story is not ready yet.");
         const story = screenStory(row), chs = (Array.isArray(b.channels) ? b.channels : CHANNELS).filter(c => CHANNELS.includes(c));
         if (!chs.length) return err("Choose a channel.");
-        const dur = Math.ceil((story.secs > 0 ? Math.max(8, story.secs + 2) : 20) + 4 + (story.bytes || []).reduce((n, x) => n + 1.2 + (Number(x.secs) || 30), 0));
+        const dur = Math.ceil((story.secs > 0 ? Math.max(8, story.secs + 2) : 20) + 4 + (story.bytes || []).reduce((n, x) => n + 1.2 + (Number(x.secs) || 30) + 4, 0));
         const item = { id: `avo-now:${second}`, type: "avo", title: story.title, dur, scene: itemScene({ type: "avo", title: story.title, duration: dur, data: { story, avoId: second } }) };
         for (const ch of chs) await ctlCommand(env, ch, "rundown.load", { rundown: { id: `avo-now:${second}:${Date.now()}`, title: `AVO: ${story.title}`.slice(0, 120), items: [item] }, index: 0, auto: true }, user.display_name || user.email, "avo-now");
         await audit(env, user, "avo.playnow", "avo", second, { channels: chs });
