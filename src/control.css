@@ -350,3 +350,9 @@ dialog::backdrop { background: #000a; }
 .lib .clip>img{flex:none}
 .lib .clip>div{flex:1;min-width:0;text-align:left}
 .lib .clip>.btn{flex:none;width:auto}
+
+.ad-vids,.ad-byte{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px dashed var(--line);border-radius:10px}
+.ad-vrow{align-items:center;gap:8px;flex-wrap:nowrap}
+.ad-seg .btn.on{background:var(--red);border-color:var(--red);color:#fff}
+.ad-brow{display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid var(--line);border-radius:10px}
+.ad-bn{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:7px;background:#b8860b;color:#111;font-weight:800}

@@ -12,6 +12,7 @@ const main = $("main");
 const TYPE_ADD = Object.entries(ITEM_TYPES);
 const SOURCE_KINDS = { continuity: "Running order", yt: "YouTube video", clip: "App clip", guest: "Studio guest", hls: "HLS stream", whep: "WebRTC (WHEP) stream", vdo: "VDO.Ninja view link", image: "Picture" };
 const DEFAULTS = { video: 120, clip: 60, live: 300, breaking: 20, headlines: 40, lband: 60, promo: 15, adbreak: 60, slate: 10, bulletin: 120, segment: 70 };
+const avoDur = x => Math.ceil((x.secs > 0 ? Math.max(8, x.secs + 2) : 20) + 4 + (x.bytes || []).reduce((n, b) => n + 1.2 + (Number(b.secs) || 30), 0));
 const SEGS = { city: "শহরের খবর", kolkata10: "কলকাতা ১০", bangladesh: "বাংলাদেশ ডেস্ক", world: "এক মিনিটে বিশ্ব", numbers: "সংখ্যায় আজ", sports: "খেলার খবর", entertainment: "বিনোদন", lifestyle: "জীবনধারা", onthisday: "আজকের দিনে", soth: "এই ঘণ্টার বড় খবর" };
 
 async function loadList() {
@@ -65,8 +66,8 @@ async function avoDialog() {
       ${x.status === "ready" ? `<button class="btn sm" data-avoadd="${esc(x.id)}">Add to rundown</button>` : ""}</div>`).join("") || `<p class="muted">No AVO stories yet. Major stories become AVO stories as they arrive.</p>`);
     $$("[data-avoadd]", d).forEach(b => b.onclick = async () => {
       if (!S.rd) return toast("Open a rundown first.");
-      const x = L.stories.find(y => y.id === b.dataset.avoadd), story = { id: x.id, title: x.title, desk: x.desk, region: x.region, sex: x.sex, lines: x.lines, voice: x.voice, secs: x.secs, images: x.images, at: x.at };
-      try { await api(`/api/admin/rundowns/${S.rd.id}/items`, { method: "POST", body: { type: "avo", title: x.title.slice(0, 200), duration: Math.ceil(x.secs > 0 ? Math.max(8, x.secs + 2) : 20), data: { story, avoId: x.id } } }); b.textContent = "Added"; b.disabled = true; openRundown(S.rd.id); } catch (e) { fail(e); }
+      const x = L.stories.find(y => y.id === b.dataset.avoadd), story = { id: x.id, title: x.title, desk: x.desk, region: x.region, sex: x.sex, lines: x.lines, voice: x.voice, secs: x.secs, images: x.images, videos: x.videos, bytes: x.bytes, at: x.at };
+      try { await api(`/api/admin/rundowns/${S.rd.id}/items`, { method: "POST", body: { type: "avo", title: x.title.slice(0, 200), duration: avoDur(x), data: { story, avoId: x.id } } }); b.textContent = "Added"; b.disabled = true; openRundown(S.rd.id); } catch (e) { fail(e); }
     });
   } catch (e) { $("#al", d).innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
 }
@@ -211,7 +212,7 @@ async function libraryDialog() {
         ? `<div class="clip"><img src="${esc(i.v.thumb || `https://i.ytimg.com/vi/${i.v.ytId}/mqdefault.jpg`)}" alt=""><div style="flex:1"><span class="type video">Video</span> <b data-no-tr>${esc(i.v.title)}</b><br><small>${digits(fmt(i.v.dur || 0))} · ${t(i.at)}</small></div><button class="btn sm" data-lv="${esc(i.id)}">Add</button></div>`
         : `<div class="clip"><img src="${esc(i.x.images[0]?.src || "/partners/calibrex-mark.svg")}" alt=""><div style="flex:1"><span class="type avo">AVO</span> <b data-no-tr>${esc(i.x.title)}</b><br><small>${digits(Math.round(i.x.secs || 0))} s voice · ${digits(i.x.images.length)} pictures · ${t(i.at)}</small></div><button class="btn sm" data-la="${esc(i.id)}">Add</button></div>`).join("") || `<p class="muted">Nothing.</p>`}</section>`; }).join("");
     $$("[data-lv]", d).forEach(b => b.onclick = () => addFromLib(b, { type: "video", title: (L.videos.find(v => v.ytId === b.dataset.lv).title || "").slice(0, 200), duration: L.videos.find(v => v.ytId === b.dataset.lv).dur || 60, data: { ytId: b.dataset.lv } }));
-    $$("[data-la]", d).forEach(b => b.onclick = () => { const x = L.avo.find(y => y.id === b.dataset.la); addFromLib(b, { type: "avo", title: x.title.slice(0, 200), duration: Math.ceil(x.secs > 0 ? Math.max(8, x.secs + 2) + 4 : 24), data: { story: x, avoId: x.id } }); });
+    $$("[data-la]", d).forEach(b => b.onclick = () => { const x = L.avo.find(y => y.id === b.dataset.la); addFromLib(b, { type: "avo", title: x.title.slice(0, 200), duration: avoDur(x), data: { story: x, avoId: x.id } }); });
   };
   $$("[data-lt]", d).forEach(b => b.onclick = () => { tab = b.dataset.lt; $$("[data-lt]", d).forEach(x => x.classList.toggle("on", x === b)); draw(); });
   draw();

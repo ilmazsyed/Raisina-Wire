@@ -37,6 +37,7 @@ import m0034 from "../migrations/0034_avo_pictures.sql";
 import m0035 from "../migrations/0035_tv_evergreen.sql";
 import m0036 from "../migrations/0036_avo_updates.sql";
 import m0039 from "../migrations/0039_rundown_pcr.sql";
+import m0040 from "../migrations/0040_avo_bytes.sql";
 import m0037 from "../migrations/0037_hidden_langs.sql";
 import m0038 from "../migrations/0038_photo_checks.sql";
 import { bulletinImages, bulletinImageRoute } from "./bulletinimg.js";
@@ -106,7 +107,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031], ["0032_avo.sql", m0032], ["0033_avo_manual.sql", m0033], ["0034_avo_pictures.sql", m0034], ["0035_tv_evergreen.sql", m0035], ["0036_avo_updates.sql", m0036], ["0037_hidden_langs.sql", m0037], ["0038_photo_checks.sql", m0038], ["0039_rundown_pcr.sql", m0039]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031], ["0032_avo.sql", m0032], ["0033_avo_manual.sql", m0033], ["0034_avo_pictures.sql", m0034], ["0035_tv_evergreen.sql", m0035], ["0036_avo_updates.sql", m0036], ["0037_hidden_langs.sql", m0037], ["0038_photo_checks.sql", m0038], ["0039_rundown_pcr.sql", m0039], ["0040_avo_bytes.sql", m0040]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -1407,6 +1408,18 @@ async function api(request, env, ctx) {
       if (first === "refresh" && request.method === "POST") return done({ ok: true, ...(await refreshSources(env, { force: true, channel: CHANNELS.includes(b.channel) ? b.channel : null })) });
       if (first === "sources") {
         if (request.method === "POST") {
+          // A Facebook live video: kept as given (fb:<link>), on screen through Facebook's player.
+          // Facebook does not say when a live starts or ends, so it counts as broadcasting while
+          // it is on air.
+          const fb = String(b.ref || "").trim().match(/^https:\/\/(?:www\.|m\.|web\.)?(?:facebook\.com|fb\.watch)\/\S+$/i);
+          if (fb) {
+            const ch = CHANNELS.includes(b.channel) ? b.channel : null; if (!ch) return err("Choose the horizontal or the vertical channel.");
+            const fid = randomId();
+            await env.DB.prepare("INSERT INTO tv_sources (id,channel,kind,yt_id,title,live_now) VALUES (?,?,?,?,?,1)").bind(fid, ch, "live", `fb:${fb[0].slice(0, 600)}`, clean(b.title, 200) || "Facebook live").run()
+              .catch(e => { throw new Error(/UNIQUE/.test(e.message) ? "That live is already on this channel." : e.message); });
+            await audit(env, user, "tv.source.add", "tv_source", fid, { ch, kind: "live", fb: true });
+            return done({ ok: true, id: fid });
+          }
           const ch = CHANNELS.includes(b.channel) ? b.channel : null, ref = parseYouTubeRef(b.ref);
           if (!ch) return err("Choose the horizontal or the vertical channel.");
           if (!ref) return err("Paste a YouTube channel, playlist, video, Short or live address.");
@@ -1435,7 +1448,7 @@ async function api(request, env, ctx) {
           // One live on air per channel.
           if (b.onAir) await env.DB.prepare("UPDATE tv_sources SET on_air=0 WHERE channel=?").bind(src.channel).run();
           // Straight to air: read the live's state now rather than at the next ten-minute refresh.
-          if (b.onAir && src.kind === "live" && ytReady(env)) await refreshSource(env, src).catch(() => {});
+          if (b.onAir && src.kind === "live" && ytReady(env) && !String(src.yt_id).startsWith("fb:")) await refreshSource(env, src).catch(() => {});
           await env.DB.prepare("UPDATE tv_sources SET active=?, on_air=?, title=? WHERE id=?").bind(b.active === undefined ? src.active : b.active ? 1 : 0, b.onAir === undefined ? src.on_air : b.onAir ? 1 : 0, b.title !== undefined ? clean(b.title, 200) : src.title, second).run();
           await audit(env, user, b.onAir !== undefined ? (b.onAir ? "tv.live.on" : "tv.live.off") : "tv.source.edit", "tv_source", second, b);
           return done();

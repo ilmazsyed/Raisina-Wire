@@ -17,6 +17,7 @@
 //   graphics on the screens (its icon, map, figure and sentences).
 // - A story leaves the rotation when it is six hours old or has been on air four times.
 import { proxyImage } from "./imgproxy.js";
+import { ytCall, isoSeconds } from "./youtube.js";
 import { wholeSentences, sentencesIn, noDots } from "./sentences.js";
 import { readLine, voiceKey, tvVoice, voiceRate, voiceBudget, chargeVoice } from "./bulletinvoice.js";
 import { synthesize, sha256, ttsEnabled } from "./tts.js";
@@ -212,6 +213,9 @@ export function screenStory(r) {
     images: (!OWN.includes(r.origin) && (r.img_v || 0) < 4 && !j(r.img_log, "[]").length ? [] : j(r.images, "[]")).map((x, i) => ({ src: /^\/(media|brand)\//.test(x.url || "") ? x.url : `/api/tv/aimg/${encodeURIComponent(r.article_id)}/${i}${r.prepared_at ? `?v=${Date.parse(r.prepared_at) || 0}` : ""}`, credit: x.credit || "" })), at: r.published_at, origin: r.origin || "auto", score: r.score || 0,
     places: placesIn(`${r.title} ${j(r.script, "[]").slice(0, 2).join(" ")}`), topic: topicOf(`${r.title} ${j(r.script, "[]").slice(0, 2).join(" ")}`),
     imgLog: j(r.img_log, "[]"),
+    // Videos added by hand (shown like the pictures, muted) and, for AVO + byte, the bytes played
+    // after the reading.
+    videos: j(r.videos, "[]"), bytes: r.byte_mode ? j(r.bytes, "[]").slice(0, Math.max(1, r.byte_count || 1)) : [],
     upd: (r.origin || "auto") === "auto" && !!(r.prepared_at && r.created_at && Date.parse(r.prepared_at) - Date.parse(String(r.created_at).replace(" ", "T") + "Z") > 15 * 60e3),
     // The explainer look (src/engine.js exSlides): West Bengal, Kolkata and India politics, the world
     // and Bangladesh. Other stories keep the AVO's own look.
@@ -250,7 +254,7 @@ export async function avoLog(env) {
   const by = new Map(); plays.forEach(p => { if (!by.has(p.article_id)) by.set(p.article_id, []); by.get(p.article_id).push({ ch: p.channel, at: p.at }); });
   const day = istDay(), today = results.filter(r => r.day === day && (r.origin || "auto") === "auto");
   const count = Object.fromEntries(Object.keys(QUOTA).map(k => [k, today.filter(r => r.region === k).length]));
-  return { quota: QUOTA, today: count, daily: AVO_DAILY, stories: results.map(r => ({ ...screenStory(r), labelsSet: (() => { try { return JSON.parse(r.labels || "null"); } catch { return null; } })(), status: r.status, origin: r.origin || "auto", createdBy: r.created_by || "", findMore: !!r.find_more, given: (() => { try { return JSON.parse(r.images || "[]"); } catch { return []; } })(), score: r.score, aired: r.aired, views: r.views, lastAired: r.last_aired, createdAt: r.created_at, nImages: (() => { try { return JSON.parse(r.images || "[]").length; } catch { return 0; } })(), plays: by.get(r.article_id) || [], inRotation: r.status === "ready" && Date.parse(r.published_at) >= Date.now() - AVO_HOURS * 3600e3 && r.aired < AVO_MAX_AIRED })) };
+  return { quota: QUOTA, today: count, daily: AVO_DAILY, stories: results.map(r => ({ ...screenStory(r), labelsSet: (() => { try { return JSON.parse(r.labels || "null"); } catch { return null; } })(), videosSet: (() => { try { return JSON.parse(r.videos || "[]"); } catch { return []; } })(), bytesSet: (() => { try { return JSON.parse(r.bytes || "[]"); } catch { return []; } })(), byteMode: r.byte_mode ? "byte" : "avo", byteCount: r.byte_count || 1, status: r.status, origin: r.origin || "auto", createdBy: r.created_by || "", findMore: !!r.find_more, given: (() => { try { return JSON.parse(r.images || "[]"); } catch { return []; } })(), score: r.score, aired: r.aired, views: r.views, lastAired: r.last_aired, createdAt: r.created_at, nImages: (() => { try { return JSON.parse(r.images || "[]").length; } catch { return 0; } })(), plays: by.get(r.article_id) || [], inRotation: r.status === "ready" && Date.parse(r.published_at) >= Date.now() - AVO_HOURS * 3600e3 && r.aired < AVO_MAX_AIRED })) };
 }
 
 // The AVO Story Desk (control room): a story written by hand. Headline, a brief to be read (up to
@@ -269,13 +273,36 @@ function cleanManual(b, max = 450) {
     .map(x => ({ url: x.url, credit: x.credit ? (x.credit.startsWith("ছবি") ? x.credit : `ছবি: ${x.credit}`) : "" }));
   const region = ["bengal", "india", "neighbours", "world"].includes(b.region) ? b.region : "bengal";
   const desk = DESK_OK.includes(b.desk) ? b.desk : "Kolkata";
-  return { title, brief, images, region, desk, findMore: b.findMore !== false };
+  // Videos (links, added by hand): shown like the pictures, muted.
+  const videos = (Array.isArray(b.videos) ? b.videos : []).map(v => vidOf(typeof v === "string" ? v : v?.url)).filter(Boolean).slice(0, 6);
+  // Bytes: a person's video played in full after the reading, with their name on screen.
+  const bytes = (Array.isArray(b.bytes) ? b.bytes : []).map(x => { const v = vidOf(x?.url); if (!v) return null;
+    return { ...v, name: String(x.name || "").replace(/\s+/g, " ").trim().slice(0, 60), title: String(x.title || "").replace(/\s+/g, " ").trim().slice(0, 80), secs: Math.max(0, Math.min(900, Math.round(Number(x.secs) || 0))) }; }).filter(Boolean).slice(0, 3);
+  const byteMode = b.byteMode === "byte" && bytes.length ? 1 : 0, byteCount = Math.max(1, Math.min(bytes.length || 1, Math.round(Number(b.byteCount) || bytes.length || 1)));
+  return { title, brief, images, region, desk, findMore: b.findMore !== false, videos, bytes, byteMode, byteCount };
+}
+// A video link: YouTube (any address) or a video file (https …mp4/webm/mov, or the clip store).
+function vidOf(u) {
+  u = String(u || "").trim(); if (!/^https:\/\//.test(u) && !/^\/clips\//.test(u)) return null;
+  const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([\w-]{11})/);
+  if (yt) return { kind: "yt", id: yt[1], url: u };
+  return { kind: "file", url: u.slice(0, 800) };
+}
+// A byte with no length given: a YouTube video's own length (when the YouTube key is set), else 30 s.
+async function byteLengths(env, bytes) {
+  for (const x of bytes) {
+    if (x.secs) continue;
+    if (x.kind === "yt" && env.YOUTUBE_API_KEY) { try { const d = await ytCall(env, "videos", { part: "contentDetails", id: x.id }); x.secs = isoSeconds(d.items?.[0]?.contentDetails?.duration) || 0; } catch { /* none */ } }
+    if (!x.secs) x.secs = 30;
+  }
+  return bytes;
 }
 export async function avoManualAdd(env, b, by) {
   const m = cleanManual(b), id = `man:${crypto.randomUUID()}`;
   const lines = sentencesOf(m.brief).length ? sentencesOf(m.brief) : [m.brief];
-  await env.DB.prepare("INSERT INTO avo_stories (article_id,title,desk,region,score,script,images,status,day,published_at,origin,find_more,created_by) VALUES (?,?,?,?,?,?,?,'new',?,?,'manual',?,?)")
-    .bind(id, m.title, m.desk, m.region, 50, JSON.stringify(lines), JSON.stringify(m.images), istDay(), new Date().toISOString(), m.findMore ? 1 : 0, String(by || "").slice(0, 80)).run();
+  await byteLengths(env, m.bytes);
+  await env.DB.prepare("INSERT INTO avo_stories (article_id,title,desk,region,score,script,images,status,day,published_at,origin,find_more,created_by,videos,bytes,byte_mode,byte_count) VALUES (?,?,?,?,?,?,?,'new',?,?,'manual',?,?,?,?,?,?)")
+    .bind(id, m.title, m.desk, m.region, 50, JSON.stringify(lines), JSON.stringify(m.images), istDay(), new Date().toISOString(), m.findMore ? 1 : 0, String(by || "").slice(0, 80), JSON.stringify(m.videos), JSON.stringify(m.bytes), m.byteMode, m.byteCount).run();
   return { ok: true, id };
 }
 export async function avoManualEdit(env, id, b) {
@@ -300,8 +327,9 @@ export async function avoManualEdit(env, id, b) {
   if (row.status === "pulled") throw new Error("This story is pulled. Put it back first.");
   const m = cleanManual(b, row.origin === "manual" ? 450 : 900), lines = sentencesOf(m.brief).length ? sentencesOf(m.brief) : [m.brief];
   const origin = row.origin === "manual" || row.origin === "breaking" ? row.origin : "edited";
-  await env.DB.prepare("UPDATE avo_stories SET title=?, desk=?, region=?, script=?, images=?, find_more=?, origin=?, voice='[]', secs=0, status='new', published_at=?, aired=0, img_v=4 WHERE article_id=?")
-    .bind(m.title, m.desk, m.region, JSON.stringify(lines), JSON.stringify(m.images), m.findMore ? 1 : 0, origin, new Date().toISOString(), id).run();
+  await byteLengths(env, m.bytes);
+  await env.DB.prepare("UPDATE avo_stories SET title=?, desk=?, region=?, script=?, images=?, find_more=?, origin=?, voice='[]', secs=0, status='new', published_at=?, aired=0, img_v=4, videos=?, bytes=?, byte_mode=?, byte_count=? WHERE article_id=?")
+    .bind(m.title, m.desk, m.region, JSON.stringify(lines), JSON.stringify(m.images), m.findMore ? 1 : 0, origin, new Date().toISOString(), JSON.stringify(m.videos), JSON.stringify(m.bytes), m.byteMode, m.byteCount, id).run();
   return { ok: true };
 }
 // Any AVO story can be deleted for good: off air at once, gone from the desk and the rundowns'

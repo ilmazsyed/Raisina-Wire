@@ -1597,3 +1597,16 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .br-v .br-media{position:relative;inset:auto;height:760px;margin:-60px -60px 10px;flex:none}
 .br-v .br-media i{position:absolute;inset:auto 0 0 0;height:180px;background:linear-gradient(transparent,var(--red))}
 .br-v .br-dots{margin:0}
+
+/* AVO: videos added by hand fill the shot like the pictures; AVO + byte. */
+.avo .avo-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border:0;pointer-events:none;background:#000}
+.avo-byte{position:absolute;inset:0;background:#000;overflow:hidden}
+.avo-byte iframe,.avo-byte video{position:absolute;inset:0;width:100%;height:100%;border:0;object-fit:contain;pointer-events:none}
+.byte-super{position:absolute;left:60px;bottom:150px;display:flex;align-items:stretch;border-radius:10px;overflow:hidden;box-shadow:0 14px 34px rgba(0,0,0,.45);animation:spli .6s .4s both}
+.byte-super .bs-tag{display:flex;align-items:center;gap:10px;padding:0 20px;background:var(--red);color:#fff;font:800 30px/1 "Hind Siliguri",sans-serif}
+.byte-super .bs-who{display:flex;flex-direction:column;justify-content:center;padding:12px 24px;background:rgba(255,255,255,.97);border-bottom:4px solid var(--gold)}
+.byte-super .bs-who b{font:800 44px/1.2 "Noto Serif Bengali",serif;color:#111}
+.byte-super .bs-who small{font:600 28px/1.3 "Hind Siliguri",sans-serif;color:var(--red)}
+.avo-byte.v .byte-super{left:40px;right:40px;bottom:420px}
+.byte-n{position:absolute;right:60px;top:60px;padding:6px 16px;border-radius:8px;background:rgba(0,0,0,.6);color:#fff;font:700 28px "Hind Siliguri",sans-serif}
+.byte-n{top:150px}
