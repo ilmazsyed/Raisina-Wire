@@ -1467,4 +1467,10 @@ export default {
   "Paused": "স্থগিত",
   "Failed or pulled": "ব্যর্থ বা সরানো",
   "IN ROTATION · TOP-UP": "সম্প্রচারে · পূরণ",
+  "(over the ticker)": "(টিকারের উপরে)",
+  "Keep playing continuously": "একটানা চলবে",
+  "Turn BIG BREAKING on": "বড় ব্রেকিং চালু করুন",
+  "Update BIG BREAKING": "বড় ব্রেকিং বদলান",
+  "Write at least one line.": "অন্তত একটি লাইন লিখুন।",
+  "Choose a channel.": "একটি চ্যানেল বাছুন।",
 };

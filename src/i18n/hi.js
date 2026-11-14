@@ -1415,4 +1415,10 @@ export default {
   "Paused": "रुकी हुई",
   "Failed or pulled": "विफल या हटाई गई",
   "IN ROTATION · TOP-UP": "प्रसारण में · पूरक",
+  "(over the ticker)": "(टिकर के ऊपर)",
+  "Keep playing continuously": "लगातार चलाएँ",
+  "Turn BIG BREAKING on": "बड़ी ब्रेकिंग चालू करें",
+  "Update BIG BREAKING": "बड़ी ब्रेकिंग बदलें",
+  "Write at least one line.": "कम से कम एक पंक्ति लिखें।",
+  "Choose a channel.": "चैनल चुनें।",
 };

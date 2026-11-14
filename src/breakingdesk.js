@@ -10,7 +10,7 @@ import { shell, api, toast, fail, esc, $, $$, istClock } from "./crshell.js";
 import { mountTV } from "./engine.js";
 import { digits } from "./i18n.js";
 
-const S = { d: null, sets: [], dirty: false, mon: {}, lines: [""], media: null };
+const S = { d: null, sets: [], dirty: false, mon: {}, lines: [""], media: null, bb: null, bbDirty: false };
 const CH = { h: "Rashtrix TV", v: "Rashtrix Shorts" };
 const SETS = 8, PER = 3, MAX = 24;
 const blankSets = () => Array.from({ length: SETS }, (_, i) => ({ id: `s${i + 1}`, live: false, points: ["", "", ""] }));
@@ -83,6 +83,39 @@ function drawBreak() {
   $("#bClear").onclick = async () => { const chs = chans(); if (!chs.length) return toast("Choose a channel.", true); try { await api("/api/admin/tv/desk/breaking", { method: "POST", body: { clear: true, channels: chs } }); toast("Cleared."); load(); } catch (e) { fail(e); } };
 }
 
+// BIG BREAKING over the ticker: 1 to 7 lines; each comes in with the BIG BREAKING wipe; a run
+// every 30 seconds, or continuous.
+function drawBig() {
+  const cur = S.d.bigBreak;
+  if (!S.bb || !S.bbDirty) S.bb = { lines: cur?.lines?.length ? [...cur.lines] : ["", "", ""], h: cur ? !!cur.channels?.h : true, v: cur ? !!cur.channels?.v : true, continuous: !!cur?.continuous };
+  const B = S.bb, on = !!cur?.on;
+  $(".bd-big").innerHTML = `<div class="row" style="justify-content:space-between;flex-wrap:wrap"><h2>BIG BREAKING <small class="muted">(over the ticker)</small></h2>${on ? `<span class="tag red">ON AIR · ${cur.continuous ? "Continuous" : "Every 30 seconds"} · ${[cur.channels?.h && "Rashtrix TV", cur.channels?.v && "Rashtrix Shorts"].filter(Boolean).join(" + ")}</span>` : `<span class="tag">OFF</span>`}</div>
+    <p class="muted" style="margin:0">Up to seven lines (at least one). Each line comes in with the BIG BREAKING wipe and stays seven seconds.</p>
+    <div class="bd-lines">${B.lines.map((t, i) => `<label class="bd-line"><span>${digits(i + 1)}</span><textarea rows="2" maxlength="160" data-bb="${i}" data-no-tr placeholder="${i ? "পরের লাইন (ঐচ্ছিক)" : "বড় ব্রেকিং লিখুন"}">${esc(t)}</textarea>${B.lines.length > 1 ? `<button class="btn sm" type="button" data-bbrm="${i}" aria-label="Remove">✕</button>` : ""}</label>`).join("")}</div>
+    <div class="row" style="flex-wrap:wrap">${B.lines.length < 7 ? `<button class="btn sm" type="button" id="bbAdd">+ Add a line</button>` : ""}<small class="muted">${digits(B.lines.filter(x => x.trim()).length)} / ${digits(7)} lines</small></div>
+    <div class="row" style="flex-wrap:wrap;gap:14px">
+      <label class="chk"><input type="checkbox" id="bbH" ${B.h ? "checked" : ""}> Rashtrix TV</label>
+      <label class="chk"><input type="checkbox" id="bbV" ${B.v ? "checked" : ""}> Rashtrix Shorts</label>
+      <label class="chk"><input type="checkbox" id="bbC" ${B.continuous ? "checked" : ""}> Keep playing continuously</label></div>
+    <small class="muted">${B.continuous ? "Plays one run after another without a break." : "Plays every 30 seconds (one run of all the lines, then 30 seconds of the normal ticker)."}</small>
+    <div class="row" style="flex-wrap:wrap"><button class="btn red" type="button" id="bbGo">${on ? "Update BIG BREAKING" : "Turn BIG BREAKING on"}</button>${on ? `<button class="btn" type="button" id="bbOff">Turn off</button>` : ""}</div>`;
+  const keep = () => { S.bbDirty = true; };
+  $$("[data-bb]").forEach(t => t.oninput = () => { B.lines[+t.dataset.bb] = t.value; keep(); });
+  $$("[data-bbrm]").forEach(x => x.onclick = () => { B.lines.splice(+x.dataset.bbrm, 1); keep(); drawBig(); });
+  $("#bbAdd")?.addEventListener("click", () => { B.lines.push(""); keep(); drawBig(); $(`[data-bb="${B.lines.length - 1}"]`)?.focus(); });
+  $("#bbH").onchange = e => { B.h = e.target.checked; keep(); };
+  $("#bbV").onchange = e => { B.v = e.target.checked; keep(); };
+  $("#bbC").onchange = e => { B.continuous = e.target.checked; keep(); drawBig(); };
+  const send = async onAir => {
+    const lines = B.lines.map(x => x.trim()).filter(Boolean);
+    if (onAir && !lines.length) return toast("Write at least one line.");
+    if (onAir && !B.h && !B.v) return toast("Choose a channel.");
+    try { const r = await api("/api/admin/tv/desk/bigbreak", { method: "PUT", body: { on: onAir, lines, channels: { h: B.h, v: B.v }, continuous: B.continuous } }); S.d.bigBreak = r.bigBreak; S.bbDirty = false; toast(onAir ? "BIG BREAKING is on air." : "BIG BREAKING is off."); drawBig(); } catch (e) { fail(e); }
+  };
+  $("#bbGo").onclick = () => send(true);
+  $("#bbOff")?.addEventListener("click", () => send(false));
+}
+
 function drawLives() {
   const L = S.d.lives || [];
   $(".bd-lives").innerHTML = `<h2>Lives</h2>
@@ -129,7 +162,7 @@ async function load() {
   try {
     S.d = await api("/api/admin/tv/desk");
     if (!S.dirty) { const g = S.d.desk.sets || []; S.sets = blankSets().map((b, i) => g[i] ? { id: g[i].id || b.id, live: !!g[i].live, points: [0, 1, 2].map(j => g[i].points?.[j] || "") } : b); }
-    drawBreak(); drawLives();
+    drawBreak(); if (!document.activeElement?.closest?.(".bd-big")) drawBig(); drawLives();
     if (!document.activeElement?.closest?.(".bd-split")) drawSplit();
   } catch (e) { fail(e); }
 }
@@ -137,7 +170,7 @@ async function load() {
 (async () => {
   const user = await shell("Breaking desk");
   if (!user) return;
-  $("main").innerHTML = `<div class="bd-wrap"><div class="bd-col"><section class="panel bd-break"><p class="muted">Loading…</p></section><section class="panel bd-lives"></section><section class="panel bd-monp"><h2>On air</h2><div class="bd-mons"></div></section></div>
+  $("main").innerHTML = `<div class="bd-wrap"><div class="bd-col"><section class="panel bd-break"><p class="muted">Loading…</p></section><section class="panel bd-big"></section><section class="panel bd-lives"></section><section class="panel bd-monp"><h2>On air</h2><div class="bd-mons"></div></section></div>
     <section class="panel bd-split"></section></div>`;
   await load(); monitors(); setInterval(load, 20000);
 })();

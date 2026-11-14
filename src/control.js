@@ -26,7 +26,7 @@ const DEFAULT = {
   transition: { type: "mix", ms: 600 },
   layers: { bug: true, live: true, clock: true, lower: true, ticker: true, ad: true, weather: true },
   lower: null, breaking: null, delay: 0, dumpAt: 0, standby: { on: false, auto: false, reason: "" },
-  overlay: { poll: null, results: null, comments: null }, sponsor: null, ticker: [], split: null, version: 0, updatedAt: 0
+  overlay: { poll: null, results: null, comments: null }, sponsor: null, ticker: [], split: null, bigBreak: null, version: 0, updatedAt: 0
 };
 
 export class TvControl {
@@ -131,6 +131,9 @@ export class TvControl {
       // three that take turns on screen.
       case "split": s.split = a && a.on ? { on: true, every: Math.max(6, Math.min(30, Math.round(Number(a.every) || 10))), title: String(a.title || "").slice(0, 80),
           sets: (Array.isArray(a.sets) ? a.sets : []).slice(0, 8).map(x => (Array.isArray(x) ? x : []).map(t => String(t || "").slice(0, 160)).filter(Boolean).slice(0, 3)).filter(x => x.length) } : null; break;
+      // BIG BREAKING (the Breaking desk): up to seven lines over the ticker.
+      case "bigbreak": s.bigBreak = a && a.on ? { on: true, lines: (Array.isArray(a.lines) ? a.lines : []).map(t => String(t || "").replace(/\s+/g, " ").trim().slice(0, 160)).filter(Boolean).slice(0, 7), continuous: !!a.continuous, at: a.at && !isNaN(Date.parse(a.at)) ? a.at : iso() } : null;
+        if (s.bigBreak && !s.bigBreak.lines.length) s.bigBreak = null; break;
       case "delay": s.delay = Math.max(0, Math.min(10, Math.round(Number(a.seconds) || 0))); break;
       case "dump": s.dumpAt = now(); s.standby = { on: true, auto: false, reason: "dump" }; await this.asrun({ label: "DUMP", graphic: { kind: "standby" } }, "dump"); break;
       case "standby": s.standby = { on: !!a.on, auto: !!a.auto, reason: String(a.reason || "").slice(0, 120) }; if (a.on) await this.asrun({ label: "Standby", graphic: { kind: "standby" } }, "standby"); break;

@@ -1667,8 +1667,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         if (sl.img) return `<div class="avo-slide">${mediaTag(sl.img)}</div>`;
         if (sl.fact) return `<div class="avo-slide"><div class="avo-info fact"><span class="lbl">${desk} · সংখ্যায়</span><div class="fig"><b class="num" data-to="${sl.fact.n}" data-dec="${sl.fact.dec ? 1 : 0}">০</b><em>${esc(sl.fact.unit)}</em></div><p>${esc(sl.fact.line)}</p><i class="rule"></i></div></div>`;
         if (sl.pts) return `<div class="avo-slide"><div class="avo-info pts"><span class="lbl">মূল তথ্য</span><ol>${sl.pts.map((p, i) => `<li style="--i:${i}"><i>${bnDigits(i + 1)}</i><span>${esc(p)}</span></li>`).join("")}</ol></div></div>`;
-        const bg = bgOf(x);
-        return `<div class="avo-slide"><div class="avo-brk">${bg ? `<img class="bg" src="${esc(bg.src)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')">` : ""}<i class="s1"></i><i class="s2"></i><div class="in"><span class="brk-tag">${x.upd ? "নতুন তথ্য" : "এইমাত্র পাওয়া খবর"}</span><small data-no-tr>BREAKING NEWS</small><b>${esc(x.title)}</b></div></div></div>`;
+        const vid = imgsOf(x).find(i => i.video), bg = vid ? null : bgOf(x), look = vid ? "vid" : bg ? "img" : "plain";
+        return `<div class="avo-slide"><div class="avo-brk ${look}">${vid ? `<div class="brk-v">${mediaTag(vid)}</div><i class="tint"></i>` : bg ? `<div class="brk-p"><img class="bg" src="${esc(bg.src)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')"></div>` : ""}<i class="s1"></i><i class="s2"></i><div class="in"><span class="brk-tag">${x.upd ? "নতুন তথ্য" : "এইমাত্র পাওয়া খবর"}</span><small data-no-tr>BREAKING NEWS</small><b>${esc(x.title)}</b></div></div></div>`;
       };
       // The key figure counts up in Bengali digits.
       const countUp = box => box.querySelectorAll(".num[data-to]").forEach(n => { if (n.dataset.done) return; n.dataset.done = 1; const to = Number(n.dataset.to), dec = n.dataset.dec === "1", t0 = performance.now(), dur = 1300;
@@ -1702,14 +1702,31 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         stage.classList.add("byte-on"); drawJacket();
         let playing = b.kind !== "yt";
         const lift = () => { if (w.isConnected) { w.classList.add("out"); setTimeout(() => w.remove(), 450); } };
+        const hold = `<div class="byte-hold"><img src="${channel === "v" ? STUDIO_SQUARE : STUDIO_WIDE}" alt=""><i class="sw-shine"></i></div>`;
         setTimeout(() => { if (!el.isConnected || st.byteKey !== bkey) return;
-          el.innerHTML = `<div class="avo-byte${channel === "v" ? " v" : ""}${playing ? "" : " wait"}">${media}<div class="byte-super"><span class="bs-tag"><i class="lt-pulse"></i>বক্তব্য</span><span class="bs-who">${b.name ? `<b>${esc(b.name)}</b>` : ""}${b.title ? `<small>${esc(b.title)}</small>` : ""}</span></div>${bl.length > 1 ? `<span class="byte-n">${bnDigits(bi + 1)}/${bnDigits(bl.length)}</span>` : ""}</div>`;
+          el.innerHTML = `<div class="avo-byte${channel === "v" ? " v" : ""}${playing ? "" : " wait"}">${media}${b.kind === "yt" ? hold : ""}<div class="byte-super"><span class="bs-tag"><i class="lt-pulse"></i>বক্তব্য</span><span class="bs-who">${b.name ? `<b>${esc(b.name)}</b>` : ""}${b.title ? `<small>${esc(b.title)}</small>` : ""}</span></div>${bl.length > 1 ? `<span class="byte-n">${bnDigits(bi + 1)}/${bnDigits(bl.length)}</span>` : ""}</div>`;
           const f = el.querySelector("iframe.byte-yt"); if (!f) return;
-          const go = () => { if (playing) return; playing = true; el.querySelector(".avo-byte")?.classList.remove("wait"); lift(); window.removeEventListener("message", onMsg); };
-          const onMsg = e => { if (e.source !== f.contentWindow) return; let d; try { d = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch { return; } if ((d?.event === "onStateChange" && d.info === 1) || (d?.event === "infoDelivery" && d.info?.playerState === 1)) go(); };
+          const box = el.querySelector(".avo-byte"), cmd = (func, args = []) => { try { f.contentWindow.postMessage(JSON.stringify({ event: "command", func, args, id: bkey, channel: "widget" }), "*"); } catch { /* fine */ } };
+          let heard = false, state = -1, showT = 0, nudged = 0;
+          const cover = on => { clearTimeout(showT); if (on) box.classList.add("wait"); else showT = setTimeout(() => box.classList.remove("wait"), 350); };
+          const go = () => { if (!playing) { playing = true; lift(); } cover(false); };
+          // The player's own messages: playing shows the byte (a moment after its first frame, so
+          // no black); paused, stalled or ended puts the studio frame back over it at once.
+          const onMsg = e => { if (e.source !== f.contentWindow) return; let d; try { d = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch { return; }
+            heard = true; const s = d?.event === "onStateChange" ? d.info : d?.event === "infoDelivery" && d.info && "playerState" in d.info ? d.info.playerState : undefined;
+            if (s === undefined || s === state) return; state = s;
+            if (s === 1) go(); else if (playing && [0, 2, 3, -1].includes(s)) { cover(true); if (s === 2 || s === -1) cmd("playVideo"); } };
           window.addEventListener("message", onMsg);
-          f.addEventListener("load", () => { try { f.contentWindow.postMessage(JSON.stringify({ event: "listening", id: bkey, channel: "widget" }), "*"); } catch { /* fine */ } });
-          setTimeout(go, 5000); }, 550);
+          const off = () => { if (!el.isConnected || st.byteKey !== bkey) { window.removeEventListener("message", onMsg); return true; } return false; };
+          // Ask the player to talk (until it does), then to play; if it will not play with sound,
+          // it plays muted rather than stand on a pause sign.
+          let tries = 0; const hello = setInterval(() => { if (off() || heard || ++tries > 40) { clearInterval(hello); return; }
+            try { f.contentWindow.postMessage(JSON.stringify({ event: "listening", id: bkey, channel: "widget" }), "*"); } catch { /* fine */ }
+            cmd("addEventListener", ["onStateChange"]); }, 250);
+          const nudge = setInterval(() => { if (off()) { clearInterval(nudge); return; } if (state === 1) return;
+            nudged++; if (nudged === 3 && !quiet) cmd("mute"); cmd("playVideo"); if (nudged > 40) clearInterval(nudge); }, 900);
+          // (no word from the player at all: shown after five seconds)
+          setTimeout(() => { if (!heard && !off()) go(); }, 5000); }, 550);
         setTimeout(() => { if (playing) lift(); }, 1400);
       };
       const speakAvo = x => {
@@ -2074,6 +2091,32 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const key = tease ? `${tease.k}|${tease.b}` : "";
     if (te.dataset.t !== key) { te.dataset.t = key; te.hidden = !tease; te.innerHTML = tease ? `<span>${esc(tease.k)}</span><b>${esc(tease.b)}</b>` : ""; }
   }
+  // BIG BREAKING (the Breaking desk): its lines in a big band over the ticker, each brought in by
+  // the BIG BREAKING wipe; a run every 30 seconds, or one run after another (continuous). Timed
+  // from the moment it was put on, so every screen shows the same line.
+  function drawBigBreak() {
+    const bb = st.ctl && "bigBreak" in st.ctl ? st.ctl.bigBreak : st.tv?.bigBreak;
+    const lines = bb?.on ? (bb.lines || []).map(t => String(t || "").trim()).filter(Boolean).slice(0, 7) : [];
+    let box = stage.querySelector(".tvp-bb");
+    const hide = () => { if (box && !box.classList.contains("gone")) { box.classList.add("gone"); box.dataset.k = ""; } stage.classList.remove("bb-on"); };
+    if (!lines.length || stage.querySelector(".tv-breaking")) return hide();
+    const LINE = 7, TR = 1.4, run = lines.length * (LINE + TR), cycle = bb.continuous ? run : run + 30;
+    const since = Math.max(0, (now() - (Date.parse(bb.at) || 0)) / 1000), t = since % cycle;
+    if (t >= run) return hide();
+    const k = Math.floor(t / (LINE + TR)), tr = t - k * (LINE + TR) < TR, key = `${Math.floor(since / cycle)}:${k}:${tr ? "t" : "l"}`;
+    if (!box) {
+      box = document.createElement("div"); box.className = `tvp-bb${channel === "v" ? " v" : ""} gone`;
+      box.innerHTML = `<div class="bb-band"><span class="bb-tag"><b data-no-tr>BIG</b><b data-no-tr>BREAKING</b></span><div class="bb-txt"><b class="bb-line"></b></div><span class="bb-n" data-no-tr></span></div><div class="bb-wipe"><i></i><b data-no-tr>BIG BREAKING</b><i class="g"></i></div>`;
+      stage.append(box);
+    }
+    stage.classList.add("bb-on"); box.classList.remove("gone");
+    if (box.dataset.k === key) return; box.dataset.k = key;
+    const wipe = box.querySelector(".bb-wipe");
+    if (tr) { wipe.classList.remove("go"); void wipe.offsetWidth; wipe.classList.add("go"); if (!st.muted && st.audio && (mode === "app" || output) && k === 0) stingerSound(st.audio); return; }
+    const ln = box.querySelector(".bb-line"), txt = lines[k]; ln.textContent = txt; ln.classList.toggle("long", txt.length > 70); ln.classList.toggle("mid", txt.length > 45 && txt.length <= 70);
+    ln.style.animation = "none"; void ln.offsetWidth; ln.style.animation = "";
+    box.querySelector(".bb-n").textContent = lines.length > 1 ? `${bnDigits(k + 1)}/${bnDigits(lines.length)}` : "";
+  }
   function drawJacket() {
     let gfx = "", ovl = "";
     const c = st.ctl || {}, L = c.layers || { bug: true, live: true, clock: true, lower: true, ticker: true, ad: true, weather: true }, s = st.tv || {};
@@ -2182,7 +2225,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       : m.kind === "video" ? `<div class="br-media"><video src="${esc(m.url)}" autoplay muted loop playsinline></video><i></i></div>`
       : `<div class="br-media"><img src="${esc(m.url)}" alt="" referrerpolicy="no-referrer"><i></i></div>`;
     const dots = lines.length > 1 ? `<span class="br-dots">${lines.map((_, i) => `<i data-i="${i}"></i>`).join("")}</span>` : "";
-    const el = document.createElement("div"); el.className = `tv-breaking${m ? ` has-media has-vid` : ""}`;
+    const el = document.createElement("div"); el.className = `tv-breaking${!m ? " br-plain" : ["yt", "video"].includes(m.kind) ? " has-media has-vid" : " has-media has-img"}`;
     el.innerHTML = channel === "h"
       ? `${media}<div class="br-slash"></div><div class="br-in"><span class="br-tag">এইমাত্র পাওয়া খবর</span>${dots}<b class="br-line"></b>${m ? "" : `<img src="${LOGO}" alt="">`}</div><div class="br-bar"></div>`
       : vJacket(`<div class="br-v">${media}<span class="br-tag">এইমাত্র পাওয়া খবর</span>${dots}<b class="br-line"></b></div>`, "এইমাত্র পাওয়া খবর");
@@ -2226,7 +2269,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (mode === "app") { preloadYT(st.preWant); preRoll(); }
     const b = st.ctl?.breaking || st.tv?.breaking;
     if (mode !== "scene" && b && st.shownBreaking !== b.at && now() - Date.parse(b.at) < 90e3) { st.shownBreaking = b.at; showBreaking(b); }
-    drawJacket(); fillAds(); fillWx(); drawCues();
+    drawJacket(); drawBigBreak(); fillAds(); fillWx(); drawCues();
     // Health: a source that has not moved for ten seconds is reported (outputs only).
     const stalled = st.current?.slots.some(s => s.stalled());
     st.stalledSince = stalled ? st.stalledSince || Date.now() : 0;
