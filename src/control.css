@@ -364,3 +364,10 @@ dialog::backdrop { background: #000a; }
 .ad-cmeta{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .ad-cmeta b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:640px){.ad-clip{flex-wrap:wrap}.ad-clip video{width:100%;height:auto;aspect-ratio:16/9}}
+
+/* AVO desk: the tabs (filled when chosen, with their counts) and the list in groups. */
+.ad-filters .btn.on{background:var(--amber);border-color:var(--amber);color:#111;outline:none}
+.ad-filters .btn.red.on{background:var(--red);border-color:var(--red);color:#fff}
+.ad-filters .btn small{opacity:.75;font-weight:700}
+.ad-group{margin:18px 0 6px;font-size:15px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted, #9aa)}
+.ad-group:first-child{margin-top:4px}

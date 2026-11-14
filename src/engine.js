@@ -1213,7 +1213,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     stage.classList.toggle("vid", !sc?.graphic && sc?.layout === "full" && (sc?.sources || []).length === 1);
     stage.classList.toggle("full-gfx", !!sc?.full || sc?.graphic?.kind === "promo" || sc?.graphic?.kind === "ads");
     stage.classList.toggle("wx-on", ["weather", "market"].includes(sc?.graphic?.kind));
-    if (sc?.graphic?.kind !== "avo") stage.classList.remove("ex-on");
+    if (sc?.graphic?.kind !== "avo") stage.classList.remove("ex-on", "byte-on");
   }
 
   /* ---------- graphics ---------- */
@@ -1695,11 +1695,22 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         w.innerHTML = `<div class="sw-full"><img src="${channel === "v" ? STUDIO_SQUARE : STUDIO_WIDE}" alt=""><i class="sw-shine"></i></div><i class="sw-edge"></i>`;
         stage.append(w); if (!st.muted && st.audio && (mode === "app" || output)) stingerSound(st.audio);
         const b = bl[bi], quiet = st.muted || (mode !== "app" && !output);
-        const media = b.kind === "yt" ? `<iframe src="https://www.youtube.com/embed/${esc(b.id)}?autoplay=1&mute=${quiet ? 1 : 0}&controls=0&playsinline=1&rel=0&modestbranding=1" allow="autoplay; encrypted-media" title=""></iframe>`
+        // A YouTube byte is taller than the frame (its title and logo fall outside it) and stays
+        // hidden behind the studio wipe until it is really playing (at most five seconds).
+        const media = b.kind === "yt" ? `<iframe class="byte-yt" src="https://www.youtube.com/embed/${esc(b.id)}?autoplay=1&mute=${quiet ? 1 : 0}&controls=0&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3&fs=0&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" allow="autoplay; encrypted-media" title=""></iframe>`
           : `<video src="${esc(b.url)}" autoplay playsinline ${quiet ? "muted" : ""}></video>`;
+        stage.classList.add("byte-on"); drawJacket();
+        let playing = b.kind !== "yt";
+        const lift = () => { if (w.isConnected) { w.classList.add("out"); setTimeout(() => w.remove(), 450); } };
         setTimeout(() => { if (!el.isConnected || st.byteKey !== bkey) return;
-          el.innerHTML = `<div class="avo-byte${channel === "v" ? " v" : ""}">${media}<div class="byte-super"><span class="bs-tag"><i class="lt-pulse"></i>বক্তব্য</span><span class="bs-who">${b.name ? `<b>${esc(b.name)}</b>` : ""}${b.title ? `<small>${esc(b.title)}</small>` : ""}</span></div>${bl.length > 1 ? `<span class="byte-n">${bnDigits(bi + 1)}/${bnDigits(bl.length)}</span>` : ""}</div>`; }, 550);
-        setTimeout(() => w.remove(), 1400);
+          el.innerHTML = `<div class="avo-byte${channel === "v" ? " v" : ""}${playing ? "" : " wait"}">${media}<div class="byte-super"><span class="bs-tag"><i class="lt-pulse"></i>বক্তব্য</span><span class="bs-who">${b.name ? `<b>${esc(b.name)}</b>` : ""}${b.title ? `<small>${esc(b.title)}</small>` : ""}</span></div>${bl.length > 1 ? `<span class="byte-n">${bnDigits(bi + 1)}/${bnDigits(bl.length)}</span>` : ""}</div>`;
+          const f = el.querySelector("iframe.byte-yt"); if (!f) return;
+          const go = () => { if (playing) return; playing = true; el.querySelector(".avo-byte")?.classList.remove("wait"); lift(); window.removeEventListener("message", onMsg); };
+          const onMsg = e => { if (e.source !== f.contentWindow) return; let d; try { d = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch { return; } if ((d?.event === "onStateChange" && d.info === 1) || (d?.event === "infoDelivery" && d.info?.playerState === 1)) go(); };
+          window.addEventListener("message", onMsg);
+          f.addEventListener("load", () => { try { f.contentWindow.postMessage(JSON.stringify({ event: "listening", id: bkey, channel: "widget" }), "*"); } catch { /* fine */ } });
+          setTimeout(go, 5000); }, 550);
+        setTimeout(() => { if (playing) lift(); }, 1400);
       };
       const speakAvo = x => {
         st.voice?.pause(); st.voice = null;
@@ -1747,8 +1758,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           const first = shownK < 0; shownK = k; shownS = -1;
           // A fresh frame always gets its first slide (a slide drawn into the old frame during the
           // wipe must not count, or the new story stays black until its second slide).
-          stage.classList.toggle("ex-on", !!x.ex);
-          const paint = () => { el.innerHTML = storyHTML(x, k); shownS = -1; st.byteKey = ""; if (!st.bed) startBed(st.current?.scene); speakAvo(x); st.resumeVoice = () => { if (el.isConnected) speakAvo(x); }; drawA(); };
+          stage.classList.toggle("ex-on", !!x.ex); stage.classList.remove("byte-on");
+          const paint = () => { el.innerHTML = storyHTML(x, k); shownS = -1; st.byteKey = ""; if (stage.classList.contains("byte-on")) { stage.classList.remove("byte-on"); drawJacket(); } if (!st.bed) startBed(st.current?.scene); speakAvo(x); st.resumeVoice = () => { if (el.isConnected) speakAvo(x); }; drawA(); };
           // Each story is logged: an airing from the broadcast output, a view from the app or site.
           const logKey = `${x.id}@${Math.round(at0 + starts[k] * 1000)}`;
           if ((mode === "app" || output) && !avoLogged.has(logKey)) { avoLogged.add(logKey); markAvoSeen(x.id); fetch("/api/tv/avo/played", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: x.id, ch: channel, key: output ? key : "" }), keepalive: true }).catch(() => {}); }
@@ -2066,7 +2077,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   function drawJacket() {
     let gfx = "", ovl = "";
     const c = st.ctl || {}, L = c.layers || { bug: true, live: true, clock: true, lower: true, ticker: true, ad: true, weather: true }, s = st.tv || {};
-    const sc = st.current?.scene, fullGfx = stage.classList.contains("full-gfx"), exOn = fullGfx && stage.classList.contains("ex-on");
+    const sc = st.current?.scene, fullGfx = stage.classList.contains("full-gfx"), exOn = fullGfx && (stage.classList.contains("ex-on") || stage.classList.contains("byte-on"));
     // The channel's logo stays on screen throughout: videos, graphics, bulletins, the weather and
     // market updates, intro cards and breaking news (the control room can still turn it off).
     { const bug = $(".tv-bug-fixed"); if (bug) bug.hidden = L.bug === false; }
@@ -2171,7 +2182,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       : m.kind === "video" ? `<div class="br-media"><video src="${esc(m.url)}" autoplay muted loop playsinline></video><i></i></div>`
       : `<div class="br-media"><img src="${esc(m.url)}" alt="" referrerpolicy="no-referrer"><i></i></div>`;
     const dots = lines.length > 1 ? `<span class="br-dots">${lines.map((_, i) => `<i data-i="${i}"></i>`).join("")}</span>` : "";
-    const el = document.createElement("div"); el.className = `tv-breaking${m ? " has-media" : ""}`;
+    const el = document.createElement("div"); el.className = `tv-breaking${m ? ` has-media has-vid` : ""}`;
     el.innerHTML = channel === "h"
       ? `${media}<div class="br-slash"></div><div class="br-in"><span class="br-tag">এইমাত্র পাওয়া খবর</span>${dots}<b class="br-line"></b>${m ? "" : `<img src="${LOGO}" alt="">`}</div><div class="br-bar"></div>`
       : vJacket(`<div class="br-v">${media}<span class="br-tag">এইমাত্র পাওয়া খবর</span>${dots}<b class="br-line"></b></div>`, "এইমাত্র পাওয়া খবর");
