@@ -383,3 +383,20 @@ dialog::backdrop { background: #000a; }
 .pd-erow{display:flex;gap:10px;align-items:flex-start}
 .pd-n{flex:none;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:var(--amber);color:#111;font-weight:800}
 .pd-edit input,.pd-edit textarea{width:100%}
+
+/* The OAP desk (src/oapdesk.js): the form beside the preview; style swatches. */
+.oap-grid{display:grid;grid-template-columns:minmax(320px,440px) 1fr;gap:16px;align-items:start;margin-top:10px}
+@media (max-width:900px){.oap-grid{grid-template-columns:1fr}}
+.oap-form{max-height:calc(100vh - 160px);overflow:auto;padding-right:4px}
+@media (max-width:900px){.oap-form{max-height:none}}
+.oap-stage{background:#000;border-radius:10px;overflow:hidden;display:grid;place-items:center}
+.oap-stage canvas{width:100%;height:auto;display:block}
+.oap-stage.v{max-width:min(100%,420px);margin:0 auto}
+.oap-row input{flex:1;min-width:0}
+.oap-row select{flex:0 0 auto}
+.oap-sw{display:grid;gap:4px;justify-items:center;background:none;border:2px solid transparent;border-radius:10px;padding:4px;color:var(--mute);font-size:11px;cursor:pointer}
+.oap-sw.on{border-color:var(--amber);color:var(--ink)}
+.oap-sw i{display:flex;align-items:flex-end;gap:3px;width:64px;height:40px;border-radius:6px;padding:4px;box-sizing:border-box}
+.oap-sw b{width:12px;height:8px;border-radius:2px}
+.oap-bar{height:8px;border-radius:4px;background:var(--panel2);overflow:hidden}
+.oap-bar i{display:block;height:100%;width:0;background:var(--green);transition:width .2s}

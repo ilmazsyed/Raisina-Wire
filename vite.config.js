@@ -49,7 +49,8 @@ export default defineConfig({
         avodesk: resolve(import.meta.dirname, "avodesk.html"),
         breaking: resolve(import.meta.dirname, "breaking.html"),
         progdesk: resolve(import.meta.dirname, "progdesk.html"),
-        adsdesk: resolve(import.meta.dirname, "adsdesk.html")
+        adsdesk: resolve(import.meta.dirname, "adsdesk.html"),
+        oapdesk: resolve(import.meta.dirname, "oapdesk.html")
       }
     }
   }
