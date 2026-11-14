@@ -85,10 +85,8 @@ class_name = "TvControl"
 tag = "v1"
 new_sqlite_classes = ["TvControl"]
 
-# Video clips (src/clips.js) in Cloudflare R2 (free tier: 10 GB). Switched off until the bucket
-# exists (a deploy fails if it names a bucket that does not): enable R2 in the dashboard, run
-# `npx wrangler r2 bucket create rashtrix-clips`, then remove the # from the three lines below.
+# Video clips (src/clips.js) in Cloudflare R2 (free tier: 10 GB): the bucket "rashtrix-clips".
 # Clips not marked "keep" are deleted after CLIP_RETENTION_DAYS without use.
-# [[r2_buckets]]
-# binding = "CLIPS"
-# bucket_name = "rashtrix-clips"
+[[r2_buckets]]
+binding = "CLIPS"
+bucket_name = "rashtrix-clips"
