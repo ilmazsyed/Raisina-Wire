@@ -240,7 +240,7 @@ body.tv-output #tvHost,body.tv-output .tvp-fit{width:100vw;height:100vh}
 .v-flash span,.v-flash b{animation:tvin .35s .4s both}
 
 /* ---------- The video loaded in advance stays invisible until its turn ---------- */
-.tvp-ytlayer.pre{display:block!important;opacity:0;pointer-events:none}
+.tvp-ytlayer.pre{display:block!important;opacity:1;pointer-events:none}
 
 /* ---------- "Up next": the coming video, in one Bengali line ---------- */
 .un{position:absolute;inset:0;overflow:hidden;background:#0c0507;color:#fff}
@@ -1880,4 +1880,11 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tvp-ythold.on{opacity:1;transition:none}
 .tvp-ythold img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.7)}
 .tvp-ytspin{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;border:5px solid rgba(255,255,255,.18);border-top-color:#fff;animation:ndspin2 .9s linear infinite}
-.tvp-ytlayer.tap .tvp-ythold{display:none}
+/* A phone that needs one tap: the holding frame stays with our own "tap to play"; the player sits
+   on top, almost invisible, so the tap lands on it (YouTube's red button never shows). */
+.tvp-yttap{display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);align-items:center;gap:14px;padding:16px 30px;border-radius:999px;background:rgba(12,14,22,.82);color:#fff;font:700 34px "Hind Siliguri",sans-serif;white-space:nowrap;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.tvp-yttap b{display:grid;place-items:center;width:58px;height:58px;border-radius:50%;background:#c4121a;font-size:26px}
+.tvp-ytlayer.tap .tvp-ythold{opacity:1}
+.tvp-ytlayer.tap .tvp-yttap{display:flex}
+.tvp-ytlayer.tap .tvp-ytspin{display:none}
+.tvp-ytlayer.tap .tvs-ytwrap{z-index:4;opacity:.02}
