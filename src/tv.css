@@ -1888,3 +1888,7 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tvp-ytlayer.tap .tvp-yttap{display:flex}
 .tvp-ytlayer.tap .tvp-ytspin{display:none}
 .tvp-ytlayer.tap .tvs-ytwrap{z-index:4;opacity:.02}
+
+/* A byte that has played to its end rests on the studio picture (until the story or block moves on). */
+.avo-byte.over{background-size:cover;background-position:center}
+.avo-byte.over video,.avo-byte.over iframe,.avo-byte.over .byte-hold{opacity:0;transition:opacity .3s}

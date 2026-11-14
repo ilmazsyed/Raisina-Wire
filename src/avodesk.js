@@ -12,7 +12,7 @@ const S = { list: [], quota: {}, today: {}, daily: 45, edit: null, images: [], r
 const secsOf = v => { const p = String(v || "").trim().split(":").map(Number); if (p.some(isNaN)) return 0; return p.reduce((a, x) => a * 60 + x, 0); };
 const mmss = n => n ? `${Math.floor(n / 60)}:${String(Math.round(n % 60)).padStart(2, "0")}` : "";
 // An AVO story's length on air: its reading, then its bytes (with the wipe before each).
-export const avoDur = x => Math.ceil((x.secs > 0 ? Math.max(8, x.secs + 2) : 20) + 4 + (x.bytes || []).reduce((n, b) => n + 1.2 + (Number(b.secs) || 30), 0));
+export const avoDur = x => Math.ceil((x.secs > 0 ? Math.max(8, x.secs + 2) : 20) + 4 + (x.bytes || []).reduce((n, b) => n + 1.2 + (Number(b.secs) || 30) + 4, 0));
 const REGION = { bengal: "Bengal & Kolkata", india: "India", neighbours: "Bangladesh, USA, China, Russia, South Asia", world: "World" };
 const DESKS = { Kolkata: "কলকাতা", "West Bengal": "রাজ্য", India: "দেশ", "Probashi Bangali": "প্রবাসী বাঙালি", World: "বিশ্ব", Sports: "খেলা", Entertainment: "বিনোদন", Lifestyle: "লাইফস্টাইল", Breaking: "এইমাত্র" };
 const DK = { kolkata: "Kolkata", bengal: "Bengal", india: "India", bangladesh: "Bangladesh", world: "World", sports: "Sports", business: "Business", other: "Other" };
