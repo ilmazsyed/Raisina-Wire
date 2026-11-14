@@ -52,6 +52,7 @@ import { handleControlRoom, control as ctlCommand } from "./controlroom.js";
 import { serveClip, clipHousekeeping } from "./clips.js";
 import { progPlayed, handleProgs, progHousekeeping } from "./progs.js";
 import { applyVoice, handleVoice } from "./voicelab.js";
+import { adVoiceover } from "./advo.js";
 import { handleStudio } from "./studioapi.js";
 import { handleExtras, tvExtras } from "./extras.js";
 import { rundownHousekeeping, rundownCues } from "./rundown.js";
@@ -1906,6 +1907,7 @@ async function scheduled(env) {
   await step("market brief", () => marketBrief(env));
   // The newsreader's voice for the bulletin's stories (when the Google voice key is set).
   await step("bulletin voices", async () => prepareBulletinVoices(env, (await tvState(env, "h")).bulletin));
+  await step("promo voice-over", () => adVoiceover(env));
   await step("tv links", () => prepareLinks(env));
   // The AVO Breaking Engine: major new stories, their reading and pictures (src/avo.js).
   await step("avo engine", () => avoStep(env));
