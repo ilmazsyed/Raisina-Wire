@@ -1636,3 +1636,108 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .tv-breaking.has-vid .br-v>*:not(.br-media){position:relative}
 .tv-breaking.has-vid .br-v b{padding:20px 26px;background:rgba(170,4,4,.92);border-left:10px solid #fff;border-radius:6px;font-size:64px}
 .tv-breaking.has-vid .br-v .br-tag{background:var(--red);color:#fff}
+
+/* ---- The desk's breaking card, by what it carries ---- */
+/* Text only: the red card full screen, each line in the middle. */
+.tv-breaking.br-plain{background:radial-gradient(ellipse at 50% 45%,#d11a1f 0,#a8070d 55%,#6e050a 100%)}
+.tv-breaking.br-plain .br-slash{background:repeating-linear-gradient(115deg,rgba(255,255,255,.04) 0 40px,transparent 40px 80px)}
+.tv-breaking.br-plain .br-in{left:120px;right:120px;top:50%;transform:translateY(-54%);display:flex;flex-direction:column;align-items:center;text-align:center}
+.tv-breaking.br-plain .br-in>img{position:static;transform:none;order:-1;height:120px;padding:8px;margin-bottom:34px;border-radius:14px}
+.tv-breaking.br-plain .br-in>b{font-size:96px;line-height:1.25;margin-top:40px}
+.tv-breaking.br-plain .br-dots{margin:26px 0 0}
+.tv-breaking.br-plain .br-v{align-items:center;text-align:center;background:radial-gradient(ellipse at 50% 45%,#d11a1f 0,#a8070d 55%,#6e050a 100%)}
+.tv-breaking.br-plain .br-v .br-tag{align-self:center}
+.tv-breaking.br-plain .br-v b{font-size:84px}
+/* A video: it plays full screen, the text in the middle over it on a red tint. */
+.tv-breaking.has-vid .br-in{left:50%;right:auto;top:50%;bottom:auto;width:min(1500px,86%);transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;text-align:center;padding:40px 54px 46px;background:rgba(150,4,8,.72);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.45);backdrop-filter:blur(2px)}
+.tv-breaking.has-vid .br-in>b{background:none;border:0;padding:0;margin-top:26px;font-size:80px;box-shadow:none}
+.tv-breaking.has-vid .br-media i{height:100%;background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,.15),rgba(0,0,0,.45))}
+.tv-breaking.has-vid .br-dots{margin:22px 0 0}
+.tv-breaking.has-vid .br-v{justify-content:center;align-items:center;text-align:center;padding:60px 40px}
+.tv-breaking.has-vid .br-v>*:not(.br-media){z-index:1}
+.tv-breaking.has-vid .br-v .br-tag{align-self:center}
+.tv-breaking.has-vid .br-v b{background:rgba(150,4,8,.78);border:0;border-radius:16px;padding:30px 34px;font-size:70px}
+.tv-breaking.has-vid .br-v .br-media i{height:100%;background:rgba(0,0,0,.3)}
+/* A picture: split, the red half with the text and the picture beside it. */
+.tv-breaking.has-img{background:linear-gradient(135deg,#c4121a,#7a060c)}
+.tv-breaking.has-img .br-slash{display:none}
+.tv-breaking.has-img .br-media{left:50%;right:0;top:0;bottom:0;inset:0 0 0 50%;border-left:10px solid #fff;box-shadow:-14px 0 0 var(--gold)}
+.tv-breaking.has-img .br-media i{display:none}
+.tv-breaking.has-img .br-in{left:90px;right:auto;width:calc(50% - 180px);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:flex-start}
+.tv-breaking.has-img .br-in>b{font-size:74px}
+.tv-breaking.has-img .br-v{background:linear-gradient(160deg,#c4121a,#7a060c);justify-content:flex-start;padding:0 0 60px}
+.tv-breaking.has-img .br-v .br-media{position:relative;inset:auto;height:50%;margin:0 0 50px;border-bottom:10px solid #fff;box-shadow:0 14px 0 var(--gold)}
+.tv-breaking.has-img .br-v .br-media i{display:none}
+.tv-breaking.has-img .br-v>.br-tag,.tv-breaking.has-img .br-v>b,.tv-breaking.has-img .br-v>.br-dots{margin-left:50px;margin-right:50px}
+
+/* ---- The AVO's BREAKING NEWS card ---- */
+.avo-brk.plain{background:radial-gradient(ellipse at 50% 45%,#d11a1f 0,#a8070d 55%,#6e050a 100%)}
+.avo-brk.plain .s1{background:repeating-linear-gradient(115deg,rgba(255,255,255,.035) 0 40px,transparent 40px 80px)}
+.avo-brk.plain .s2{display:none}
+.avo-brk.plain .in,.avo-brk.vid .in{left:50%;right:auto;top:50%;bottom:auto;width:min(1560px,84%);transform:translate(-50%,-50%);align-items:center;text-align:center}
+.avo-brk.plain .brk-tag,.avo-brk.vid .brk-tag{align-self:center}
+.avo-brk.plain b{font-size:92px;line-height:1.25}
+.avo-brk.vid{background:#000}
+.avo-brk .brk-v{position:absolute;inset:0;overflow:hidden}
+.avo-brk .brk-v .avo-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border:0}
+.avo-brk.vid .tint{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,.1),rgba(0,0,0,.45))}
+.avo-brk.vid .s1,.avo-brk.vid .s2{display:none}
+.avo-brk.vid .in{padding:38px 54px 44px;background:rgba(150,4,8,.74);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+.avo-brk.vid b{font-size:78px}
+.avo-brk.img{background:linear-gradient(135deg,#c4121a,#7a060c)}
+.avo-brk.img .s1,.avo-brk.img .s2{display:none}
+.avo-brk .brk-p{position:absolute;top:0;bottom:0;left:50%;right:0;overflow:hidden;border-left:10px solid #fff;box-shadow:-14px 0 0 var(--gold)}
+.avo-brk.img .brk-p .bg{left:0;width:100%;filter:none;object-position:50% 35%}
+.avo-brk.img .in{left:90px;width:calc(50% - 170px);top:200px;bottom:260px}
+.avo-brk.img b{font-size:70px}
+.avo.v .avo-brk.plain .in,.avo.v .avo-brk.vid .in{width:88%;top:46%}
+.avo.v .avo-brk.plain b{font-size:84px}
+.avo.v .avo-brk .brk-p{left:0;right:0;top:0;bottom:auto;height:46%;border-left:0;border-bottom:10px solid #fff;box-shadow:0 14px 0 var(--gold)}
+.avo.v .avo-brk.img .brk-p .bg{top:0;height:100%}
+.avo.v .avo-brk.img .in{left:50px;right:50px;width:auto;top:52%;bottom:560px}
+
+/* ---- The YouTube byte's holding frame (until it plays; again if it pauses or ends) ---- */
+.avo-byte .byte-hold{position:absolute;inset:0;z-index:1;opacity:0;pointer-events:none;transition:opacity .25s;overflow:hidden;background:#000}
+.avo-byte .byte-hold img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.avo-byte.wait .byte-hold{opacity:1;transition:none}
+.avo-byte .byte-super,.avo-byte .byte-n{z-index:2}
+
+/* ---- BIG BREAKING over the ticker ---- */
+.tvp-bb{position:absolute;left:0;right:0;bottom:0;height:200px;z-index:14;pointer-events:none;transition:opacity .35s,transform .45s cubic-bezier(.2,.8,.2,1)}
+.tvp-bb.gone{opacity:0;transform:translateY(40px)}
+.tvp-bb .bb-band{position:absolute;inset:0;display:flex;align-items:stretch;background:linear-gradient(90deg,#8d050b,#c4121a 40%,#a30a10);border-top:8px solid var(--gold);box-shadow:0 -14px 40px rgba(0,0,0,.4)}
+.tvp-bb .bb-tag{flex:none;display:flex;flex-direction:column;justify-content:center;align-items:center;width:330px;background:#fff;color:#c4121a;font-family:Montserrat,"Hind Siliguri",sans-serif;clip-path:polygon(0 0,100% 0,88% 100%,0 100%);animation:bbpulse 1.2s ease-in-out infinite}
+.tvp-bb .bb-tag b{font-weight:900;line-height:1}
+.tvp-bb .bb-tag b:first-child{font-size:70px;letter-spacing:.06em}
+.tvp-bb .bb-tag b:last-child{font-size:38px;letter-spacing:.08em}
+.tvp-bb .bb-txt{flex:1;display:flex;align-items:center;padding:0 60px 0 30px;overflow:hidden}
+.tvp-bb .bb-line{display:block;font:800 72px/1.2 "Noto Serif Bengali",serif;color:#fff;text-shadow:0 4px 16px rgba(0,0,0,.35);animation:bbline .6s cubic-bezier(.2,.8,.2,1) both}
+.tvp-bb .bb-line.mid{font-size:58px}
+.tvp-bb .bb-line.long{font-size:46px}
+.tvp-bb .bb-n{position:absolute;right:24px;top:-56px;padding:6px 16px;border-radius:8px;background:#c4121a;color:#fff;font:800 30px "Hind Siliguri",sans-serif}
+.tvp-bb .bb-n:empty{display:none}
+.tvp-bb .bb-wipe{position:absolute;inset:-60px 0 0;overflow:hidden;opacity:0}
+.tvp-bb .bb-wipe i{position:absolute;inset:0;background:#c4121a;transform:translateX(-102%)}
+.tvp-bb .bb-wipe i.g{background:var(--gold);inset:auto 0 0;height:100%;transform:translateX(-102%)}
+.tvp-bb .bb-wipe b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:900 120px/1 Montserrat,sans-serif;letter-spacing:.06em;color:#fff;text-shadow:0 6px 24px rgba(0,0,0,.35);opacity:0}
+.tvp-bb .bb-wipe.go{opacity:1}
+.tvp-bb .bb-wipe.go i.g{animation:bbwipe 1.4s cubic-bezier(.7,0,.3,1) both}
+.tvp-bb .bb-wipe.go i:not(.g){animation:bbwipe 1.4s .07s cubic-bezier(.7,0,.3,1) both}
+.tvp-bb .bb-wipe.go b{animation:bbword 1.4s both}
+@keyframes bbwipe{0%{transform:translateX(-102%)}38%,62%{transform:none}100%{transform:translateX(102%)}}
+@keyframes bbword{0%,22%{opacity:0;transform:scale(1.25)}34%{opacity:1;transform:none}46%{opacity:.35}54%{opacity:1}66%{opacity:1}78%,100%{opacity:0;transform:scale(.92)}}
+@keyframes bbline{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
+@keyframes bbpulse{0%,100%{background:#fff}50%{background:#ffe08a}}
+.tvp.bb-on .tv-ticker,.tvp.bb-on .tv-mkt,.tvp.bb-on .tv-l3,.tvp.bb-on .tv-adslot{visibility:hidden}
+.tvp.bb-on .byte-super{bottom:250px}
+.tvp-bb.v{height:300px;bottom:0}
+.tvp-bb.v .bb-band{flex-direction:column}
+.tvp-bb.v .bb-tag{width:auto;height:84px;flex-direction:row;gap:18px;clip-path:none}
+.tvp-bb.v .bb-tag b:first-child{font-size:56px}
+.tvp-bb.v .bb-tag b:last-child{font-size:56px}
+.tvp-bb.v .bb-txt{padding:10px 40px;justify-content:center;text-align:center}
+.tvp-bb.v .bb-line{font-size:58px}
+.tvp-bb.v .bb-line.mid{font-size:48px}
+.tvp-bb.v .bb-line.long{font-size:40px}
+.tvp-bb.v .bb-wipe b{font-size:96px}
+.tvp.bb-on .tv-ticker.v{visibility:hidden}

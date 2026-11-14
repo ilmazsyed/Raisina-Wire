@@ -308,6 +308,7 @@ export async function tvState(env, ch) {
     live: live || null,
     // The live split from the Breaking desk (the realtime state carries it too).
     split: live ? await liveSplit(env, ch).catch(() => null) : null,
+    bigBreak: await bigBreakOf(env, ch).catch(() => null),
     schedule: s.on ? schedule : [],
     breaking: s.breaking && Date.now() - Date.parse(s.breaking.at) < ((s.breaking.total || s.breaking.seconds) + 90) * 1000 ? s.breaking : null,
     lband: ch === "h" ? s.lband : null,
@@ -368,6 +369,12 @@ export async function copyImage(env, url, userId) {
   return `/media/${key}.${ext}`;
 }
 
+// BIG BREAKING from the Breaking desk, for a channel (src/worker.js).
+async function bigBreakOf(env, ch) {
+  const r = await env.DB.prepare("SELECT value FROM settings WHERE key='tv:bigbreak'").first();
+  const d = r ? JSON.parse(r.value || "null") : null;
+  return d?.on && d.channels?.[ch] && (d.lines || []).length ? { on: true, lines: d.lines, continuous: !!d.continuous, at: d.at } : null;
+}
 // The Breaking desk's live split for a channel: on, with the pointers' sets put live (src/worker.js).
 async function liveSplit(env, ch) {
   const r = await env.DB.prepare("SELECT value FROM settings WHERE key='tv:livedesk'").first();

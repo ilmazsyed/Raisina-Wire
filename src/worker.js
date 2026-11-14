@@ -1359,6 +1359,20 @@ async function api(request, env, ctx) {
         await audit(env, user, "avo.delete", "avo", third, { from: "breaking desk" });
         return done({ ok: true });
       }
+      // BIG BREAKING over the ticker: 1 to 7 lines, on TV and/or Shorts, every 30 seconds or continuous.
+      if (first === "desk" && second === "bigbreak" && request.method === "PUT") {
+        const lines = (Array.isArray(b.lines) ? b.lines : []).map(t => String(t || "").replace(/\s+/g, " ").trim().slice(0, 160)).filter(Boolean).slice(0, 7);
+        const on = { h: !!b.channels?.h, v: !!b.channels?.v };
+        if (b.on && !lines.length) return err("Write at least one line.");
+        if (b.on && !on.h && !on.v) return err("Choose a channel.");
+        const bb = { on: !!b.on, lines, channels: on, continuous: !!b.continuous, at: new Date().toISOString() };
+        await putDeskSettings(env, "tv:bigbreak", bb);
+        const by = user.display_name || user.email;
+        for (const ch of CHANNELS) await ctlCommand(env, ch, "bigbreak", bb.on && on[ch] ? { on: true, lines, continuous: bb.continuous, at: bb.at } : { on: false }, by, "bigbreak").catch(() => {});
+        await audit(env, user, bb.on ? "tv.bigbreak" : "tv.bigbreak.off", "tv", "", { lines: lines.length, channels: on, continuous: bb.continuous });
+        clearTvCache();
+        return done({ ok: true, bigBreak: bb });
+      }
       if (first === "desk" && second === "live" && request.method === "PUT") {
         try { return done(await saveLiveDesk(env, b, user)); } catch (e) { return err(e.message); }
       }
@@ -1990,11 +2004,11 @@ async function liveDesk(env) {
 // What goes on screen: the sets put live, each of up to three pointers.
 const liveSets = d => (d.sets || []).filter(x => x.live).map(x => (x.points || []).map(t => String(t || "").trim()).filter(Boolean).slice(0, 3)).filter(x => x.length);
 async function breakingDesk(env) {
-  const [desk, log, lives, h, v] = await Promise.all([liveDesk(env), deskSettings(env, "tv:breaklog", []),
+  const [desk, log, lives, h, v, bigBreak] = await Promise.all([liveDesk(env), deskSettings(env, "tv:breaklog", []),
     env.DB.prepare("SELECT id, channel, yt_id, title, live_now, on_air, live_video, last_error, last_refresh FROM tv_sources WHERE kind='live' AND active=1 ORDER BY created_at DESC").all().then(r => r.results).catch(() => []),
-    tvSettings(env, "h"), tvSettings(env, "v")]);
+    tvSettings(env, "h"), tvSettings(env, "v"), deskSettings(env, "tv:bigbreak", null)]);
   const cur = s => s.breaking && Date.now() - Date.parse(s.breaking.at) < ((s.breaking.total || s.breaking.seconds) + 90) * 1000 ? s.breaking : null;
-  return { desk, log, lives, breaking: { h: cur(h), v: cur(v) } };
+  return { desk, log, lives, breaking: { h: cur(h), v: cur(v) }, bigBreak };
 }
 async function saveLiveDesk(env, b, user) {
   const d = await liveDesk(env);
