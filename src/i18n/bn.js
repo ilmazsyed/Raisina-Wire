@@ -1479,4 +1479,13 @@ export default {
   "Yesterday": "গতকাল",
   "▶ Play again": "▶ আবার চালান",
   "Back to today and yesterday": "আজ ও গতকালে ফিরুন",
+  "Newsreader voice": "সংবাদপাঠকের কণ্ঠ",
+  "Lines to hear": "যে লাইন শুনবেন",
+  "Woman's voice": "মহিলা কণ্ঠ",
+  "Man's voice": "পুরুষ কণ্ঠ",
+  "▶ Listen": "▶ শুনুন",
+  "Pace": "গতি",
+  "Use on air from tomorrow (12 AM)": "কাল থেকে সম্প্রচারে (রাত ১২টা)",
+  "Use on air now": "এখনই সম্প্রচারে",
+  "Cancel tomorrow's change": "কালকের বদল বাতিল",
 };

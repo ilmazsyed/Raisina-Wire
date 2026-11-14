@@ -1427,4 +1427,13 @@ export default {
   "Yesterday": "कल",
   "▶ Play again": "▶ फिर चलाएँ",
   "Back to today and yesterday": "आज और कल पर लौटें",
+  "Newsreader voice": "समाचार वाचक की आवाज़",
+  "Lines to hear": "सुनने के लिए पंक्तियाँ",
+  "Woman's voice": "महिला आवाज़",
+  "Man's voice": "पुरुष आवाज़",
+  "▶ Listen": "▶ सुनें",
+  "Pace": "गति",
+  "Use on air from tomorrow (12 AM)": "कल से प्रसारण में (रात 12 बजे)",
+  "Use on air now": "अभी प्रसारण में",
+  "Cancel tomorrow's change": "कल का बदलाव रद्द करें",
 };

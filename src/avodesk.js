@@ -86,6 +86,40 @@ async function pickClip(use) {
   draw();
 }
 
+// The newsreader's voice: listen to the Bengali voices on a sample at any pace, then choose a
+// woman's and a man's voice for the bulletins, AVO stories and links (now, or from midnight).
+const VSAMPLE = "নমস্কার, রাষ্ট্রিক্স ২৪×৭-এ আপনাকে স্বাগত। আজ বিধানসভায় শীতকালীন অধিবেশনের প্রথম দিনেই তুমুল হট্টগোল হল। বিরোধীদের ওয়াকআউটের পর অধিবেশন আধঘণ্টা মুলতুবি রাখেন স্পিকার। কলকাতায় আজ সর্বোচ্চ তাপমাত্রা ছিল চব্বিশ ডিগ্রি সেলসিয়াস।";
+const V = { d: null, f: "", m: "", rate: 1.1, text: VSAMPLE, audio: null };
+async function loadVoice() { try { V.d = await api("/api/admin/tv/voice"); const pick = V.d.next || V.d.onAir; V.f ||= pick.f.split("-").pop(); V.m ||= pick.m.split("-").pop(); V.rate = V.d.next?.rate || 1.1; drawVoice(); } catch (e) { $(".ad-voice").innerHTML = `<p class="muted">${esc(e.message)}</p>`; } }
+function drawVoice() {
+  const d = V.d, nm = v => v.split("-").pop(), when = t => new Date(t).toLocaleString("en-GB", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  $(".ad-voice").innerHTML = `<h2>Newsreader voice</h2>
+    <p class="muted" style="margin:0">On air now: <b data-no-tr>${esc(nm(d.onAir.f))}</b> (woman) and <b data-no-tr>${esc(nm(d.onAir.m))}</b> (man), pace <b data-no-tr>${d.onAir.rate}</b>.${d.next ? ` From ${esc(when(d.next.from))}: <b data-no-tr>${esc(nm(d.next.f))}</b> and <b data-no-tr>${esc(nm(d.next.m))}</b>, pace <b data-no-tr>${d.next.rate}</b>.` : ""}${d.enabled ? "" : " <span class='tag red'>The natural voice is not set up.</span>"}</p>
+    <label class="stack" style="gap:4px"><small class="muted">Lines to hear</small><textarea id="vText" rows="3" data-no-tr>${esc(V.text)}</textarea></label>
+    <div class="row" style="flex-wrap:wrap;gap:8px"><label class="stack" style="gap:4px"><small class="muted">Woman's voice</small><select id="vF">${d.voices.f.map(n => `<option${n === V.f ? " selected" : ""}>${n}</option>`).join("")}</select></label><button class="btn sm" type="button" data-vplay="f">▶ Listen</button>
+      <label class="stack" style="gap:4px"><small class="muted">Man's voice</small><select id="vM">${d.voices.m.map(n => `<option${n === V.m ? " selected" : ""}>${n}</option>`).join("")}</select></label><button class="btn sm" type="button" data-vplay="m">▶ Listen</button></div>
+    <label class="row" style="gap:10px;align-items:center"><small class="muted">Pace</small><input type="range" id="vRate" min="0.9" max="1.3" step="0.02" value="${V.rate}" style="flex:1"><b id="vRateN" data-no-tr>${V.rate}</b><small class="muted">(1.0 is an ordinary speaking pace; on air now ${d.onAir.rate})</small></label>
+    <div class="row" style="flex-wrap:wrap"><button class="btn green" type="button" id="vTomorrow">Use on air from tomorrow (12 AM)</button><button class="btn" type="button" id="vNow">Use on air now</button>${d.next ? `<button class="btn sm" type="button" id="vCancel">Cancel tomorrow's change</button>` : ""}</div>
+    <small class="muted">Each sample uses a little of the month's free voice allowance (${(d.budget / 1000).toFixed(0)}k characters left). Stories already recorded keep their voice; new ones use the chosen voices.</small>`;
+  $("#vText").oninput = e => { V.text = e.target.value; };
+  $("#vF").onchange = e => { V.f = e.target.value; };
+  $("#vM").onchange = e => { V.m = e.target.value; };
+  $("#vRate").oninput = e => { V.rate = Number(e.target.value); $("#vRateN").textContent = V.rate; };
+  $$("[data-vplay]").forEach(b => b.onclick = async () => {
+    const voice = b.dataset.vplay === "f" ? V.f : V.m; b.disabled = true; b.textContent = "…";
+    try {
+      const r = await fetch("/api/admin/tv/voice/sample", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ voice, rate: V.rate, text: V.text }) });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Could not make the sample.");
+      V.audio?.pause(); V.audio = new Audio(URL.createObjectURL(await r.blob())); V.audio.play();
+    } catch (e) { fail(e); }
+    b.disabled = false; b.textContent = "▶ Listen";
+  });
+  const save = async when => { try { await api("/api/admin/tv/voice", { method: "PUT", body: { f: V.f, m: V.m, rate: V.rate, when } }); toast(when === "now" ? "On air now: new recordings use these voices." : when === "cancel" ? "Tomorrow's change cancelled." : "Set: from 12 AM tonight the channel reads in these voices."); loadVoice(); } catch (e) { fail(e); } };
+  $("#vTomorrow").onclick = () => save("tomorrow");
+  $("#vNow").onclick = () => { if (confirm("Switch the newsreader's voice now?")) save("now"); };
+  $("#vCancel")?.addEventListener("click", () => save("cancel"));
+}
+
 function drawForm() {
   const F = $(".ad-form"), e = S.edit, MAXF = maxFor(e);
   F.innerHTML = `<h2>${e ? "Edit AVO story" : "New AVO story"}</h2>${e ? `<p class="muted" style="margin:0">Saved changes are voiced and pictured again within a minute, and the story goes back on air (in rotation for six hours or four airings from now).${e.origin !== "manual" ? " From then on it is read as written here, not from its report." : ""}</p>` : ""}
@@ -236,8 +270,8 @@ async function load() {
 (async () => {
   const user = await shell("AVO Story Desk");
   if (!user) return;
-  $("main").innerHTML = `<div class="ad-wrap"><div class="ad-left"><section class="panel ad-form"></section><section class="panel ad-send"><p class="muted">Loading…</p></section></div><section class="panel ad-list"><p class="muted">Loading…</p></section></div>`;
-  drawForm(); load(); loadSend(); setInterval(load, 30000);
+  $("main").innerHTML = `<div class="ad-wrap"><div class="ad-left"><section class="panel ad-form"></section><section class="panel ad-send"><p class="muted">Loading…</p></section><section class="panel ad-voice"><p class="muted">Loading…</p></section></div><section class="panel ad-list"><p class="muted">Loading…</p></section></div>`;
+  drawForm(); load(); loadSend(); loadVoice(); setInterval(load, 30000);
   // A story sent from elsewhere (?send=<id>) is made at once.
   const want = new URLSearchParams(location.search).get("send");
   if (want) api("/api/admin/tv/avo/send", { method: "POST", body: { id: want } }).then(() => { toast("Sent. It is made and goes on air within a minute or two."); load(); loadSend(); }).catch(fail);

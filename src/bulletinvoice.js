@@ -10,6 +10,7 @@ import { noDots } from "./sentences.js";
 import { synthesize, sha256, ttsEnabled } from "./tts.js";
 
 const VOICE = { f: "bn-IN-Chirp3-HD-Despina", m: "bn-IN-Chirp3-HD-Sadachbia" };   // smooth; lively
+export const DEFAULT_TV_VOICE = VOICE, DEFAULT_TV_RATE = 1.22;
 export const tvVoice = (env, sex = "f") => (sex === "m" ? env.TV_VOICE_MALE : env.TV_VOICE_FEMALE) || VOICE[sex];
 const rate = env => Math.min(1.4, Math.max(0.9, Number(env.TV_VOICE_RATE) || 1.22));
 // Shared by the bulletin and the AVO engine (src/avo.js), inside Google's free million a month.

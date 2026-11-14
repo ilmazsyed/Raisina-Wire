@@ -51,6 +51,7 @@ import { indexNow } from "./indexnow.js";
 import { handleControlRoom, control as ctlCommand } from "./controlroom.js";
 import { serveClip, clipHousekeeping } from "./clips.js";
 import { progPlayed, handleProgs, progHousekeeping } from "./progs.js";
+import { applyVoice, handleVoice } from "./voicelab.js";
 import { handleStudio } from "./studioapi.js";
 import { handleExtras, tvExtras } from "./extras.js";
 import { rundownHousekeeping, rundownCues } from "./rundown.js";
@@ -1329,6 +1330,8 @@ async function api(request, env, ctx) {
     const b = ["GET", "DELETE"].includes(request.method) ? {} : await request.json().catch(() => ({}));
     const done = async (out = { ok: true }) => { clearTvCache(); return json(out, 200, { "cache-control": "no-store" }); };
     try {
+      // The newsreader's voice: listen to any voice, choose the ones on air (now or from midnight).
+      if (parts[0] === "voice") { const out = await handleVoice(request, env, parts[1], b, { json, err, audit: (...a) => audit(env, user, ...a) }); if (request.method === "PUT") clearTvCache(); return out; }
       if (!parts.length && request.method === "GET") {
         const [h, v, sources, counts, cards, usage] = await Promise.all([tvSettings(env, "h"), tvSettings(env, "v"),
           env.DB.prepare("SELECT * FROM tv_sources ORDER BY channel, kind, created_at").all().then(r => r.results),
@@ -1878,6 +1881,7 @@ async function serveMedia(request, env, ctx) {
 async function scheduled(env) {
   if (!env.DB) return;
   await ensureSchema(env);
+  await applyVoice(env).catch(() => {});
   const { results } = await env.DB.prepare(`SELECT id,slug,title,kind,status,published_at FROM articles WHERE alert_state='pending' AND status='published' AND published_at<=? LIMIT 5`).bind(new Date().toISOString()).all();
   // Each step runs on its own, so one failure can't hold up the others; errors go to the Worker logs.
   const step = async (name, fn) => { try { await fn(); } catch (e) { console.error(`cron ${name} failed:`, e?.stack || e); } };
@@ -1963,6 +1967,8 @@ export default {
       catch (e) { return json({error:"MCP internal error",detail:e.message},500,{"cache-control":"no-store"}); }
     }
     if (url.pathname.startsWith("/api/")) {
+      // (the newsreader's voices the desk chose: src/voicelab.js)
+      await applyVoice(env).catch(() => {});
       try { return await api(request,env,ctx); }
       catch (e) { return json({error:"Internal API error",detail:e.message},500,{"cache-control":"no-store"}); }
     }
