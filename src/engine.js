@@ -1218,12 +1218,27 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
 
   /* ---------- graphics ---------- */
   const istParts = d => { const [h, m] = d.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).split(":").map(Number); return { h, m }; };
+  // The news backdrop behind the bulletin and segment cards, faded: the world in dots, the
+  // newsrooms lit up with lines from Kolkata, a turning globe, signal rings and NEWS in outline.
+  const DECO_CITIES = [["কলকাতা", 88.4, 22.6, 1], ["দিল্লি", 77.2, 28.6], ["ঢাকা", 90.4, 23.8], ["লন্ডন", -0.1, 51.5], ["নিউ ইয়র্ক", -74, 40.7], ["বেজিং", 116.4, 39.9], ["দুবাই", 55.3, 25.3], ["মস্কো", 37.6, 55.8], ["সিডনি", 151.2, -33.9], ["নাইরোবি", 36.8, -1.3]];
+  function newsDeco() {
+    const P = (lon, lat) => [(lon + 180) / 360 * 1920, (84 - lat) / 142 * 900], [kx, ky] = P(88.4, 22.6);
+    const arcs = DECO_CITIES.slice(1).map(([, lon, lat], i) => { const [x, y] = P(lon, lat), mx = (kx + x) / 2, my = Math.min(ky, y) - Math.abs(x - kx) * 0.22 - 30; return `<path d="M${kx.toFixed(0)} ${ky.toFixed(0)} Q${mx.toFixed(0)} ${my.toFixed(0)} ${x.toFixed(0)} ${y.toFixed(0)}" style="--i:${i}"/>`; }).join("");
+    const pins = DECO_CITIES.map(([n, lon, lat, home], i) => { const [x, y] = P(lon, lat); return `<i class="nd-pin${home ? " home" : ""}" style="left:${(x / 19.2).toFixed(2)}%;top:${(y / 9).toFixed(2)}%;--i:${i}"><b>${n}</b></i>`; }).join("");
+    return `<div class="nd" aria-hidden="true"><div class="nd-words" data-no-tr><b>NEWS</b><b>NEWS</b><b>NEWS</b></div>
+      <div class="nd-map"><img src="/brand/worldmap-dots.webp" alt=""><svg viewBox="0 0 1920 900" preserveAspectRatio="none">${arcs}</svg>${pins}</div>
+      <svg class="nd-globe" viewBox="-110 -110 220 220"><circle r="100"/><ellipse rx="100" ry="34"/><ellipse rx="100" ry="70"/><line x1="-100" x2="100"/><g class="spin"><ellipse rx="34" ry="100"/><ellipse rx="70" ry="100"/><line y1="-100" y2="100"/></g></svg>
+      <div class="nd-sig"><i></i><i></i><i></i></div><i class="nd-scan"></i></div>`;
+  }
   function slotWords(d) {
     const { h, m } = istParts(d), h12 = h % 12 || 12;
     const part = h < 4 ? "রাত" : h < 6 ? "ভোর" : h < 12 ? "সকাল" : h < 15 ? "দুপুর" : h < 18 ? "বিকেল" : h < 20 ? "সন্ধ্যা" : "রাত";
     const tail = n => `${bnDigits(n)}${n === 2 ? "টো" : n === 3 || n === 4 ? "টে" : "টা"}`;
-    if (m < 30) return `${part} ${tail(h12)}`;
-    return `${part} ${h12 === 1 ? "দেড়টা" : h12 === 2 ? "আড়াইটে" : `সাড়ে ${tail(h12)}`}`;
+    // (on the hour, quarter past, half past, quarter to: ৬টা, সোয়া ৬টা, সাড়ে ৬টা, পৌনে ৭টা)
+    if (m < 15) return `${part} ${tail(h12)}`;
+    if (m < 30) return `${part} সোয়া ${tail(h12)}`;
+    if (m < 45) return `${part} ${h12 === 1 ? "দেড়টা" : h12 === 2 ? "আড়াইটে" : `সাড়ে ${tail(h12)}`}`;
+    return `${part} পৌনে ${tail(h12 % 12 + 1)}`;
   }
   const bnDate = d => { try { return bnDigits(d.toLocaleDateString("bn-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long", year: "numeric" })); } catch { return ""; } };
   const ist = () => bnDigits(new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }));
@@ -1333,7 +1348,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       let at = 0; screens.forEach(x => { x.d *= scale; x.at = at; at += x.d; });
       let shownM = -1;
       const drawM = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = Math.max(0, screens.findLastIndex(x => e >= x.at)); if (k === shownM) return; const first = shownM < 0; shownM = k;
-        const paint = () => { el.innerHTML = `<div class="seg mk${channel === "v" ? " v" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>${screens[k].h()}${k > 0 && k < screens.length - 1 ? segStrap("MARKET UPDATE", "বাজারের খবর", screens, k) : ""}</div>`; };
+        const paint = () => { el.innerHTML = `<div class="seg mk${channel === "v" ? " v" : ""}"><i class="bs-bg"></i>${newsDeco()}<i class="bs-glow"></i>${screens[k].h()}${k > 0 && k < screens.length - 1 ? segStrap("MARKET UPDATE", "বাজারের খবর", screens, k) : ""}</div>`; };
         if (first || !el.isConnected) return paint();
         const w = document.createElement("div"); w.className = "bs-wipe mk-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
         stage.append(w); if (!st.muted) whoosh(st.audio);
@@ -1365,7 +1380,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         : `<div class="sg-screen">${segHead(ZONE[x.zone][0], ZONE[x.zone][1], st.tv?.weatherAt)}<div class="sg-row n${x.c.length}">${x.c.map(card).join("")}</div></div>`;
       let shownW = -1;
       const drawW = () => { if (!el.isConnected && st.current) return; const e = (now() - (sc.startAt || now())) / 1000, k = Math.max(0, screens.findLastIndex(x => e >= x.at)); if (k === shownW) return; const first = shownW < 0; shownW = k;
-        const paint = () => { el.innerHTML = `<div class="seg wx${channel === "v" ? " v" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>${screenHTML(screens[k])}${k > 0 && k < screens.length - 1 ? segStrap("WEATHER UPDATE", "আবহাওয়ার খবর", screens, k) : ""}</div>`; };
+        const paint = () => { el.innerHTML = `<div class="seg wx${channel === "v" ? " v" : ""}"><i class="bs-bg"></i>${newsDeco()}<i class="bs-glow"></i>${screenHTML(screens[k])}${k > 0 && k < screens.length - 1 ? segStrap("WEATHER UPDATE", "আবহাওয়ার খবর", screens, k) : ""}</div>`; };
         if (first || !el.isConnected) return paint();
         const w = document.createElement("div"); w.className = "bs-wipe wx-wipe"; w.innerHTML = "<i></i><i></i><i></i>";
         stage.append(w); if (!st.muted) whoosh(st.audio);
@@ -1455,7 +1470,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         return `<div class="sx-item${x.img ? " has-img" : ""}"><div class="sx-num">${bnDigits(i + 1)}</div><div class="sx-body"><span class="sx-lbl">${esc(DESK_BN[x.d] || x.d || "খবর")}</span><h2>${esc(x.t)}</h2>${x.line && x.line !== x.t ? `<p>${esc(x.line)}</p>` : ""}</div>${x.img ? `<div class="sx-img"><img src="${esc(x.img)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')"></div>` : ""}</div>`;
       };
       const score = name === "sports" && st.tv?.segs?.score ? `<div class="sx-score"><span>স্কোর</span><b>${esc(st.tv.segs.score)}</b></div>` : "";
-      el.innerHTML = `<div class="sx sx-${esc(name)}${v}"><i class="sx-bg"></i><div class="sx-stage"></div>
+      el.innerHTML = `<div class="sx sx-${esc(name)}${v}"><i class="sx-bg"></i>${newsDeco()}<div class="sx-stage"></div>
         <div class="sx-title"><small>রাষ্ট্রিক্স ২৪×৭</small><b>${esc(title)}</b><span>${esc(kick)}</span><i></i></div>${score}
         <div class="sx-strap"><b>${esc(title)}</b><div class="sx-steps">${items.map((x, j) => `<i style="--d:${x.d0}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div></div>`;
       let shownI = -1, tok = {};
@@ -1829,14 +1844,14 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         const spare = Math.max(0, total - t) / Math.max(1, plan.length); let a = intro;
         plan.forEach(p => { p.d += spare; p.at = a; a += p.d; }); }
       const list = plan.map(p => p.x), per = plan[0]?.d || even;
-      const at = new Date(sc.playAt || sc.startAt || now()), when = slotWords(at), day = bnDate(at);
-      const opening = () => `<div class="nb${channel === "v" ? " v" : ""}"><i class="nb-ray"></i><i class="nb-ray r2"></i><i class="nb-ring"></i><i class="nb-ring b"></i>
+      const at = new Date(sc.playAt || sc.startAt || now()), when = slotWords(new Date(Math.floor(at.getTime() / QUARTER) * QUARTER)), day = bnDate(at);
+      const opening = () => `<div class="nb${channel === "v" ? " v" : ""}">${newsDeco()}<i class="nb-ray"></i><i class="nb-ray r2"></i><i class="nb-ring"></i><i class="nb-ring b"></i>
         <div class="nb-logo"><img src="${LOGO}" alt="রাষ্ট্রিক্স"></div>
         <div class="nb-word" data-no-tr><b class="w1">NEWS</b><b class="w2">BULLETIN</b></div><i class="nb-line"></i>
         <div class="nb-bn">${short ? "খবর সংক্ষেপে" : "সংবাদ বুলেটিন"} · ${esc(when)}</div><div class="nb-when"><span>${esc(day)}</span></div></div>`;
       // A story with a photo (free-licence, from Wikimedia Commons) shows it wiping in beside the
       // text, slowly zooming, with its credit in small type.
-      const story = (x, k) => `<div class="bs${channel === "v" ? " v" : ""}${x.image ? " has-img" : ""}"><i class="bs-bg"></i><i class="bs-glow"></i>${x.image ? `<div class="bs-img" style="--d:${plan[k]?.d || per}s"><img src="${esc(x.image)}" alt="" referrerpolicy="no-referrer"></div>${x.credit ? `<small class="bs-credit">${esc(x.credit)}</small>` : ""}` : ""}
+      const story = (x, k) => `<div class="bs${channel === "v" ? " v" : ""}${x.image ? " has-img" : ""}"><i class="bs-bg"></i>${newsDeco()}<i class="bs-glow"></i>${x.image ? `<div class="bs-img" style="--d:${plan[k]?.d || per}s"><img src="${esc(x.image)}" alt="" referrerpolicy="no-referrer"></div>${x.credit ? `<small class="bs-credit">${esc(x.credit)}</small>` : ""}` : ""}
         <div class="bs-side"><em>${bnDigits(k + 1)}</em><small>/ ${bnDigits(list.length)}</small><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span>${x.tag ? `<b class="bs-new">${esc(x.tag)}</b>` : ""}</div>
         <div class="bs-main"><h2>${String(x.title || "").split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</h2><p>${esc(x.text || "")}</p></div>
         <div class="bs-strap"><b data-no-tr>NEWS BULLETIN</b><span>${esc(when)}</span><div class="bs-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${plan[j]?.d || per}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div></div>`;
