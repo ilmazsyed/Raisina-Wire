@@ -1861,3 +1861,15 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .avo-brk.calm small{color:#cfe0ff}
 .avo-brk.calm.vid .in{background:rgba(12,24,44,.78)}
 .avo-brk.calm.img{background:linear-gradient(135deg,#0f1b2e,#24395d)}
+
+/* AVO byte: the name super only once the byte itself is on screen (not over the studio frame or
+   the wipe); the NEWS UPDATE band stays on through the bytes, with the super above it. */
+.avo-byte .byte-super{transition:opacity .4s .25s}
+.avo-byte.wait .byte-super,.avo-byte.wait .byte-n{opacity:0;transition:none}
+.avo-byte .avo-l3{z-index:2;animation:none}
+.avo-byte .byte-super,.tvp.byte-on .avo-byte .byte-super{bottom:250px}
+.tvp.bb-on .avo-byte .byte-super{bottom:290px}
+.avo-byte.v .avo-l3{left:44px;right:44px;bottom:200px;flex-direction:column}
+.avo-byte.v .avo-l3 .lt-tag{padding:12px 22px}
+.avo-byte.v .avo-l3 .lt-text{font-size:54px}
+.avo-byte.v .byte-super,.tvp.byte-on .avo-byte.v .byte-super{bottom:500px}

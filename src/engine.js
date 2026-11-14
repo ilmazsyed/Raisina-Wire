@@ -542,7 +542,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     // their own sound. A graphic with no music of its own gets the soft bed; a breaking card plays
     // its sting (its own music); the channel ID plays its signature.
     const spec = BEDS[kind] || (sc?.graphic && !(sc.sources || []).length && !["breaking", "ident"].includes(kind) && !(kind === "breaking" && sc.graphic.music) ? { style: "avo", duck: 0.6 } : null);
-    if (!spec || st.muted || !st.audio || (mode !== "app" && !output) || st.bed) return;
+    if (!spec || st.muted || !st.audio || (mode !== "app" && !output) || st.bed || Date.now() < (st.breakUntil || 0)) return;
     wake();
     const gone = (now() - (sc.startAt || now())) / 1000, left = Math.max(2, (sc.dur || 10) - gone);
     // With the newsreader reading the stories, the bulletin's music stays on as the bed under
@@ -939,6 +939,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   function localSeg() {
     const loop = st.tv?.loop || []; if (!loop.length) return null;
     const t = now(), q = st.seq ||= { i: 0, item: null, seg: null, start: 0, n: 0, head: loop[0]?.ytId || "" };
+    // A full-screen breaking holds the running order: nothing new starts under it (the item on
+    // air waits, a video paused), and it carries on from there when the breaking is over.
+    if (q.seg && Date.now() < (st.breakUntil || 0)) return q.seg;
     const slot = Math.floor(t / QUARTER) * QUARTER, BULLETIN_MS = bulletinMs(slot);
     // The bulletins at :00, :15, :30 and :45 never cut into a video, an AVO block or a segment: the
     // bulletin starts as soon as the item on air ends. At :00 and :30 the weather (45 seconds) and
@@ -1766,7 +1769,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         const lift = () => { if (w.isConnected) { w.classList.add("out"); setTimeout(() => w.remove(), 450); } };
         const hold = `<div class="byte-hold"><img src="${channel === "v" ? STUDIO_SQUARE : STUDIO_WIDE}" alt=""><i class="sw-shine"></i></div>`;
         setTimeout(() => { if (!el.isConnected || st.byteKey !== bkey) return;
-          el.innerHTML = `<div class="avo-byte${channel === "v" ? " v" : ""}${playing ? "" : " wait"}">${media}${b.kind === "yt" ? hold : ""}<div class="byte-super"><span class="bs-tag"><i class="lt-pulse"></i>বক্তব্য</span><span class="bs-who">${b.name ? `<b>${esc(b.name)}</b>` : ""}${b.title ? `<small>${esc(b.title)}</small>` : ""}</span></div>${bl.length > 1 ? `<span class="byte-n">${bnDigits(bi + 1)}/${bnDigits(bl.length)}</span>` : ""}</div>`;
+          el.innerHTML = `<div class="avo-byte${channel === "v" ? " v" : ""}${playing ? "" : " wait"}">${media}${b.kind === "yt" ? hold : ""}<div class="byte-super"><span class="bs-tag"><i class="lt-pulse"></i>বক্তব্য</span><span class="bs-who">${b.name ? `<b>${esc(b.name)}</b>` : ""}${b.title ? `<small>${esc(b.title)}</small>` : ""}</span></div>${bl.length > 1 ? `<span class="byte-n">${bnDigits(bi + 1)}/${bnDigits(bl.length)}</span>` : ""}<div class="avo-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>${calm(x) ? "বিস্তারিত" : "এই মুহূর্তে"}</small></span><span class="lt-text">${esc(x.title)}</span></div></div>`;
           const f = el.querySelector("iframe.byte-yt"); if (!f) return;
           const box = el.querySelector(".avo-byte"), cmd = (func, args = []) => { try { f.contentWindow.postMessage(JSON.stringify({ event: "command", func, args, id: bkey, channel: "widget" }), "*"); } catch { /* fine */ } };
           let heard = false, state = -1, showT = 0, nudged = 0;
@@ -1777,7 +1780,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           const onMsg = e => { if (e.source !== f.contentWindow) return; let d; try { d = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch { return; }
             heard = true; const s = d?.event === "onStateChange" ? d.info : d?.event === "infoDelivery" && d.info && "playerState" in d.info ? d.info.playerState : undefined;
             if (s === undefined || s === state) return; state = s;
-            if (s === 1) go(); else if (playing && [0, 2, 3, -1].includes(s)) { cover(true); if (s === 2 || s === -1) cmd("playVideo"); } };
+            if (s === 1) go(); else if (playing && [0, 2, 3, -1].includes(s)) { cover(true); if ((s === 2 || s === -1) && Date.now() >= (st.breakUntil || 0)) cmd("playVideo"); } };
           window.addEventListener("message", onMsg);
           const off = () => { if (!el.isConnected || st.byteKey !== bkey) { window.removeEventListener("message", onMsg); return true; } return false; };
           // Ask the player to talk (until it does), then to play; if it will not play with sound,
@@ -1785,7 +1788,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           let tries = 0; const hello = setInterval(() => { if (off() || heard || ++tries > 40) { clearInterval(hello); return; }
             try { f.contentWindow.postMessage(JSON.stringify({ event: "listening", id: bkey, channel: "widget" }), "*"); } catch { /* fine */ }
             cmd("addEventListener", ["onStateChange"]); }, 250);
-          const nudge = setInterval(() => { if (off()) { clearInterval(nudge); return; } if (state === 1) return;
+          const nudge = setInterval(() => { if (off()) { clearInterval(nudge); return; } if (state === 1 || Date.now() < (st.breakUntil || 0)) return;
             nudged++; if (nudged === 3 && !quiet) cmd("mute"); cmd("playVideo"); if (nudged > 40) clearInterval(nudge); }, 900);
           // (no word from the player at all: shown after five seconds)
           setTimeout(() => { if (!heard && !off()) go(); }, 5000); }, 550);
@@ -2274,9 +2277,37 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   function introCard(breaking) {
     return `<div class="gx-intro${breaking ? " br" : ""}${channel === "v" ? " v" : ""}"><i class="gx-bg"></i><i class="gx-bar"></i><div class="gx-in"><img src="${LOGO}" alt=""><b data-no-tr>${breaking ? "BREAKING NEWS" : "HEADLINES"}</b><span>${breaking ? "এইমাত্র পাওয়া খবর" : "শিরোনাম"}</span></div></div>`;
   }
+  // While a full-screen breaking is on air, only it and its sound play: the video on air is paused,
+  // the music, the newsreader, a byte and anything else under it are silenced, and the running
+  // order waits (localSeg). When it is over, everything picks up where it stopped.
+  function breakHold() {
+    if (!st.held) st.held = { from: Date.now() };
+    const quiet = () => {
+      st.bed?.(); st.bed = null; st.voice?.pause?.(); st.voice = null;
+      st.current?.slots?.forEach(s => s.setMuted(true));
+      try { st.yt?.player?.pauseVideo?.(); } catch { /* none */ }
+      stage.querySelectorAll("video").forEach(v => { if (v.closest(".tv-breaking")) return; if (!v.paused) { v.dataset.brk = "1"; v.pause(); } });
+      stage.querySelectorAll("iframe").forEach(f => { if (f.closest(".tv-breaking") || /mute=1/.test(f.src) && !f.classList.contains("byte-yt")) return; try { f.contentWindow.postMessage(JSON.stringify({ event: "command", func: "pauseVideo", args: [], channel: "widget" }), "*"); f.dataset.brk = "1"; } catch { /* fine */ } });
+    };
+    quiet(); clearInterval(st.heldT);
+    st.heldT = setInterval(() => {
+      if (Date.now() < (st.breakUntil || 0)) return quiet();
+      clearInterval(st.heldT);
+      const held = Date.now() - (st.held?.from || Date.now()); st.held = null;
+      // (a video's clock moves on by the time it was held; the other items finish as they were)
+      const q = st.seq; if (q?.item?.type === "video" || q?.item?.type === "cutin") q.start += held;
+      st.current?.slots?.forEach(s => s.setMuted(st.muted));
+      try { st.yt?.player?.playVideo?.(); } catch { /* none */ }
+      stage.querySelectorAll("video[data-brk]").forEach(v => { delete v.dataset.brk; v.play().catch(() => {}); });
+      stage.querySelectorAll("iframe[data-brk]").forEach(f => { delete f.dataset.brk; try { f.contentWindow.postMessage(JSON.stringify({ event: "command", func: "playVideo", args: [], channel: "widget" }), "*"); } catch { /* fine */ } });
+      if (!st.bed && st.current?.scene?.graphic) startBed(st.current.scene);
+      st.resumeVoice?.();
+    }, 250);
+  }
   function showBreaking(b) {
     // A short BREAKING NEWS card first, then the story.
     voStop(); st.breakUntil = Date.now() + (2 + (Number(b.total) || Number(b.seconds) || 20)) * 1000 + 400;
+    breakHold();
     // (a new breaking replaces one still on screen)
     clearTimeout(st.brT); stage.querySelectorAll(".tv-breaking,.tv-intro").forEach(x => x.remove());
     const intro = document.createElement("div"); intro.className = "tv-intro"; intro.innerHTML = introCard(true); stage.append(intro);
