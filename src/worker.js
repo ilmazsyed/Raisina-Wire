@@ -39,6 +39,7 @@ import m0035 from "../migrations/0035_tv_evergreen.sql";
 import m0036 from "../migrations/0036_avo_updates.sql";
 import m0039 from "../migrations/0039_rundown_pcr.sql";
 import m0040 from "../migrations/0040_avo_bytes.sql";
+import m0041 from "../migrations/0041_programmes.sql";
 import m0037 from "../migrations/0037_hidden_langs.sql";
 import m0038 from "../migrations/0038_photo_checks.sql";
 import { bulletinImages, bulletinImageRoute } from "./bulletinimg.js";
@@ -49,6 +50,7 @@ import { ogRoute, renderCards, renderSiteCard } from "./ogcard.js";
 import { indexNow } from "./indexnow.js";
 import { handleControlRoom, control as ctlCommand } from "./controlroom.js";
 import { serveClip, clipHousekeeping } from "./clips.js";
+import { progPlayed, handleProgs, progHousekeeping } from "./progs.js";
 import { handleStudio } from "./studioapi.js";
 import { handleExtras, tvExtras } from "./extras.js";
 import { rundownHousekeeping, rundownCues } from "./rundown.js";
@@ -108,7 +110,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031], ["0032_avo.sql", m0032], ["0033_avo_manual.sql", m0033], ["0034_avo_pictures.sql", m0034], ["0035_tv_evergreen.sql", m0035], ["0036_avo_updates.sql", m0036], ["0037_hidden_langs.sql", m0037], ["0038_photo_checks.sql", m0038], ["0039_rundown_pcr.sql", m0039], ["0040_avo_bytes.sql", m0040]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031], ["0032_avo.sql", m0032], ["0033_avo_manual.sql", m0033], ["0034_avo_pictures.sql", m0034], ["0035_tv_evergreen.sql", m0035], ["0036_avo_updates.sql", m0036], ["0037_hidden_langs.sql", m0037], ["0038_photo_checks.sql", m0038], ["0039_rundown_pcr.sql", m0039], ["0040_avo_bytes.sql", m0040], ["0041_programmes.sql", m0041]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -1266,6 +1268,12 @@ async function api(request, env, ctx) {
     }
     if (request.method === "GET") { const row = await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(KEY).first().catch(() => null); let starts = []; try { starts = JSON.parse(row?.value || "[]"); } catch { /* none */ } return json({ starts }, 200, { "cache-control": "no-store" }); }
   }
+  // A bulletin or segment aired by the broadcast output (the Segment & bulletin desk).
+  if (url.pathname === "/api/tv/prog/played" && request.method === "POST") {
+    const b = await request.json().catch(() => ({}));
+    const outputOk = !!b.key && CHANNELS.includes(b.ch) && await checkKey(env, b.ch, String(b.key));
+    return json(await progPlayed(env, b, outputOk).catch(() => ({ ok: false })), 200, { "cache-control": "no-store" });
+  }
   if (url.pathname === "/api/tv/avo/played" && request.method === "POST") {
     const b = await request.json().catch(() => ({}));
     const outputOk = !!b.key && CHANNELS.includes(b.ch) && await checkKey(env, b.ch, String(b.key));
@@ -1310,7 +1318,7 @@ async function api(request, env, ctx) {
     if (out) return out;
   }
   // ---- The control room (src/controlroom.js): realtime control, PCR commands, Companion, rundowns, clips.
-  if (/^\/api\/(ws\/ctl|ctl|companion|admin\/(rundowns|templates|asrun|proof|clips|macros|companion|copy-image|inputs))(\/|$)/.test(url.pathname)) {
+  if (/^\/api\/(ws\/ctl|ctl|companion|admin\/(rundowns|templates|asrun|proof|clips|progs|macros|companion|copy-image|inputs))(\/|$)/.test(url.pathname)) {
     const out = await handleControlRoom(request, env, url, { json, err, currentUser, isStaff, auditFn: (u, ...a) => audit(env, u, ...a) });
     if (out) return out;
   }
@@ -1347,8 +1355,9 @@ async function api(request, env, ctx) {
         try { for (const ch of chs) { br = await setBreaking(env, ch, b); await ctlCommand(env, ch, "breaking", br ? br : { clear: true }, user.display_name || user.email, "breaking").catch(() => {}); } }
         catch (e) { return err(e.message); }
         // One AVO story for the breaking (not one per channel), and the desk's log.
-        const avoId = br ? await avoFromBreaking(env, br).catch(() => "") : "";
-        await deskLog(env, { act: br ? "breaking" : "clear", text: br ? br.lines.join(" · ") : "", media: br?.media?.kind || "", channels: chs, seconds: br?.seconds || 0, by: user.display_name || user.email, at: new Date().toISOString(), avoId: avoId || "" });
+        // (a breaking played again from the log is not made into a second AVO story)
+        const avoId = br && !b.replay ? await avoFromBreaking(env, br).catch(() => "") : "";
+        await deskLog(env, { act: br ? "breaking" : "clear", replay: !!b.replay, lines: br?.lines || [], mediaObj: br?.media || null, music: b.music !== false, text: br ? br.lines.join(" · ") : "", media: br?.media?.kind || "", channels: chs, seconds: br?.seconds || 0, by: user.display_name || user.email, at: new Date().toISOString(), avoId: avoId || "" });
         await audit(env, user, br ? "tv.breaking" : "tv.breaking.clear", "tv", chs.join(","), br || {});
         return done({ ok: true, breaking: br });
       }
@@ -1901,6 +1910,7 @@ async function scheduled(env) {
   // Rundowns sent to the PCR go on air at their start time (src/rundown.js).
   await step("rundown cues", () => rundownCues(env, (ch, cmd, args) => ctlCommand(env, ch, cmd, args, "Bulletin producer", "rundown")));
   await step("clips", () => clipHousekeeping(env));
+  await step("programmes", () => progHousekeeping(env));
   // Share cards for the newest stories (last: it opens a headless browser).
   await step("share cards", async () => {
     const origin = env.SITE_URL || (await env.DB.prepare("SELECT value FROM settings WHERE key='site_origin'").first())?.value;
@@ -1994,7 +2004,7 @@ async function putDeskSettings(env, key, v) {
 }
 async function deskLog(env, row) {
   const log = await deskSettings(env, "tv:breaklog", []);
-  log.unshift(row); await putDeskSettings(env, "tv:breaklog", log.slice(0, 40));
+  log.unshift(row); await putDeskSettings(env, "tv:breaklog", log.slice(0, 300));
 }
 const LIVE_DESK = { sets: [], every: 10, split: { h: false, v: false } };
 async function liveDesk(env) {

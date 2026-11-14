@@ -1230,6 +1230,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       <svg class="nd-globe" viewBox="-110 -110 220 220"><circle r="100"/><ellipse rx="100" ry="34"/><ellipse rx="100" ry="70"/><line x1="-100" x2="100"/><g class="spin"><ellipse rx="34" ry="100"/><ellipse rx="70" ry="100"/><line y1="-100" y2="100"/></g></svg>
       <div class="nd-sig"><i></i><i></i><i></i></div><i class="nd-scan"></i></div>`;
   }
+  // The desk's name in Bengali (an AVO made from a breaking: খবর, not এইমাত্র).
+  function deskOf(x) { return x?.origin === "breaking" || String(x?.id || "").startsWith("brk:") ? "খবর" : DESK_BN[x?.desk] || x?.desk || "খবর"; }
+  // A bulletin or segment the broadcast output has aired, recorded once for the Segment & bulletin
+  // desk (src/progs.js), where it can be edited and played again.
+  function progRecord(kind, name, slot, items, short, title = "") {
+    const k = `${channel}:${kind}:${name}:${slot}`; st.progSent ||= new Set(); if (st.progSent.has(k)) return; st.progSent.add(k);
+    fetch("/api/tv/prog/played", { method: "POST", headers: { "content-type": "application/json" }, keepalive: false,
+      body: JSON.stringify({ ch: channel, key, kind, name, slot: new Date(slot).toISOString(), short: !!short, title, items }) }).catch(() => {});
+  }
   function slotWords(d) {
     const { h, m } = istParts(d), h12 = h % 12 || 12;
     const part = h < 4 ? "রাত" : h < 6 ? "ভোর" : h < 12 ? "সকাল" : h < 15 ? "দুপুর" : h < 18 ? "বিকেল" : h < 20 ? "সন্ধ্যা" : "রাত";
@@ -1452,6 +1461,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if ((now() - (sc.startAt || now())) / 1000 < 1.5) { if (!st.muted) whoosh(st.audio); playLink("seg:soth", el); }
     } else if (g.kind === "seg") {   // a segment (src/segments.js): a title card, then its items one by one
       const NAMES = st.tv?.segNames || {}, name = g.name, title = NAMES[name] || "", items = g.items || [], v = channel === "v" ? " v" : "";
+      if (output && !g.replay && items.length) progRecord("segment", name, Math.floor((sc.startAt || now()) / QUARTER) * QUARTER, items, false, title);
       const head = g.head || 4, starts = []; { let a = head; for (const x of items) { starts.push(a); a += x.d0; } }
       const kick = { entertainment: "পর্দা, মঞ্চ আর তারকাদের খবর", lifestyle: "স্বাস্থ্য, খাওয়াদাওয়া, বেড়ানো", kolkata10: "শহর ও রাজ্যের দশ খবর", world: "দুনিয়ার বড় খবর", bangladesh: "পড়শি দেশের খবর", sports: "মাঠের খবর", numbers: "আজকের খবরের অঙ্ক", onthisday: "ইতিহাসের পাতা থেকে", city: "আবহাওয়া, যাতায়াত, শহর", soth: "বিস্তারিত" }[name] || "";
       const count = n => { const to = Number(n.dataset.to), dec = n.dataset.dec === "1", t0 = performance.now(); const step = t => { if (!n.isConnected) return; const p = Math.min(1, (t - t0) / 1300), e = 1 - Math.pow(1 - p, 3); n.textContent = bnDigits((dec ? (to * e).toFixed(1) : Math.round(to * e)).toLocaleString("en-IN")); if (p < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
@@ -1567,6 +1577,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // graphics: its headline with the story's icon, the map of its places, its figure counting up,
       // its sentences lighting up as they are read (and its one photo, if it has one).
       const graphic = x => !(x.images || []).length;
+      // An AVO made from a breaking is a story by the time it airs: none of the breaking look
+      // (no এই মুহূর্তে, no BREAKING NEWS card, no এইমাত্র tags); its words, pictures and videos stay.
+      const calm = x => x?.origin === "breaking" || String(x?.id || "").startsWith("brk:");
       const gSlides = x => {
         const P = imgsOf(x).filter(i => imgState.get(i.src) === "ok"), f = factOf(x), out = [{ brk: 1 }];
         if (P[0]) out.push({ img: P[0] });
@@ -1602,7 +1615,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const bgOf = x => imgsOf(x).find(i => !i.video && imgState.get(i.src) === "ok");
       const gHTML = (x, sl, d) => {
         const icon = SOTH_ICONS[x.topic] || SOTH_ICONS.news, pl = x.places || [], tone = { head: 1, map: 3, stat: 2, type: 0, split: 2 }[sl.g] ?? 0;
-        const beat = sl.g === "head" ? `<div class="so-beat so-head"><div class="so-ico">${icon}<i></i><i></i></div><div class="so-hd"><span class="so-tag red">${x.upd ? "নতুন তথ্য" : "এইমাত্র"}</span><span class="so-tag">${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span><h1>${soWords(x.title, d * 0.6, pl)}</h1></div></div>`
+        const beat = sl.g === "head" ? `<div class="so-beat so-head"><div class="so-ico">${icon}<i></i><i></i></div><div class="so-hd"><span class="so-tag red">${x.upd ? "নতুন তথ্য" : calm(x) ? "বিস্তারিত" : "এইমাত্র"}</span><span class="so-tag">${esc(deskOf(x))}</span><h1>${soWords(x.title, d * 0.6, pl)}</h1></div></div>`
           : sl.g === "map" ? `<div class="so-beat so-map"><div class="so-mapbox"><svg preserveAspectRatio="xMidYMid meet"></svg></div></div>`
           : sl.g === "stat" ? `<div class="so-beat so-stat"><div class="so-fig"><b class="num" data-to="${sl.f.n}" data-dec="${sl.f.dec ? 1 : 0}">০</b><em>${esc(sl.f.unit)}</em></div><p>${soWords(sl.f.line, d, pl)}</p></div>`
           : sl.g === "split" ? `<div class="so-beat so-split"><div class="so-ico sm">${icon}</div><p>${soWords(sl.l, d, pl)}</p></div>`
@@ -1660,7 +1673,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       };
       const exDate = () => bnDigits(new Date(now() + 5.5 * 3600e3).toLocaleDateString("bn-IN", { timeZone: "UTC", day: "numeric", month: "long" }));
       const exHTML = (x, sl, d) => {
-        const pl = x.places || [], desk = esc(DESK_BN[x.desk] || x.desk || "খবর"), bg = bgOf(x);
+        const pl = x.places || [], desk = esc(deskOf(x)), bg = bgOf(x);
         const back = bg && sl.ex !== "clip" && sl.ex !== "close" ? `<img class="ex-bgimg" src="${esc(bg.src)}" alt="" referrerpolicy="no-referrer">` : "";
         const kick = t => `<span class="ex-kick">${t}</span>`;
         const body = sl.ex === "head" ? `<div class="ex-head">${kick(`${desk} · ${x.upd ? "নতুন তথ্য" : sl.close ? "এক নজরে" : "এইমাত্র"}`)}<h1>${exWords(x.title, d * 0.55, pl)}</h1></div>`
@@ -1674,9 +1687,13 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         return `<div class="avo-slide ex-s ex-${sl.ex}">${back}<div class="ex-cam">${body}</div></div>`;
       };
       const slideHTML = (x, sl, d = 5) => {
+        if (calm(x) && !sl.ex && !sl.g && !sl.img && !sl.fact && !sl.pts) {
+          const vid = imgsOf(x).find(i => i.video), bg = vid ? null : bgOf(x), look = vid ? "vid" : bg ? "img" : "plain";
+          return `<div class="avo-slide"><div class="avo-brk calm ${look}">${vid ? `<div class="brk-v">${mediaTag(vid)}</div><i class="tint"></i>` : bg ? `<div class="brk-p"><img class="bg" src="${esc(bg.src)}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('ok')"></div>` : ""}<i class="s1"></i><i class="s2"></i><div class="in"><span class="brk-tag">বিস্তারিত</span><small data-no-tr>RASHTRIX NEWS</small><b>${esc(x.title)}</b></div></div></div>`;
+        }
         if (sl.ex) return exHTML(x, sl, d);
         if (sl.g) return gHTML(x, sl, d);
-        const desk = esc(DESK_BN[x.desk] || x.desk || "খবর");
+        const desk = esc(deskOf(x));
         if (sl.img && sl.fx === "duo") return `<div class="avo-slide fx-duo">${mediaTag(sl.img)}<i class="duo"></i><b class="avo-big">${esc(x.title)}</b></div>`;
         if (sl.img && sl.fx === "split") return `<div class="avo-slide fx-split"><div class="sp a">${mediaTag(sl.img)}</div><div class="sp b">${mediaTag(sl.img)}</div><i class="sp-line"></i></div>`;
         if (sl.img) return `<div class="avo-slide">${mediaTag(sl.img)}</div>`;
@@ -1693,8 +1710,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         <small class="avo-credit"></small>
         <div class="avo-steps ex-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${lens[j]}s"></i>`).join("")}</div></div>`
         : `<div class="avo${channel === "v" ? " v" : ""}" data-k="${k}"><div class="avo-pics"></div><i class="avo-shade"></i>
-        <div class="avo-kick"><i class="lt-pulse"></i><b>এই মুহূর্তে</b><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span></div>
-        <div class="avo-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>এই মুহূর্তে</small></span><span class="lt-text">${esc(x.title)}</span></div>
+        <div class="avo-kick"><i class="lt-pulse"></i><b>${calm(x) ? "খবর" : "এই মুহূর্তে"}</b><span>${esc(calm(x) ? "বিস্তারিত" : deskOf(x))}</span></div>
+        <div class="avo-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>${calm(x) ? "বিস্তারিত" : "এই মুহূর্তে"}</small></span><span class="lt-text">${esc(x.title)}</span></div>
         <small class="avo-credit"></small>
         <div class="avo-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${lens[j]}s"></i>`).join("")}</div></div>`;
       // The newsreader: the story's recordings one after the other, through the music's sound engine.
@@ -1801,7 +1818,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           // progress stay on screen; the strip's headline changes, and its picture comes in under the
           // stinger with a whoosh.
           box0.dataset.k = k;
-          const kick = box0.querySelector(".avo-kick span"); if (kick) kick.textContent = DESK_BN[x.desk] || x.desk || "খবর";
+          const kick = box0.querySelector(".avo-kick span"); if (kick) kick.textContent = calm(x) ? "বিস্তারিত" : deskOf(x);
+          const kb = box0.querySelector(".avo-kick b"); if (kb) kb.textContent = calm(x) ? "খবর" : "এই মুহূর্তে";
+          const ls = box0.querySelector(".avo-l3 .lt-tag small"); if (ls) ls.textContent = calm(x) ? "বিস্তারিত" : "এই মুহূর্তে";
           const lt = box0.querySelector(".avo-l3 .lt-text, .ex-cap .lt-text"); if (lt) { lt.textContent = x.title; lt.classList.remove("swap"); void lt.offsetWidth; lt.classList.add("swap"); }
           box0.querySelectorAll(".avo-steps i").forEach((n, j) => { n.className = j < k ? "done" : j === k ? "on" : ""; });
           if (!st.muted) whoosh(st.audio);
@@ -1837,13 +1856,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // The two-minute bulletins carry up to seven stories; the 65-second ones at :15 and :45, four.
       // Each story stays on screen as long as the newsreader takes to read it (when its line is
       // ready); as many stories as fit, the spare seconds shared out among them.
-      const total = sc.dur || 120, short = total < 100, all = bulletinPick(Math.floor((sc.playAt || sc.startAt || now()) / QUARTER) * QUARTER, short), intro = 12;
+      const total = sc.dur || 120, short = total < 100, all = g.stories?.length ? g.stories : bulletinPick(Math.floor((sc.playAt || sc.startAt || now()) / QUARTER) * QUARTER, short), intro = 12;
       const even = all.length ? (total - intro) / all.length : total, plan = [];
       { let t = intro;
         for (const x of all) { const d = x.secs ? Math.max(8, x.secs + 1) : even; if (plan.length && t + d > total - 0.5) break; plan.push({ x, at: t, d }); t += d; }
         const spare = Math.max(0, total - t) / Math.max(1, plan.length); let a = intro;
         plan.forEach(p => { p.d += spare; p.at = a; a += p.d; }); }
       const list = plan.map(p => p.x), per = plan[0]?.d || even;
+      // The broadcast output records each bulletin it airs (the Segment & bulletin desk).
+      if (output && !g.stories && list.length) progRecord("bulletin", "", Math.floor((sc.playAt || sc.startAt || now()) / QUARTER) * QUARTER, list, short);
       const at = new Date(sc.playAt || sc.startAt || now()), when = slotWords(new Date(Math.floor(at.getTime() / QUARTER) * QUARTER)), day = bnDate(at);
       const opening = () => `<div class="nb${channel === "v" ? " v" : ""}">${newsDeco()}<i class="nb-ray"></i><i class="nb-ray r2"></i><i class="nb-ring"></i><i class="nb-ring b"></i>
         <div class="nb-logo"><img src="${LOGO}" alt="রাষ্ট্রিক্স"></div>
@@ -1852,7 +1873,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // A story with a photo (free-licence, from Wikimedia Commons) shows it wiping in beside the
       // text, slowly zooming, with its credit in small type.
       const story = (x, k) => `<div class="bs${channel === "v" ? " v" : ""}${x.image ? " has-img" : ""}"><i class="bs-bg"></i>${newsDeco()}<i class="bs-glow"></i>${x.image ? `<div class="bs-img" style="--d:${plan[k]?.d || per}s"><img src="${esc(x.image)}" alt="" referrerpolicy="no-referrer"></div>${x.credit ? `<small class="bs-credit">${esc(x.credit)}</small>` : ""}` : ""}
-        <div class="bs-side"><em>${bnDigits(k + 1)}</em><small>/ ${bnDigits(list.length)}</small><span>${esc(DESK_BN[x.desk] || x.desk || "খবর")}</span>${x.tag ? `<b class="bs-new">${esc(x.tag)}</b>` : ""}</div>
+        <div class="bs-side"><em>${bnDigits(k + 1)}</em><small>/ ${bnDigits(list.length)}</small><span>${esc(deskOf(x))}</span>${x.tag ? `<b class="bs-new">${esc(x.tag)}</b>` : ""}</div>
         <div class="bs-main"><h2>${String(x.title || "").split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</h2><p>${esc(x.text || "")}</p></div>
         <div class="bs-strap"><b data-no-tr>NEWS BULLETIN</b><span>${esc(when)}</span><div class="bs-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${plan[j]?.d || per}s"></i>`).join("")}</div><img src="${LOGO}" alt=""></div></div>`;
       let shown = -9;

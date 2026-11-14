@@ -371,3 +371,15 @@ dialog::backdrop { background: #000a; }
 .ad-filters .btn small{opacity:.75;font-weight:700}
 .ad-group{margin:18px 0 6px;font-size:15px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted, #9aa)}
 .ad-group:first-child{margin-top:4px}
+
+/* The Segment & bulletin desk */
+.pd{max-width:1100px;margin:0 auto}
+.pd-list{display:flex;flex-direction:column;gap:10px}
+.pd-card .ad-body{width:100%}
+.pd-items{margin:6px 0;padding-left:22px;display:flex;flex-direction:column;gap:8px}
+.pd-items li b{display:block}
+.pd-items li small{display:block;color:var(--muted,#9aa)}
+.pd-edit{display:flex;flex-direction:column;gap:10px;margin:8px 0;padding:12px;border:1px dashed var(--line);border-radius:10px}
+.pd-erow{display:flex;gap:10px;align-items:flex-start}
+.pd-n{flex:none;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:var(--amber);color:#111;font-weight:800}
+.pd-edit input,.pd-edit textarea{width:100%}

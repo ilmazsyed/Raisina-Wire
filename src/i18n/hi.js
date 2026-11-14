@@ -1421,4 +1421,10 @@ export default {
   "Update BIG BREAKING": "बड़ी ब्रेकिंग बदलें",
   "Write at least one line.": "कम से कम एक पंक्ति लिखें।",
   "Choose a channel.": "चैनल चुनें।",
+  "Segment & bulletin desk": "सेगमेंट और बुलेटिन डेस्क",
+  "Unarchive": "संग्रह से निकालें",
+  "Hide stories": "खबरें छिपाएँ",
+  "Yesterday": "कल",
+  "▶ Play again": "▶ फिर चलाएँ",
+  "Back to today and yesterday": "आज और कल पर लौटें",
 };

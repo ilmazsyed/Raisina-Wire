@@ -1775,3 +1775,11 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .v .nd-words b{font-size:200px}
 /* the app on phones: lighter (no moving lines or turning globe) */
 .tvp-app .nd-map path,.tvp-app .nd-globe .spin,.tvp-app .nd-scan{animation:none}
+
+/* An AVO made from a breaking: a story card, not the breaking one. */
+.avo-brk.calm{background:linear-gradient(135deg,#0f1b2e,#1d2f4d 60%,#28406a)}
+.avo-brk.calm.plain .s1{background:repeating-linear-gradient(115deg,rgba(255,255,255,.03) 0 40px,transparent 40px 80px)}
+.avo-brk.calm .brk-tag{background:#f2c14e;color:#1a1204;animation:nupop .5s .35s cubic-bezier(.2,1.6,.4,1) both}
+.avo-brk.calm small{color:#cfe0ff}
+.avo-brk.calm.vid .in{background:rgba(12,24,44,.78)}
+.avo-brk.calm.img{background:linear-gradient(135deg,#0f1b2e,#24395d)}

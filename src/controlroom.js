@@ -3,6 +3,7 @@
 import { checkKey, copyImage } from "./tvchannel.js";
 import { handleRundowns } from "./rundown.js";
 import { handleClips, markClipUsed } from "./clips.js";
+import { handleProgs } from "./progs.js";
 
 const CH = ["h", "v"];
 // Commands that change what goes on air are written to the audit log (who did what, when).
@@ -88,7 +89,7 @@ export async function handleControlRoom(request, env, url, { json, err, currentU
     return json(await companion(env, comp[1], comp[2], (u, ...a) => auditFn(u, ...a)), 200, { "cache-control": "no-store" });
   }
 
-  const staffPaths = /^\/api\/(ctl\/(h|v)\/cmd|admin\/(rundowns|templates|asrun|proof|clips|macros|companion|copy-image|inputs)(\/|$))/;
+  const staffPaths = /^\/api\/(ctl\/(h|v)\/cmd|admin\/(rundowns|templates|asrun|proof|clips|progs|macros|companion|copy-image|inputs)(\/|$))/;
   if (!staffPaths.test(p)) return null;
   const user = await currentUser(request, env);
   if (!isStaff(user)) return err("Editor access required.", 403);
@@ -119,6 +120,8 @@ export async function handleControlRoom(request, env, url, { json, err, currentU
     return json(out, out.ok ? 200 : 400, { "cache-control": "no-store" });
   }
   if (p.startsWith("/api/admin/clips")) return handleClips(request, env, url, user, helpers);
+  // The Segment & bulletin desk (src/progs.js): a recorded one is played as a one-item rundown.
+  if (p.startsWith("/api/admin/progs")) return handleProgs(request, env, url, user, { ...helpers, play: (ch, rundown) => control(env, ch, "rundown.load", { rundown, index: 0, auto: true }, user.display_name || user.email, "prog") });
   // A picture pasted as a Google Drive link (or any https address) is copied into the app once.
   if (p === "/api/admin/copy-image" && request.method === "POST") {
     const b = await request.json().catch(() => ({}));
