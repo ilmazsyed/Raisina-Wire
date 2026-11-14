@@ -1388,4 +1388,12 @@ export default {
   "Upload picture": "तस्वीर अपलोड",
   "Upload video (plays muted)": "वीडियो अपलोड (बिना आवाज़)",
   "Add link": "लिंक जोड़ें",
+  "Library": "लाइब्रेरी",
+  "Send to PCR": "पीसीआर को भेजें",
+  "Take back from the PCR": "पीसीआर से वापस लें",
+  "Place bulletins & segments": "बुलेटिन और सेगमेंट रखें",
+  "Last 24 hours": "पिछले 24 घंटे",
+  "24 to 48 hours ago": "24 से 48 घंटे पहले",
+  "48 to 72 hours ago": "48 से 72 घंटे पहले",
+  "News bulletin": "न्यूज़ बुलेटिन",
 };

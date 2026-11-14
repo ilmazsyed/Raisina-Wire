@@ -11,7 +11,8 @@ const main = $("main");
 
 const TYPE_ADD = Object.entries(ITEM_TYPES);
 const SOURCE_KINDS = { continuity: "Running order", yt: "YouTube video", clip: "App clip", guest: "Studio guest", hls: "HLS stream", whep: "WebRTC (WHEP) stream", vdo: "VDO.Ninja view link", image: "Picture" };
-const DEFAULTS = { video: 120, clip: 60, live: 300, breaking: 20, headlines: 40, lband: 60, promo: 15, adbreak: 60, slate: 10 };
+const DEFAULTS = { video: 120, clip: 60, live: 300, breaking: 20, headlines: 40, lband: 60, promo: 15, adbreak: 60, slate: 10, bulletin: 120, segment: 70 };
+const SEGS = { city: "শহরের খবর", kolkata10: "কলকাতা ১০", bangladesh: "বাংলাদেশ ডেস্ক", world: "এক মিনিটে বিশ্ব", numbers: "সংখ্যায় আজ", sports: "খেলার খবর", entertainment: "বিনোদন", lifestyle: "জীবনধারা", onthisday: "আজকের দিনে", soth: "এই ঘণ্টার বড় খবর" };
 
 async function loadList() {
   const q = S.archive ? `archived=1&from=${S.from || istDay(Date.now() - 30 * 864e5)}&to=${S.to || istDay()}` : `day=${S.day}`;
@@ -90,7 +91,7 @@ function drawList() {
       : `<label style="flex:1">Day<input type="date" id="day" value="${S.day}"></label>`}</div>
     <div class="row" style="margin-bottom:10px"><button class="btn" id="archToggle">${S.archive ? "← Working rundowns" : "Archive"}</button>${S.archive ? "" : `<button class="btn green" id="newRd">+ New rundown</button>`}</div>
     ${S.archive ? "" : `<div class="row" style="margin-bottom:10px"><select id="fromTpl" style="flex:1"><option value="">From a template…</option>${S.templates.filter(t => t.channel === S.ch).map(t => `<option value="${t.id}">${esc(t.title)} · ${esc(t.slot_start || "")}</option>`).join("")}</select></div>`}
-    <div>${S.list.length ? S.list.map(r => `<button class="rd" data-id="${r.id}"${S.rd?.id === r.id ? ' aria-current="true"' : ""}><b data-no-tr>${esc(r.title)}</b><small>${S.archive ? `${digits(r.day)} · ` : ""}${r.slot_start ? digits(r.slot_start) + " · " : ""}${digits(fmt(r.seconds))} / ${digits(r.slot_minutes)} min · ${digits(r.items)} items</small></button>`).join("") : `<p class="muted">No rundowns${S.archive ? " in these dates" : " for this day yet"}.</p>`}</div>
+    <div>${S.list.length ? S.list.map(r => `<button class="rd" data-id="${r.id}"${S.rd?.id === r.id ? ' aria-current="true"' : ""}><b data-no-tr>${esc(r.title)}</b>${r.pcr_sent_at ? ` <span class="tag ${r.pcr_aired_at ? "" : "red"}">${r.pcr_aired_at ? "AIRED" : "PCR"}</span>` : ""}<small>${S.archive ? `${digits(r.day)} · ` : ""}${r.slot_start ? digits(r.slot_start) + " · " : ""}${digits(fmt(r.seconds))} / ${digits(r.slot_minutes)} min · ${digits(r.items)} items</small></button>`).join("") : `<p class="muted">No rundowns${S.archive ? " in these dates" : " for this day yet"}.</p>`}</div>
     <hr style="border-color:var(--line)"><div class="row"><button class="btn" id="avoBtn">AVO stories</button><button class="btn" id="storiesBtn">Channel videos</button><button class="btn" id="clipsBtn">Clips library</button><button class="btn" id="tplBtn">Templates</button><button class="btn" id="asrunBtn">As-run log</button></div>`;
   $$("[data-ch]", L).forEach(b => b.onclick = () => { S.ch = b.dataset.ch; S.rd = null; loadList().then(() => drawRundown()); loadOnAir(); });
   $$(".rd", L).forEach(b => b.onclick = () => openRundown(b.dataset.id).catch(fail));
@@ -129,7 +130,8 @@ function drawRundown() {
       <label>Starts<input type="time" id="rdStart" value="${esc(r.slot_start)}" ${ro ? "disabled" : ""}></label>
       <label>Slot (min)<input type="number" id="rdSlot" min="1" max="720" value="${r.slot_minutes}" style="width:80px" ${ro ? "disabled" : ""}></label></div>
     <div class="row" style="margin-bottom:8px">${ro ? `<span class="tag amber">Archived</span><button class="btn" id="copyRd">Copy to today</button>` : `<button class="btn red" id="onAir">▶ On air from the top</button><button class="btn" id="onAirSel" ${S.sel ? "" : "disabled"}>▶ On air from selected</button><button class="btn" id="saveTpl">Save as template</button><button class="btn" id="copyRd">Copy</button><button class="btn" id="nrcs">Import from Command Centre</button>`}
-      <button class="btn" id="print">Print (PDF)</button>${ro ? "" : `<button class="btn" id="delRd">Delete</button>`}</div>
+      <button class="btn" id="print">Print (PDF)</button>${ro ? "" : `<button class="btn" id="libBtn">Library</button><button class="btn" id="fixedBtn" title="The channel's bulletins and segments at their times in this slot">Place bulletins &amp; segments</button>`}${ro ? "" : `<button class="btn" id="delRd">Delete</button>`}</div>
+    ${ro ? "" : `<div class="rd-pcr ${r.pcr_sent_at ? "on" : ""}"><button class="btn ${r.pcr_sent_at ? "" : "red"}" id="pcrBtn">${r.pcr_sent_at ? "Take back from the PCR" : "Send to PCR"}</button><span>${r.pcr_sent_at ? (r.pcr_aired_at && r.pcr_aired_at !== "missed" && r.pcr_aired_at !== "empty" ? `<b>Went on air</b> at ${digits(istClock(Date.parse(r.pcr_aired_at), false))}` : r.pcr_aired_at === "missed" ? "Its start time passed" : `<b>Sent to the PCR.</b> It cuts to air at ${digits(r.slot_start || "—")} by itself, and the channel goes back to autopilot when it ends.`) : r.slot_start ? `Not sent. Send it and it goes on air at ${digits(r.slot_start)} by itself.` : "Give it a start time, then send it to the PCR."}</span></div>`}
     <div class="rd-time" id="rdTime"></div>
     <table class="items"><thead><tr><th></th><th>#</th><th>Type</th><th>Item</th><th>Length</th><th>From top</th><th>Back-time</th><th></th></tr></thead><tbody></tbody></table>
     ${ro ? "" : `<div class="add-row">${TYPE_ADD.map(([k, n]) => `<button class="btn sm" data-add="${k}">+ ${n}</button>`).join("")}</div>`}`;
@@ -144,6 +146,11 @@ function drawRundown() {
   $("#copyRd", C)?.addEventListener("click", async () => { try { const d = await api(`/api/admin/rundowns/${r.id}/copy`, { method: "POST", body: { day: istDay() } }); S.archive = false; S.day = istDay(); await loadList(); await openRundown(d.id); toast("Copied to today."); } catch (e) { fail(e); } });
   $("#delRd", C)?.addEventListener("click", async () => { if (!confirm("Delete this rundown and all its items?")) return; try { await api(`/api/admin/rundowns/${r.id}`, { method: "DELETE" }); S.rd = null; await loadList(); drawRundown(); } catch (e) { fail(e); } });
   $("#print", C).onclick = () => printRundown();
+  $("#libBtn", C)?.addEventListener("click", libraryDialog);
+  $("#fixedBtn", C)?.addEventListener("click", async () => { try { const d = await api(`/api/admin/rundowns/${r.id}/fixed`, { method: "POST" }); toast(d.fixed ? `${d.fixed} bulletins and segments placed at their times.` : "Give the rundown a start time first."); openRundown(r.id); } catch (e) { fail(e); } });
+  $("#pcrBtn", C)?.addEventListener("click", async () => { const on = !r.pcr_sent_at;
+    if (on && !confirm(`Send "${r.title}" to the PCR? At ${r.slot_start || "its start time"} the channel leaves autopilot and runs this rundown; when it ends, autopilot comes back.`)) return;
+    try { await api(`/api/admin/rundowns/${r.id}/pcr`, { method: "PUT", body: { sent: on } }); toast(on ? "Sent to the PCR." : "Taken back."); openRundown(r.id); loadList(); } catch (e) { fail(e); } });
   $("#nrcs", C)?.addEventListener("click", () => nrcsDialog());
   drawItems(); drawItem();
 }
@@ -160,12 +167,16 @@ function drawItems() {
   const air = S.onair?.rundown?.id === r.id ? S.onair.rundown.items[S.onair.rundown.index]?.id : null;
   const start = r.startsAt ? Date.parse(r.startsAt) : null;
   tb.innerHTML = r.items.map((it, i) => { const row = t.rows[i];
-    return `<tr class="it ${it.status === "skipped" ? "skipped" : ""} ${air === it.id ? "onair" : ""}" data-id="${it.id}" ${ro ? "" : 'draggable="true"'}${S.sel === it.id ? ' aria-current="true"' : ""}>
-      <td class="grip">${ro ? "" : "⋮⋮"}</td><td class="num">${digits(i + 1)}</td><td><span class="type ${it.type}">${ITEM_TYPES[it.type] || it.type}</span></td>
-      <td><b data-no-tr>${esc(it.title || "—")}</b>${it.data.lowerThird ? `<br><small class="muted" data-no-tr>${esc(it.data.lowerThird)}</small>` : ""}</td>
+    const fx = !!it.data.fixed;
+    return `<tr class="it ${it.status === "skipped" ? "skipped" : ""} ${air === it.id ? "onair" : ""} ${fx ? "fixed" : ""}" data-id="${it.id}" ${ro || fx ? "" : 'draggable="true"'}${S.sel === it.id ? ' aria-current="true"' : ""}>
+      <td class="grip">${ro ? "" : fx ? `<span title="Fixed: the channel's clock">🔒</span>` : `<span class="mv"><button type="button" data-up="${it.id}" aria-label="Move up" ${i ? "" : "disabled"}>▲</button><button type="button" data-down="${it.id}" aria-label="Move down" ${i < r.items.length - 1 ? "" : "disabled"}>▼</button></span>`}</td><td class="num">${digits(i + 1)}</td><td><span class="type ${it.type}">${ITEM_TYPES[it.type] || it.type}</span>${fx ? `<br><small class="muted">at ${digits(it.data.at || "")}</small>` : ""}</td>
+      <td><b data-no-tr>${esc(it.title || "—")}</b>${it.data.lowerThird ? `<br><small class="muted" data-no-tr>${esc(it.data.lowerThird)}</small>` : ""}${fx && !ro ? `<br><button type="button" class="btn sm" data-fskip="${it.id}">${it.status === "skipped" ? "Unskip" : "Skip"}</button>` : ""}</td>
       <td class="dur">${digits(fmt(row.dur))}</td><td class="t">${digits(fmt(row.start))}</td>
       <td class="t">${start ? digits(istClock(start + row.backStart * 1000)) : `−${digits(fmt(t.slot ? t.slot - row.backStart : t.total - row.start))}`}</td>
       <td>${air === it.id ? '<span class="tag red">ON AIR</span>' : ""}</td></tr>`; }).join("") || `<tr><td colspan="8" class="muted" style="padding:20px">No items yet. Add them with the buttons below.</td></tr>`;
+  $$("[data-up],[data-down]", tb).forEach(b => b.onclick = e => { e.stopPropagation(); moveBy(b.dataset.up || b.dataset.down, b.dataset.up ? -1 : 1); });
+  $$("[data-fskip]", tb).forEach(b => b.onclick = async e => { e.stopPropagation(); const it = r.items.find(x => x.id === b.dataset.fskip);
+    try { await api(`/api/admin/rundowns/${r.id}/items/${it.id}`, { method: "PUT", body: { status: it.status === "skipped" ? "ready" : "skipped" } }); openRundown(r.id); } catch (x) { fail(x); } });
   $$("tr.it", tb).forEach(tr => {
     tr.onclick = () => { S.sel = tr.dataset.id; $$("tr.it", tb).forEach(x => x.toggleAttribute("aria-current", x === tr)); $("#onAirSel") && ($("#onAirSel").disabled = false); drawItem(); };
     if (ro) return;
@@ -175,6 +186,44 @@ function drawItems() {
     tr.addEventListener("drop", e => { e.preventDefault(); const id = e.dataTransfer.getData("text/plain"); if (id && id !== tr.dataset.id) reorder(id, tr.dataset.id); });
   });
   // Keyboard: Alt+↑ / Alt+↓ move the selected item.
+}
+// ▲ / ▼: one place up or down (past the fixed items, which keep their time).
+async function moveBy(id, d) {
+  const items = S.rd.items, i = items.findIndex(x => x.id === id); let j = i + d;
+  while (j >= 0 && j < items.length && items[j].data.fixed) j += d;
+  if (j < 0 || j >= items.length) return;
+  const [it] = items.splice(i, 1); items.splice(j, 0, it); S.sel = id; drawItems();
+  try { await api(`/api/admin/rundowns/${S.rd.id}/order`, { method: "PUT", body: { ids: items.map(x => x.id) } }); openRundown(S.rd.id); } catch (e) { fail(e); openRundown(S.rd.id); }
+}
+// The library: the channel's YouTube videos and the AVO stories of the last three days, by age.
+async function libraryDialog() {
+  if (!S.rd) return toast("Open a rundown first.");
+  const d = dialog(`<h3>Library</h3><p class="muted">${S.ch === "h" ? "Rashtrix TV" : "Rashtrix Shorts"}: YouTube videos and AVO stories from the last three days. Add any to the rundown; it goes in after the selected item.</p>
+    <div class="row lib-tabs"><button class="btn sm on" data-lt="all">All</button><button class="btn sm" data-lt="video">Videos</button><button class="btn sm" data-lt="avo">AVO</button></div><div id="lib" class="lib"><p class="muted">Loading…</p></div>`);
+  let L; try { L = await api(`/api/admin/rundowns/library?channel=${S.ch}`); } catch (e) { $("#lib", d).innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
+  const age = t => (Date.now() - Date.parse(t)) / 3600e3, BANDS = [[0, 24, "Last 24 hours"], [24, 48, "24 to 48 hours ago"], [48, 72, "48 to 72 hours ago"]];
+  const t = s => new Date(s).toLocaleString("en-GB", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const all = [...L.videos.map(v => ({ k: "video", id: v.ytId, at: v.at, v })), ...L.avo.map(x => ({ k: "avo", id: x.id, at: x.at, x }))].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  let tab = "all";
+  const draw = () => { const list = all.filter(i => tab === "all" || i.k === tab);
+    $("#lib", d).innerHTML = BANDS.map(([a, b, name]) => { const g = list.filter(i => age(i.at) >= a && age(i.at) < b);
+      return `<section><h4>${name} <small class="muted">${digits(g.length)}</small></h4>${g.map(i => i.k === "video"
+        ? `<div class="clip"><img src="${esc(i.v.thumb || `https://i.ytimg.com/vi/${i.v.ytId}/mqdefault.jpg`)}" alt=""><div style="flex:1"><span class="type video">Video</span> <b data-no-tr>${esc(i.v.title)}</b><br><small>${digits(fmt(i.v.dur || 0))} · ${t(i.at)}</small></div><button class="btn sm" data-lv="${esc(i.id)}">Add</button></div>`
+        : `<div class="clip"><img src="${esc(i.x.images[0]?.src || "/partners/calibrex-mark.svg")}" alt=""><div style="flex:1"><span class="type avo">AVO</span> <b data-no-tr>${esc(i.x.title)}</b><br><small>${digits(Math.round(i.x.secs || 0))} s voice · ${digits(i.x.images.length)} pictures · ${t(i.at)}</small></div><button class="btn sm" data-la="${esc(i.id)}">Add</button></div>`).join("") || `<p class="muted">Nothing.</p>`}</section>`; }).join("");
+    $$("[data-lv]", d).forEach(b => b.onclick = () => addFromLib(b, { type: "video", title: (L.videos.find(v => v.ytId === b.dataset.lv).title || "").slice(0, 200), duration: L.videos.find(v => v.ytId === b.dataset.lv).dur || 60, data: { ytId: b.dataset.lv } }));
+    $$("[data-la]", d).forEach(b => b.onclick = () => { const x = L.avo.find(y => y.id === b.dataset.la); addFromLib(b, { type: "avo", title: x.title.slice(0, 200), duration: Math.ceil(x.secs > 0 ? Math.max(8, x.secs + 2) + 4 : 24), data: { story: x, avoId: x.id } }); });
+  };
+  $$("[data-lt]", d).forEach(b => b.onclick = () => { tab = b.dataset.lt; $$("[data-lt]", d).forEach(x => x.classList.toggle("on", x === b)); draw(); });
+  draw();
+}
+async function addFromLib(btn, body) {
+  btn.disabled = true;
+  try {
+    const after = S.rd.items.findIndex(x => x.id === S.sel), d = await api(`/api/admin/rundowns/${S.rd.id}/items`, { method: "POST", body });
+    await openRundown(S.rd.id);
+    if (after >= 0) { const ids = S.rd.items.map(x => x.id).filter(x => x !== d.id); ids.splice(after + 1, 0, d.id); await api(`/api/admin/rundowns/${S.rd.id}/order`, { method: "PUT", body: { ids } }); }
+    S.sel = d.id; await openRundown(S.rd.id); btn.textContent = "Added";
+  } catch (e) { fail(e); btn.disabled = false; }
 }
 async function reorder(id, beforeId) {
   const items = S.rd.items, from = items.findIndex(x => x.id === id); const [it] = items.splice(from, 1);
@@ -210,6 +259,8 @@ function drawItem() {
   if (it.type === "headlines") specific = `<label>Title<input name="htitle" value="${esc(d.title || "")}" placeholder="শিরোনাম" ${dis}></label><label>Headlines (one a line, up to 5; empty = the latest from the site)<textarea name="lines" rows="5" ${dis}>${esc(d.lines || "")}</textarea></label>`;
   if (it.type === "lband") specific = `<label>Band headline<input name="text" value="${esc(d.text || "")}" ${dis}></label><label>Band lines (one a line)<textarea name="lines" rows="4" ${dis}>${esc(d.lines || "")}</textarea></label><div class="src-row"><select name="lbKind" ${dis}>${["continuity", "yt", "clip", "hls", "whep", "image"].map(k => `<option value="${k}" ${(d.source?.kind || "continuity") === k ? "selected" : ""}>${SOURCE_KINDS[k]}</option>`).join("")}</select><input name="lbRef" value="${esc(d.source?.id || d.source?.url || "")}" placeholder="Link (not needed for the running order)" ${dis}></div>`;
   if (it.type === "promo" || it.type === "slate") specific = `<label>Picture (Google Drive link or https address; copied into the app)<input name="image" value="${esc(d.image || "")}" ${dis}></label>${it.type === "slate" ? `<label>Slate text<input name="text" value="${esc(d.text || "")}" ${dis}></label>` : ""}`;
+  if (it.type === "bulletin") specific = `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="short" ${d.short ? "checked" : ""} ${dis}> Quick bulletin (খবর সংক্ষেপে)</label><p class="muted">The channel's bulletin: its stories, pictures and the newsreader, as it is at air time.${d.fixed ? ` Fixed at ${digits(d.at || "")} by the channel's clock.` : ""}</p>`;
+  if (it.type === "segment") specific = `<label>Segment<select name="seg" ${dis}>${Object.entries(SEGS).map(([k, n]) => `<option value="${k}" ${d.name === k ? "selected" : ""}>${n}</option>`).join("")}</select></label><p class="muted">Built from the channel's material at air time.${d.fixed ? ` Fixed at ${digits(d.at || "")} by the channel's clock.` : ""}</p>`;
   if (it.type === "adbreak") specific = `<label>Ads (one a line: picture link, seconds)<textarea name="ads" rows="5" ${dis}>${esc((d.items || []).map(x => `${x.image}, ${x.seconds}`).join("\n"))}</textarea></label>`;
   R.innerHTML = `<form class="stack" autocomplete="off"><h3><span class="type ${it.type}">${ITEM_TYPES[it.type]}</span></h3>
     <label>Title (for the rundown)<input name="title" value="${esc(it.title)}" data-no-tr ${dis}></label>
@@ -253,6 +304,9 @@ async function saveItem(it, F) {
     if (it.type === "headlines") Object.assign(d, { title: f.htitle, lines: f.lines });
     if (it.type === "lband") { const k = f.lbKind, ref = f.lbRef.trim(); Object.assign(d, { text: f.text, lines: f.lines, source: k === "continuity" ? null : k === "yt" ? { kind: k, id: ref.match(/(?:v=|youtu\.be\/|shorts\/|live\/)([\w-]{11})/)?.[1] || ref } : { kind: k, url: k === "image" ? await copyPic(ref) : ref } }); }
     if (it.type === "promo" || it.type === "slate") Object.assign(d, { image: await copyPic(f.image.trim()), text: f.text });
+    if (it.type === "bulletin") Object.assign(d, { short: !!F.elements.short.checked, at: it.data.at || "", fixed: !!it.data.fixed });
+    if (it.type === "segment") Object.assign(d, { name: f.seg, at: it.data.at || "", fixed: !!it.data.fixed });
+    if (it.type === "avo") Object.assign(d, { avoId: it.data.avoId, story: it.data.story });
     if (it.type === "adbreak") d.items = await Promise.all(f.ads.split("\n").map(l => l.trim()).filter(Boolean).map(async l => { const [img, sec] = l.split(/,\s*(?=\d+\s*$)/); return { image: await copyPic(img.trim()), seconds: Number(sec) || 10 }; }));
     await api(`/api/admin/rundowns/${S.rd.id}/items/${it.id}`, { method: "PUT", body: { title: f.title, duration: f.duration ? parseTime(f.duration) : it.duration, script: f.script, data: d } });
     toast("Saved."); await openRundown(S.rd.id);

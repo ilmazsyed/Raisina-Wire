@@ -1129,7 +1129,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       return { ...c.program, startAt: c.program.takenAt, key: `m:${c.program.takenAt}${cont ? `:${seg ? `${seg.ytId || seg.type}:${seg.start}` : "none"}` : ""}` };
     }
     const r = c?.rundown;
-    if (r && r.items?.[r.index]) { const it = r.items[r.index]; return { ...it.scene, startAt: r.pausedAt ? now() - (r.pausedAt - r.itemStartedAt) : r.itemStartedAt, key: `r:${r.id}:${r.index}:${r.itemStartedAt}` }; }
+    if (r && r.items?.[r.index]) {
+      const it = r.items[r.index], key = `r:${r.id}:${r.index}:${r.itemStartedAt}`; let scene = it.scene;
+      // A segment in a rundown is built from the channel's material when it goes on air (once).
+      if (scene?.graphic?.kind === "seg" && !scene.graphic.items && st.tv) {
+        if (st.segFill?.key !== key) { const b = segBuild(scene.graphic.name); st.segFill = { key, g: b ? { ...scene.graphic, head: b.head, items: b.items } : { kind: "headlines" } }; }
+        scene = { ...scene, graphic: st.segFill.g };
+      }
+      return { ...scene, startAt: r.pausedAt ? now() - (r.pausedAt - r.itemStartedAt) : r.itemStartedAt, key };
+    }
     return continuityScene();
   }
 
@@ -2165,6 +2173,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   }
   function tick() {
     if (!st.alive) return;
+    // While the sign-in form is open in the app, the player's graphics wait (typing stayed slow on
+    // iPads with the channel drawing behind it); the picture and sound go on.
+    if (mode === "app" && document.body.classList.contains("auth-open")) return;
     // Outputs apply realtime changes after the broadcast delay.
     while (st.queue.length && st.queue[0].at <= Date.now()) { st.ctl = st.queue.shift().state; onState?.(st.ctl); }
     let sc = resolve();

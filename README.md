@@ -168,6 +168,20 @@ the PCR and the app's story tools no longer have their own breaking button.
   (default 30) unused. MP4 (H.264) plays everywhere. Pictures pasted as Drive links (promo cards,
   slates, ad box) are copied into the app's storage.
 
+### Bulletin producer: the clock's items, the library and Send to PCR
+
+- **Fixed items:** a rundown with a start time gets the channel's own bulletins (:00 and :30, two
+  minutes; :15 and :45, the quick one) and the clock's segments at their times within its slot
+  (🔒 in the list, with the time). Stories move around them with ▲ / ▼ or by dragging, and they keep
+  their place by time; each can be skipped or put back. "Place bulletins & segments" places them
+  again (also done when the start time or the slot changes).
+- **Library:** the channel's YouTube videos and the AVO stories of the last three days, in three
+  groups (the last 24 hours, 24 to 48, 48 to 72); Add puts one after the selected item. An AVO in a
+  rundown is read afresh from the AVO engine when it goes on air.
+- **Send to PCR:** a rundown sent to the PCR goes on air by itself at its start time (the channel
+  leaves autopilot; the minute cron, `rundownCues`), and when it ends the channel goes back to
+  autopilot. The list marks it PCR, then AIRED.
+
 ## Phase 4: live studio
 
 - **Guests join from a link** (`/guest.html?t=…`, no install): camera preview, name and title (they
