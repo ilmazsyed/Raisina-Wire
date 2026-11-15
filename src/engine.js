@@ -421,10 +421,13 @@ export function vary(list, keep = 1) {
 // on with the same block at the same moment instead of choosing again and jumping.
 const RUNNING = {};
 const LAST = {};   // the channel's latest data, shared by every player on the page
-export function mountTV(host, { channel = "h", output = false, mode, key = "", scene: fixedScene = null, guestToken = "", onState, muted, tapUnmute = true } = {}) {
+export function mountTV(host, { channel = "h", output = false, mode, key = "", scene: fixedScene = null, guestToken = "", onState, muted, tapUnmute = true, sound = false } = {}) {
   // The studio pictures are loaded at once, so the first image wipe or ad-box turn shows them.
   for (const src of [STUDIO_WIDE, STUDIO_SQUARE]) { const im = new Image(); im.decoding = "async"; im.src = src; }
   mode ||= output ? "program" : "app";
+  // Screens that play the channel's own sound (music, voices, stings): the app, the outputs, and a
+  // scene asked to (the AVO desk's recording page).
+  const loud = mode === "app" || output || sound;
   const [W, H] = SIZE[channel];
   host.innerHTML = `<div class="tvp-fit"><div class="tvp tvp-${channel}${mode === "app" ? " tvp-app" : ""}" style="width:${W}px;height:${H}px">
       <div class="tvp-bg"><i class="dots"></i><i class="arc a1"></i><i class="arc a2"></i><i class="sheen"></i></div>
@@ -569,7 +572,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     // their own sound. A graphic with no music of its own gets the soft bed; a breaking card plays
     // its sting (its own music); the channel ID plays its signature.
     const spec = BEDS[kind] || (sc?.graphic && !(sc.sources || []).length && !["breaking", "ident"].includes(kind) && !(kind === "breaking" && sc.graphic.music) ? { style: "avo", duck: 0.6 } : null);
-    if (!spec || st.muted || !st.audio || (mode !== "app" && !output) || st.bed || Date.now() < (st.breakUntil || 0)) return;
+    if (!spec || st.muted || !st.audio || !loud || st.bed || Date.now() < (st.breakUntil || 0)) return;
     wake();
     const gone = (now() - (sc.startAt || now())) / 1000, left = Math.max(2, (sc.dur || 10) - gone);
     // With the newsreader reading the stories, the bulletin's music stays on as the bed under
@@ -1521,7 +1524,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       }
     } else if (g.kind === "ident") {   // the channel ID: the Rashtrix logo, five seconds
       el.innerHTML = identHTML();
-      if (!st.muted && (mode === "app" || output)) identSig(st.audio);
+      if (!st.muted && loud) identSig(st.audio);
     } else if (g.kind === "upnext") {   // the coming video, in one Bengali line
       const v = g.video || {}, dur = sc.dur || 6, line = String(v.line || v.title || "").trim();
       const thumb = `https://i.ytimg.com/vi/${esc(v.ytId)}/hqdefault.jpg`;
@@ -1532,7 +1535,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         <h2 class="un-line">${line.split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</h2>
         <div class="un-count"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44"/><circle class="p" cx="50" cy="50" r="44" style="--d:${dur}s"/></svg><b></b></div>
         <i class="un-bar" style="--d:${dur}s"></i></div>`;
-      if (!st.muted && (mode === "app" || output)) riser(st.audio);
+      if (!st.muted && loud) riser(st.audio);
       const count = () => { if (!el.isConnected && st.current) return; const left = Math.max(1, Math.ceil(dur - (now() - (sc.startAt || now())) / 1000)); const b = el.querySelector(".un-count b"); if (b && b.textContent !== bnDigits(left)) b.textContent = bnDigits(left); };
       count(); const t = setInterval(() => el.isConnected ? count() : clearInterval(t), 250);
     } else if (g.kind === "market") {
@@ -1959,8 +1962,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         voStop(); st.voice?.pause?.(); st.voice = null; st.bed?.(); st.bed = null;
         const w = document.createElement("div"); w.className = "tvp-stinger tvp-studiowipe";
         w.innerHTML = `<div class="sw-full"><img src="${channel === "v" ? STUDIO_SQUARE : STUDIO_WIDE}" alt=""><i class="sw-shine"></i></div><i class="sw-edge"></i>`;
-        stage.append(w); if (!st.muted && st.audio && (mode === "app" || output)) stingerSound(st.audio);
-        const b = bl[bi], quiet = st.muted || (mode !== "app" && !output);
+        stage.append(w); if (!st.muted && st.audio && loud) stingerSound(st.audio);
+        const b = bl[bi], quiet = st.muted || !loud;
         // A YouTube byte is taller than the frame (its title and logo fall outside it) and stays
         // hidden behind the studio wipe until it is really playing (at most five seconds).
         const media = b.kind === "yt" ? `<iframe class="byte-yt" src="https://www.youtube.com/embed/${esc(b.id)}?autoplay=1&mute=${quiet ? 1 : 0}&controls=0&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3&fs=0&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" allow="autoplay; encrypted-media" title=""></iframe>`
@@ -2003,7 +2006,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       };
       const speakAvo = x => {
         st.voice?.pause(); st.voice = null;
-        if (!x?.voice?.length || st.muted || (mode !== "app" && !output) || !st.audio) return;
+        if (!x?.voice?.length || st.muted || !loud || !st.audio) return;
         const tok = {}; st.voice = { pause() { tok.off = true; try { tok.src?.stop(); } catch { /* done */ } } };
         const play = i => { if (tok.off || i >= x.voice.length) return; voiceBuf(x.voice[i]).then(buf => {
           if (tok.off || !buf || st.muted || st.alive === false) return;
@@ -2024,7 +2027,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           if (!el.querySelector(".nn")) {
             el.innerHTML = `<div class="nn${channel === "v" ? " v" : ""}"><i class="nn-bg"></i><i class="nn-bar a"></i><i class="nn-bar b"></i><i class="nn-bar c"></i><i class="nn-flash"></i>
               <div class="nn-in"><img class="nn-logo" src="${LOGO}" alt=""><div class="nn-word" data-no-tr><b>NEWS</b><b class="now"><i></i>NOW</b></div><div class="nn-bn">এই মুহূর্তের খবর</div></div><i class="nn-line"></i></div>`;
-            if (!st.muted && st.audio && (mode === "app" || output)) { stingerSound(st.audio); setTimeout(() => { if (el.isConnected && !st.muted) whoosh(st.audio); }, 2900); }
+            if (!st.muted && st.audio && loud) { stingerSound(st.audio); setTimeout(() => { if (el.isConnected && !st.muted) whoosh(st.audio); }, 2900); }
           }
           return;
         }
@@ -2122,7 +2125,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // that is replaced cuts its line off.
       const speak = x => {
         st.voice?.pause(); st.voice = null;
-        if (!x?.voice || st.muted || (mode !== "app" && !output)) return;
+        if (!x?.voice || st.muted || !loud) return;
         // Played through the same sound engine as the music: a separate audio player started by
         // the programme (not by a tap) is blocked by phones and browsers, so the newsreader was
         // silent while the music played.
@@ -2389,7 +2392,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     stage.classList.add("bb-on"); box.classList.remove("gone");
     if (box.dataset.k === key) return; box.dataset.k = key;
     const wipe = box.querySelector(".bb-wipe");
-    if (tr) { wipe.classList.remove("go"); void wipe.offsetWidth; wipe.classList.add("go"); if (!st.muted && st.audio && (mode === "app" || output) && k === 0) stingerSound(st.audio); return; }
+    if (tr) { wipe.classList.remove("go"); void wipe.offsetWidth; wipe.classList.add("go"); if (!st.muted && st.audio && loud && k === 0) stingerSound(st.audio); return; }
     const ln = box.querySelector(".bb-line"), txt = lines[k]; ln.textContent = txt; ln.classList.toggle("long", txt.length > 70); ln.classList.toggle("mid", txt.length > 45 && txt.length <= 70);
     ln.style.animation = "none"; void ln.offsetWidth; ln.style.animation = "";
     box.querySelector(".bb-n").textContent = lines.length > 1 ? `${bnDigits(k + 1)}/${bnDigits(lines.length)}` : "";
@@ -2612,6 +2615,6 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const timers = [setInterval(loadTv, 15000), setInterval(tick, 500), setInterval(() => { st.flash++; }, 8000), setInterval(poll, 5000), setInterval(heartbeat, 5000)];
   return {
     destroy() { if (keepOrder && st.seq) RUNNING[channel] = { seq: st.seq, tv: st.tv, ctl: st.ctl, skew: st.skew, at: Date.now() }; st.alive = false; document.removeEventListener("visibilitychange", onVisible); st.offGesture?.(); try { st.wake?.release(); } catch { /* none */ } st.wake = null; st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null; try { st.audio?.close(); } catch { /* closed */ } document.removeEventListener("fullscreenchange", fsChange); document.removeEventListener("webkitfullscreenchange", fsChange); document.documentElement.classList.remove("tvp-fs-lock"); ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
-    unmute, setScene(sc) { fixedScene = sc; tick(); }, get state() { return st.ctl; }, sceneDur: () => fixedScene?.graphic?.items || fixedScene?.graphic?.kind !== "seg" ? fixedScene?.dur || 0 : 0
+    unmute, setScene(sc) { fixedScene = sc; tick(); }, avoExtra: () => st.avoExtra?.ms || 0, get state() { return st.ctl; }, sceneDur: () => fixedScene?.graphic?.items || fixedScene?.graphic?.kind !== "seg" ? fixedScene?.dur || 0 : 0
   };
 }

@@ -400,3 +400,16 @@ dialog::backdrop { background: #000a; }
 .oap-sw b{width:12px;height:8px;border-radius:2px}
 .oap-bar{height:8px;border-radius:4px;background:var(--panel2);overflow:hidden}
 .oap-bar i{display:block;height:100%;width:0;background:var(--green);transition:width .2s}
+
+/* AVO video download (src/avorec.js): while recording, the story alone on black, as large as the window allows. */
+body.rec-on{overflow:hidden;cursor:none}
+body.rec-on>header,body.rec-on>main,body.rec-on>nav,body.rec-on .cr-top{visibility:hidden}
+.rec-stage{position:fixed;inset:0;z-index:9999;background:#000;display:grid;place-items:center}
+.rec-frame{position:relative;background:#000;overflow:hidden}
+.rec-frame.h{width:min(100vw,calc(100vh * 16 / 9));aspect-ratio:16/9}
+.rec-frame.v{height:100vh;aspect-ratio:9/16}
+.rec-frame .tvp-bar,.rec-frame .tvp-sound,.rec-frame .tvp-like,.rec-frame .tvp-share{display:none!important}
+.rec-bar{position:fixed;right:12px;bottom:10px;display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:999px;background:rgba(20,24,32,.85);color:#fff;font-size:13px;cursor:default;opacity:.25;transition:opacity .2s}
+.rec-bar:hover{opacity:1}
+.rec-dot{width:10px;height:10px;border-radius:50%;background:#e1251b;animation:recblink 1s steps(1,end) infinite}
+@keyframes recblink{50%{opacity:.2}}
