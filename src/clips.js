@@ -65,6 +65,22 @@ export async function handleClips(request, env, url, user, { json, err, audit })
     await audit("clip.cleanup", "clip", "", { hours, deleted: n, freed });
     return ok({ deleted: n, freedBytes: freed, spared });
   }
+  // A clip replaced by its light copy (made in the browser, src/lightclip.js): every AVO story,
+  // rundown item and ad that uses it moves to the copy, and the heavy original goes.
+  if (id === "swap" && m === "POST") {
+    const b = await request.json().catch(() => ({})), from = String(b.from || ""), to = String(b.to || "");
+    if (!/^\/clips\/[\w./-]+$/.test(from) || !/^\/clips\/[\w./-]+$/.test(to) || from.includes("..") || to.includes("..") || from === to) return err("Two clip addresses are needed.");
+    if (!(await env.DB.prepare("SELECT 1 FROM clips WHERE r2_key=? AND status='ready'").bind(to.slice(1)).first())) return err("The light copy is not in the clip store.");
+    const like = `%${from}%`;
+    const r1 = await env.DB.prepare("UPDATE avo_stories SET videos=REPLACE(videos,?,?), bytes=REPLACE(bytes,?,?) WHERE videos LIKE ? OR bytes LIKE ?").bind(from, to, from, to, like, like).run();
+    const r2 = await env.DB.prepare("UPDATE rundown_items SET data=REPLACE(data,?,?) WHERE data LIKE ?").bind(from, to, like).run().catch(() => ({ meta: {} }));
+    const r3 = await env.DB.prepare("UPDATE tv_ads SET url=? WHERE url=?").bind(to, from).run().catch(() => ({ meta: {} }));
+    await env.DB.prepare("UPDATE clips SET keep=1 WHERE r2_key=?").bind(to.slice(1)).run();
+    const old = await env.DB.prepare("SELECT id FROM clips WHERE r2_key=?").bind(from.slice(1)).first();
+    if (old) { await env.CLIPS.delete(from.slice(1)).catch(() => {}); await env.DB.prepare("DELETE FROM clips WHERE id=?").bind(old.id).run(); }
+    await audit("clip.lighten", "clip", old?.id || "", { from, to });
+    return ok({ stories: r1.meta?.changes || 0, items: r2.meta?.changes || 0, ads: r3.meta?.changes || 0 });
+  }
   const c = await env.DB.prepare("SELECT * FROM clips WHERE id=?").bind(id).first();
   if (!c && id !== "drive") return err("Clip not found.", 404);
   if (sub === "part" && m === "PUT") {   // one part of the file

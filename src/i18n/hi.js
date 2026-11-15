@@ -1559,4 +1559,15 @@ export default {
   "No tab audio was shared: the video will be silent. Stop, and tick “Also share tab audio” next time.": "टैब की आवाज़ साझा नहीं हुई: वीडियो में आवाज़ नहीं होगी। रोकें, और अगली बार “Also share tab audio” पर टिक करें।",
   "This AVO story was not found. Open it from the AVO desk.": "यह एवीओ ख़बर नहीं मिली। इसे एवीओ डेस्क से खोलें।",
   "This AVO story is not ready yet.": "यह एवीओ ख़बर अभी तैयार नहीं है।",
+  // AVO video file; light videos.
+  "⬇ Make the video file": "⬇ वीडियो फ़ाइल बनाएँ",
+  "The video file is made in this browser: the NEWS NOW opener, the story with its pictures, videos, voice and music, each byte with its name, and the end card. Full HD. Keep this tab open until it is done.": "वीडियो फ़ाइल इसी ब्राउज़र में बनती है: न्यूज़ नाउ शुरुआत, तस्वीरों, वीडियो, आवाज़ और संगीत के साथ ख़बर, नाम के साथ हर बाइट, और अंतिम कार्ड। फ़ुल एचडी। पूरा होने तक यह टैब खुला रखें।",
+  "Make them light": "हल्का करें",
+  "They were filmed at full HD and stall or go black on mobile data. Make them light: 720p, the same picture, about a sixth of the size.": "ये फ़ुल एचडी में शूट हुए हैं और मोबाइल डेटा पर रुकते या काले हो जाते हैं। हल्का करें: 720पी, वही तस्वीर, आकार लगभग छठा हिस्सा।",
+  "Done: every video is light now.": "हो गया: अब हर वीडियो हल्का है।",
+  "Loading the story’s pictures, videos and voice": "ख़बर की तस्वीरें, वीडियो और आवाज़ लाई जा रही हैं",
+  "Mixing the sound": "आवाज़ मिलाई जा रही है",
+  "Making the video": "वीडियो बन रहा है",
+  "Done": "हो गया",
+  "This browser cannot make video files. Use Chrome or Edge on a computer.": "इस ब्राउज़र में वीडियो फ़ाइल नहीं बनती। कंप्यूटर पर क्रोम या एज इस्तेमाल करें।",
 };

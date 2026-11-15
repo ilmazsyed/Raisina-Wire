@@ -413,3 +413,4 @@ body.rec-on>header,body.rec-on>main,body.rec-on>nav,body.rec-on .cr-top{visibili
 .rec-bar:hover{opacity:1}
 .rec-dot{width:10px;height:10px;border-radius:50%;background:#e1251b;animation:recblink 1s steps(1,end) infinite}
 @keyframes recblink{50%{opacity:.2}}
+.ad-right{display:grid;gap:16px;min-width:0;align-content:start}

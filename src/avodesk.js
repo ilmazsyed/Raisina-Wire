@@ -7,6 +7,7 @@
 import { shell, api, toast, fail, esc, $, $$, fmt, istDay } from "./crshell.js";
 import { mountTV } from "./engine.js";
 import { digits } from "./i18n.js";
+import { lightenVideo } from "./lightclip.js";
 
 const S = { list: [], quota: {}, today: {}, daily: 45, edit: null, images: [], rundowns: [], filter: (() => { try { return localStorage.getItem("avoFilter") || "all"; } catch { return "all"; } })(), send: [], sendQ: "", videos: [], bytes: [], byteMode: "avo", byteCount: 1 };
 const secsOf = v => { const p = String(v || "").trim().split(":").map(Number); if (p.some(isNaN)) return 0; return p.reduce((a, x) => a * 60 + x, 0); };
@@ -45,6 +46,8 @@ async function upload(file) {
 // (never deleted for lack of use, since an AVO uses it), with its length read from the file.
 async function uploadClip(file, bar, title) {
   if (!/^video\/(mp4|quicktime|webm)$/.test(file.type)) throw new Error("Choose an MP4, MOV or WebM video.");
+  // (made light first: 720p, about 2.5 Mbit/s, so it plays at once on a phone's data; src/lightclip.js)
+  bar.hidden = false; const lit = await lightenVideo(file, { onProgress: k => { $("i", bar).style.width = `${Math.round(k * 50)}%`; } }); if (lit) file = lit;
   const dur = await new Promise(res => { const v = document.createElement("video"); v.preload = "metadata"; v.onloadedmetadata = () => { res(Math.round(v.duration || 0)); URL.revokeObjectURL(v.src); }; v.onerror = () => res(0); v.src = URL.createObjectURL(file); });
   const start = await api("/api/admin/clips", { method: "POST", body: { title: (title || file.name.replace(/\.\w+$/, "")).slice(0, 150), filename: file.name, size: file.size, mime: file.type, duration: dur } });
   const parts = [], n = Math.ceil(file.size / start.partSize); bar.hidden = false;
@@ -263,14 +266,44 @@ async function load() {
   try {
     const [d, r] = await Promise.all([api("/api/admin/tv/avo"), api(`/api/admin/rundowns?day=${istDay()}`).catch(() => ({ rundowns: [] }))]);
     S.list = d.stories; S.quota = d.quota; S.today = d.today; S.daily = d.daily; S.rundowns = r.rundowns || [];
-    drawList();
+    drawList(); heavyCheck();
   } catch (e) { fail(e); }
+}
+
+// Videos in AVO stories too heavy for a phone's data (phone footage at full HD, 15–20 Mbit/s): they
+// stall or stand black on air. One button makes each light (720p, about 2.5 Mbit/s) in this
+// browser and puts the light copy in place everywhere the clip is used (src/lightclip.js).
+let heavyBusy = false;
+async function heavyCheck() {
+  const P = $(".ad-heavy"); if (!P || heavyBusy) return;
+  const used = new Set(); S.list.filter(x => ["ready", "off", "new"].includes(x.status)).forEach(x => [...(x.videos || []), ...(x.bytes || [])].forEach(v => { const u = typeof v === "string" ? v : v?.url || ""; if (/^\/clips\//.test(u)) used.add(u); }));
+  if (!used.size) { P.hidden = true; return; }
+  let clips = []; try { clips = (await api("/api/admin/clips")).clips || []; } catch { return; }
+  const heavy = clips.filter(c => c.status === "ready" && used.has(c.url) && (c.duration > 0 ? c.bytes * 8 / c.duration > 3.6e6 : c.bytes > 8e6));
+  P.hidden = !heavy.length; if (!heavy.length) return;
+  P.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><b>${digits(heavy.length)} videos in AVO stories are too heavy for phones</b><br><small class="muted">They were filmed at full HD and stall or go black on mobile data. Make them light: 720p, the same picture, about a sixth of the size.</small></div><button class="btn amber" type="button" id="hvGo">Make them light</button></div><div class="oap-bar" id="hvBar" hidden><i></i></div><small class="muted" id="hvMsg"></small>`;
+  $("#hvGo").onclick = async () => {
+    heavyBusy = true; $("#hvGo").disabled = true; const bar = $("#hvBar"); bar.hidden = false; let done = 0, kept = 0;
+    for (const c of heavy) {
+      try {
+        $("#hvMsg").textContent = `${digits(done + 1)} / ${digits(heavy.length)}: ${c.title || "video"}`;
+        const blob = await fetch(c.url).then(r => { if (!r.ok) throw new Error("not found"); return r.blob(); });
+        const file = new File([blob], (c.title || "clip").replace(/[^\w\u0980-\u09FF -]+/g, "").slice(0, 60) + ".mp4", { type: blob.type || "video/mp4" });
+        const lit = await lightenVideo(file, { onProgress: k => { $("i", bar).style.width = `${Math.round((done + k * .7) / heavy.length * 100)}%`; } });
+        if (!lit) { kept++; done++; continue; }
+        const up = await uploadClip(lit, $("#hvBar"), c.title || "AVO video");
+        await api("/api/admin/clips/swap", { method: "POST", body: { from: c.url, to: up.url } });
+      } catch { kept++; }
+      done++; $("i", bar).style.width = `${Math.round(done / heavy.length * 100)}%`;
+    }
+    heavyBusy = false; toast(kept ? `Done. ${digits(heavy.length - kept)} made light, ${digits(kept)} could not be.` : "Done: every video is light now."); load();
+  };
 }
 
 (async () => {
   const user = await shell("AVO Story Desk");
   if (!user) return;
-  $("main").innerHTML = `<div class="ad-wrap"><div class="ad-left"><section class="panel ad-form"></section><section class="panel ad-send"><p class="muted">Loading…</p></section><section class="panel ad-voice"><p class="muted">Loading…</p></section></div><section class="panel ad-list"><p class="muted">Loading…</p></section></div>`;
+  $("main").innerHTML = `<div class="ad-wrap"><div class="ad-left"><section class="panel ad-form"></section><section class="panel ad-send"><p class="muted">Loading…</p></section><section class="panel ad-voice"><p class="muted">Loading…</p></section></div><div class="ad-right"><section class="panel ad-heavy" hidden></section><section class="panel ad-list"><p class="muted">Loading…</p></section></div></div>`;
   drawForm(); load(); loadSend(); loadVoice(); setInterval(load, 30000);
   // A story sent from elsewhere (?send=<id>) is made at once.
   const want = new URLSearchParams(location.search).get("send");

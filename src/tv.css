@@ -1894,3 +1894,15 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 /* A byte that has played to its end rests on the studio picture (until the story or block moves on). */
 .avo-byte.over{background-size:cover;background-position:center}
 .avo-byte.over video,.avo-byte.over iframe,.avo-byte.over .byte-hold{opacity:0;transition:opacity .3s}
+/* AVO bytes (Nov 2026): no studio photo. While a byte loads, between bytes and after one ends, the
+   channel's red with the logo; the wipe into a byte is the short Rashtrix stinger. */
+.avo-byte .byte-hold{background:linear-gradient(165deg,#d10a0a 0%,#AA0404 55%,#6e0000 100%);display:grid;place-items:center}
+.avo-byte .byte-hold img{position:static;width:auto;height:34%;object-fit:contain;background:#fff;padding:2%;border-radius:18px;box-shadow:0 0 0 4px #D4A017,0 20px 50px rgba(0,0,0,.35)}
+.avo-byte.over video,.avo-byte.over iframe{opacity:0;transition:opacity .3s}
+.avo-byte.over .byte-hold{opacity:1;transition:opacity .3s}
+.avo-byte video{background:#000}
+.tvp-stinger.avo-sting.out{opacity:0;transition:opacity .4s}
+/* The channel logo: a red halo pulsing round it, so it stands out on any picture. */
+.tv-bug{animation:bughalo 2.4s ease-in-out infinite}
+@keyframes bughalo{0%,100%{box-shadow:0 0 0 3px var(--gold,#D4A017),0 0 0 6px rgba(200,16,15,.0),0 0 18px 4px rgba(200,16,15,.35),0 14px 30px rgba(0,0,0,.25)}50%{box-shadow:0 0 0 3px var(--gold,#D4A017),0 0 0 10px rgba(200,16,15,.55),0 0 46px 16px rgba(200,16,15,.65),0 14px 30px rgba(0,0,0,.25)}}
+@media(prefers-reduced-motion:reduce){.tv-bug{animation:none}}

@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "@cloudflare/puppeteer": "1.4.0",
-    "hls.js": "^1.5.17"
+    "hls.js": "^1.5.17",
+    "mp4-muxer": "^5.2.2",
+    "webm-muxer": "^5.1.4"
   }
 }

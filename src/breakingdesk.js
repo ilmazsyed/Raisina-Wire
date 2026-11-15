@@ -6,6 +6,7 @@
 //     pointers at 40. Up to 24 pointers in eight sets of three; each set is put live or taken off,
 //     and the sets on air take turns on screen. A change is on screen within a second
 //     (src/worker.js saveLiveDesk, src/control.js "split", src/engine.js drawSplit).
+import { lightenVideo } from "./lightclip.js";
 import { shell, api, toast, fail, esc, $, $$, istClock } from "./crshell.js";
 import { mountTV } from "./engine.js";
 import { digits } from "./i18n.js";
@@ -30,6 +31,8 @@ async function uploadImage(file) {
   throw new Error("This picture is too large even after compression.");
 }
 async function uploadVideo(file, bar) {
+  // (made light first: 720p, about 2.5 Mbit/s, so it plays at once on a phone's data; src/lightclip.js)
+  bar.hidden = false; const lit = await lightenVideo(file, { onProgress: k => { $("i", bar).style.width = `${Math.round(k * 50)}%`; } }); if (lit) file = lit;
   const start = await api("/api/admin/clips", { method: "POST", body: { title: `Breaking: ${file.name.replace(/\.\w+$/, "")}`, filename: file.name, size: file.size, mime: file.type, duration: 0 } });
   const parts = [], n = Math.ceil(file.size / start.partSize); bar.hidden = false;
   try {

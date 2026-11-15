@@ -8,6 +8,7 @@ import { shell, api, toast, fail, esc, $ } from "./crshell.js";
 import "./tv.css";
 import { mountTV } from "./engine.js";
 import { digits } from "./i18n.js";
+import { hasYouTube, makeAvoFile } from "./avofile.js";
 
 const id = new URLSearchParams(location.search).get("id") || "";
 const S = { story: null, ch: "h", rec: null, tv: null };
@@ -16,8 +17,11 @@ const baseSecs = x => (x.secs > 0 ? Math.max(8, x.secs + 2) : 20) + 4 + (x.bytes
 const pickType = () => ["video/mp4;codecs=avc1.640028,mp4a.40.2", "video/mp4;codecs=avc1.4d002a,mp4a.40.2", "video/mp4;codecs=avc1,mp4a", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || "";
 const clock = s => digits(`${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`);
 
+// A story with no YouTube link is made straight into a file (src/avofile.js); one with a YouTube
+// link (a video or a byte) is recorded as it plays, since YouTube's video cannot be read into a file.
 function panel() {
   const x = S.story, n = (x.bytes || []).length;
+  if (!hasYouTube(x)) return filePanel();
   $("main").innerHTML = `<section class="panel" style="max-width:720px;margin:24px auto">
     <h2>AVO video download</h2>
     <div class="stack" style="gap:12px">
@@ -34,6 +38,33 @@ function panel() {
     </div></section>`;
   $("#rCh").value = S.ch; $("#rCh").onchange = e => { S.ch = e.target.value; };
   $("#rGo").onclick = record;
+}
+
+function filePanel() {
+  const x = S.story, n = (x.bytes || []).length;
+  $("main").innerHTML = `<section class="panel" style="max-width:720px;margin:24px auto">
+    <h2>AVO video download</h2>
+    <div class="stack" style="gap:12px">
+      <b data-no-tr style="font-size:18px">${esc(x.title)}</b>
+      <small class="muted"><span>${n ? `AVO + ${digits(n)} byte` : "AVO"}</span></small>
+      <label>Shape<select id="rCh"><option value="h">Rashtrix TV · horizontal 16:9</option><option value="v">Rashtrix Shorts · vertical 9:16</option></select></label>
+      <p class="muted" style="margin:0">The video file is made in this browser: the NEWS NOW opener, the story with its pictures, videos, voice and music, each byte with its name, and the end card. Full HD. Keep this tab open until it is done.</p>
+      <div class="row"><button class="btn green" type="button" id="rMake">⬇ Make the video file</button><a class="btn" href="/avodesk.html">Back to the AVO desk</a></div>
+      <div class="oap-bar" id="rBar" hidden><i></i></div><small class="muted" id="rMsg"></small>
+      <div id="rOut"></div>
+    </div></section>`;
+  $("#rCh").value = S.ch; $("#rCh").onchange = e => { S.ch = e.target.value; };
+  $("#rMake").onclick = async () => {
+    const btn = $("#rMake"), bar = $("#rBar"); btn.disabled = true; bar.hidden = false; $("#rOut").innerHTML = "";
+    try {
+      const t0 = Date.now(), r = await makeAvoFile(x, { orient: S.ch, onProgress: (k, label) => { $("i", bar).style.width = `${Math.round(k * 100)}%`; $("#rMsg").textContent = `${label} · ${digits(Math.round(k * 100))}%`; } });
+      const url = URL.createObjectURL(r.blob), name = `rashtrix-avo-${S.ch === "v" ? "vertical" : "horizontal"}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}.${r.ext}`;
+      $("#rOut").innerHTML = `<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><a class="btn green" href="${url}" download="${name}">⬇ Download the video</a><small class="muted"><span data-no-tr>${esc(name)}</span> · <span data-no-tr>${clock(r.seconds)} · ${digits((r.blob.size / 1048576).toFixed(1))} MB</span></small></div>
+        <video src="${url}" controls playsinline style="width:100%;max-height:420px;margin-top:8px;background:#000;border-radius:8px"></video>`;
+      $("#rMsg").textContent = ""; toast("The video is ready."); void t0;
+    } catch (e) { fail(e); $("#rMsg").textContent = ""; }
+    finally { btn.disabled = false; bar.hidden = true; }
+  };
 }
 
 async function record() {
