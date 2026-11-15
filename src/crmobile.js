@@ -9,7 +9,7 @@ export const isPhone = () => matchMedia(PHONE).matches;
 
 // Every control-room screen, grouped. admin.html views are "#view" links.
 export const GROUPS = [
-  ["Newsroom", [["/admin.html#overview", "Overview", "overview"], ["/admin.html#editorial", "Stories", "editorial"], ["/admin.html#wire", "Wire desk", "wire"],
+  ["Newsroom", [["/admin.html#overview", "Overview", "overview"], ["/admin.html#editorial", "Stories", "editorial"], ["/admin.html#wire", "Wire desk", "wire"], ["/newsprint.html", "Newsprint desk"],
     ["/admin.html#corrections", "Corrections", "corrections"], ["/admin.html#translations", "Translations", "translations"], ["/admin.html#wix", "Wix import", "wix"], ["/admin.html#writers", "Writers", "writers"]]],
   ["TV", [["/breaking.html", "Breaking desk"], ["/admin.html#tv", "TV channels", "tv"], ["/pcr.html", "PCR"], ["/producer.html", "Bulletin producer"], ["/avodesk.html", "AVO desk"], ["/onair.html", "On-air desk"],
     ["/studio.html", "Live studio"], ["/prompter.html", "Teleprompter"], ["/admin.html#multimedia", "Multimedia", "multimedia"], ["/admin.html#live", "Live publishing", "live"]]],

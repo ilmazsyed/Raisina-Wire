@@ -292,6 +292,10 @@ async function callGemini(env, text, retried = false, think = true, tries = 0, o
   return JSON.parse(out);
 }
 
+// A small JSON task for other parts of the site (the e-paper's horoscope): the same free model
+// chain, its own instructions and answer schema.
+export const geminiJSON = (env, system, text, schema) => callGemini(env, text, false, false, 0, { system, schema });
+
 // Copying check: no run of eight words in a row may come from a source.
 const words = s => String(s || "").toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s]+/gu, " ").split(/\s+/).filter(Boolean);
 export function copiedRun(text, sources, n = 8) {

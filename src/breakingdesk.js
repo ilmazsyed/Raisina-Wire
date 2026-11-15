@@ -65,7 +65,7 @@ function drawBreak() {
     </div>
     <div class="row"><button class="btn red bd-fire" id="bGo">Break in</button><button class="btn" id="bClear">Clear breaking</button></div>
     <p class="muted" style="margin:0">It goes on every screen of the channels chosen at once, and is read as an AVO story within a minute.</p>
-    <details ${d.log?.length ? "open" : ""}><summary class="muted">Breaking log (${digits((d.log || []).filter(x => x.act !== "clear").length)}) · every breaking, played again with one click</summary><ul class="bd-log">${(d.log || []).map(x => `<li><small class="muted">${when(x.at)} · ${(x.channels || []).map(c => CH[c]).join(", ")} · ${esc(x.by || "")}</small>${x.act === "clear" ? `<span class="muted">Cleared</span>` : `<b data-no-tr>${esc(x.text)}</b>${x.replay ? ` <span class="tag amber">PLAYED AGAIN</span>` : ""}${x.media ? ` <span class="tag">${x.media === "yt" ? "YOUTUBE" : x.media.toUpperCase()}</span>` : ""}<span><button class="btn sm red" data-again="${esc(x.at)}">▶ Play again</button></span>${x.avoId ? (x.avoDeleted ? `<small class="muted">AVO deleted</small>` : `<span><button class="btn sm red" data-delavo="${esc(x.avoId)}">Delete its AVO</button></span>`) : ""}`}</li>`).join("") || `<li class="muted">Nothing yet.</li>`}</ul></details>`;
+    <details ${d.log?.length ? "open" : ""}><summary class="muted">Breaking log (${digits((d.log || []).filter(x => x.act !== "clear").length)}) · every breaking, played again with one click</summary><ul class="bd-log">${(d.log || []).map(x => `<li><small class="muted">${when(x.at)} · ${(x.channels || []).map(c => CH[c]).join(", ")} · ${esc(x.by || "")}</small>${x.act === "clear" ? `<span class="muted">Cleared</span>` : `<b data-no-tr>${esc(x.text)}</b>${x.replay ? ` <span class="tag amber">PLAYED AGAIN</span>` : ""}${x.media ? ` <span class="tag">${x.media === "yt" ? "YOUTUBE" : x.media.toUpperCase()}</span>` : ""}<span><button class="btn sm red" data-again="${esc(x.at)}">▶ Play again</button> <button class="btn sm" data-np="${esc(x.at)}">Send to newsprint</button></span>${x.avoId ? (x.avoDeleted ? `<small class="muted">AVO deleted</small>` : `<span><button class="btn sm red" data-delavo="${esc(x.avoId)}">Delete its AVO</button></span>`) : ""}`}</li>`).join("") || `<li class="muted">Nothing yet.</li>`}</ul></details>`;
   $$("[data-bl]").forEach(t => t.oninput = () => { S.lines[+t.dataset.bl] = t.value; });
   $$("[data-blrm]").forEach(b => b.onclick = () => { S.lines.splice(+b.dataset.blrm, 1); drawBreak(); });
   $("#bAdd")?.addEventListener("click", () => { if (S.lines.length < 5) { S.lines.push(""); drawBreak(); $(`[data-bl="${S.lines.length - 1}"]`)?.focus(); } });
@@ -85,6 +85,14 @@ function drawBreak() {
     b.disabled = true;
     try { await api("/api/admin/tv/desk/breaking", { method: "POST", body: { lines, text: lines[0], seconds: x.seconds || 20, music: x.music !== false, channels: chs, media: x.mediaObj || null, replay: true } }); toast("On air again."); load(); } catch (e) { fail(e); }
     b.disabled = false;
+  });
+  // A breaking for the e-paper (the Newsprint desk): with its AVO when it has one.
+  $$("[data-np]").forEach(b => b.onclick = async () => {
+    const x = (S.d.log || []).find(y => y.at === b.dataset.np); if (!x) return;
+    const lines = x.lines?.length ? x.lines : String(x.text || "").split(" · ").filter(Boolean), m = x.mediaObj || {};
+    const body = x.avoId && !x.avoDeleted ? { kind: "avo", id: x.avoId, from: "breaking" }
+      : { kind: "breaking", from: "breaking", content: { title: lines[0], body: lines.slice(1).join(" "), images: m.kind === "image" && m.url ? [m.url] : [], video: m.kind !== "image" && m.url ? m.url : "" } };
+    try { await api("/api/admin/epaper/send", { method: "POST", body }); toast("Sent to the newsprint."); } catch (e) { fail(e); }
   });
   $("#bGo").onclick = async () => {
     const lines = S.lines.map(x => String(x || "").trim()).filter(Boolean), chs = chans();

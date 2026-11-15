@@ -414,3 +414,18 @@ body.rec-on>header,body.rec-on>main,body.rec-on>nav,body.rec-on .cr-top{visibili
 .rec-dot{width:10px;height:10px;border-radius:50%;background:#e1251b;animation:recblink 1s steps(1,end) infinite}
 @keyframes recblink{50%{opacity:.2}}
 .ad-right{display:grid;gap:16px;min-width:0;align-content:start}
+/* The Newsprint desk (src/newsprintdesk.js) */
+.np-slot{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:10px 14px;border-radius:10px;border:1px solid var(--line,#333);background:var(--panel2,rgba(255,255,255,.03));color:inherit;cursor:pointer;text-align:left;min-width:220px}
+.np-slot.on{outline:2px solid var(--red);}
+.np-pages{display:flex;flex-direction:column;gap:14px}
+.np-page{border:1px solid var(--line,#333);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.np-item{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;padding:8px;border-radius:8px;background:var(--panel2,rgba(255,255,255,.03))}
+.np-item.lead{outline:2px solid var(--red)}
+.np-text{display:flex;flex-direction:column;gap:4px;flex:1;min-width:240px}
+.np-media{display:flex;gap:6px;flex-wrap:wrap}
+.np-m{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;width:84px}
+.np-m img,.np-m i{width:84px;height:48px;object-fit:cover;border-radius:4px;background:#000;display:grid;place-items:center;color:#fff;font-style:normal}
+.np-m button{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;border:0;background:rgba(0,0,0,.7);color:#fff;cursor:pointer;line-height:1}
+.np-tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.np-add{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;padding:8px;border-radius:8px;background:var(--panel2,rgba(255,255,255,.03))}
+.np-stars{margin:0;padding-left:22px;display:grid;gap:4px}
