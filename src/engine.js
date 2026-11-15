@@ -436,7 +436,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       ${mode === "app" ? `<div class="tvp-ytlayer" hidden><div class="tvs-ytwrap"><div class="tvs-yt"></div></div><div class="tvp-ythold on"><img alt=""><i class="tvp-ytspin"></i><span class="tvp-yttap"><b>▶</b>ভিডিও চালু করতে ছুঁয়ে দিন</span></div><div class="tvp-shield"></div></div>` : ""}
       <div class="tvp-stage"></div>
       <div class="tvp-lbl"></div><div class="tvp-split" hidden></div><div class="tvp-gfx"></div><div class="tvp-ovl"></div><div class="tvp-cd" hidden></div><div class="tvp-tease" hidden></div><div class="tvp-promo" hidden></div><div class="tvp-cm" hidden></div>
-      <div class="tv-bug tv-bug-fixed"><img src="${LOGO}" alt=""></div>
+      <div class="tv-bug tv-bug-fixed"><div class="bug-flip"><img class="bug-front" src="${LOGO}" alt=""><div class="bug-back" data-no-tr><i class="bug-dl"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M4.5 17.5v2h15v-2" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></i><b>DOWNLOAD<br>THE APP</b><small>rashtrix.live</small></div></div></div>
       <div class="tv-mkt" hidden><span class="mkt-label" data-no-tr>MARKETS</span><div class="mkt-track"></div></div>
       <div class="tvp-standby" hidden><img src="${LOGO}" alt=""><b>অনুষ্ঠান একটু পরেই</b><small>আমাদের সঙ্গে থাকুন</small></div>
       <div class="tvp-off" hidden><img src="${LOGO}" alt=""><b>শিগগির ফিরছি</b></div>
