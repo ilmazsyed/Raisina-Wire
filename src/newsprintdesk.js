@@ -7,7 +7,7 @@
 import { shell, api, toast, fail, esc, $, $$, istClock } from "./crshell.js";
 import { digits } from "./i18n.js";
 
-const S = { list: null, id: "", ed: null, cands: [], dirty: false, showAdd: "" };
+const S = { list: null, id: "", ed: null, cands: [], dirty: false, showAdd: "", form: null };
 const SLOT = { morning: "Morning edition", evening: "Evening edition" };
 const PAGE = { front: "Front page", kolkata: "Kolkata", bengal: "West Bengal", india: "India", world: "World", sports: "Sports", life: "Entertainment & Life", stars: "Horoscope" };
 const STATUS = { draft: ["DRAFT", "amber"], approved: ["APPROVED", "green"], published: ["PRINTED", ""] };
@@ -59,18 +59,79 @@ function draw() {
 function page(p, pi, out) {
   const stars = p.key === "stars", hz = S.ed.edition.horoscope?.bn || [];
   return `<div class="np-page"><div class="row" style="justify-content:space-between"><h3 style="margin:0"><span>${PAGE[p.key] || esc(p.title)}</span> <small class="muted">${stars ? "" : `(${digits(p.items.length)})`}</small></h3>
-    ${out || stars ? "" : `<button class="btn sm" data-add="${pi}">${S.showAdd === String(pi) ? "Close" : "+ Add a story"}</button>`}</div>
+    ${out || stars ? "" : `<div class="row"><button class="btn sm green" data-write="${pi}">✍ Write a story</button><button class="btn sm" data-add="${pi}">${S.showAdd === String(pi) ? "Close" : "+ Add a story"}</button></div>`}</div>
+    ${S.form && S.form.pi === pi && S.form.i < 0 ? form() : ""}
     ${stars ? (hz.length ? `<ol class="np-stars" data-no-tr>${hz.map(t => `<li>${esc(t)}</li>`).join("")}</ol>` : `<p class="muted">The horoscope is written with the draft.</p>`) : ""}
     ${S.showAdd === String(pi) ? addList(pi) : ""}
-    ${p.items.map((x, i) => `<div class="np-item ${pi === 0 && i === 0 ? "lead" : ""}">
-      ${pi === 0 && i === 0 ? `<span class="tag red">LEAD</span>` : ""}${x.sent ? `<span class="tag amber">SENT</span>` : ""}
-      <div class="np-text"><b data-no-tr>${esc(x.title)}</b><small class="muted" data-no-tr>${esc(x.dek || "")}</small>
+    ${p.items.map((x, i) => S.form && S.form.pi === pi && S.form.i === i ? form() : `<div class="np-item ${pi === 0 && i === 0 ? "lead" : ""}">
+      ${pi === 0 && i === 0 ? `<span class="tag red">LEAD</span>` : ""}${x.sent ? `<span class="tag amber">SENT</span>` : ""}${x.ref.startsWith("w:") ? `<span class="tag green">WRITTEN FOR THE PAPER</span>` : x.edited ? `<span class="tag">EDITED</span>` : ""}
+      <div class="np-text"><b data-no-tr>${esc(x.title)}</b><small class="muted" data-no-tr>${esc(x.dek || "")}</small>${x.byline ? `<small class="np-by"><span>By</span> <span data-no-tr>${esc(x.byline)}</span></small>` : ""}
         <div class="np-media">${(x.media || []).map((m, mi) => `<span class="np-m">${thumb(m) ? `<img src="${esc(thumb(m))}" alt="" loading="lazy">` : `<i>▶</i>`}<small>${m.kind === "img" ? "Picture" : "Video"}</small>${out ? "" : `<button type="button" title="Remove" data-unmedia="${pi}:${i}:${mi}">×</button>`}</span>`).join("") || `<small class="muted">No pictures (set in type only)</small>`}</div></div>
-      ${out ? "" : `<div class="np-tools">${pi === 0 && i === 0 ? "" : `<button class="btn sm" data-lead="${pi}:${i}">Make lead</button>`}
+      ${out ? "" : `<div class="np-tools"><button class="btn sm" data-edit="${pi}:${i}">✎ Edit</button>${pi === 0 && i === 0 ? "" : `<button class="btn sm" data-lead="${pi}:${i}">Make lead</button>`}
         <button class="btn sm" data-up="${pi}:${i}" ${i ? "" : "disabled"}>▲</button><button class="btn sm" data-down="${pi}:${i}" ${i < p.items.length - 1 ? "" : "disabled"}>▼</button>
         <select data-move="${pi}:${i}"><option value="">Move to…</option>${S.ed.edition.pages.map((q, qi) => qi === pi || q.key === "stars" ? "" : `<option value="${qi}">${PAGE[q.key]}</option>`).join("")}</select>
         <button class="btn sm red" data-drop="${pi}:${i}">Remove</button></div>`}
     </div>`).join("")}</div>`;
+}
+function form() {
+  const F = S.form;
+  return `<div class="np-form pd-edit stack" style="gap:10px"><h3 style="margin:0">${F.i < 0 ? "Write a story for the paper" : "Edit this story in the paper"}</h3>
+    ${F.loading ? `<p class="muted">Loading…</p>` : `
+    <label class="stack" style="gap:4px"><small>Headline</small><input id="fTitle" maxlength="240" value="${esc(F.title)}" data-no-tr></label>
+    <label class="stack" style="gap:4px"><small>Sub-headline</small><input id="fDek" maxlength="360" value="${esc(F.dek)}" data-no-tr></label>
+    <label class="stack" style="gap:4px;max-width:420px"><small>Byline (the writer's name; leave empty for none)</small><input id="fBy" maxlength="120" value="${esc(F.byline)}" data-no-tr placeholder="নিজস্ব সংবাদদাতা"></label>
+    <label class="stack" style="gap:4px"><small>The story (a blank line between paragraphs)</small><textarea id="fBody" rows="12" data-no-tr>${esc(F.body)}</textarea></label>
+    <div class="stack" style="gap:6px"><small>Pictures and video</small>
+      <div class="np-media">${F.media.map((m, mi) => `<span class="np-m">${thumb(m) ? `<img src="${esc(thumb(m))}" alt="">` : `<i>▶</i>`}<small>${m.kind === "img" ? "Picture" : "Video"}</small><button type="button" title="Remove" data-fm="${mi}">×</button></span>`).join("") || `<small class="muted">None yet.</small>`}</div>
+      <div class="row" style="flex-wrap:wrap;gap:8px"><label class="btn sm"><input type="file" id="fImg" accept="image/*" hidden><span>Upload a picture</span></label>
+        <input id="fLink" placeholder="or a picture, video or YouTube link (https://…)" style="flex:1;min-width:240px" data-no-tr><button class="btn sm" type="button" id="fLinkAdd">Add</button></div></div>
+    <div class="row"><button class="btn green" type="button" id="fSave">${F.i < 0 ? "Put it on the page" : "Done"}</button><button class="btn" type="button" id="fCancel">Cancel</button></div>`}</div>`;
+}
+// A picture from this computer, made web-sized, to the picture store.
+async function uploadImage(file) {
+  const bmp = await createImageBitmap(file);
+  for (const [max, q] of [[1920, .86], [1600, .8], [1400, .72]]) {
+    const k = Math.min(1, max / bmp.width), w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
+    const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(bmp, 0, 0, w, h);
+    const blob = await new Promise(r => c.toBlob(r, "image/webp", q));
+    if (blob && blob.size < 1_700_000) {
+      const r = await fetch("/api/admin/images", { method: "POST", headers: { "content-type": blob.type, "x-image-width": String(w), "x-image-height": String(h) }, body: blob });
+      const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || "Upload failed."); return d.url;
+    }
+  }
+  throw new Error("This picture is too large even after compression.");
+}
+const linkMedia = u => { const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([\w-]{11})/); return yt ? { kind: "yt", id: yt[1] } : /\.(mp4|webm|mov)(\?|$)/i.test(u) || /^\/clips\//.test(u) ? { kind: "video", url: u } : { kind: "img", url: u }; };
+async function openForm(pi, i) {
+  const x = i >= 0 ? S.ed.edition.pages[pi].items[i] : null;
+  S.form = { pi, i, title: x?.title || "", dek: x?.dek || "", byline: x?.byline || "", body: x?.body || "", media: structuredClone(x?.media || []), loading: !!x && !x.body };
+  S.showAdd = ""; draw();
+  if (S.form.loading) {
+    try { const r = await api(`/api/admin/epaper/story?ref=${encodeURIComponent(x.ref)}`); Object.assign(S.form, { body: r.body || "", byline: x.byline || r.byline || "", orig: r.body || "" }); } catch (e) { fail(e); }
+    S.form.loading = false; draw();
+  }
+}
+function keepForm() { const F = S.form; if (!F || F.loading || !$("#fTitle")) return; Object.assign(F, { title: $("#fTitle").value.trim(), dek: $("#fDek").value.trim(), byline: $("#fBy").value.trim(), body: $("#fBody").value }); }
+function wireForm() {
+  const F = S.form; if (!F || F.loading || !$("#fSave")) return;
+  $("#fCancel").onclick = () => { S.form = null; draw(); };
+  $$("[data-fm]").forEach(b => b.onclick = () => { keepForm(); F.media.splice(+b.dataset.fm, 1); draw(); });
+  $("#fLinkAdd").onclick = () => { const u = $("#fLink").value.trim(); if (!/^(https:\/\/|\/clips\/|\/media\/)/.test(u)) return toast("Paste a link that starts with https://", true); keepForm(); if (F.media.length >= 6) return toast("Six at most.", true); F.media.push(linkMedia(u)); draw(); };
+  $("#fImg").onchange = async e => { const f = e.target.files[0]; if (!f) return; keepForm(); if (F.media.length >= 6) return toast("Six at most.", true); try { toast("Uploading the picture…"); F.media.push({ kind: "img", url: await uploadImage(f) }); draw(); } catch (err) { fail(err); } };
+  $("#fSave").onclick = () => {
+    keepForm();
+    if (!F.title) return toast("A headline is needed.", true);
+    if (F.i < 0 && !F.body.trim()) return toast("Write the story.", true);
+    const P = S.ed.edition.pages, pg = P[F.pi];
+    if (F.i < 0) {
+      pg.items.push({ ref: `w:${crypto.randomUUID()}`, kind: "own", from: "newsprint", page: pg.key, desk: PAGE[pg.key] || "", at: new Date().toISOString(), title: F.title, dek: F.dek, byline: F.byline, body: F.body.trim(), media: F.media, edited: true });
+    } else {
+      const x = pg.items[F.i];
+      Object.assign(x, { title: F.title, dek: F.dek, byline: F.byline, media: F.media, edited: true });
+      if (x.body || F.body.trim() !== (F.orig || "").trim()) x.body = F.body.trim();
+    }
+    S.form = null; S.dirty = true; draw(); toast("Done. Save the changes to keep them.");
+  };
 }
 function addList(pi) {
   const used = new Set(S.ed.edition.pages.flatMap(p => p.items.map(x => x.ref)));
@@ -87,6 +148,9 @@ function wire() {
   if ($("#npRec")) $("#npRec").onclick = async () => { try { await api("/api/admin/epaper/settings", { method: "PUT", body: { recipients: $$("[data-rec]").filter(x => x.checked).map(x => x.dataset.rec) } }); toast("Saved."); load(); } catch (e) { fail(e); } };
   if (!S.ed) return;
   const id = S.ed.edition.id;
+  $$("[data-edit]").forEach(b => b.onclick = () => { const [p, i] = at(b.dataset.edit); openForm(p, i); });
+  $$("[data-write]").forEach(b => b.onclick = () => openForm(+b.dataset.write, -1));
+  wireForm();
   $$("[data-up]").forEach(b => b.onclick = () => change(P => { const [p, i] = at(b.dataset.up); const L = P[p].items; [L[i - 1], L[i]] = [L[i], L[i - 1]]; }));
   $$("[data-down]").forEach(b => b.onclick = () => change(P => { const [p, i] = at(b.dataset.down); const L = P[p].items; [L[i + 1], L[i]] = [L[i], L[i + 1]]; }));
   $$("[data-drop]").forEach(b => b.onclick = () => change(P => { const [p, i] = at(b.dataset.drop); P[p].items.splice(i, 1); }));
@@ -103,7 +167,7 @@ function wire() {
 }
 
 async function openEd() {
-  S.ed = null; S.showAdd = ""; draw();
+  S.ed = null; S.showAdd = ""; S.form = null; draw();
   try { const r = await api(`/api/admin/epaper/${S.id}`); S.ed = r; S.cands = r.candidates || []; draw(); } catch (e) { fail(e); }
 }
 async function load(quiet = false) {
@@ -119,5 +183,5 @@ async function load(quiet = false) {
   const user = await shell("Newsprint desk");
   if (!user) return;
   $("main").innerHTML = `<p class="muted">Loading…</p>`;
-  await load(); setInterval(() => { if (!S.dirty && !S.showAdd) load(true); }, 60000);
+  await load(); setInterval(() => { if (!S.dirty && !S.showAdd && !S.form) load(true); }, 60000);
 })();

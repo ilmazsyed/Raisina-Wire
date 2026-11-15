@@ -429,3 +429,6 @@ body.rec-on>header,body.rec-on>main,body.rec-on>nav,body.rec-on .cr-top{visibili
 .np-tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .np-add{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;padding:8px;border-radius:8px;background:var(--panel2,rgba(255,255,255,.03))}
 .np-stars{margin:0;padding-left:22px;display:grid;gap:4px}
+.np-form{border:2px solid var(--green);border-radius:10px;padding:12px}
+.np-form textarea{font-size:16px;line-height:1.6}
+.np-by{color:var(--amber);font-weight:600}

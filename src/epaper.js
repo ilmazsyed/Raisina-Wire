@@ -16,6 +16,7 @@ import { translateTexts } from "./mt.js";
 import { geminiJSON, BENGALI_STYLE } from "./wiredesk.js";
 import { sendPush } from "./push.js";
 import { ownerPush, ownerTelegram } from "./ownerbrief.js";
+import { writer } from "./writers.js";
 
 const IST = 5.5 * 3600e3, DEADLINE = 45 * 60e3, REMIND = 4 * 3600e3, BUILD_EVERY = 20 * 60e3;
 export const SLOTS = { morning: 7, evening: 17 };
@@ -25,6 +26,9 @@ export const editionAt = (day, slot) => Date.parse(`${day}T${String(SLOTS[slot])
 const nowIso = (t = Date.now()) => new Date(t).toISOString();
 const bnNum = v => String(v).replace(/\d/g, d => "০১২৩৪৫৬৭৮৯"[d]);
 const clean = (v, n) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
+// (a story's text: paragraphs kept, separated by a blank line)
+const cleanBody = (v, n = 20000) => String(v ?? "").replace(/\r/g, "").replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, n);
+const htmlText = h => cleanBody(String(h || "").replace(/<\/(p|h\d|li|blockquote)>|<br\s*\/?>/gi, "\n\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'"));
 const J = (t, d) => { try { return JSON.parse(t || ""); } catch { return d; } };
 
 // The pages, in order: each takes the desks named (the front page takes the best of all).
@@ -63,12 +67,12 @@ async function mediaOf(env, a) {
 }
 const firstLine = t => clean(String(t || "").replace(/<[^>]+>/g, " "), 600).split(/(?<=[।.!?])\s/)[0] || "";
 async function articleItem(env, a, from = "") {
-  return { ref: `a:${a.id}`, title: clean(a.title, 240), dek: clean(a.dek, 360) || firstLine(a.body), desk: a.category || "", slug: a.slug, kind: a.kind || "article", at: a.published_at, from, page: pageOf(a.category, `${a.title} ${String(a.body || "").slice(0, 300)}`), media: await mediaOf(env, a), pri: bulletinRank(a.category, `${a.title} ${String(a.body || "").slice(0, 300)}`) };
+  return { ref: `a:${a.id}`, byline: a.kind === "article" && a.writer ? clean(writer(a.writer)?.name, 120) : "", title: clean(a.title, 240), dek: clean(a.dek, 360) || firstLine(a.body), desk: a.category || "", slug: a.slug, kind: a.kind || "article", at: a.published_at, from, page: pageOf(a.category, `${a.title} ${String(a.body || "").slice(0, 300)}`), media: await mediaOf(env, a), pri: bulletinRank(a.category, `${a.title} ${String(a.body || "").slice(0, 300)}`) };
 }
 function poolCard(p) {
   const c = J(p.content, {});
   const media = [...(c.video ? [/youtu/.test(c.video) ? { kind: "yt", id: (c.video.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/) || [])[1] || "" } : { kind: "video", url: c.video }] : []), ...(c.images || []).map(u => ({ kind: "img", url: u }))].filter(x => x.url || x.id).slice(0, 6);
-  return { ref: `p:${p.id}`, title: clean(c.title, 240), dek: clean(c.dek, 360) || firstLine(c.body), body: clean(c.body, 6000), desk: c.desk || "", kind: p.kind, at: p.created_at, from: p.sent_from || p.kind, page: pageOf(c.desk, `${c.title} ${c.body || ""}`), media, pri: bulletinRank(c.desk, `${c.title} ${c.body || ""}`) };
+  return { ref: `p:${p.id}`, byline: clean(c.byline, 120), title: clean(c.title, 240), dek: clean(c.dek, 360) || firstLine(c.body), body: cleanBody(c.body), desk: c.desk || "", kind: p.kind, at: p.created_at, from: p.sent_from || p.kind, page: pageOf(c.desk, `${c.title} ${c.body || ""}`), media, pri: bulletinRank(c.desk, `${c.title} ${c.body || ""}`) };
 }
 
 /* ---------- building an edition ---------- */
@@ -131,7 +135,7 @@ async function localise(env, pages, lang) {
   const want = [];
   for (const p of out) {
     p.title = PAGES.find(x => x.key === p.key)?.title[lang] || p.title;
-    for (const x of p.items) { const t = x.ref.startsWith("a:") ? tr.get(x.ref.slice(2)) : null; if (t?.title) { x.title = t.title; x.dek = t.dek || x.dek; } else want.push(x); }
+    for (const x of p.items) { const t = x.ref.startsWith("a:") && !x.edited ? tr.get(x.ref.slice(2)) : null; if (t?.title) { x.title = t.title; x.dek = t.dek || x.dek; } else want.push(x); }
   }
   // (what has no translation yet: machine-translated now, from Bengali)
   if (want.length) {
@@ -214,12 +218,12 @@ export async function sendToNewsprint(env, user, b) {
     const vids = J(r.videos, []).map(v => v?.url || "").filter(Boolean);
     content = { title: r.title, body: J(r.script, []).join(" "), desk: r.desk, images: J(r.images, []).map((_, i) => `/api/tv/aimg/${encodeURIComponent(ref)}/${i}`), video: vids[0] || "" };
   }
-  if (kind === "breaking") { const c = b.content || {}; content = { title: clean(c.title, 240), dek: clean(c.dek, 360), body: clean(c.body, 6000), desk: clean(c.desk, 40), images: (c.images || []).filter(u => /^(\/media\/|\/clips\/|https:\/\/)/.test(u)).slice(0, 4), video: /^(\/clips\/|https:\/\/)/.test(c.video || "") ? c.video : "" }; if (!content.title) throw new Error("A headline is needed."); }
+  if (kind === "breaking") { const c = b.content || {}; content = { title: clean(c.title, 240), dek: clean(c.dek, 360), body: cleanBody(c.body), desk: clean(c.desk, 40), images: (c.images || []).filter(u => /^(\/media\/|\/clips\/|https:\/\/)/.test(u)).slice(0, 4), video: /^(\/clips\/|https:\/\/)/.test(c.video || "") ? c.video : "" }; if (!content.title) throw new Error("A headline is needed."); }
   const id = crypto.randomUUID();
   await env.DB.prepare("INSERT INTO epaper_pool (id,kind,ref,content,sent_by,sent_from) VALUES (?,?,?,?,?,?)").bind(id, kind, ref, JSON.stringify(content), user.id, clean(b.from || kind, 30)).run();
   return { id };
 }
-const SAFE_ITEM = x => ({ ref: clean(x.ref, 140), title: clean(x.title, 240), dek: clean(x.dek, 360), body: x.body ? clean(x.body, 6000) : undefined, desk: clean(x.desk, 40), slug: clean(x.slug, 200), kind: clean(x.kind, 20), at: clean(x.at, 40), from: clean(x.from, 30), page: clean(x.page, 20), media: (Array.isArray(x.media) ? x.media : []).filter(m => m && (m.url || m.id)).slice(0, 6).map(m => ({ kind: ["img", "video", "yt"].includes(m.kind) ? m.kind : "img", url: m.url ? clean(m.url, 600) : undefined, id: m.id ? clean(m.id, 20) : undefined })), sent: !!x.sent });
+const SAFE_ITEM = x => ({ ref: clean(x.ref, 140), title: clean(x.title, 240), dek: clean(x.dek, 360), body: x.body ? cleanBody(x.body) : undefined, byline: clean(x.byline, 120), edited: !!x.edited, desk: clean(x.desk, 40), slug: clean(x.slug, 200), kind: clean(x.kind, 20), at: clean(x.at, 40), from: clean(x.from, 30), page: clean(x.page, 20), media: (Array.isArray(x.media) ? x.media : []).filter(m => m && (m.url || m.id)).slice(0, 6).map(m => ({ kind: ["img", "video", "yt"].includes(m.kind) ? m.kind : "img", url: m.url ? clean(m.url, 600) : undefined, id: m.id ? clean(m.id, 20) : undefined })), sent: !!x.sent });
 export async function handleNewsprint(request, env, url, user, { json, err, audit, isOwner }) {
   const parts = url.pathname.split("/").slice(4).map(decodeURIComponent), m = request.method;   // after /api/admin/epaper
   const b = ["GET", "DELETE"].includes(m) ? {} : await request.json().catch(() => ({}));
@@ -232,6 +236,12 @@ export async function handleNewsprint(request, env, url, user, { json, err, audi
     // the next two editions, with their deadlines
     const next = []; for (const d of [istDay(t), istDay(t + 864e5)]) for (const slot of Object.keys(SLOTS)) { const at = editionAt(d, slot); if (at > t - 30 * 60e3) next.push({ id: `${d}:${slot}`, day: d, slot, at: new Date(at).toISOString(), deadline: new Date(at - DEADLINE).toISOString(), draftFrom: new Date(at - DEADLINE - REMIND).toISOString() }); }
     return json({ editions: eds.results, next: next.slice(0, 2), pool: pool.results.map(p => ({ ...p, content: J(p.content, {}) })), settings: s, owner: !!isOwner, users: users.results.map(u => ({ id: u.id, name: u.name || u.email, role: u.role })) }, 200, { "cache-control": "no-store" });
+  }
+  if (parts[0] === "story" && m === "GET") {
+    const ref = url.searchParams.get("ref") || "";
+    if (ref.startsWith("a:")) { const a = await env.DB.prepare("SELECT title, dek, body, kind, writer FROM articles WHERE id=?").bind(ref.slice(2)).first(); if (!a) return err("Story not found.", 404); return json({ title: a.title, dek: a.dek || "", body: htmlText(a.body), byline: a.kind === "article" && a.writer ? writer(a.writer)?.name || "" : "" }, 200, { "cache-control": "no-store" }); }
+    if (ref.startsWith("p:")) { const p = await env.DB.prepare("SELECT content FROM epaper_pool WHERE id=?").bind(ref.slice(2)).first(); const c = J(p?.content, {}); return json({ title: c.title || "", dek: c.dek || "", body: cleanBody(c.body), byline: c.byline || "" }, 200, { "cache-control": "no-store" }); }
+    return json({ title: "", dek: "", body: "", byline: "" }, 200, { "cache-control": "no-store" });
   }
   if (parts[0] === "send" && m === "POST") { try { const r = await sendToNewsprint(env, user, b); await audit("epaper.send", "epaper", r.id, { kind: b.kind, from: b.from }); return ok(r); } catch (e) { return err(e.message); } }
   if (parts[0] === "pool" && parts[1] && m === "DELETE") { await env.DB.prepare("DELETE FROM epaper_pool WHERE id=?").bind(parts[1]).run(); return ok(); }
