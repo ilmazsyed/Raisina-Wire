@@ -41,6 +41,7 @@ import m0039 from "../migrations/0039_rundown_pcr.sql";
 import m0040 from "../migrations/0040_avo_bytes.sql";
 import m0041 from "../migrations/0041_programmes.sql";
 import m0042 from "../migrations/0042_ads.sql";
+import m0043 from "../migrations/0043_epaper.sql";
 import m0037 from "../migrations/0037_hidden_langs.sql";
 import m0038 from "../migrations/0038_photo_checks.sql";
 import { bulletinImages, bulletinImageRoute } from "./bulletinimg.js";
@@ -53,6 +54,7 @@ import { handleControlRoom, control as ctlCommand } from "./controlroom.js";
 import { serveClip, clipHousekeeping } from "./clips.js";
 import { progPlayed, handleProgs, progHousekeeping } from "./progs.js";
 import { adPlayed, seedBrandFilm } from "./ads.js";
+import { epaperStep, handleNewsprint, readerEdition, epaperSettings } from "./epaper.js";
 import { applyVoice, handleVoice } from "./voicelab.js";
 import { handleStudio } from "./studioapi.js";
 import { handleExtras, tvExtras } from "./extras.js";
@@ -113,7 +115,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031], ["0032_avo.sql", m0032], ["0033_avo_manual.sql", m0033], ["0034_avo_pictures.sql", m0034], ["0035_tv_evergreen.sql", m0035], ["0036_avo_updates.sql", m0036], ["0037_hidden_langs.sql", m0037], ["0038_photo_checks.sql", m0038], ["0039_rundown_pcr.sql", m0039], ["0040_avo_bytes.sql", m0040], ["0041_programmes.sql", m0041], ["0042_ads.sql", m0042]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031], ["0032_avo.sql", m0032], ["0033_avo_manual.sql", m0033], ["0034_avo_pictures.sql", m0034], ["0035_tv_evergreen.sql", m0035], ["0036_avo_updates.sql", m0036], ["0037_hidden_langs.sql", m0037], ["0038_photo_checks.sql", m0038], ["0039_rundown_pcr.sql", m0039], ["0040_avo_bytes.sql", m0040], ["0041_programmes.sql", m0041], ["0042_ads.sql", m0042], ["0043_epaper.sql", m0043]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -1331,6 +1333,21 @@ async function api(request, env, ctx) {
     const out = await handleControlRoom(request, env, url, { json, err, currentUser, isStaff, auditFn: (u, ...a) => audit(env, u, ...a) });
     if (out) return out;
   }
+  // ---- The e-paper's control room, the Newsprint desk (src/epaper.js).
+  if (url.pathname === "/api/admin/epaper" || url.pathname.startsWith("/api/admin/epaper/")) {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    return handleNewsprint(request, env, url, user, { json, err, audit: (...a) => audit(env, user, ...a), isOwner: isOwner(env, user) });
+  }
+  // ---- The e-paper for readers: Bengali for everyone, English and Hindi for signed-in readers.
+  if (url.pathname === "/api/epaper" || url.pathname.startsWith("/api/epaper/")) {
+    if (request.method !== "GET") return err("Not found.", 404);
+    const [, , , day, slot] = url.pathname.split("/"), lang = ["en", "hi"].includes(url.searchParams.get("lang")) ? url.searchParams.get("lang") : "bn";
+    if (lang !== "bn" && !(await currentUser(request, env).catch(() => null))) return json({ signin: true }, 401, { "cache-control": "no-store" });
+    const ed = await readerEdition(env, { day: /^\d{4}-\d{2}-\d{2}$/.test(day || "") ? day : "", slot: ["morning", "evening"].includes(slot) ? slot : "", lang });
+    if (!ed) return json({ edition: null }, 404, { "cache-control": "no-store" });
+    return json({ edition: ed }, 200, { "cache-control": lang === "bn" ? "public, max-age=60" : "private, max-age=60" });
+  }
   if (url.pathname.startsWith("/api/admin/tv")) {
     const user = await currentUser(request, env);
     if (!isStaff(user)) return err("Editor access required.", 403);
@@ -1619,6 +1636,12 @@ async function api(request, env, ctx) {
       const own = isOwner(env, user) && await env.DB.prepare("SELECT value FROM settings WHERE key='owner_alert'").first();
       const oa = own ? JSON.parse(own.value) : null;
       if (oa && Date.now() - Date.parse(oa.at) < 5 * 60e3) return json({ alert: { title: oa.title, body: oa.body, url: oa.url, createdAt: oa.at } }, 200, { "cache-control": "no-store" });
+      // The e-paper's reminder (an edition waiting for approval): the owner and the people they chose.
+      if (user && (isOwner(env, user) || (isStaff(user) && (await epaperSettings(env)).recipients.includes(user.id)))) {
+        const er = await env.DB.prepare("SELECT value FROM settings WHERE key='epaper_alert'").first();
+        const ea = er ? JSON.parse(er.value) : null;
+        if (ea && Date.now() - Date.parse(ea.at) < 5 * 60e3 && !(oa && Date.parse(oa.at) > Date.parse(ea.at))) return json({ alert: { title: ea.title, body: ea.body, url: ea.url, createdAt: ea.at } }, 200, { "cache-control": "no-store" });
+      }
       const row = isStaff(user) && await env.DB.prepare("SELECT value FROM settings WHERE key='staff_alert'").first();
       const sa = row ? JSON.parse(row.value) : null;
       if (sa && Date.now() - Date.parse(sa.at) < 5 * 60e3) return json({ alert: { title: sa.title, body: sa.body, url: sa.url, createdAt: sa.at } }, 200, { "cache-control": "no-store" });
@@ -1915,6 +1938,8 @@ async function scheduled(env) {
   // The newsreader's voice for the bulletin's stories (when the Google voice key is set).
   await step("bulletin voices", async () => prepareBulletinVoices(env, (await tvState(env, "h")).bulletin));
   await step("brand film", () => seedBrandFilm(env));
+  // The e-paper: drafts four hours before the deadline, reminders, printing at 7:00 and 17:00.
+  await step("e-paper", () => epaperStep(env, env.CRON_TEST_NOW ? Date.parse(env.CRON_TEST_NOW) : Date.now()));
   await step("tv links", () => prepareLinks(env));
   // The AVO Breaking Engine: major new stories, their reading and pictures (src/avo.js).
   await step("avo engine", () => avoStep(env));
