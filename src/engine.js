@@ -498,6 +498,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const ro = new ResizeObserver(scale); ro.observe(fit); scale();
 
   const st = { tv: null, ctl: null, queue: [], skew: 0, alive: true, muted: muted ?? (mode === "app" ? false : !output), audio: null, current: null, shownBreaking: "", flash: 0, stalledSince: 0, playing: false, ws: null, dumpUntil: 0, pkgTimer: null };
+  // (for the channel's own soak tests: ?rxdebug exposes this screen's state, read-only use)
+  if (/[?&]rxdebug/.test(location.search)) (window.__rx ||= []).push(st);
   const keepOrder = mode === "app" && !output && !fixedScene;
   // A remounted player also starts from the channel's data and control state it had a moment ago,
   // so it draws at once instead of showing an empty stage while it fetches them again.
@@ -544,6 +546,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   }
   const onVisible = () => {
     if (document.hidden || !st.alive) return;
+    st.backAt = Date.now();
     keepAwake(); wake();
     // Back on screen (a phone unlocked, the app reopened): the video on air plays on at once.
     const y = st.yt; if (st.ytOwner && y?.ready && y.state !== 1) { try { if (!canSound()) y.player.mute(); y.player.playVideo(); } catch { /* none */ } }
@@ -644,6 +647,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (mode === "app" && !st.ytDiag) { st.ytDiag = { t0: Date.now(), preAgo: y.preAt ? Date.now() - y.preAt : -1, rolled: y.rolling === src.id, pre: y.pre === src.id, preState: y.state, muted: !!st.muted, seq: [] }; setTimeout(() => sendDiag(), 8000); }
       try {
         y.ended = false;
+        if (ytIsBad(src.id)) { y.ended = true; y.pre === src.id && (y.pre = null); return; }
         if (y.pre === src.id) { y.pre = null; y.preloading = false; y.rolling = null; let at = 0; try { at = y.player.getCurrentTime() || 0; } catch { /* none */ } if (Math.abs(at - start) > 0.6) y.player.seekTo(start, true); canSound() ? (st.ytMuted = false, y.player.unMute(), diagMark(91)) : y.player.mute(); y.player.playVideo(); }
         else { y.pre = null; y.player.loadVideoById({ videoId: src.id, startSeconds: start }); canSound() ? (st.ytMuted = false, y.player.unMute()) : y.player.mute(); }
         if (!canSound() && !st.muted && soundBtn) soundBtn.hidden = false;
@@ -677,7 +681,10 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         if (stuck > 450 && !layer.classList.contains("tap")) ytHold(true);
         if (stuck > 1500 && w.n === 0) { w.n = 1; diagMark(92); try { if (!st.muted && !st.ytMuted) soundOff(); y.player.mute(); y.player.playVideo(); } catch { /* none */ } }
         else if (stuck > 3000 && w.n === 1) { w.n = 2; diagMark(93); try { y.player.mute(); y.player.playVideo(); } catch { /* none */ } }
-        else if (stuck > 4500 && w.n === 2) { w.n = 3; diagMark(94); needTap(true); }
+        else if (stuck > 4500 && w.n === 2) {
+          w.n = 3; let bad = ""; try { bad = y.player.getVideoData()?.errorCode || ""; } catch { /* none */ }
+          if (bad) { ytFailed(src.id, 150); y.ended = true; } else { diagMark(94); needTap(true); }
+        }
       }, 300);
     };
     st.ytLoad = load;
@@ -700,6 +707,10 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // on its own graphics (AVO stories, a segment), the player is made hidden and muted with the
   // first video loading in it, so the first video plays the moment its turn comes instead of
   // waiting for YouTube's player to be built and the video to buffer (four or five seconds).
+  // Videos YouTube refused on this screen (id → when): not tried again for ten minutes.
+  const ytBad = new Map();
+  const ytFailed = (id, code) => { if (!id) return; ytBad.set(id, Date.now()); if (st.nowYt?.id === id) { st.ytDiag ||= { t0: Date.now(), seq: [], pre: false, preState: 0, preAgo: -1, rolled: false, muted: !!st.muted }; diagMark(96); diagMark(Number(code) || 0); sendDiag(); } };
+  const ytIsBad = id => { const t = ytBad.get(id); return !!t && Date.now() - t < 600e3; };
   function makeYT(YT, id, start, early) {
     const layer = $(".tvp-ytlayer");
     st.yt = { state: -1, since: Date.now(), ready: false, pre: early ? id : null, preloading: early };
@@ -722,7 +733,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
             liftPoster(st.ytPoster); needTap(false); noCaptions(e.target); unfocusYt();
           }
         },
-        onError: () => { st.yt.state = 0; st.yt.ended = true; }
+        // YouTube will not play this video: remembered by its id (it may be the one loaded in
+        // advance), so its turn is given up at once instead of standing on a still.
+        onError: e => { let id = ""; try { id = e.target.getVideoData()?.video_id || ""; } catch { /* none */ } ytFailed(id || st.yt.pre || st.nowYt?.id, e.data); if (!st.yt.pre || st.yt.pre !== id) { st.yt.state = 0; st.yt.ended = true; } }
       } });
   }
   // The next video is loaded into the one player while the flash or the "up next" card is on
@@ -733,6 +746,12 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // start, which is already loaded.
   function preRoll() {
     const q = st.seq, y = st.yt;
+    // A video started early whose turn was then taken by something else (an ad break, the bulletin):
+    // it is paused and put back to its start, so it never plays on, unseen, under another item.
+    if (y?.ready && y.rolling && !st.ytOwner && !(q?.item?.type === "upnext" && q.item.video?.ytId === y.rolling)) {
+      try { y.player.pauseVideo(); y.player.seekTo(y.preStart || 0, true); } catch { /* none */ }
+      y.rolling = null;
+    }
     if (!q || q.item?.type !== "upnext" || !y?.ready || st.ytOwner || !y.pre || y.pre !== q.item.video?.ytId || y.rolling === y.pre) return;
     // (four seconds before the card ends: Safari and iPhones take up to three to get a video moving)
     if (now() - q.start < Math.max(0.5, q.item.dur - 4) * 1000) return;
@@ -750,7 +769,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (want && !st.yt && !st.ytOwner && !st.ytMaking) { st.ytMaking = true; loadYT().then(YT => { st.ytMaking = false; if (YT && st.alive && !st.yt && !st.ytOwner) makeYT(YT, want.id, Math.floor(want.at || 0), true); }); return; }
     const y = st.yt;
     if (!want || !y?.ready || st.ytOwner || y.pre === want.id) return;
-    y.pre = want.id; y.preloading = true; y.preAt = Date.now();
+    y.pre = want.id; y.preloading = true; y.preAt = Date.now(); y.preStart = Math.floor(want.at || 0); y.rolling = null;
     $(".tvp-ytlayer")?.classList.add("pre"); ytHold(true);
     try { y.player.mute(); y.player.loadVideoById({ videoId: want.id, startSeconds: Math.floor(want.at || 0) }); } catch { y.pre = null; y.preloading = false; }
   }
@@ -768,7 +787,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         if (!YT || !st.alive || !el.isConnected) return;
         player = new YT.Player(el.querySelector(".tvs-yt"), { width: "100%", height: "100%", videoId: src.id,
           playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, iv_load_policy: 3, cc_load_policy: 0, playsinline: 1, fs: 0, autoplay: 1, mute: mute() ? 1 : 0, start: Math.floor((src.in || 0) + offset), ...(src.out ? { end: Math.floor(src.out) } : {}), origin: location.origin },
-          events: { onStateChange: e => { state = e.data; since = Date.now(); ytMaskState(el, e.data, e.data === 1 && !!el.querySelector(".tvs-poster")); if (e.data === 1) { liftPoster(el); played(); noCaptions(e.target); } }, onReady: e => { mute() ? e.target.mute() : e.target.unMute(); e.target.playVideo(); } } });
+          events: { onError: () => { state = 0; since = Date.now(); }, onStateChange: e => { state = e.data; since = Date.now(); ytMaskState(el, e.data, e.data === 1 && !!el.querySelector(".tvs-poster")); if (e.data === 1) { liftPoster(el); played(); noCaptions(e.target); } }, onReady: e => { mute() ? e.target.mute() : e.target.unMute(); e.target.playVideo(); } } });
       });
       // If the phone blocks autoplay (iPhone Low Power Mode, data saver), the cover that keeps
       // viewers off YouTube's controls is lifted after a few seconds so YouTube's own play button
@@ -792,7 +811,23 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       v.muted = mute();
       // A clip starts with sound only where the browser allows it; refused, it starts muted at once
       // (never sitting paused), and takes its sound with the viewer's tap like every video.
-      if (src.kind === "clip") { v.src = src.url; v.addEventListener("loadedmetadata", () => { v.currentTime = (src.in || 0) + offset; v.play().catch(() => { v.muted = true; v.play().catch(() => {}); }); }, { once: true }); }
+      let clipT0 = Date.now(), clipMoved = 0, clipErr = false, clipWd = 0;
+      if (src.kind === "clip") {
+        v.preload = "auto"; v.src = src.url;
+        const at0 = (src.in || 0) + offset;
+        if (at0 > 0.5) v.addEventListener("loadedmetadata", () => { try { v.currentTime = at0; } catch { /* none */ } }, { once: true });
+        const go = () => { const pr = v.play(); if (pr?.catch) pr.catch(() => { v.muted = true; v.play().catch(() => {}); }); };
+        v.addEventListener("error", () => { clipErr = true; });
+        go();
+        // (every half second: a clip that is not moving is started again, muted from the second try)
+        let lastT = -1, tries = 0;
+        clipWd = setInterval(() => {
+          if (!el.isConnected || !st.alive) { clearInterval(clipWd); return; }
+          if (v.ended || Date.now() < (st.breakUntil || 0) || document.hidden) return;
+          if (v.currentTime > lastT + 0.01) { lastT = v.currentTime; clipMoved = Date.now(); tries = 0; return; }
+          if (Date.now() - Math.max(clipMoved, clipT0, st.backAt || 0) > 1500 + tries * 1500 && tries < 4) { tries++; if (tries >= 2) v.muted = true; if (tries === 3) { try { v.load(); } catch { /* none */ } } go(); }
+        }, 500);
+      }
       if (src.kind === "hls") playHls(v, src.url, st.ctl?.delay || 0).then(x => { extra = x; v.play().catch(() => {}); }).catch(() => {});
       if (src.kind === "whep") playWhep(v, src.url).then(x => { extra = x; }).catch(() => {});
       if (src.kind === "guest") {
@@ -806,11 +841,13 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         }).catch(() => {});
       }
       if (src.kind === "clip" && src.out) v.addEventListener("timeupdate", () => { if (v.currentTime >= src.out) v.pause(); });
-      slot.destroy = () => { try { extra?.destroy?.(); extra?.close?.(); } catch { /* none */ } v.pause(); v.removeAttribute("src"); v.srcObject = null; };
+      slot.destroy = () => { clearInterval(clipWd); try { extra?.destroy?.(); extra?.close?.(); } catch { /* none */ } v.pause(); v.removeAttribute("src"); v.srcObject = null; };
       slot.setMuted = m => { v.muted = m || !isMain; };
       slot.stalled = () => { if (v.currentTime !== last) { last = v.currentTime; lastT = Date.now(); } return src.kind !== "clip" && Date.now() - lastT > 10000; };
       slot.playing = () => !v.paused && v.readyState >= 2;
       slot.ended = () => v.ended;
+      // (cannot play: an error, or no movement for eight seconds)
+      slot.dead = () => src.kind === "clip" && !v.ended && (clipErr || Date.now() - Math.max(clipMoved, clipT0, st.breakUntil || 0, st.backAt || 0) > 8000);
     } else if (src.kind === "fb" && src.url) {   // a Facebook live video, through Facebook's player
       el.innerHTML = `<iframe src="https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(src.url)}&show_text=false&autoplay=true&mute=${mute() ? 1 : 0}&width=1280" allow="autoplay; encrypted-media; fullscreen" allowfullscreen title=""></iframe><div class="tvp-shield"></div>`;
     } else if (src.kind === "vdo" && src.url) {
@@ -1053,7 +1090,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (q.item?.type !== "cutin" || q.start !== vStart || q.item.ytId !== v.ytId) {
         if (q.item?.type === "video") { const at = (q.item.in || 0) + ytPos(q.item.ytId); q.resume = at < q.item.dur - 8 ? { ...q.item, at, resumed: true } : null; }
         else if (q.item?.type === "upnext") q.resume = q.item.video;
-        q.item = { type: "cutin", ytId: v.ytId, dur: v.dur, cut: c.id }; q.start = vStart; q.n++;
+        q.item = { type: "cutin", ytId: v.ytId, dur: v.dur, cut: c.id }; q.start = vStart; q.wall = Date.now(); q.gaveUp = false; q.n++;
         q.seg = { type: "video", ytId: v.ytId, title: v.title, line: v.line || v.title, dur: v.dur, start: vStart, in: 0, sting: k === 0, n: q.n };
       }
       st.preWant = vids[k + 1] ? { id: vids[k + 1].ytId, at: 0 } : null;
@@ -1065,17 +1102,24 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // the time it took to load or buffer is never cut from its end. Only a video that has not
       // moved for 20 seconds past its length (it will not play) gives way.
       const ytEnded = (st.yt?.ended && st.nowYt?.id === it.ytId) || !!st.current?.slots?.some(s => s.src?.kind === "yt" && s.src.id === it.ytId && s.ended?.());
-      const len = (it.dur - (it.in || 0)) * 1000, still = Date.now() - (st.ytMovedAt || 0) > 20000;
+      const len = (it.dur - (it.in || 0)) * 1000;
+      // (measured on this screen's own clock from the item's start, a breaking's end, or the page
+      //  coming back on screen, whichever is latest)
+      const base = Math.max(q.wall || 0, st.breakUntil || 0, st.backAt || 0), started = (st.ytMovedAt || 0) > (q.wall || 0);
+      const noStart = !document.hidden && !started && Date.now() - base > 12000, still = !document.hidden && started && Date.now() - Math.max(st.ytMovedAt || 0, base) > 20000;
+      const isYt = it.type === "video" || (it.type === "ad" && it.ytId);
+      if (isYt && (noStart || still) && !q.gaveUp) { q.gaveUp = true; st.ytDiag ||= { t0: Date.now(), seq: [], pre: false, preState: 0, preAgo: -1, rolled: false, muted: !!st.muted }; diagMark(noStart ? 97 : 98); sendDiag(); needTap(false); }
       // (an AVO block waits for its bytes to play in full: src/engine.js byteStep)
       const extra = st.avoExtra && st.avoExtra.start === q.seg?.start ? st.avoExtra.ms : 0;
       // An ad plays whole too: a YouTube ad like a video; an uploaded one until its file has ended
       // (or 20 seconds past its length, when it will not play).
-      const clipEnded = it.type === "ad" && !!it.url && !!st.current?.slots?.some(s => s.src?.kind === "clip" && s.src.url === it.url && s.ended?.());
-      const done = it.type === "video" || (it.type === "ad" && it.ytId)
-        ? ytEnded || (age > len + 20000 && still) || age > len * 2 + 600e3
-        : it.type === "ad" ? clipEnded || age > it.dur * 1000 + 20000
+      const clipSlot = it.type === "ad" && it.url ? st.current?.slots?.find(s => s.src?.kind === "clip" && s.src.url === it.url) : null;
+      const clipEnded = !!clipSlot?.ended?.(), clipDead = !!clipSlot?.dead?.() || (it.type === "ad" && !!it.url && !clipSlot && Date.now() - base > 6000);
+      const done = isYt
+        ? ytEnded || ytIsBad(it.ytId) || noStart || still || age > len * 2 + 600e3
+        : it.type === "ad" ? clipEnded || clipDead || age > it.dur * 1000 + 20000
         : age >= it.dur * 1000 + extra;
-      if (!done) return q.seg;
+      if (!done && !(it.type === "upnext" && ytIsBad(it.video?.ytId))) return q.seg;
     }
     // The bulletin block: the bulletin, then what follows it (each when the one before has ended).
     if (q.block?.length) {
@@ -1105,7 +1149,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (q.adQueue.length) {
       if (q.item?.type === "upnext") q.resume = q.item.video;
       const a = q.adQueue.shift(); q.n++;
-      q.item = { type: "ad", id: a.id, ytId: a.ytId, url: a.url, dur: a.dur }; q.start = t;
+      q.item = { type: "ad", id: a.id, ytId: a.ytId, url: a.url, dur: a.dur }; q.start = t; q.wall = Date.now(); q.gaveUp = false;
       q.seg = { type: "ad", id: a.id, title: a.title, ytId: a.ytId, url: a.url, dur: a.dur, start: t, in: 0, sting: true, n: q.n };
       adAired(a);
       const nextAd = q.adQueue[0];
@@ -1148,6 +1192,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (["bulletin", "weather", "market"].includes(q.item?.type) && q.pending?.length) q.pending = q.pending.filter(x => x.type !== "flash");
     const take = () => { const x = loop[q.i % loop.length]; q.i = (q.i + 1) % loop.length; return x; };
     let next;
+    if (q.item?.type === "upnext" && ytIsBad(q.item.video?.ytId)) { if (!q.item.video.resumed && !q.item.video.eg) take(); q.item = { type: "skip" }; }
     if (q.item?.type === "upnext") {
       const v = q.item.video;
       next = { type: "video", ytId: v.ytId, title: v.title, line: v.line, dur: v.dur, in: v.at || 0, resumed: !!v.resumed, eg: !!v.eg };
@@ -1160,6 +1205,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // the bulletin on either channel.
       while (x.type === "flash" && (channel === "h" || q.item?.type === "bulletin") && loop.some(y => y.type === "video")) { take(); x = loop[q.i % loop.length]; }
       if (x.type === "video") x = fitVideo(q, loop, freshVideo(q, loop, x), t);
+      // (a video YouTube refused on this screen is passed over; if all are refused, the headlines)
+      for (let k = 0; x.type === "video" && !x.fill && ytIsBad(x.ytId) && k < loop.length; k++) { take(); x = loop[q.i % loop.length]; if (x.type !== "video") { take(); x = loop[q.i % loop.length]; } }
+      if (x.type === "video" && !x.fill && ytIsBad(x.ytId)) x = { ...x, fill: true };
       // Under a minute to a bulletin and no video short enough: the headlines (or the channel ID)
       // fill the gap, so the bulletin starts on time.
       if (x.type === "video" && x.fill) { next = channel === "h" && q.item?.type !== "flash" ? { type: "flash", dur: 8, sting: true } : { type: "ident", dur: 5, sting: false }; x = null; }
@@ -1184,7 +1232,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       else if (x.type === "video" && q.item) next = upnext({ ...x, at: 0 });
       else next = take();
     }
-    q.n++; q.item = next; q.start = t;
+    q.n++; q.item = next; q.start = t; q.wall = Date.now(); q.gaveUp = false;
     if (next.type === "video" && !next.resumed) { q.sinceAvo = (q.sinceAvo ?? 3) + 1; markVid(next.ytId); }
     q.seg = { ...next, start: t, in: next.in || 0, n: next.n ?? q.n };
     // While a flash or the "up next" card is on, the video after it is loaded in advance.
@@ -1924,6 +1972,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         setTimeout(() => { if (!el.isConnected || st.byteKey !== bkey) return;
           el.innerHTML = `<div class="avo-byte${channel === "v" ? " v" : ""}${playing ? "" : " wait"}">${media}${b.kind === "yt" ? hold : ""}<div class="byte-super"><span class="bs-tag"><i class="lt-pulse"></i>বক্তব্য</span><span class="bs-who">${b.name ? `<b>${esc(b.name)}</b>` : ""}${b.title ? `<small>${esc(b.title)}</small>` : ""}</span></div>${bl.length > 1 ? `<span class="byte-n">${bnDigits(bi + 1)}/${bnDigits(bl.length)}</span>` : ""}<div class="avo-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>${calm(x) ? "বিস্তারিত" : "এই মুহূর্তে"}</small></span><span class="lt-text">${esc(x.title)}</span></div></div>`;
           const fv = el.querySelector(".avo-byte video");
+          if (fv) { const pr = fv.play(); if (pr?.catch) pr.catch(() => { fv.muted = true; fv.play().catch(() => {}); }); }
           // (a finished byte rests on the studio picture, never on its last frame or a black screen)
           const over = () => { const bx = el.querySelector(".avo-byte"); if (bx) { bx.style.backgroundImage = `url(${channel === "v" ? STUDIO_SQUARE : STUDIO_WIDE})`; bx.classList.add("over"); } };
           if (fv) { fv.addEventListener("playing", () => { run.started = true; }); fv.addEventListener("ended", () => { run.ended = true; over(); }); fv.addEventListener("error", () => { run.started = true; run.ended = true; over(); }); }

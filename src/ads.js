@@ -22,8 +22,10 @@ const ytOf = u => (String(u || "").match(/(?:youtube\.com\/(?:watch\?v=|shorts\/
 
 // The brand film the app made (seed/rashtrix-brand-film.mp4 in the repository), copied once into
 // the clip store by the cron, and put on rotation twice in every 30 minutes on the TV channel.
-export const BRAND_FILM = { id: "brand-film-1", title: "Rashtrix brand film", secs: 93, key: "clips/brand/rashtrix-brand-film.mp4",
-  src: "https://raw.githubusercontent.com/ilmazsyed/Raisina-Wire/rashtrix/seed/rashtrix-brand-film.mp4" };
+// (720p at about 1.5 Mbit/s: it starts at once and plays without stalling on a phone's mobile data;
+//  the first copy, full HD at twice that, is replaced by it)
+export const BRAND_FILM = { id: "brand-film-1", title: "Rashtrix brand film", secs: 93, key: "clips/brand/rashtrix-brand-film-720.mp4", oldKey: "clips/brand/rashtrix-brand-film.mp4",
+  src: "https://raw.githubusercontent.com/ilmazsyed/Raisina-Wire/rashtrix/seed/rashtrix-brand-film-720.mp4" };
 
 const row = r => {
   let times = []; try { times = JSON.parse(r.times || "[]"); } catch { /* none */ }
@@ -76,7 +78,8 @@ export async function adClips(env) {
 // Cron: the brand film, once, into the clip store and the ad library.
 export async function seedBrandFilm(env) {
   if (!env.CLIPS) return null;
-  if (await env.DB.prepare("SELECT 1 FROM tv_ads WHERE id=?").bind(BRAND_FILM.id).first()) return null;
+  const row = await env.DB.prepare("SELECT url FROM tv_ads WHERE id=?").bind(BRAND_FILM.id).first();
+  if (row && row.url !== `/${BRAND_FILM.oldKey}`) return null;
   const has = await env.CLIPS.head(BRAND_FILM.key);
   let bytes = has?.size || 0;
   if (!has) {
@@ -88,9 +91,11 @@ export async function seedBrandFilm(env) {
     await r.body.pipeTo(writable); await put; bytes = len;
   }
   await env.DB.prepare("INSERT OR IGNORE INTO clips (id,title,r2_key,mime,bytes,duration,source,status,keep) VALUES (?,?,?,?,?,?,?,?,1)")
-    .bind(BRAND_FILM.id, BRAND_FILM.title, BRAND_FILM.key, "video/mp4", bytes, BRAND_FILM.secs, "app", "ready").run().catch(() => {});
+    .bind(`${BRAND_FILM.id}-720`, BRAND_FILM.title, BRAND_FILM.key, "video/mp4", bytes, BRAND_FILM.secs, "app", "ready").run().catch(() => {});
   await env.DB.prepare("INSERT OR IGNORE INTO tv_ads (id,title,kind,url,secs,origin,category,channels,per30) VALUES (?,?,?,?,?,?,?,?,?)")
     .bind(BRAND_FILM.id, BRAND_FILM.title, "clip", `/${BRAND_FILM.key}`, BRAND_FILM.secs, "app", "brand", "h", 2).run();
+  // (the ad already in the library moves to the lighter copy; its schedule stays as the desk set it)
+  if (row) { await env.DB.prepare("UPDATE tv_ads SET url=? WHERE id=?").bind(`/${BRAND_FILM.key}`, BRAND_FILM.id).run(); await env.CLIPS.delete(BRAND_FILM.oldKey).catch(() => {}); await env.DB.prepare("DELETE FROM clips WHERE r2_key=?").bind(BRAND_FILM.oldKey).run().catch(() => {}); }
   return { seeded: bytes };
 }
 
