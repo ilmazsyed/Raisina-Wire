@@ -1611,4 +1611,15 @@ export default {
   "No tab audio was shared: the video will be silent. Stop, and tick “Also share tab audio” next time.": "ট্যাবের শব্দ শেয়ার হয়নি, ভিডিওতে শব্দ থাকবে না। থামিয়ে আবার শুরু করুন, ‘Also share tab audio’-তে টিক দিন।",
   "This AVO story was not found. Open it from the AVO desk.": "এভিও খবরটি পাওয়া যায়নি। এভিও ডেস্ক থেকে খুলুন।",
   "This AVO story is not ready yet.": "এভিও খবরটি এখনও তৈরি হয়নি।",
+  // AVO video file; light videos.
+  "⬇ Make the video file": "⬇ ভিডিও ফাইল তৈরি করুন",
+  "The video file is made in this browser: the NEWS NOW opener, the story with its pictures, videos, voice and music, each byte with its name, and the end card. Full HD. Keep this tab open until it is done.": "ভিডিও ফাইল এই ব্রাউজারেই তৈরি হয়: নিউজ নাউ সূচনা, ছবি, ভিডিও, কণ্ঠ ও মিউজিক সহ খবর, নাম সহ প্রতিটি বক্তব্য, আর শেষ কার্ড। ফুল এইচডি। শেষ না হওয়া পর্যন্ত এই ট্যাবটি খোলা রাখুন।",
+  "Make them light": "হালকা করুন",
+  "They were filmed at full HD and stall or go black on mobile data. Make them light: 720p, the same picture, about a sixth of the size.": "এগুলি ফুল এইচডি-তে তোলা, মোবাইল ডেটায় আটকে যায় বা কালো হয়ে যায়। হালকা করুন: ৭২০পি, একই ছবি, আকার প্রায় ছয় ভাগের এক ভাগ।",
+  "Done: every video is light now.": "হয়ে গেছে: সব ভিডিও এখন হালকা।",
+  "Loading the story’s pictures, videos and voice": "খবরের ছবি, ভিডিও আর কণ্ঠ আনা হচ্ছে",
+  "Mixing the sound": "শব্দ মেশানো হচ্ছে",
+  "Making the video": "ভিডিও তৈরি হচ্ছে",
+  "Done": "হয়ে গেছে",
+  "This browser cannot make video files. Use Chrome or Edge on a computer.": "এই ব্রাউজারে ভিডিও ফাইল তৈরি হয় না। কম্পিউটারে ক্রোম বা এজ ব্যবহার করুন।",
 };

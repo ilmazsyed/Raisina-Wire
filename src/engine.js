@@ -191,7 +191,7 @@ const STYLES = {
       if (k === 0 || k === 6) ch.forEach(f => v.osc("sawtooth", f, at, 0.32, 0.085, 2600, 0, 0.02)); // brass stabs
     } }
 };
-export function newsBed(ctx, seconds = 10, { style = "headlines", level = 0.85, delay = 0, duck = 1 } = {}) {
+export function newsBed(ctx, seconds = 10, { style = "headlines", level = 0.85, delay = 0, duck = 1, all = false } = {}) {
   if (!ctx) return () => {};
   const S = STYLES[style] || STYLES.headlines; level = (S.level || level) * duck;
   // Notes are scheduled a second ahead as it plays, so a two-minute piece costs no more than a short one.
@@ -207,13 +207,15 @@ export function newsBed(ctx, seconds = 10, { style = "headlines", level = 0.85, 
   const v = voice(ctx, out);
   let step = 0, next = t0;
   const plan = () => {
-    while (next < ctx.currentTime + 0.8 && next < end - 0.05) {
+    // (all: every note at once, for a piece rendered into a file rather than played: src/avofile.js)
+    while ((all || next < ctx.currentTime + 0.8) && next < end - 0.05) {
       const k = step % 16, bar = Math.floor(step / 16), c = bar % 4;
       S.step(v, next, k, bar, S.chords[c], S.roots[c], s16);
       next += s16; step++;
     }
   };
-  plan(); const timer = setInterval(plan, 200);
+  plan(); if (all) return () => {};
+  const timer = setInterval(plan, 200);
   setTimeout(() => clearInterval(timer), (end - ctx.currentTime + 1) * 1000);
   // Stop: a 0.9-second fade (a cross-fade with whatever starts now), never a cut.
   return (fade = 0.9) => {
@@ -233,16 +235,16 @@ function identSig(ctx) {
   setTimeout(() => { try { out.disconnect(); } catch { /* done */ } }, 7000);
 }
 // The stinger: a rising swoosh, then a deep hit with a metallic ring.
-function stingerSound(ctx) {
+export function stingerSound(ctx, { at = 0, keep = false } = {}) {
   if (!ctx) return;
-  const t = ctx.currentTime + 0.02, out = ctx.createGain(); out.gain.value = 0.85; out.connect(busOf(ctx));
+  const t = ctx.currentTime + 0.02 + at, out = ctx.createGain(); out.gain.value = 0.85; out.connect(busOf(ctx));
   const v = voice(ctx, out), src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
   src.buffer = noise(ctx); bp.type = "bandpass"; bp.Q.value = 1.2; bp.frequency.setValueAtTime(350, t); bp.frequency.exponentialRampToValueAtTime(5200, t + 0.5);
   g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.55, t + 0.45); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.62);
   src.connect(bp).connect(g).connect(out); src.start(t, 0, 0.7);
   v.osc("sine", 120, t + 0.5, 0.7, 0.95, 500, 36); v.hiss(t + 0.5, 0.5, 0.3, "bandpass", 3000, 0.9);
   v.osc("triangle", 880, t + 0.52, 0.6, 0.08, 7000); v.osc("triangle", 1318.5, t + 0.52, 0.5, 0.05, 8000);
-  setTimeout(() => { try { out.disconnect(); } catch { /* done */ } }, 2500);
+  if (!keep) setTimeout(() => { try { out.disconnect(); } catch { /* done */ } }, 2500);
 }
 // A rising swoosh and a hit, for the "up next" card.
 function riser(ctx) {
@@ -1361,7 +1363,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // time), one in eight at other hours.
       const primeNow = (h => h >= 17 && h < 23)(new Date(now() + 5.5 * 3600e3).getUTCHours());
       st.stingN = (st.stingN || 0) + 1;
-      if (t.type === "stinger" && st.stingN % (primeNow ? 3 : 8) === 0) { w.className = "tvp-stinger tvp-studiowipe"; w.innerHTML = `<div class="sw-full"><img src="${channel === "v" ? STUDIO_SQUARE : STUDIO_WIDE}" alt=""><i class="sw-shine"></i></div><i class="sw-edge"></i>`; }
+      if (t.type === "stinger" && st.stingN % (primeNow ? 3 : 8) === 0 && sc?.graphic?.kind !== "avo" && old?.scene?.graphic?.kind !== "avo") { w.className = "tvp-stinger tvp-studiowipe"; w.innerHTML = `<div class="sw-full"><img src="${channel === "v" ? STUDIO_SQUARE : STUDIO_WIDE}" alt=""><i class="sw-shine"></i></div><i class="sw-edge"></i>`; }
       else if (t.type === "stinger") w.innerHTML = `<img src="${LOGO}" alt="">`;
       stage.append(w); box.style.visibility = "hidden";
       if (!st.muted) (t.type === "stinger" ? stingerSound : whoosh)(st.audio);
@@ -1960,24 +1962,46 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         // (this byte on the story's clock: from after its wipe to its planned end)
         const run = st.byteRun = { key: bkey, at0, base: starts[k] + avoVoiceLen(x), end: acc + BYTE_WIPE + Math.max(3, Number(bl[bi].secs) || 30), started: false, ended: false, t0: Date.now() };
         voStop(); st.voice?.pause?.(); st.voice = null; st.bed?.(); st.bed = null;
-        const w = document.createElement("div"); w.className = "tvp-stinger tvp-studiowipe";
-        w.innerHTML = `<div class="sw-full"><img src="${channel === "v" ? STUDIO_SQUARE : STUDIO_WIDE}" alt=""><i class="sw-shine"></i></div><i class="sw-edge"></i>`;
+        const w = document.createElement("div"); w.className = "tvp-stinger avo-sting";
+        w.innerHTML = `<img src="${LOGO}" alt="">`;
         stage.append(w); if (!st.muted && st.audio && loud) stingerSound(st.audio);
         const b = bl[bi], quiet = st.muted || !loud;
         // A YouTube byte is taller than the frame (its title and logo fall outside it) and stays
         // hidden behind the studio wipe until it is really playing (at most five seconds).
         const media = b.kind === "yt" ? `<iframe class="byte-yt" src="https://www.youtube.com/embed/${esc(b.id)}?autoplay=1&mute=${quiet ? 1 : 0}&controls=0&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3&fs=0&disablekb=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" allow="autoplay; encrypted-media" title=""></iframe>`
-          : `<video src="${esc(b.url)}" autoplay playsinline ${quiet ? "muted" : ""}></video>`;
+          : `<i class="byte-slot"></i>`;
         stage.classList.add("byte-on"); drawJacket();
-        let playing = b.kind !== "yt";
+        let playing = false;
         const lift = () => { if (w.isConnected) { w.classList.add("out"); setTimeout(() => w.remove(), 450); } };
-        const hold = `<div class="byte-hold"><img src="${channel === "v" ? STUDIO_SQUARE : STUDIO_WIDE}" alt=""><i class="sw-shine"></i></div>`;
+        const hold = `<div class="byte-hold"><img src="${LOGO}" alt=""></div>`;
         setTimeout(() => { if (!el.isConnected || st.byteKey !== bkey) return;
-          el.innerHTML = `<div class="avo-byte${channel === "v" ? " v" : ""}${playing ? "" : " wait"}">${media}${b.kind === "yt" ? hold : ""}<div class="byte-super"><span class="bs-tag"><i class="lt-pulse"></i>বক্তব্য</span><span class="bs-who">${b.name ? `<b>${esc(b.name)}</b>` : ""}${b.title ? `<small>${esc(b.title)}</small>` : ""}</span></div>${bl.length > 1 ? `<span class="byte-n">${bnDigits(bi + 1)}/${bnDigits(bl.length)}</span>` : ""}<div class="avo-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>${calm(x) ? "বিস্তারিত" : "এই মুহূর্তে"}</small></span><span class="lt-text">${esc(x.title)}</span></div></div>`;
-          const fv = el.querySelector(".avo-byte video");
-          if (fv) { const pr = fv.play(); if (pr?.catch) pr.catch(() => { fv.muted = true; fv.play().catch(() => {}); }); }
+          el.innerHTML = `<div class="avo-byte${channel === "v" ? " v" : ""}${playing ? "" : " wait"}">${media}${hold}<div class="byte-super"><span class="bs-tag"><i class="lt-pulse"></i>বক্তব্য</span><span class="bs-who">${b.name ? `<b>${esc(b.name)}</b>` : ""}${b.title ? `<small>${esc(b.title)}</small>` : ""}</span></div>${bl.length > 1 ? `<span class="byte-n">${bnDigits(bi + 1)}/${bnDigits(bl.length)}</span>` : ""}<div class="avo-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>${calm(x) ? "বিস্তারিত" : "এই মুহূর্তে"}</small></span><span class="lt-text">${esc(x.title)}</span></div></div>`;
+          // An uploaded byte: the element loaded in advance (bytePre), put in place, started (muted where
+          // sound is refused); shown only once its picture really moves, the frame over it until then.
+          let fv = null;
+          if (b.kind !== "yt") {
+            fv = bytePre(b.url); fv.muted = quiet; fv.loop = false; fv.className = ""; fv.style.cssText = "";
+            el.querySelector(".byte-slot")?.replaceWith(fv);
+            try { if (fv.ended || fv.currentTime > 0.2) fv.currentTime = 0; } catch { /* none */ }
+            const box = el.querySelector(".avo-byte"), start = () => { const pr = fv.play(); if (pr?.catch) pr.catch(() => { fv.muted = true; fv.play().catch(() => {}); }); };
+            start();
+            let lastT = -1, moved = 0, since = Date.now(), tries = 0;
+            const wd = setInterval(() => {
+              if (!el.isConnected || st.byteKey !== bkey || run.ended) { clearInterval(wd); return; }
+              if (Date.now() < (st.breakUntil || 0) || document.hidden) { since = Date.now(); return; }
+              if (fv.currentTime > lastT + 0.02 && !fv.paused) {
+                lastT = fv.currentTime; moved = Date.now(); since = 0; run.started = true;
+                if (!playing) { playing = true; lift(); } box?.classList.remove("wait"); return;
+              }
+              since ||= Date.now(); const stuck = Date.now() - since;
+              if (stuck > 400) box?.classList.add("wait");
+              if (stuck > 1500 && tries < 4 && stuck > 1500 * (tries + 1)) { tries++; if (tries >= 2) fv.muted = true; start(); }
+              // never started in 8 s, or stalled for 6 s: the byte gives way (the story carries on)
+              if ((!moved && stuck > 8000) || (moved && stuck > 6000)) { run.started = true; run.ended = true; over(); lift(); clearInterval(wd); }
+            }, 250);
+          }
           // (a finished byte rests on the studio picture, never on its last frame or a black screen)
-          const over = () => { const bx = el.querySelector(".avo-byte"); if (bx) { bx.style.backgroundImage = `url(${channel === "v" ? STUDIO_SQUARE : STUDIO_WIDE})`; bx.classList.add("over"); } };
+          const over = () => { const bx = el.querySelector(".avo-byte"); if (bx) bx.classList.add("over"); };
           if (fv) { fv.addEventListener("playing", () => { run.started = true; }); fv.addEventListener("ended", () => { run.ended = true; over(); }); fv.addEventListener("error", () => { run.started = true; run.ended = true; over(); }); }
           const f = el.querySelector("iframe.byte-yt"); if (!f) return;
           const box = el.querySelector(".avo-byte"), cmd = (func, args = []) => { try { f.contentWindow.postMessage(JSON.stringify({ event: "command", func, args, id: bkey, channel: "widget" }), "*"); } catch { /* fine */ } };
@@ -2003,7 +2027,25 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           // (no word from the player at all: shown after five seconds)
           setTimeout(() => { if (!heard && !off()) go(); }, 5000); }, 550);
         setTimeout(() => { if (playing) lift(); }, 1400);
+        // (whatever happens, the stinger never stays longer than five seconds)
+        setTimeout(lift, 5000);
       };
+      // Uploaded bytes and their elements, loaded in advance: each story's bytes start loading the
+      // moment the story is on screen (while the newsreader reads), so a byte plays at once.
+      const bytePre = url => {
+        const m = (st.bytePre ||= new Map());
+        let v = m.get(url);
+        if (!v) {
+          v = document.createElement("video"); v.preload = "auto"; v.playsInline = true; v.muted = true; v.setAttribute("playsinline", ""); v.src = url;
+          try { v.load(); } catch { /* none */ }
+          m.set(url, v);
+          // (the oldest go once there are more than six)
+          if (m.size > 6) { const [k, old] = m.entries().next().value; if (!old.isConnected) { old.removeAttribute("src"); try { old.load(); } catch { /* none */ } m.delete(k); } }
+        }
+        return v;
+      };
+      const preBytes = x => (x?.bytes || []).forEach(b => { if (b.kind !== "yt" && b.url) bytePre(b.url); });
+      list.slice(0, 2).forEach(preBytes);
       const speakAvo = x => {
         st.voice?.pause(); st.voice = null;
         if (!x?.voice?.length || st.muted || !loud || !st.audio) return;
@@ -2033,6 +2075,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         }
         const e = e0 - AVO_INTRO; let k = 0; while (k < list.length - 1 && e >= starts[k + 1]) k++;
         const x = list[k]; if (!x) return;
+        preBytes(x); preBytes(list[k + 1]);
         // A story's slide times are fixed by its length (each slide at least four and a half
         // seconds); a slide still to come takes a picture that finishes loading meanwhile, and a slide
         // on screen never changes.
