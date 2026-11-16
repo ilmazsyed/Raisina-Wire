@@ -2016,7 +2016,7 @@ export default {
     if (/^\/bn(\/|$)/.test(url.pathname) && ["GET", "HEAD"].includes(request.method)) return Response.redirect(new URL((url.pathname.replace(/^\/bn/, "") || "/") + url.search, request.url).toString(), 301);
     try {
       if (url.pathname.startsWith("/media/")) return await serveMedia(request, env, ctx);
-      if (url.pathname.startsWith("/clips/")) return await serveClip(request, env);
+      if (url.pathname.startsWith("/clips/")) return await serveClip(request, env, ctx);
       if (url.pathname === "/robots.txt") return robots(request, env);
       if (url.pathname === "/privacy.html" || url.pathname === "/terms.html") return Response.redirect(new URL(url.pathname.replace(".html", ""), request.url).toString(), 301);
       if (url.pathname === "/sitemap.xml" && env.DB) return await sitemap(request, env, ensureSchema);

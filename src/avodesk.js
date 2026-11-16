@@ -284,20 +284,27 @@ async function heavyCheck() {
   P.hidden = !heavy.length; if (!heavy.length) return;
   P.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><b>${digits(heavy.length)} videos in AVO stories are too heavy for phones</b><br><small class="muted">They were filmed at full HD and stall or go black on mobile data. Make them light: 720p, the same picture, about a sixth of the size.</small></div><button class="btn amber" type="button" id="hvGo">Make them light</button></div><div class="oap-bar" id="hvBar" hidden><i></i></div><small class="muted" id="hvMsg"></small>`;
   $("#hvGo").onclick = async () => {
+    // (the sound, made available by this tap: Safari plays sound only from a tap)
+    let audio = null; try { audio = new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); } catch { /* none */ }
+    const ask = text => new Promise(res => { const b = document.createElement("button"); b.className = "btn amber"; b.type = "button"; b.textContent = text; $("#hvMsg").after(b); b.onclick = () => { b.remove(); res(); }; });
+    const whys = [];
     heavyBusy = true; $("#hvGo").disabled = true; const bar = $("#hvBar"); bar.hidden = false; let done = 0, kept = 0;
     for (const c of heavy) {
       try {
         $("#hvMsg").textContent = `${digits(done + 1)} / ${digits(heavy.length)}: ${c.title || "video"}`;
         const blob = await fetch(c.url).then(r => { if (!r.ok) throw new Error("not found"); return r.blob(); });
         const file = new File([blob], (c.title || "clip").replace(/[^\w\u0980-\u09FF -]+/g, "").slice(0, 60) + ".mp4", { type: blob.type || "video/mp4" });
-        const lit = await lightenVideo(file, { onProgress: k => { $("i", bar).style.width = `${Math.round((done + k * .7) / heavy.length * 100)}%`; } });
-        if (!lit) { kept++; done++; continue; }
+        let why = "";
+        const lit = await lightenVideo(file, { audio, ask, onWhy: t => { why = t; }, onProgress: k => { $("i", bar).style.width = `${Math.round((done + k * .7) / heavy.length * 100)}%`; } });
+        if (!lit) { kept++; done++; whys.push(`${c.title || "video"}: ${why || "it could not be made light."}`); continue; }
         const up = await uploadClip(lit, $("#hvBar"), c.title || "AVO video");
         await api("/api/admin/clips/swap", { method: "POST", body: { from: c.url, to: up.url } });
-      } catch { kept++; }
+      } catch (e) { kept++; whys.push(`${c.title || "video"}: ${e?.message || "it could not be saved."}`); }
       done++; $("i", bar).style.width = `${Math.round(done / heavy.length * 100)}%`;
     }
-    heavyBusy = false; toast(kept ? `Done. ${digits(heavy.length - kept)} made light, ${digits(kept)} could not be.` : "Done: every video is light now."); load();
+    heavyBusy = false; try { audio?.close(); } catch { /* none */ }
+    toast(kept ? `Done. ${digits(heavy.length - kept)} made light, ${digits(kept)} could not be.` : "Done: every video is light now.");
+    if (whys.length) { $("#hvMsg").textContent = whys.join(" · "); setTimeout(load, 15000); } else load();
   };
 }
 

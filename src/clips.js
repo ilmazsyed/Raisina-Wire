@@ -9,14 +9,31 @@ const PART = 20 * 1024 * 1024;   // upload part size (R2 needs at least 5 MB exc
 const now = () => new Date().toISOString();
 const ready = env => Boolean(env.CLIPS);
 
-export async function serveClip(request, env) {
+// Served from Cloudflare's cache near the viewer once anyone has played it (whole clips up to 300 MB;
+// the cache answers byte ranges itself), so a byte starts at once instead of waiting on storage.
+const EDGE_MAX = 300 * 1024 * 1024, caching = new Set();
+export async function serveClip(request, env, ctx) {
   if (!ready(env)) return new Response("Clips are not set up", { status: 404 });
-  const key = decodeURIComponent(new URL(request.url).pathname.slice(1));   // "clips/…"
+  const u = new URL(request.url), key = decodeURIComponent(u.pathname.slice(1));   // "clips/…"
   if (!/^clips\/[\w./-]+$/.test(key) || key.includes("..")) return new Response("Not found", { status: 404 });
   const range = request.headers.get("range");
+  const cache = typeof caches !== "undefined" ? caches.default : null, ck = new Request(`${u.origin}/${key}`);
+  if (cache && request.method === "GET") {
+    const hit = await cache.match(range ? new Request(ck, { headers: { range } }) : ck).catch(() => null);
+    if (hit) return hit;
+  }
   const obj = await env.CLIPS.get(key, range ? { range: request.headers } : {});
   if (!obj) return new Response("Not found", { status: 404 });
   const h = new Headers({ "content-type": obj.httpMetadata?.contentType || "video/mp4", "accept-ranges": "bytes", "cache-control": "public, max-age=86400", etag: obj.httpEtag });
+  // (the whole clip into the cache, in the background, for the next viewer and the next range)
+  if (cache && ctx && request.method === "GET" && obj.size <= EDGE_MAX && !caching.has(key)) {
+    caching.add(key);
+    ctx.waitUntil((async () => {
+      const full = await env.CLIPS.get(key); if (!full) return;
+      const hh = new Headers(h); hh.set("content-length", String(full.size)); hh.set("cache-control", "public, max-age=2592000, immutable");
+      await cache.put(ck, new Response(full.body, { headers: hh }));
+    })().catch(() => {}).finally(() => setTimeout(() => caching.delete(key), 60e3)));
+  }
   if (range && obj.range) {
     const { offset = 0, length = obj.size - offset } = obj.range;
     h.set("content-range", `bytes ${offset}-${offset + length - 1}/${obj.size}`); h.set("content-length", String(length));
