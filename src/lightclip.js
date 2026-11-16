@@ -2,7 +2,10 @@
 // more than a phone's mobile data can stream, so a byte stood black or froze on air. Each upload
 // is re-encoded in this browser to at most 1280×720 at about 2.5 Mbit/s (H.264 and AAC in MP4),
 // from the video playing at double speed (so an 8-second byte takes about 4 seconds). A video that
-// is already light, or a browser that cannot encode, keeps the original.
+// is already light keeps the original. Where the browser cannot encode this way (an iPhone's Safari has
+// no audio encoder), the video is recorded instead: played once at normal speed, drawn at 720p, its
+// sound taken through Web Audio, and the two recorded as a light MP4 (WebM where MP4 cannot be
+// recorded). opts.onWhy hears why a video could not be made light.
 import { Muxer, ArrayBufferTarget } from "mp4-muxer";
 
 // (some browsers give the first chunk no colour space; the MP4 needs one: the usual HD one)
@@ -11,8 +14,14 @@ const SR = 48000;
 // Already light: at most 720 lines and 3.5 Mbit/s.
 export const isLight = (bytes, secs, h = 0) => secs > 0 && bytes * 8 / secs <= 3.5e6 && (!h || h <= 720);
 
-export async function lightenVideo(file, { onProgress = () => {} } = {}) {
-  if (!window.VideoEncoder || !window.AudioEncoder || !window.VideoFrame) return null;
+export async function lightenVideo(file, opts = {}) {
+  const r = await encodeLight(file, opts);
+  if (r !== FALLBACK) return r;
+  return recordLight(file, opts);
+}
+const FALLBACK = Symbol("record instead");
+async function encodeLight(file, { onProgress = () => {} } = {}) {
+  if (!window.VideoEncoder || !window.AudioEncoder || !window.VideoFrame) return FALLBACK;
   const url = URL.createObjectURL(file);
   const v = document.createElement("video"); v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url;
   try {
@@ -24,11 +33,11 @@ export async function lightenVideo(file, { onProgress = () => {} } = {}) {
     const vcfg = { codec: "avc1.4d401f", width: W, height: H, bitrate: 2.5e6, framerate: 30 };
     const acfg = { codec: "mp4a.40.2", sampleRate: SR, numberOfChannels: 2, bitrate: 128000 };
     const ok = async (E, c) => { try { return (await E.isConfigSupported(c)).supported; } catch { return false; } };
-    if (!(await ok(VideoEncoder, vcfg))) { vcfg.codec = "avc1.42001f"; if (!(await ok(VideoEncoder, vcfg))) return null; }
+    if (!(await ok(VideoEncoder, vcfg))) { vcfg.codec = "avc1.42001f"; if (!(await ok(VideoEncoder, vcfg))) return FALLBACK; }
     // the sound (decoded whole; a video with no sound track is made silent)
     let audio = null;
     try { const ac = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SR }); audio = await ac.decodeAudioData(await file.arrayBuffer()); ac.close(); } catch { audio = null; }
-    if (audio && !(await ok(AudioEncoder, acfg))) return null;
+    if (audio && !(await ok(AudioEncoder, acfg))) return FALLBACK;
     const target = new ArrayBufferTarget();
     const muxer = new Muxer({ target, fastStart: "in-memory", firstTimestampBehavior: "offset", video: { codec: "avc", width: W, height: H, frameRate: 30 }, ...(audio ? { audio: { codec: "aac", numberOfChannels: 2, sampleRate: SR } } : {}) });
     let failed = null;
@@ -56,10 +65,76 @@ export async function lightenVideo(file, { onProgress = () => {} } = {}) {
       v.requestVideoFrameCallback(each); v.playbackRate = 2; v.play().catch(rej);
     });
     await venc.flush(); if (failed) throw failed; venc.close(); muxer.finalize();
-    if (n < secs * 8) return null;   // too few frames came through (a background tab): keep the original
+    if (n < secs * 8) return FALLBACK;   // too few frames came through: recorded instead
     onProgress(1);
     const name = file.name.replace(/\.\w+$/, "") + ".mp4";
     return new File([target.buffer], name, { type: "video/mp4" });
-  } catch { return null; }
+  } catch { return FALLBACK; }
   finally { v.removeAttribute("src"); try { v.load(); } catch { /* none */ } URL.revokeObjectURL(url); }
+}
+
+// The recording way: works in Safari (iPhone, iPad, Mac) and Chrome. Real time: an 80-second byte takes
+// 80 seconds; the screen must stay on. opts.audio is an AudioContext made in the tap that started it
+// (Safari lets sound play only from a tap); opts.ask(text) shows a button and resolves when it is
+// tapped, for when Safari still wants a tap before a video plays.
+// (H.264 and AAC only: what every phone plays, iPhones included)
+// (Safari's plain MP4 is always H.264 and AAC; elsewhere both are asked for by name)
+const apple = () => { const u = navigator.userAgent; return (/AppleWebKit/.test(u) && !/Chrome|Chromium|Edg|OPR|Android/.test(u)) || /CriOS|FxiOS|EdgiOS/.test(u); };
+const REC_TYPES = ["video/mp4;codecs=avc1.4d401f,mp4a.40.2", "video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1,mp4a.40.2", "video/mp4;codecs=avc1,mp4a"];
+export async function recordLight(file, { onProgress = () => {}, onWhy = () => {}, audio = null, ask = null } = {}) {
+  const why = t => { onWhy(t); return null; };
+  if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return why("This browser cannot make video files. Use Chrome on a computer, or Safari on an up-to-date iPhone.");
+  const mime = [...REC_TYPES, ...(apple() ? ["video/mp4"] : [])].find(t => { try { return MediaRecorder.isTypeSupported(t); } catch { return false; } });
+  if (!mime) return why("This browser cannot make H.264 video. Use Chrome on a Windows or Mac computer, or Safari on an iPhone or iPad.");
+  const url = URL.createObjectURL(file);
+  const v = document.createElement("video"); v.playsInline = true; v.setAttribute("playsinline", ""); v.preload = "auto"; v.src = url;
+  v.style.cssText = "position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:.01;pointer-events:none";
+  document.body.appendChild(v);
+  let ac = audio, own = false, rec = null;
+  try {
+    await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error("This video cannot be read.")); });
+    const secs = v.duration || 0, iw = v.videoWidth, ih = v.videoHeight;
+    if (!secs || !iw) return why("This video cannot be read.");
+    if (isLight(file.size, secs, Math.min(iw, ih))) return null;
+    const sc = Math.min(1, 1280 / Math.max(iw, ih), 720 / Math.min(iw, ih)), W = Math.round(iw * sc / 2) * 2, H = Math.round(ih * sc / 2) * 2;
+    const canvas = document.createElement("canvas"); canvas.width = W; canvas.height = H; const c = canvas.getContext("2d", { alpha: false });
+    c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
+    const stream = canvas.captureStream(30);
+    // the sound: the video's own, through Web Audio, into the recording (not out of the speaker)
+    if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); own = true; }
+    try { await ac.resume(); } catch { /* none */ }
+    const dest = ac.createMediaStreamDestination(); ac.createMediaElementSource(v).connect(dest);
+    dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+    rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 2_500_000, audioBitsPerSecond: 128_000 });
+    const chunks = []; rec.ondataavailable = e => { if (e.data?.size) chunks.push(e.data); };
+    const stopped = new Promise(res => { rec.onstop = res; });
+    // each frame drawn as it is shown
+    let last = -1, alive = Date.now();
+    const draw = () => { if (v.ended || rec.state === "inactive") return; if (v.currentTime !== last) { c.drawImage(v, 0, 0, W, H); last = v.currentTime; alive = Date.now(); onProgress(Math.min(.99, v.currentTime / secs)); }
+      if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(draw); else requestAnimationFrame(draw); };
+    v.currentTime = 0;
+    try { await v.play(); } catch (e) {
+      if (!ask) throw e;
+      await ask("Tap to make the next video light");
+      try { await ac.resume(); } catch { /* none */ }
+      await v.play();
+    }
+    rec.start(1000); draw();
+    await new Promise((res, rej) => {
+      v.onended = res; v.onerror = () => rej(new Error("This video stopped playing."));
+      const wd = setInterval(() => { if (v.ended) { clearInterval(wd); return; } if (Date.now() - alive > 20000) { clearInterval(wd); rej(new Error("This video stalled while it was being made light. Keep the screen on and try again.")); } }, 1000);
+    });
+    c.drawImage(v, 0, 0, W, H);
+    rec.stop(); await stopped;
+    const type = mime.split(";")[0], blob = new Blob(chunks, { type });
+    if (!blob.size || blob.size > file.size) return why("The light copy came out no smaller; the original is kept.");
+    onProgress(1);
+    return new File([blob], file.name.replace(/\.\w+$/, "") + (type === "video/mp4" ? ".mp4" : ".webm"), { type });
+  } catch (e) {
+    try { if (rec && rec.state !== "inactive") rec.stop(); } catch { /* none */ }
+    return why(e?.message || "This video could not be made light.");
+  } finally {
+    v.pause(); v.removeAttribute("src"); try { v.load(); } catch { /* none */ } v.remove(); URL.revokeObjectURL(url);
+    if (own) ac.close().catch(() => {});
+  }
 }
