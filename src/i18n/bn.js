@@ -1707,4 +1707,8 @@ export default {
   "Done. Save the changes to keep them.": "হয়ে গেছে। রাখতে হলে বদল সেভ করুন।",
   "Uploading the picture…": "ছবি আপলোড হচ্ছে…",
   "Paste a link that starts with https://": "https:// দিয়ে শুরু হওয়া লিঙ্ক দিন",
+  // The e-paper.
+  "E-paper": "ই-পেপার",
+  "Open the e-paper ↗": "ই-পেপার খুলুন ↗",
+  "Read it ↗": "পড়ুন ↗",
 };

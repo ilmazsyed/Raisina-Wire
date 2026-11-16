@@ -146,6 +146,7 @@ const NAV = [
   ["Briefs", "/briefs", r => r.page === "briefs"],
   ["Shorts", "/shorts", r => r.page === "shorts"],
   ["Watch", "/watch", r => r.page === "watch"],
+  ["E-paper", `/epaper${lang === "bn" ? "" : `?lang=${lang}`}`, () => false],
   ["Community", "/community", r => r.page === "community" || r.page === "discussion"]
 ];
 
@@ -193,7 +194,7 @@ function renderShell() {
       </div>
     </div>
     <div class="sf-grid">
-      <nav class="sf-col" aria-label="Sections"><h3>Sections</h3>${DESKS.map(d => `<a href="${deskHref(d)}">${d}</a>`).join("")}<a href="/live">Latest</a><a href="/briefs">Briefs</a><a href="/shorts">Shorts</a><a href="/watch">Watch</a></nav>
+      <nav class="sf-col" aria-label="Sections"><h3>Sections</h3>${DESKS.map(d => `<a href="${deskHref(d)}">${d}</a>`).join("")}<a href="/live">Latest</a><a href="/briefs">Briefs</a><a href="/shorts">Shorts</a><a href="/watch">Watch</a><a href="/epaper${lang === "bn" ? "" : `?lang=${lang}`}">E-paper</a></nav>
       <nav class="sf-col" aria-label="Rashtrix"><h3>Rashtrix</h3><a href="/about">About Rashtrix</a><a href="/community">Community</a><a href="/corrections">Corrections Policy</a><a href="/grievance">Grievance Redressal</a><a href="https://www.rashtrix.live" target="_blank" rel="noopener">rashtrix.live ↗</a></nav>
       <form class="lead-form sf-form" id="leadForm"><h3 class="kicker">Advertising &amp; contact</h3>
         <label class="sr-only" for="leadName">Your name</label><input id="leadName" name="name" placeholder="Your name" required minlength="2" autocomplete="name">
@@ -318,7 +319,7 @@ function interceptLinks(e) {
   const a = e.target.closest("a[href]"); if (!a || a.target || a.hasAttribute("download")) return;
   if (a.dataset.lang) { setLanguagePreference(a.dataset.lang); return; } // other language: full page load
   const href = a.getAttribute("href");
-  if (!href.startsWith("/") || href.startsWith("//") || /^\/(api|admin|media)\b|\.(html|xml|txt|json|webmanifest|jpg|png|webp|pdf)$/i.test(href.split("?")[0])) return;
+  if (!href.startsWith("/") || href.startsWith("//") || /^\/(api|admin|media|epaper)\b|\.(html|xml|txt|json|webmanifest|jpg|png|webp|pdf)$/i.test(href.split("?")[0])) return;
   e.preventDefault();
   a.closest("dialog")?.close();
   navigate(href);
