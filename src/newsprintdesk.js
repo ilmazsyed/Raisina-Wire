@@ -21,7 +21,7 @@ function draw() {
   const next = L.next || [];
   $("main").innerHTML = `<section class="panel pd">
     <div class="row" style="justify-content:space-between;flex-wrap:wrap"><h2>Newsprint desk</h2>
-      <div class="row"><button class="btn sm" id="npR">Refresh</button></div></div>
+      <div class="row"><a class="btn sm" href="/epaper" target="_blank" rel="noopener">Open the e-paper ↗</a><button class="btn sm" id="npR">Refresh</button></div></div>
     <p class="muted" style="margin:0">The e-paper: the morning edition at 7:00 and the evening edition at 17:00. Each is drafted on its own four hours before its deadline (45 minutes before the edition), from the stories sent to the newsprint and the day's news. Choose the lead, order the pages and approve. At the edition's time it is printed, approved or not.</p>
     <div class="np-next row" style="flex-wrap:wrap;gap:10px">${next.map(n => { const r = L.editions.find(x => x.id === n.id); const [s, c] = STATUS[r?.status || "draft"];
       return `<button type="button" class="np-slot ${S.id === n.id ? "on" : ""}" data-pick="${n.id}"><b>${SLOT[n.slot]}</b><small data-no-tr>${esc(day(n.day))}</small>
@@ -32,7 +32,7 @@ function draw() {
   ${ed ? `<section class="panel pd">
     <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
       <h2 style="margin:0"><span>${SLOT[ed.slot]}</span> · <span data-no-tr>${esc(day(ed.day))}</span> <span class="tag ${STATUS[ed.status][1]}">${STATUS[ed.status][0]}</span></h2>
-      <div class="row" style="flex-wrap:wrap">${out ? "" : `
+      <div class="row" style="flex-wrap:wrap">${out ? `<a class="btn sm" href="/epaper?ed=${ed.day}/${ed.slot}" target="_blank" rel="noopener">Read it ↗</a>` : `
         ${S.dirty ? `<button class="btn sm green" id="npSave">Save changes</button>` : ""}
         <button class="btn sm" id="npBuild" title="Draft it again from the latest news (your changes are lost)">Draft again</button>
         <button class="btn sm ${ed.status === "approved" ? "" : "green"}" id="npOk">${ed.status === "approved" ? "Withdraw approval" : "✓ Approve"}</button>

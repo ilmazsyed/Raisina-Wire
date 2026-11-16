@@ -17,6 +17,7 @@ import { geminiJSON, BENGALI_STYLE } from "./wiredesk.js";
 import { sendPush } from "./push.js";
 import { ownerPush, ownerTelegram } from "./ownerbrief.js";
 import { writer } from "./writers.js";
+import { bangabda, weather } from "./extras.js";
 
 const IST = 5.5 * 3600e3, DEADLINE = 45 * 60e3, REMIND = 4 * 3600e3, BUILD_EVERY = 20 * 60e3;
 export const SLOTS = { morning: 7, evening: 17 };
@@ -67,7 +68,7 @@ async function mediaOf(env, a) {
 }
 const firstLine = t => clean(String(t || "").replace(/<[^>]+>/g, " "), 600).split(/(?<=[।.!?])\s/)[0] || "";
 async function articleItem(env, a, from = "") {
-  return { ref: `a:${a.id}`, byline: a.kind === "article" && a.writer ? clean(writer(a.writer)?.name, 120) : "", title: clean(a.title, 240), dek: clean(a.dek, 360) || firstLine(a.body), desk: a.category || "", slug: a.slug, kind: a.kind || "article", at: a.published_at, from, page: pageOf(a.category, `${a.title} ${String(a.body || "").slice(0, 300)}`), media: await mediaOf(env, a), pri: bulletinRank(a.category, `${a.title} ${String(a.body || "").slice(0, 300)}`) };
+  return { ref: `a:${a.id}`, byline: a.kind === "article" && a.writer && a.writer !== "rashtrix-desk" ? clean(writer(a.writer)?.name, 120) : "", title: clean(a.title, 240), dek: clean(a.dek, 360) || firstLine(a.body), desk: a.category || "", slug: a.slug, kind: a.kind || "article", at: a.published_at, from, page: pageOf(a.category, `${a.title} ${String(a.body || "").slice(0, 300)}`), media: await mediaOf(env, a), pri: bulletinRank(a.category, `${a.title} ${String(a.body || "").slice(0, 300)}`) };
 }
 function poolCard(p) {
   const c = J(p.content, {});
@@ -145,9 +146,36 @@ async function localise(env, pages, lang) {
   }
   return out;
 }
+const TEXT_MAX = 1100;
+const excerpt = (body, n = TEXT_MAX) => { const t = htmlText(body); if (t.length <= n) return t; const cut = t.slice(0, n), end = Math.max(cut.lastIndexOf("।"), cut.lastIndexOf(". "), cut.lastIndexOf("\n")); return (end > n * .5 ? cut.slice(0, end + 1) : cut).trim(); };
+async function addText(env, pages, lang) {
+  const items = pages.flatMap(p => p.items), ids = [...new Set(items.filter(x => x.ref.startsWith("a:") && !x.body).map(x => x.ref.slice(2)))];
+  const art = new Map(), tr = new Map();
+  for (let i = 0; i < ids.length; i += 80) {
+    const part = ids.slice(i, i + 80), q = part.map(() => "?").join(",");
+    (await env.DB.prepare(`SELECT id, lang, body FROM articles WHERE id IN (${q})`).bind(...part).all()).results.forEach(r => art.set(r.id, r));
+    (await env.DB.prepare(`SELECT ref, body FROM translations WHERE kind='article' AND lang=? AND status IN ('ready','manual') AND body<>'' AND ref IN (${q})`).bind(lang, ...part).all().catch(() => ({ results: [] }))).results.forEach(r => tr.set(r.ref, r.body));
+  }
+  const want = {};
+  for (const x of items) {
+    if (x.body) { x.text = excerpt(x.body, TEXT_MAX * 2); continue; }
+    if (!x.ref.startsWith("a:")) { x.text = x.dek || ""; continue; }
+    const a = art.get(x.ref.slice(2)); if (!a) { x.text = x.dek || ""; continue; }
+    if ((a.lang || "bn") === lang) x.text = excerpt(a.body);
+    else if (tr.get(a.id)) x.text = excerpt(tr.get(a.id));
+    else (want[a.lang || "bn"] ||= []).push([x, excerpt(a.body, 700)]);
+  }
+  // (no translation of the story yet: its opening, machine-translated; else the translated summary,
+  // never another language's text)
+  for (const [from, list] of Object.entries(want)) {
+    const src = list.map(([, t]) => t), done = await translateTexts(env, lang, src, { from }).catch(() => src);
+    list.forEach(([x], i) => { x.text = done[i] && done[i] !== src[i] ? done[i] : (x.dek || ""); });
+  }
+  return pages;
+}
 export async function printEdition(env, id, by = "auto", t = Date.now()) {
   const row = await env.DB.prepare("SELECT * FROM epaper_editions WHERE id=?").bind(id).first(); if (!row) return null;
-  const pages = J(row.pages, []), langs = { en: await localise(env, pages, "en"), hi: await localise(env, pages, "hi") };
+  const pages = J(row.pages, []), langs = { bn: await addText(env, structuredClone(pages), "bn"), en: await addText(env, await localise(env, pages, "en"), "en"), hi: await addText(env, await localise(env, pages, "hi"), "hi") };
   await env.DB.prepare("UPDATE epaper_editions SET status='published', langs=?, published_at=?, updated_at=?, approved_by=COALESCE(approved_by,?) WHERE id=?").bind(JSON.stringify(langs), nowIso(t), nowIso(t), by, id).run();
   return true;
 }
@@ -196,7 +224,7 @@ export async function readerEdition(env, { day, slot, lang = "bn" } = {}) {
     ? await env.DB.prepare("SELECT * FROM epaper_editions WHERE id=? AND status='published'").bind(`${day}:${slot}`).first()
     : await env.DB.prepare("SELECT * FROM epaper_editions WHERE status='published' ORDER BY published_at DESC LIMIT 1").first();
   if (!row) return null;
-  const pages = lang === "bn" ? J(row.pages, []) : (J(row.langs, {})[lang] || J(row.pages, []));
+  const langs = J(row.langs, {}), pages = langs[lang] || (lang === "bn" ? J(row.pages, []) : langs.en || J(row.pages, []));
   const hz = J(row.horoscope, {});
   // a story changed since the paper went out: marked (the paper knows the news)
   const ids = pages.flatMap(p => p.items).filter(x => x.ref.startsWith("a:")).map(x => x.ref.slice(2));
@@ -204,7 +232,8 @@ export async function readerEdition(env, { day, slot, lang = "bn" } = {}) {
   if (ids.length) { const { results } = await env.DB.prepare(`SELECT id FROM articles WHERE id IN (${ids.map(() => "?").join(",")}) AND (updated_at > ? OR corrected_at > ?)`).bind(...ids, row.published_at, row.published_at).all().catch(() => ({ results: [] })); results.forEach(r => upd.add(`a:${r.id}`)); }
   pages.forEach(p => p.items.forEach(x => { if (upd.has(x.ref)) x.updated = true; delete x.pri; }));
   const { results: list } = await env.DB.prepare("SELECT id, day, slot FROM epaper_editions WHERE status='published' ORDER BY published_at DESC LIMIT 30").all();
-  return { id: row.id, day: row.day, slot: row.slot, name: SLOT_NAME[row.slot][lang], publishedAt: row.published_at, pages, horoscope: hz[lang] || hz.bn || [], editions: list };
+  const at = editionAt(row.day, row.slot), wx = await weather(env).catch(() => null);
+  return { id: row.id, day: row.day, slot: row.slot, lang, name: SLOT_NAME[row.slot][lang], publishedAt: row.published_at, at: new Date(at).toISOString(), bangabda: bangabda(at).text, weather: wx ? { temp: wx.temp, text: wx.text } : null, pages, horoscope: hz[lang] || hz.bn || [], editions: list };
 }
 
 /* ---------- the control room (the Newsprint desk) ---------- */

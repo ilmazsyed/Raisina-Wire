@@ -1655,4 +1655,8 @@ export default {
   "Done. Save the changes to keep them.": "हो गया। रखने के लिए बदलाव सहेजें।",
   "Uploading the picture…": "तस्वीर अपलोड हो रही है…",
   "Paste a link that starts with https://": "https:// से शुरू होने वाला लिंक दें",
+  // The e-paper.
+  "E-paper": "ई-पेपर",
+  "Open the e-paper ↗": "ई-पेपर खोलें ↗",
+  "Read it ↗": "पढ़ें ↗",
 };
