@@ -224,7 +224,13 @@ export async function readerEdition(env, { day, slot, lang = "bn" } = {}) {
     ? await env.DB.prepare("SELECT * FROM epaper_editions WHERE id=? AND status='published'").bind(`${day}:${slot}`).first()
     : await env.DB.prepare("SELECT * FROM epaper_editions WHERE status='published' ORDER BY published_at DESC LIMIT 1").first();
   if (!row) return null;
-  const langs = J(row.langs, {}), pages = langs[lang] || (lang === "bn" ? J(row.pages, []) : langs.en || J(row.pages, []));
+  const langs = J(row.langs, {});
+  let pages = langs[lang] || (lang === "bn" ? J(row.pages, []) : langs.en || J(row.pages, []));
+  // (an edition printed before the paper carried its stories' text: the text added once, and kept)
+  if (!pages.some(p => p.items.some(x => x.text))) {
+    pages = await addText(env, structuredClone(pages), lang).catch(() => pages);
+    if (pages.some(p => p.items.some(x => x.text))) { langs[lang] = pages; await env.DB.prepare("UPDATE epaper_editions SET langs=? WHERE id=?").bind(JSON.stringify(langs), row.id).run().catch(() => {}); }
+  }
   const hz = J(row.horoscope, {});
   // a story changed since the paper went out: marked (the paper knows the news)
   const ids = pages.flatMap(p => p.items).filter(x => x.ref.startsWith("a:")).map(x => x.ref.slice(2));

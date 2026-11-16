@@ -36,182 +36,199 @@ document.title = `${W.daily} ${W.name} · ${W.epaper}`;
 
 /* ---------- pieces ---------- */
 const box = (c, n, top, h, inner, cls = "", attrs = "") => `<div class="g ${cls}" style="left:${X(c)}px;top:${top}px;width:${WD(n)}px;height:${h}px" ${attrs}>${inner}</div>`;
-const at = (l, t, w, h, inner, cls = "") => `<div class="g ${cls}" style="left:${l}px;top:${t}px;width:${w}px;height:${h}px">${inner}</div>`;
+const at = (l, t, w, h, inner, cls = "", attrs = "") => `<div class="g ${cls}" style="left:${l}px;top:${t}px;width:${w}px;height:${h}px" ${attrs}>${inner}</div>`;
 const vr = (c, top, h) => `<div class="g vr" style="left:${X(c) - 7}px;top:${top}px;height:${h}px"></div>`;
 const hr = (top, k = "hr") => `<div class="g ${k}" style="left:0;top:${top}px;width:1180px"></div>`;
 const paras = t => String(t || "").split(/\n{2,}|\n/).map(s => s.trim()).filter(Boolean).map(s => `<p>${esc(s)}</p>`).join("");
 const yt = id => `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hqdefault.jpg`;
-function media(m, h, { cls = "", lead = false } = {}) {
+// a picture that lives: it develops from sepia into colour when its page is shown, then drifts
+function media(m, h, { lead = false } = {}) {
   if (!m) return "";
   const st = h ? `style="height:${h}px"` : `style="height:100%"`;
-  if (m.kind === "video") return `<div class="ph ${cls}" ${st}><video src="${esc(m.url)}" muted autoplay loop playsinline preload="metadata"></video>${lead ? `<span class="lv">▶ ${W.moving}</span><button class="snd" type="button">🔇</button>` : ""}</div>`;
-  if (m.kind === "yt") return `<div class="ph ${cls}" ${st}><i style="background-image:url('${yt(m.id)}')"></i><span class="play">▶</span>${lead ? `<span class="lv">▶ ${W.moving}</span>` : ""}</div>`;
-  return `<div class="ph ${cls}" ${st}><i style="background-image:url('${esc(m.url)}')"></i></div>`;
+  if (m.kind === "video") return `<div class="ph" ${st}><video src="${esc(m.url)}" muted autoplay loop playsinline preload="metadata"></video>${lead ? `<span class="lv">▶ ${W.moving}</span><button class="snd" type="button" aria-label="Sound">🔇</button>` : ""}</div>`;
+  if (m.kind === "yt") return `<div class="ph" ${st}><i style="background-image:url('${yt(m.id)}')"></i><b class="gleam"></b><span class="play">▶</span>${lead ? `<span class="lv">▶ ${W.moving}</span>` : ""}</div>`;
+  return `<div class="ph" ${st}><i style="background-image:url('${esc(m.url)}')"></i><b class="gleam"></b></div>`;
 }
 const pic = x => (x?.media || []).find(m => m.kind === "video") || (x?.media || [])[0] || null;
 const byline = (x, def = false) => x.byline ? `<p class="by">${esc(x.byline)}</p>` : def ? `<p class="by">${CORR} <span>· ${W.city}</span></p>` : "";
 const desk = x => esc((DESKS[x.desk] || [])[LI] || x.desk || "");
-// a story: label, headline, picture, byline, text filling the rest of its space
-function story(x, { size = 30, kbar = true, kcls = "", photo = 0, txtCols = 1, deck = false, stamp = true, jump = true } = {}) {
-  if (!x) return "";
-  return `${stamp && x.updated ? `<span class="stamp">${W.updated}</span>` : ""}${kbar && desk(x) ? `<div class="kbar ${kcls}">${desk(x)}</div>` : ""}<h2 class="hl" style="font-size:${size}px">${esc(x.title)}</h2>${deck && x.dek ? `<p class="deck">${esc(x.dek)}</p>` : ""}${photo && pic(x) ? `<div style="margin:9px 0 5px">${media(pic(x), photo, { cls: "b" })}</div>` : ""}${byline(x)}<div class="txt" style="column-count:${txtCols}">${paras(x.text || x.dek)}</div>${jump ? `<p class="jump">${W.cont} ›</p>` : ""}`;
-}
-const st = (c, n, top, h, x, opt, cls = "") => x ? box(c, n, top, h, story(x, opt), "story " + cls, `data-ref="${esc(x.ref)}"`) : "";
+const body = x => paras(x.text) || (x.dek ? `<p>${esc(x.dek)}</p>` : "");
 
 function masthead(ed, y0) {
   const day = new Date(ed.at).toLocaleDateString(LOCALE, { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
   const no = D(Math.max(1, (ed.editions || []).length));
-  const pagesN = D((ed.pages || []).length + 1);
   const left = `${W.city} · ${esc(day)}${LANG === "bn" && ed.bangabda ? ` · ${esc(ed.bangabda)}` : ""}`;
   return at(0, y0, 1180, 238, `<div class="mh"><div class="top"><span>${left}</span><span class="red">${esc(ed.name)}</span><span>${W.vol} · ${LANG === "en" ? "No." : LANG === "bn" ? "সংখ্যা" : "अंक"} ${no}</span></div>
-<div class="row"><div class="w">${W.daily}</div><img class="crest" src="${CREST}" alt="Rashtrix"><div class="w">${W.name}</div></div>
+<div class="row"><div class="w">${W.daily}</div><span class="crestw"><img class="crest" src="${CREST}" alt="Rashtrix"></span><div class="w">${W.name}</div></div>
 <div class="rules"><i class="gd"></i><i class="bk"></i></div>
-<div class="bot"><span>rashtrix.live${ed.weather && ed.weather.temp != null ? ` · ${D(ed.weather.temp)}°` : ""}</span><span class="red">${W.tag}</span><span>${pagesN} ${W.pages} · ${W.free}</span></div></div>`);
+<div class="bot"><span>rashtrix.live${ed.weather && ed.weather.temp != null ? ` · ${D(ed.weather.temp)}°` : ""}</span><span class="red">${W.tag}</span><span>${D(PAGES_N)} ${W.pages} · ${W.free}</span></div></div>`);
 }
 function ad(top, h) {
-  if (h < 260) return box(0, 8, top, h, `<div class="glow"></div><img class="a0" src="/brand/logo-sm.webp" style="left:28px;top:${(h - 140) / 2}px;width:98px" alt="Rashtrix 24×7 News"><div class="a1" style="left:150px;top:30px;width:620px;font-size:46px">${W.ad1.replace("<br>", " ")}</div><div class="a2" style="left:150px;top:${h - 72}px;width:560px;font-size:16px">${W.ad2}</div><div class="cta" style="right:${h * 16 / 9 + 64}px;top:${h / 2 - 24}px;display:none">${W.cta}</div><img src="/brand/studio-wide.webp" style="position:absolute;right:30px;top:20px;height:${h - 40}px;border:4px solid #fff" alt="">`, "ad");
+  const ih = Math.min(h - 56, 250), iw = Math.round(ih * 16 / 9);
+  if (h < 260) return box(0, 8, top, h, `<div class="glow"></div><img class="a0" src="/brand/logo-sm.webp" style="left:28px;top:${(h - 134) / 2}px;width:94px" alt="Rashtrix 24×7 News"><div class="a1" style="left:148px;top:${h / 2 - 52}px;width:${1180 - 148 - iw - 60}px;font-size:44px">${W.ad1.replace("<br>", " ")}</div><div class="a2" style="left:148px;top:${h / 2 + 4}px;width:${1180 - 148 - iw - 60}px;font-size:16px">${W.ad2}</div><img src="/brand/studio-wide.webp" style="position:absolute;right:28px;top:${(h - ih) / 2}px;height:${ih}px;border:4px solid #fff" alt="">`, "ad");
   const fs = LANG === "en" ? 58 : 60;
   return box(0, 8, top, h, `<div class="glow"></div><img class="a0" src="/brand/logo-sm.webp" style="left:34px;top:28px;width:112px" alt="Rashtrix 24×7 News">
-<div class="a1" style="left:180px;top:26px;width:520px;font-size:${fs}px">${W.ad1}</div><div class="a2" style="left:180px;top:${30 + fs * 2 + 22}px;width:500px">${W.ad2}</div>
+<div class="a1" style="left:180px;top:26px;width:${1180 - 180 - iw - 80}px;font-size:${fs}px">${W.ad1}</div><div class="a2" style="left:180px;top:${30 + fs * 2 + 22}px;width:${1180 - 180 - iw - 80}px">${W.ad2}</div>
 <div class="cta" style="left:180px;bottom:26px">${W.cta} · rashtrix.live</div>
-<img src="/brand/studio-wide.webp" style="position:absolute;right:40px;top:${(h - Math.min(h - 60, 250)) / 2}px;height:${Math.min(h - 60, 250)}px;border:4px solid #fff;box-shadow:0 14px 30px rgba(0,0,0,.4)" alt="">`, "ad");
+<img src="/brand/studio-wide.webp" style="position:absolute;right:40px;top:${(h - ih) / 2}px;height:${ih}px;border:4px solid #fff;box-shadow:0 14px 30px rgba(0,0,0,.4)" alt="">`, "ad");
 }
 const imprint = (top, n) => at(0, top, 1180, 20, `<div class="imprint"><span>${W.imprint} rashtrix.live</span><span>${esc(EDN.name)} · ${W.page} ${D(n)}</span></div>`);
-const page = (html, cls = "") => `<div class="ep-page ed-${LANG} ${cls}"><div class="ep-in">${html}</div></div>`;
+const page = (html, cls = "") => { const el = document.createElement("div"); el.innerHTML = `<div class="ep-page ed-${LANG} ${cls}"><div class="ep-in">${html}</div></div>`; return el.firstChild; };
+
+/* ---------- the stories a zone is filled with ---------- */
+// A zone is a box of columns. Stories go in one after another, in order, as many as fit; the last is
+// shortened to fit; then (when the edition's stories run out) teasers for the inside pages; then the
+// type grows a little until the columns are full. No blank space, whatever the day's news.
+function zsStory(x, { size = 26, photo = 0, kbar = true, teaser = false, first = false } = {}) {
+  const k = teaser ? `<div class="kick">${esc(x.pageName || desk(x))}${x.pageNo ? ` · ${W.page} ${D(x.pageNo)}` : ""}</div>` : kbar && desk(x) ? `<div class="kick">${desk(x)}</div>` : "";
+  const ph = photo && pic(x) ? `<div class="zph" style="--ph:${photo}px">${media(pic(x), 0)}</div>` : "";
+  return `<div class="zs${teaser ? " tz" : ""}${first ? " first" : ""}" data-ref="${esc(x.ref)}">${x.updated ? `<span class="stamp">${W.updated}</span>` : ""}<div class="zh">${k}<h3 class="hl" style="--hs:${teaser ? Math.min(size, 21) : size}px">${esc(x.title)}</h3>${ph}${teaser ? "" : byline(x)}</div><div class="txt">${teaser ? (x.dek ? `<p>${esc(x.dek)}</p>` : "") : body(x)}</div>${teaser ? "" : `<p class="jump">${W.cont} ›</p>`}</div>`;
+}
+const over = el => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+function fillZone(z, lists, opt = {}) {
+  const put = (x, teaser) => { z.insertAdjacentHTML("beforeend", zs(x, { ...opt, teaser, photo: teaser ? 0 : opt.photo && z.querySelectorAll(".zph").length < (opt.photos || 1) ? opt.photo : 0 })); return z.lastElementChild; };
+  const shorten = el => { const t = el.querySelector(".txt"); while (over(z) && t && t.children.length > 1) t.lastElementChild.remove(); if (over(z) && t?.firstElementChild) { const p = t.firstElementChild, words = p.textContent.split(" "); while (over(z) && words.length > 12) { words.splice(-6); p.textContent = words.join(" ") + "…"; } } return !over(z); };
+  for (const [list, teaser] of lists) {
+    while (list.length) {
+      const el = put(list[0], teaser);
+      if (!over(z)) { list.shift(); continue; }
+      if (!teaser && shorten(el)) { list.shift(); return grow(z); }
+      el.remove(); return grow(z);
+    }
+  }
+  grow(z);
+}
+// (the type, a touch larger, until the columns are full)
+function grow(z) {
+  let k = 1;
+  const set = v => z.style.setProperty("--k", v);
+  while (k < 1.5) { set(k + .04); if (over(z)) { set(k); break; } k += .04; }
+}
+function fitHeadline(h, box, min = 26) { let s = parseFloat(h.style.fontSize); while ((h.scrollWidth > box.clientWidth + 1 || h.scrollHeight > box.clientHeight + 1) && s > min) { s -= 2; h.style.fontSize = s + "px"; } }
 
 /* ---------- the front page ---------- */
-let EDN = null;
+let EDN = null, PAGES_N = 1;
+function teasers(ed) { return ed.pages.slice(1).flatMap((p, i) => p.items.map(x => ({ ...x, pageNo: i + 2, pageName: p.title }))); }
 function front(ed) {
-  const fp = ed.pages[0] || { items: [] }, items = fp.items.slice(), lead = items.shift();
-  const len = x => (x.text || "").length, longest = arr => arr.slice().sort((a, b) => len(b) - len(a));
-  const withPic = longest(items.filter(pic)), take = arr => { const x = arr.shift(); if (x) items.splice(items.indexOf(x), 1); return x; };
-  const right = take(withPic.length ? withPic : longest(items)), left = take(longest(items)), b1 = take(items.filter(pic).length ? longest(items.filter(pic)) : longest(items)), b2 = take(longest(items)), rest = items;
-  // headlines from the inside pages, for the briefs column and the teasers
-  const inside = ed.pages.slice(1).flatMap((p, i) => p.items.map(x => ({ ...x, pageNo: i + 2, pageName: p.title })));
+  const items = (ed.pages[0]?.items || []).slice(), lead = items.shift() || {};
+  const ri = items.findIndex(pic), right = ri >= 0 ? items.splice(ri, 1)[0] : null;   // the right column opens with a picture
+  const q1 = items, tq = teasers(ed), allT = tq.slice();
+  const lp = pic(lead), ref = `data-ref="${esc(lead.ref || "")}"`;
   let h = "", y = 0;
   if (LANG === "en") {   // The Telegraph: a strip of teasers above the nameplate
-    inside.filter(pic).slice(0, 4).forEach((x, i) => { const m = pic(x), src = m.kind === "yt" ? yt(m.id) : m.kind === "img" ? m.url : ""; h += at(i * 298, 0, 286, 78, `<div class="story" data-ref="${esc(x.ref)}" style="flex-direction:row;gap:10px;align-items:center;height:78px"><div class="ph b" style="width:96px;height:70px;flex:none">${src ? `<i style="background-image:url('${esc(src)}')"></i>` : `<video src="${esc(m.url)}" muted autoplay loop playsinline></video>`}</div><div><div class="kick" style="margin:0">${esc(x.pageName)}</div><div style="font:700 16px/1.15 var(--hd);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(x.title)}</div><div style="font:700 11px var(--lab);color:var(--grey)">${W.page} ${D(x.pageNo)}</div></div></div>`); });
+    tq.filter(pic).slice(0, 4).forEach((x, i) => { const m = pic(x), src = m.kind === "yt" ? yt(m.id) : m.kind === "img" ? m.url : ""; h += at(i * 298, 0, 286, 78, `<div class="sky" data-ref="${esc(x.ref)}"><div class="ph">${src ? `<i style="background-image:url('${esc(src)}')"></i>` : `<video src="${esc(m.url)}" muted autoplay loop playsinline></video>`}</div><div><div class="kick">${esc(x.pageName)} · ${W.page} ${D(x.pageNo)}</div><div class="skyt">${esc(x.title)}</div></div></div>`); });
     h += hr(86); y = 96;
   }
   h += masthead(ed, y); y += 246;
-  const lp = pic(lead);
-  if (LANG === "bn") {   // Sangbad Pratidin: the banner over the big picture, stories either side
-    h += st(0, 2, y, 760, left, { size: 40, txtCols: 2 });
-    h += vr(2, y, 760);
-    h += box(2, 4, y - 4, 128, `<h1 class="hl inkme fit" style="font-size:96px;text-align:center">${esc(lead?.title || "")}</h1>`, "story", `data-ref="${esc(lead?.ref || "")}"`);
-    h += box(2, 4, y + 128, 410, media(lp, 0, { lead: true }), "story", `data-ref="${esc(lead?.ref || "")}"`);
-    h += box(2, 4, y + 546, 214, `${lead?.dek ? `<p class="deck" style="font-size:20px;margin-top:0">${esc(lead.dek)}</p>` : ""}${byline(lead || {}, true)}<div class="txt" style="column-count:4">${paras(lead?.text)}</div><p class="jump">${W.cont} ›</p>`, "story", `data-ref="${esc(lead?.ref || "")}"`);
-    h += vr(6, y, 760);
-    h += st(6, 2, y, 760, right, { size: 40, photo: 190, txtCols: 2, kcls: "blk" });
-  } else if (LANG === "hi") {   // Dainik Bhaskar: the long red headline across the page
-    h += box(0, 8, y, 74, `<h1 class="hl inkme fit1" style="font-size:58px;color:var(--red);text-align:center;white-space:nowrap">${esc(lead?.title || "")}</h1>`, "story", `data-ref="${esc(lead?.ref || "")}"`);
-    h += hr(y + 80); const y1 = y + 90;
-    h += box(0, 2, y1, 670, `<div class="kbar">${W.inBrief}</div><div class="txt briefs"></div>`, "story nofill");
-    h += vr(2, y1, 670);
-    h += box(2, 4, y1, 400, media(lp, 0, { lead: true }), "story", `data-ref="${esc(lead?.ref || "")}"`);
-    h += box(2, 4, y1 + 410, 260, `${lead?.dek ? `<p class="deck" style="margin-top:0">${esc(lead.dek)}</p>` : ""}${byline(lead || {}, true)}<div class="txt" style="column-count:4">${paras(lead?.text)}</div><p class="jump">${W.cont} ›</p>`, "story", `data-ref="${esc(lead?.ref || "")}"`);
-    h += vr(6, y1, 670);
-    h += st(6, 2, y1, 400, right, { size: 34, photo: 160, txtCols: 2, kcls: "blk" });
-    h += st(6, 2, y1 + 410, 260, left, { size: 28, txtCols: 2, kbar: false });
-    y += 10;
+  const zones = [];   // [selector, queue, options] filled in order after the page is built
+  if (LANG === "bn" || LANG === "hi") {
+    const Y = y, H1 = 770;
+    if (LANG === "bn") {   // Sangbad Pratidin: the banner over the big picture, stories either side
+      h += box(0, 2, Y, H1, "", "zone z2", 'data-z="L"') + vr(2, Y, H1);
+      h += box(2, 4, Y, 120, `<h1 class="hl banner" style="font-size:60px">${esc(lead.title || "")}</h1>`, "story fitbox", ref);
+      h += box(2, 4, Y + 128, 410, media(lp, 0, { lead: true }), "story", ref);
+      h += box(2, 4, Y + 546, H1 - 546, "", "zone z4", 'data-z="C"');
+      h += vr(6, Y, H1) + box(6, 2, Y, H1, "", "zone z2", 'data-z="R"');
+    } else {   // Dainik Bhaskar: the long red headline across the page
+      h += box(0, 8, Y, 76, `<h1 class="hl banner" style="font-size:56px;color:var(--red);text-align:center">${esc(lead.title || "")}</h1>`, "story fitbox", ref);
+      h += hr(Y + 84);
+      const Y1 = Y + 94, H = H1 - 94;
+      h += box(0, 2, Y1, H, `<div class="kbar">${W.inBrief}</div><div class="zone z1 briefs" data-z="B" style="position:relative;height:${H - 34}px"></div>`, "");
+      h += vr(2, Y1, H) + box(2, 4, Y1, 380, media(lp, 0, { lead: true }), "story", ref);
+      h += box(2, 4, Y1 + 388, H - 388, "", "zone z4", 'data-z="C"');
+      h += vr(6, Y1, H) + box(6, 2, Y1, H, "", "zone z2", 'data-z="R"');
+    }
+    const Y2 = Y + H1 + 12; h += hr(Y2 - 6, "hr2");
+    const H2 = 1966 - Y2 - 340 - 34;
+    h += box(0, 6, Y2 + 6, H2, "", "zone z6", 'data-z="M"');
+    h += vr(6, Y2 + 6, H2) + box(6, 2, Y2 + 6, H2, `<h3 class="hl" style="font-size:26px;margin-bottom:8px;color:#fff">${W.inside}</h3><div class="zone z1 briefs" data-z="B2" style="position:relative;height:${H2 - 66}px"></div>`, "redbox");
+    const adY = Y2 + 6 + H2 + 14; h += ad(adY, 1966 - adY - 30) + imprint(1942, 1);
+    zones.push(["R", [[right ? [right] : [], false], [q1, false], [tq, true]], { size: 25, photo: 170 }], ["L", [[q1, false], [tq, true]], { size: 25 }], ["C", [[[{ ...lead, lead: true }], false], [q1, false], [tq, true]], { size: 24 }], ["M", [[q1, false], [tq, true]], { size: 25, photo: 140, photos: 2 }]);
   } else {   // The Telegraph: In Brief, the headline over one big picture
-    h += box(0, 2, y, 660, `<div class="kbar" style="font-family:Inter;text-transform:uppercase;letter-spacing:.06em">${W.inBrief}</div><div class="txt briefs"></div>`, "story nofill");
-    h += vr(2, y, 660);
-    h += box(2, 6, y, 170, `<div class="kick">${esc(lead?.desk || "")}</div><h1 class="hl inkme fit2" style="font-size:72px">${esc(lead?.title || "")}</h1>`, "story", `data-ref="${esc(lead?.ref || "")}"`);
-    h += box(2, 6, y + 176, 484, media(lp, 0, { lead: true }), "story", `data-ref="${esc(lead?.ref || "")}"`);
-  }
-  // the second band
-  let Y2 = LANG === "en" ? y + 676 : y + 776;
-  h += hr(Y2, "hr2"); Y2 += 12;
-  if (LANG === "en") {
-    h += box(0, 4, Y2, 470, `${lead?.dek ? `<p class="deck" style="font-size:22px;margin-top:0">${esc(lead.dek)}</p>` : ""}${byline(lead || {}, true)}<div class="txt" style="column-count:4">${paras(lead?.text)}</div><p class="jump">${W.cont} ›</p>`, "story", `data-ref="${esc(lead?.ref || "")}"`);
-    h += vr(4, Y2, 470) + st(4, 2, Y2, 470, right, { size: 30, photo: 150, txtCols: 2, kbar: false });
-    h += vr(6, Y2, 470) + st(6, 2, Y2, 470, left || b1, { size: 28, photo: left ? 0 : 150, txtCols: 2, kbar: false });
-    Y2 += 482;
-  } else {
+    const Y = y, H1 = 662;
+    h += box(0, 2, Y, H1, `<div class="kbar" style="font-family:Inter;text-transform:uppercase;letter-spacing:.06em">${W.inBrief}</div><div class="zone z1 briefs" data-z="B" style="position:relative;height:${H1 - 34}px"></div>`, "");
+    h += vr(2, Y, H1);
+    h += box(2, 6, Y, 168, `<div class="kick">${desk(lead)}</div><h1 class="hl banner" style="font-size:70px">${esc(lead.title || "")}</h1>`, "story fitbox", ref);
+    h += box(2, 6, Y + 176, H1 - 176, media(lp, 0, { lead: true }), "story", ref);
+    const Y2 = Y + H1 + 12; h += hr(Y2 - 6, "hr2");
     const H2 = 1966 - Y2 - 360 - 34;
-    h += st(0, 3, Y2, H2, b1, { size: 34, photo: 200, txtCols: 3 });
-    h += vr(3, Y2, H2) + st(3, 3, Y2, H2, b2, { size: 34, photo: b2 && pic(b2) ? 180 : 0, txtCols: 3, kcls: "blk" });
-    h += vr(6, Y2, H2) + box(6, 2, Y2, H2, `<h3 class="hl" style="font-size:28px;margin-bottom:8px">${LANG === "hi" ? W.more : W.inBrief}</h3><div class="txt briefs" style="font-size:14px;line-height:1.5"></div>`, "story nofill redbox");
-    Y2 += H2 + 14;
+    h += box(0, 4, Y2 + 6, H2, "", "zone z4", 'data-z="C"');
+    h += vr(4, Y2 + 6, H2) + box(4, 4, Y2 + 6, H2, "", "zone z4", 'data-z="R"');
+    const adY = Y2 + 6 + H2 + 14; h += ad(adY, 1966 - adY - 30) + imprint(1942, 1);
+    zones.push(["C", [[[{ ...lead, lead: true }], false], [q1, false], [tq, true]], { size: 26 }], ["R", [[right ? [right] : [], false], [q1, false], [tq, true]], { size: 26, photo: 160, photos: 2 }]);
   }
-  const adH = 1966 - Y2 - 30;
-  h += ad(Y2, adH) + imprint(Y2 + adH + 8, 1);
-  const el = document.createElement("div"); el.innerHTML = page(h, "front");
-  // the briefs: what is left of the front page, then the inside pages' headlines
-  const used = new Set([lead, right, left, ...(LANG === "en" ? (left ? [] : [b1]) : [b1, b2])].filter(Boolean).map(x => x.ref));
-  const briefs = [...fp.items.filter(x => !used.has(x.ref)), ...inside].filter((x, i, a) => x && !used.has(x.ref) && a.findIndex(y => y.ref === x.ref) === i);
-  el.firstChild._briefs = briefs;
-  return el.firstChild;
+  const pg = page(h, "front");
+  pg._fill = () => {
+    $$(".fitbox", pg).forEach(b => fitHeadline($(".hl", b), b));
+    for (const [z, lists, opt] of zones) { const el = $(`[data-z="${z}"]`, pg); if (el) fillZone(el, lists, opt); }
+    // the briefs: one line for each story inside, until the box is full
+    // (what the columns did not take first; then, if the day is thin, every page's headlines)
+    for (const b of $$(".briefs", pg)) {
+      const list = tq.length ? tq : allT;
+      while (list.length) { const x = list.shift(); b.insertAdjacentHTML("beforeend", `<p class="brief" data-ref="${esc(x.ref)}"><b>${esc(x.pageName)} · ${W.page} ${D(x.pageNo)}</b>${esc(x.title)}</p>`); if (over(b)) { b.lastElementChild.remove(); list.unshift(x); break; } }
+      grow(b);
+    }
+  };
+  return pg;
 }
+// the lead's own text in its zone: no headline, the deck first
+const zsLead = x => `<div class="zs lead" data-ref="${esc(x.ref)}"><div class="zh">${x.dek ? `<p class="deck">${esc(x.dek)}</p>` : ""}${byline(x, true)}</div><div class="txt">${paras(x.text)}</div>${x.text ? `<p class="jump">${W.cont} ›</p>` : ""}</div>`;
+const zs = (x, o) => x.lead ? zsLead(x) : zsStory(x, o);
 
-/* ---------- an inside page: the section's stories down six columns ---------- */
-function inside(ed, p, n) {
-  const items = p.items.slice(), lead = items.shift();
+/* ---------- an inside page: the section's lead, then its stories down six columns ---------- */
+function runningHead(ed, title, n) {
   const day = new Date(ed.at).toLocaleDateString(LOCALE, { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
-  let h = at(0, 0, 1180, 64, `<div class="rh"><div class="nm"><img src="${CREST.replace(".webp", "-sm.webp")}" alt="">${W.daily} ${W.name}</div><div class="meta">${W.city} · ${esc(day)}<br><b>${esc(ed.name)}</b> · ${W.page} ${D(n)}</div></div>`);
-  h += at(0, 72, 1180, 50, `<div class="sec"><b>${esc(p.title)}</b><i></i></div>`);
-  const lp = pic(lead);
-  const leadHtml = lead ? `<div class="lead story" data-ref="${esc(lead.ref)}">${lp ? media(lp, 380, { lead: true }) : ""}<div style="display:flex;flex-direction:column;min-width:0">${lead.updated ? `<span class="stamp" style="position:relative;align-self:flex-end;top:0;right:0">${W.updated}</span>` : ""}<h2 class="hl" style="font-size:${lp ? 44 : 56}px">${esc(lead.title)}</h2>${lead.dek ? `<p class="deck">${esc(lead.dek)}</p>` : ""}${byline(lead)}<div class="txt">${paras(lead.text)}</div></div></div>` : "";
-  const rest = items.map((x, i) => `<div class="st story" data-ref="${esc(x.ref)}">${x.updated ? `<span class="kick">${W.updated}</span>` : ""}<h3 class="hl" style="font-size:${i < 2 ? 30 : 24}px">${esc(x.title)}</h3>${pic(x) && i < 4 ? `<div style="margin:7px 0 5px">${media(pic(x), 150, { cls: i % 2 ? "b" : "" })}</div>` : ""}${byline(x)}<div class="txt">${paras(x.text || x.dek)}</div></div>`).join("");
-  h += at(0, 132, 1180, 1590, `<div class="flow" style="height:1590px">${leadHtml}${rest}</div>`);
+  return at(0, 0, 1180, 64, `<div class="rh"><div class="nm"><img src="${CREST.replace(".webp", "-sm.webp")}" alt="">${W.daily} ${W.name}</div><div class="meta">${W.city} · ${esc(day)}<br><b>${esc(ed.name)}</b> · ${W.page} ${D(n)}</div></div>`)
+    + at(0, 72, 1180, 50, `<div class="sec"><b>${esc(title)}</b><i></i></div>`);
+}
+function inside(ed, p, n) {
+  const items = p.items.slice(), lead = items.shift(), lp = pic(lead);
+  let h = runningHead(ed, p.title, n);
+  const leadBlock = `<div class="ilead${lp ? "" : " nopic"}" data-ref="${esc(lead.ref)}">${lp ? `<div class="ilp">${media(lp, 0, { lead: true })}</div>` : ""}<div class="ilt">${lead.updated ? `<span class="stamp">${W.updated}</span>` : ""}<div class="kick">${desk(lead)}</div><h2 class="hl" style="font-size:${lp ? 50 : 60}px">${esc(lead.title)}</h2>${lead.dek ? `<p class="deck">${esc(lead.dek)}</p>` : ""}${byline(lead, true)}</div></div>`;
+  h += at(0, 134, 1180, lp ? 400 : 230, leadBlock, "story fitlead");
+  const zt = lp ? 548 : 378;
+  h += hr(zt - 7) + at(0, zt, 1180, 1722 - zt, "", "zone z6", 'data-z="M"');
   h += ad(1736, 196) + imprint(1942, n);
-  const el = document.createElement("div"); el.innerHTML = page(h, "inside"); return el.firstChild;
+  const pg = page(h, "inside");
+  const others = teasers(ed).filter(x => x.pageNo !== n);
+  pg._fill = () => {
+    const lh = $(".ilead .hl", pg); fitHeadline(lh, $(".ilt", pg));
+    fillZone($('[data-z="M"]', pg), [[[{ ...lead, lead: true, dek: "", byline: "" }], false], [items, false], [others, true]], { size: 25, photo: 140, photos: 3 });
+  };
+  return pg;
 }
 function horoscope(ed, n) {
-  const day = new Date(ed.at).toLocaleDateString(LOCALE, { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
-  let h = at(0, 0, 1180, 64, `<div class="rh"><div class="nm"><img src="${CREST.replace(".webp", "-sm.webp")}" alt="">${W.daily} ${W.name}</div><div class="meta">${W.city} · ${esc(day)}<br><b>${esc(ed.name)}</b> · ${W.page} ${D(n)}</div></div>`);
-  h += at(0, 72, 1180, 50, `<div class="sec"><b>${W.stars}</b><i></i></div>`);
+  let h = runningHead(ed, W.stars, n);
   const hz = ed.horoscope || [];
-  h += at(0, 136, 1180, 1580, `<div class="stars" style="height:1580px;grid-template-rows:repeat(4,1fr)">${W.signs.map((s, i) => `<div class="star"><div class="s"><i>${ZOD[i]}&#xFE0E;</i><b>${s}</b></div><div class="txt" style="font-size:16px;line-height:1.55">${paras(hz[i] || "")}</div></div>`).join("")}</div>`);
+  h += at(0, 136, 1180, 1580, `<div class="stars">${W.signs.map((s, i) => `<div class="star"><div class="s"><i>${ZOD[i]}&#xFE0E;</i><b>${s}</b></div><div class="txt">${paras(hz[i] || "")}</div></div>`).join("")}</div>`);
   h += ad(1730, 202) + imprint(1942, n);
-  const el = document.createElement("div"); el.innerHTML = page(h, "inside"); return el.firstChild;
+  const pg = page(h, "inside"); pg._fill = () => {}; return pg;
 }
 
-/* ---------- no blank space: columns filled, never overflowing ---------- */
-const over = el => el.scrollWidth > el.clientWidth + 2 || el.scrollHeight > el.clientHeight + 2;
-function fillFront(pg) {
-  const pool = (pg._briefs || []).slice();
-  const line = x => `<p class="fill" data-ref="${esc(x.ref)}"><b>${esc(x.pageName || W.more)}${x.pageNo ? ` · ${W.page} ${D(x.pageNo)}` : ""}:</b> ${esc(x.title)}</p>`;
-  // the briefs columns first, then any story whose text runs short
-  const targets = [...$$(".txt.briefs", pg), ...$$(".story:not(.nofill) .txt", pg)];
-  for (const t of targets) {
-    if (!t.clientHeight) continue;
-    for (let guard = 0; guard < 40 && pool.length && !over(t); guard++) { t.insertAdjacentHTML("beforeend", line(pool.shift())); if (over(t)) { if (t.classList.contains("briefs")) { const l = t.lastElementChild; pool.unshift({ ref: l.dataset.ref, title: l.textContent }); l.remove(); } break; } }
+/* ---------- the living paper: ink, developing pictures, stamps ---------- */
+// Headlines are written in ink each time their page is shown; pictures develop from sepia.
+function prepareInk(pg) {
+  let n = 0;
+  for (const h of $$(".hl", pg)) {
+    if (!h.textContent.trim() || h.closest(".ep-clip")) continue;
+    const words = h.textContent.trim().split(/\s+/), base = Math.min(n, 14) * .18;
+    h.innerHTML = words.map((w, i) => `<span class="w" style="--d:${(base + i * .09).toFixed(2)}s">${esc(w)}</span>`).join(" ");
+    n++;
   }
-  // headlines fitted to their space
-  $$(".fit, .fit1, .fit2", pg).forEach(h => { const box = h.parentElement; let s = parseFloat(h.style.fontSize); while ((h.scrollWidth > box.clientWidth + 1 || h.offsetHeight > box.clientHeight) && s > 26) { s -= 2; h.style.fontSize = s + "px"; } });
+  $$(".ph", pg).forEach((p, i) => p.style.setProperty("--pd", `${(.15 + i * .18).toFixed(2)}s`));
 }
-function fillFlow(pg, ed) {
-  const f = $(".flow", pg); if (!f) return;
-  // too much: the last stories' text trimmed, then the last stories dropped
-  for (let guard = 0; guard < 60 && over(f); guard++) {
-    const sts = $$(".st", f), last = sts[sts.length - 1];
-    if (!last) { const t = $(".lead .txt", f); if (t?.lastElementChild) t.lastElementChild.remove(); else break; continue; }
-    const t = $(".txt", last);
-    if (t && t.children.length > 1) t.lastElementChild.remove(); else last.remove();
-  }
-  // too little: other pages' headlines, then the app, until the columns are full
-  const pool = ed.pages.flatMap((p, i) => p.items.slice(0, 4).map(x => ({ ...x, pageNo: i + 1, pageName: p.title }))).filter(x => !f.querySelector(`[data-ref="${CSS.escape(x.ref)}"]`));
-  let added = 0;
-  while (!over(f) && pool.length && added < 30) {
-    const x = pool.shift();
-    f.insertAdjacentHTML("beforeend", `<div class="st story box" data-ref="${esc(x.ref)}"><div class="kick">${esc(x.pageName)} · ${W.page} ${D(x.pageNo)}</div><h3 class="hl" style="font-size:20px">${esc(x.title)}</h3>${x.dek ? `<div class="txt"><p>${esc(x.dek)}</p></div>` : ""}</div>`);
-    added++;
-    if (over(f)) { f.lastElementChild.remove(); break; }
-  }
-}
+function alive(pg) { pg.classList.remove("alive"); void pg.offsetWidth; pg.classList.add("alive"); pg.querySelectorAll("video").forEach(v => v.play().catch(() => {})); }
 
 /* ---------- the reader ---------- */
 let pages = [], cur = 0, scale = 1, zoom = 0;
 const app = $("#ep");
 function bar(ed) {
-  const langs = [["bn", "বাংলা"], ["en", "English"], ["hi", "हिन्दी"]].map(([l, n]) => `<a class="lang ${l === LANG ? "on" : ""}" href="/epaper?lang=${l}">${n}</a>`).join("");
+  const L3 = [["bn", "বাংলা"], ["en", "English"], ["hi", "हिन्दी"]];
   const opts = (ed?.editions || []).map(e => { const [y, m, d] = e.day.split("-"); const dt = new Date(Date.UTC(+y, m - 1, +d, 6)); return `<option value="${e.day}/${e.slot}" ${ed && e.id === ed.id ? "selected" : ""}>${esc(dt.toLocaleDateString(LOCALE, { day: "numeric", month: "short", timeZone: "UTC" }))} · ${e.slot === "morning" ? (LANG === "en" ? "Morning" : LANG === "bn" ? "প্রভাতী" : "प्रभात") : (LANG === "en" ? "Evening" : LANG === "bn" ? "সান্ধ্য" : "सांध्य")}</option>`; }).join("");
-  return `<div class="ep-bar"><a class="home" href="${LANG === "bn" ? "/" : `/${LANG}/`}"><img src="/brand/logo-xs.webp" alt="Rashtrix 24×7 News"><span class="hide-s">${W.epaper}</span></a>
+  return `<div class="ep-bar"><a class="home" href="${LANG === "bn" ? "/" : `/${LANG}/`}" aria-label="Rashtrix"><img src="/brand/logo-xs.webp" alt="Rashtrix 24×7 News"><span class="hide-s">${W.epaper}</span></a>
 ${opts ? `<select id="epEd" aria-label="Edition">${opts}</select>` : ""}<span class="sp"></span>
-${ed ? `<button id="epPrev" aria-label="${W.prev}">‹</button><span class="pg" id="epPg"></span><button id="epNext" aria-label="${W.next}">›</button><button id="epZo" class="hide-s">−</button><button id="epZi" class="hide-s">+</button>` : ""}
-${langs}</div>`;
+${ed ? `<div class="nav"><button id="epPrev" aria-label="${W.prev}">‹</button><span class="pg" id="epPg"></span><button id="epNext" aria-label="${W.next}">›</button></div><button id="epZo" class="hide-s" aria-label="Zoom out">−</button><button id="epZi" class="hide-s" aria-label="Zoom in">+</button>` : ""}
+<select id="epLang" aria-label="Language">${L3.map(([l, n]) => `<option value="${l}" ${l === LANG ? "selected" : ""}>${n}</option>`).join("")}</select></div>`;
 }
 function fit() {
   const w = Math.min(window.innerWidth - (window.innerWidth < 700 ? 12 : 40), 1400);
@@ -224,28 +241,25 @@ function show(i, dir = 0) {
   if (i < 0 || i >= pages.length) return;
   const sheet = $(".ep-sheet");
   const swap = () => {
-    cur = i; sheet.innerHTML = ""; sheet.appendChild(pages[i]);
+    cur = i; sheet.innerHTML = ""; sheet.appendChild(pages[i]); alive(pages[i]);
     $("#epPg").textContent = `${W.page} ${D(i + 1)} / ${D(pages.length)}`;
     sheet.classList.remove("turn-out"); if (dir) { sheet.classList.add(dir > 0 ? "turn-in" : "turn-back"); setTimeout(() => sheet.classList.remove("turn-in", "turn-back"), 600); }
-    pages[i].querySelectorAll("video").forEach(v => v.play().catch(() => {}));
     try { history.replaceState(null, "", `/epaper?lang=${LANG}&ed=${EDN.day}/${EDN.slot}&p=${i + 1}`); } catch { /* none */ }
   };
   if (dir > 0) { sheet.classList.add("turn-out"); setTimeout(swap, 380); } else swap();
   if (dir) window.scrollTo({ top: 0, behavior: "smooth" });
 }
-// The front page, half-folded at first: the top half lies on the table, the lower half beneath.
+// The front page, half-folded at first: the top half lies flat on the table, the lower half beneath.
 function folded(pg) {
   const f = document.createElement("div"); f.className = "ep-fold folded";
   const top = document.createElement("div"); top.className = "half top"; top.appendChild(pg);
-  const bot = document.createElement("div"); bot.className = "half bot"; const clone = pg.cloneNode(true); clone.querySelectorAll(".inkme").forEach(x => x.classList.remove("inkme")); bot.appendChild(clone);
+  const bot = document.createElement("div"); bot.className = "half bot"; bot.appendChild(pg.cloneNode(true));
   f.innerHTML = `<div class="stack"><i></i><i></i></div>`; f.append(top, bot);
   f.insertAdjacentHTML("beforeend", `<i class="crease"></i><button class="unfold" type="button">${W.unfold}</button>`);
   const open = () => { if (!f.classList.contains("folded")) return; f.classList.remove("folded"); setTimeout(() => { const s = f.parentElement; if (!s) return; s.innerHTML = ""; s.appendChild(pg); }, 1600); };
-  $(".unfold", f).onclick = open; setTimeout(open, 4500);
+  $(".unfold", f).onclick = open; setTimeout(open, 5000);
+  alive(pg);
   return f;
-}
-function inkHeadlines(pg) {
-  $$(".inkme", pg).forEach(h => { const words = h.textContent.trim().split(/\s+/); h.classList.add("ink"); h.innerHTML = words.map((w, i) => `<span class="w" style="animation-delay:${.4 + i * .2}s">${esc(w)}</span>`).join(" "); });
 }
 
 /* ---------- reader mode ---------- */
@@ -273,26 +287,25 @@ async function start() {
   const path = q.get("ed") || "";
   let r, data;
   try { r = await fetch(`/api/epaper${/^\d{4}-\d{2}-\d{2}\/(morning|evening)$/.test(path) ? `/${path}` : ""}?lang=${LANG}`); data = await r.json(); } catch { data = {}; }
+  const langPick = () => $("#epLang")?.addEventListener("change", e => { location.href = `/epaper?lang=${e.target.value}`; });
   if (r?.status === 401 && data.signin) {
-    app.innerHTML = bar(null) + `<div class="ep-msg ed-${LANG}"><h2>${LANG === "hi" ? "हिन्दी ई-पेपर पढ़ने के लिए साइन इन करें" : "Sign in to read the English e-paper"}</h2><p>${LANG === "hi" ? "बांग्ला ई-पेपर सभी के लिए निःशुल्क है।" : "The Bengali e-paper is free for everyone."}</p><a href="/${LANG}/?signin=1">${LANG === "hi" ? "साइन इन करें" : "Sign in"}</a></div>`; return;
+    app.innerHTML = bar(null) + `<div class="ep-msg ed-${LANG}"><h2>${LANG === "hi" ? "हिन्दी ई-पेपर पढ़ने के लिए साइन इन करें" : "Sign in to read the English e-paper"}</h2><p>${LANG === "hi" ? "बांग्ला ई-पेपर सभी के लिए निःशुल्क है।" : "The Bengali e-paper is free for everyone."}</p><a href="/${LANG}/?signin=1">${LANG === "hi" ? "साइन इन करें" : "Sign in"}</a></div>`; langPick(); return;
   }
-  if (!data.edition) { app.innerHTML = bar(null) + `<div class="ep-msg"><h2>${W.none}</h2><p>${W.noneB}</p></div>`; return; }
+  if (!data.edition) { app.innerHTML = bar(null) + `<div class="ep-msg"><h2>${W.none}</h2><p>${W.noneB}</p></div>`; langPick(); return; }
   EDN = data.edition;
   app.innerHTML = bar(EDN) + `<div class="ep-stage"><div class="ep-holder"><div class="ep-sheet"></div></div></div><div class="ep-reader" id="epReader"><div class="ep-clip"><button class="x" type="button" aria-label="Close">×</button><div id="epRbody"></div></div></div>`;
-  fit();
-  // every page built and fitted (off screen, at full size), then shown
+  langPick(); fit();
+  // every page built and filled off screen, at full size, then shown
   const stage = document.createElement("div"); stage.style.cssText = "position:absolute;left:-99999px;top:0;width:1240px;height:2010px;visibility:hidden"; document.body.appendChild(stage);
   await document.fonts.ready.catch(() => {});
-  const fp = front(EDN); stage.appendChild(fp); fillFront(fp);
-  pages = [fp];
-  EDN.pages.slice(1).forEach((p, i) => { if (p.key === "stars") { if ((EDN.horoscope || []).some(Boolean)) { const s = horoscope(EDN, pages.length + 1); stage.appendChild(s); pages.push(s); } return; } if (!p.items.length) return; const el = inside(EDN, p, pages.length + 1); stage.appendChild(el); fillFlow(el, EDN); pages.push(el); });
-  if (!EDN.pages.some(p => p.key === "stars") && (EDN.horoscope || []).some(Boolean)) { const s = horoscope(EDN, pages.length + 1); pages.push(s); }
-  // page numbers in the imprints, now that the count is known
-  pages.forEach(p => p.remove());
-  stage.remove();
-  inkHeadlines(fp);
+  const inner = EDN.pages.slice(1).filter(p => p.key === "stars" ? (EDN.horoscope || []).some(Boolean) : p.items.length);
+  PAGES_N = 1 + inner.length;
+  pages = [front(EDN)];
+  inner.forEach(p => pages.push(p.key === "stars" ? horoscope(EDN, pages.length + 1) : inside(EDN, p, pages.length + 1)));
+  for (const pg of pages) { stage.appendChild(pg); try { pg._fill(); } catch (e) { console.error(e); } prepareInk(pg); }
+  pages.forEach(p => p.remove()); stage.remove();
   const want = Math.max(0, Math.min(pages.length - 1, (+q.get("p") || 1) - 1));
-  if (want === 0 && !q.has("p")) { const sheet = $(".ep-sheet"); sheet.appendChild(folded(fp)); cur = 0; $("#epPg").textContent = `${W.page} ${D(1)} / ${D(pages.length)}`; }
+  if (want === 0 && !q.has("p")) { $(".ep-sheet").appendChild(folded(pages[0])); cur = 0; $("#epPg").textContent = `${W.page} ${D(1)} / ${D(pages.length)}`; }
   else show(want);
   // controls
   $("#epPrev").onclick = () => show(cur - 1, -1); $("#epNext").onclick = () => show(cur + 1, 1);
