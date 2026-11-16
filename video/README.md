@@ -114,3 +114,24 @@ blend in `src/anchors.js`). Then:
 4. Publish. The intro plays at once as a voice-over on the pictures; for an on-camera intro the
    GitHub Action "Raisina TV lip sync" renders the anchor's two on-camera clips (10–20 minutes)
    and the intro switches to camera by itself. See `anchors/README.md`.
+
+
+## Publish an explainer and its Short to Raisina Wire
+
+After rendering both formats, register them in the site's Multimedia CMS with:
+
+```bash
+RW_PUBLISH_TOKEN=… npm run video:publish -- <slug>
+```
+
+The command checks for all four render outputs (16:9 MP4 and poster, 9:16 MP4 and poster), then creates two **drafts** in Watch: a horizontal video and a vertical Short linked to the full video. It never publishes by default.
+
+After editorial preview and approval, publish both by running:
+
+```bash
+RW_PUBLISH_TOKEN=… npm run video:publish -- <slug> --status published
+```
+
+Optional metadata overrides: `--title "Headline"`, `--category Geopolitics`, and `--description "Caption"`. The title and series are read from `video/scripts/<slug>.json` when available. The Worker must have the same `PUBLISH_TOKEN` configured, and the repository environment must provide it as `RW_PUBLISH_TOKEN`.
+
+The existing workflow remains: write and fact-check the JSON script, render with `npm run video -- video/scripts/<slug>.json`, inspect both formats, then register the drafts. The renderer needs the Kokoro model files, Python audio dependencies, ffmpeg and Playwright/Chromium on the machine doing the render.
