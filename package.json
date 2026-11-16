@@ -10,7 +10,8 @@
     "dev:worker": "wrangler dev",
     "deploy": "npm run build && wrangler deploy",
     "publish": "NODE_USE_ENV_PROXY=1 node scripts/publish.mjs",
-    "video": "node video/render.mjs"
+    "video": "node video/render.mjs",
+    "video:publish": "node video/publish.mjs"
   },
   "devDependencies": {
     "vite": "^6.4.1",
