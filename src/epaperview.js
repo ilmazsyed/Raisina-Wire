@@ -88,15 +88,26 @@ const over = el => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.c
 function fillZone(z, lists, opt = {}) {
   const put = (x, teaser) => { z.insertAdjacentHTML("beforeend", zs(x, { ...opt, teaser, photo: teaser ? 0 : opt.photo && z.querySelectorAll(".zph").length < (opt.photos || 1) ? opt.photo : 0 })); return z.lastElementChild; };
   const shorten = el => { const t = el.querySelector(".txt"); while (over(z) && t && t.children.length > 1) t.lastElementChild.remove(); if (over(z) && t?.firstElementChild) { const p = t.firstElementChild, words = p.textContent.split(" "); while (over(z) && words.length > 12) { words.splice(-6); p.textContent = words.join(" ") + "…"; } } return !over(z); };
-  for (const [list, teaser] of lists) {
+  outer: for (const [list, teaser] of lists) {
     while (list.length) {
       const el = put(list[0], teaser);
       if (!over(z)) { list.shift(); continue; }
-      if (!teaser && shorten(el)) { list.shift(); return grow(z); }
-      el.remove(); return grow(z);
+      if (!teaser && shorten(el)) { list.shift(); break outer; }
+      el.remove(); break outer;
     }
   }
-  grow(z);
+  lines(z, lists); grow(z);
+}
+// (a gap too small for a story: one-line headlines, from the stories still waiting, until it is full)
+function lines(z, lists) {
+  for (const [list] of lists) {
+    for (let i = 0; i < list.length; i++) {
+      const x = list[i];
+      z.insertAdjacentHTML("beforeend", `<p class="zl" data-ref="${esc(x.ref)}"><b>${esc(x.pageName || desk(x))}${x.pageNo ? ` · ${W.page} ${D(x.pageNo)}` : ""}</b>${esc(x.title)}</p>`);
+      if (over(z)) { z.lastElementChild.remove(); continue; }
+      list.splice(i--, 1);
+    }
+  }
 }
 // (the type, a touch larger, until the columns are full)
 function grow(z) {
@@ -282,6 +293,18 @@ ${mediaHtml}<div class="txt" id="epRtext">${paras(x.body || x.text || x.dek)}</d
   $("#epListen").onclick = () => { const s = window.speechSynthesis; if (!s) return; if (s.speaking) { s.cancel(); return; } const u = new SpeechSynthesisUtterance(`${x.title}. ${($("#epRtext")?.innerText || "")}`); u.lang = LOCALE; s.speak(u); };
 }
 
+/* ---------- the faces, loaded before the pages are measured (else they are laid out in a stand-in) ---------- */
+async function loadFaces() {
+  const S = { bn: "বাংলা খবর", hi: "हिन्दी ख़बर", en: "Daily News" }[LANG];
+  const want = {
+    bn: ['850 40px "Noto Serif Bengali"', '600 20px "Noto Serif Bengali"', '16px "Tiro Bangla"', '700 14px "Noto Sans Bengali"', '800 14px "Noto Sans Bengali"'],
+    hi: ['40px "Tiro Devanagari Hindi"', '700 14px "Noto Sans Devanagari"', '800 14px "Noto Sans Devanagari"'],
+    en: ['700 40px Tinos', '16px Tinos', '700 14px Inter', '800 14px Inter']
+  }[LANG];
+  await Promise.race([Promise.all(want.map(f => document.fonts.load(f, S).catch(() => null))), new Promise(r => setTimeout(r, 6000))]);
+  await document.fonts.ready.catch(() => {});
+}
+
 /* ---------- start ---------- */
 async function start() {
   const path = q.get("ed") || "";
@@ -297,7 +320,7 @@ async function start() {
   langPick(); fit();
   // every page built and filled off screen, at full size, then shown
   const stage = document.createElement("div"); stage.style.cssText = "position:absolute;left:-99999px;top:0;width:1240px;height:2010px;visibility:hidden"; document.body.appendChild(stage);
-  await document.fonts.ready.catch(() => {});
+  await loadFaces();
   const inner = EDN.pages.slice(1).filter(p => p.key === "stars" ? (EDN.horoscope || []).some(Boolean) : p.items.length);
   PAGES_N = 1 + inner.length;
   pages = [front(EDN)];
