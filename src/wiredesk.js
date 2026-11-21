@@ -1,3 +1,4 @@
+import { getCharter, charterPrompt, fixFacts } from "./charter.js";
 import { noDots } from "./sentences.js";
 import { bnLine, tidyLine } from "./bnline.js";
 // The Rashtrix wire desk. It reads the outlets the owner has approved (control room → Wire
@@ -240,6 +241,7 @@ ${items.map((it, i) => `--- Source ${i + 1} (${it.lang}) ---\nHeadline: ${it.tit
 }
 
 async function callGemini(env, text, retried = false, think = true, tries = 0, opt = {}) {
+  const charter = await getCharter(env);
   const { available } = await modelChain(env);
   if (!available.length) { await blockUntil(env, nextPacificMidnight()); const e = new Error("daily free quota used up on every model; waiting for the reset"); e.retry = true; throw e; }
   const model = available[0];
@@ -253,7 +255,7 @@ async function callGemini(env, text, retried = false, think = true, tries = 0, o
       method: "POST", signal: AbortSignal.timeout(180000),
       headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: opt.system || RULES }] },
+        systemInstruction: { parts: [{ text: `${opt.system || RULES}\n\n${charterPrompt(charter)}` }] },
         contents: [{ role: "user", parts: [{ text }] }],
         generationConfig: { temperature: 0.4, responseMimeType: "application/json", responseSchema: opt.schema || SCHEMA, maxOutputTokens: opt.schema ? 4096 : 16384, ...thinking }
       })
@@ -289,7 +291,7 @@ async function callGemini(env, text, retried = false, think = true, tries = 0, o
   const d = await r.json();
   const out = d.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "";
   if (!out) { const e = new Error(`Gemini returned nothing (${d.candidates?.[0]?.finishReason || d.promptFeedback?.blockReason || "no reason"})`); throw e; }
-  return JSON.parse(out);
+  return fixFacts(charter, JSON.parse(out));
 }
 
 // A small JSON task for other parts of the site (the e-paper's horoscope): the same free model

@@ -432,3 +432,11 @@ body.rec-on>header,body.rec-on>main,body.rec-on>nav,body.rec-on .cr-top{visibili
 .np-form{border:2px solid var(--green);border-radius:10px;padding:12px}
 .np-form textarea{font-size:16px;line-height:1.6}
 .np-by{color:var(--amber);font-weight:600}
+/* The Editorial Charter desk */
+.ch-wrap h3{margin:14px 0 6px}
+.ch-wrap textarea{width:100%;font-size:15px;line-height:1.5}
+.ch-st{display:flex;flex-direction:column;gap:8px}
+.ch-row{display:grid;grid-template-columns:220px 220px 1fr;gap:8px;align-items:center}
+.ch-crow{display:grid;grid-template-columns:1fr auto 1fr 180px auto;gap:6px;align-items:center;margin-bottom:6px}
+.ch-two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.ch-row,.ch-crow,.ch-two{grid-template-columns:1fr}.ch-crow span{display:none}}
