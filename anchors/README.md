@@ -45,7 +45,7 @@ anchor carries an on-screen "AI" label.
   recorded, Tara says the fixed line above. The blended voice the browser uses is
   `public/anchors/<key>-voice.bin` (the same blend as the recordings).
 - **Who is ready:** only anchors listed in `READY` in `src/anchors.js` go on air. For now that is
-  Tara, Kabir and Bharti. Live reads run in 3-hour shifts (`ROTA` and `onDuty` in `src/anchors.js`); a shift
+  Tara, Kabir, Bharti and Vikram. Live reads run in 3-hour shifts (`ROTA` and `onDuty` in `src/anchors.js`); a shift
   whose anchor isn't ready yet falls to the next ready anchor. Tara introduces Ilmaz's Editor's Picks
   as "Today's Editor's Pick". To add an anchor, render their faces (below), put the files in `public/anchors/`, and add
   their key to `READY`.
