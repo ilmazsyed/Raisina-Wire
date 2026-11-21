@@ -1850,8 +1850,8 @@ async function api(request, env, ctx) {
   if (url.pathname === "/api/admin/members" && request.method === "GET") {
     const user=await currentUser(request,env);
     if(!allowedRoles(user,["admin"])) return err("Administrator access required.",403);
-    const rows=await env.DB.prepare("SELECT id,email,display_name AS displayName,role,created_at AS createdAt FROM users ORDER BY created_at DESC LIMIT 500").all();
-    return json({members:rows.results},200,{"cache-control":"no-store"});
+    const rows=await env.DB.prepare("SELECT id,email,display_name AS displayName,role,created_at AS createdAt FROM users WHERE email NOT LIKE 'removed-%@removed.invalid' ORDER BY created_at DESC LIMIT 500").all();
+    return json({members:rows.results.map(m=>({...m,isOwner:isOwner(env,{email:m.email,role:"admin"})})),owner:isOwner(env,user),me:user.id},200,{"cache-control":"no-store"});
   }
   if (url.pathname.startsWith("/api/admin/members/") && request.method === "PUT") {
     const user=await currentUser(request,env);
@@ -1862,6 +1862,23 @@ async function api(request, env, ctx) {
     if(id===user.id && role!=="admin") return err("You cannot remove your own administrator role.");
     await env.DB.prepare("UPDATE users SET role=? WHERE id=?").bind(role,id).run();
     await env.DB.prepare("INSERT INTO audit_log (id,actor_id,action,target_type,target_id,details) VALUES (?,?,?,?,?,?)").bind(randomId(),user.id,"member.role.update","user",id,JSON.stringify({role})).run();
+    return json({ok:true},200,{"cache-control":"no-store"});
+  }
+  // The owner removes a member: signed out everywhere, their sign-in, email and name erased (the
+  // account can never be used again); their stories, bylines and the audit log stay, as "Former member".
+  if (url.pathname.startsWith("/api/admin/members/") && request.method === "DELETE") {
+    const user=await currentUser(request,env);
+    if(!isOwner(env,user)) return err("Only the owner can delete members.",403);
+    const id=decodeURIComponent(url.pathname.split("/").pop());
+    const m=await env.DB.prepare("SELECT id,email,display_name FROM users WHERE id=?").bind(id).first();
+    if(!m) return err("Member not found.",404);
+    if(id===user.id||isOwner(env,{email:m.email,role:"admin"})) return err("The owner's own account cannot be deleted.");
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(id),
+      env.DB.prepare("DELETE FROM push_subscriptions WHERE user_id=?").bind(id),
+      env.DB.prepare("UPDATE users SET email=?, display_name='Former member', password_hash='', role='member' WHERE id=?").bind(`removed-${id}@removed.invalid`,id)
+    ]);
+    await env.DB.prepare("INSERT INTO audit_log (id,actor_id,action,target_type,target_id,details) VALUES (?,?,?,?,?,?)").bind(randomId(),user.id,"member.delete","user",id,JSON.stringify({name:m.display_name})).run();
     return json({ok:true},200,{"cache-control":"no-store"});
   }
   if (url.pathname === "/api/admin/social-metrics" && request.method === "GET") {
