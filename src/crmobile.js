@@ -14,7 +14,7 @@ export const GROUPS = [
   ["TV", [["/breaking.html", "Breaking desk"], ["/admin.html#tv", "TV channels", "tv"], ["/pcr.html", "PCR"], ["/producer.html", "Bulletin producer"], ["/avodesk.html", "AVO desk"], ["/onair.html", "On-air desk"],
     ["/studio.html", "Live studio"], ["/prompter.html", "Teleprompter"], ["/admin.html#multimedia", "Multimedia", "multimedia"], ["/admin.html#live", "Live publishing", "live"]]],
   ["Readers", [["/admin.html#audience", "Audience", "audience"], ["/admin.html#alerts", "Alerts", "alerts"], ["/admin.html#community", "Community moderation", "community"], ["/admin.html#events", "Events", "events"]]],
-  ["Administration", [["/admin.html#members", "Members & roles", "members"], ["/admin.html#sales", "Contact & leads", "sales"], ["/admin.html#social", "Social metrics", "social"]]]
+  ["Administration", [["/admin.html#members", "Members & roles", "members"], ["/charter.html", "Editorial Charter"], ["/admin.html#sales", "Contact & leads", "sales"], ["/admin.html#social", "Social metrics", "social"]]]
 ];
 const ICON = {
   home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',

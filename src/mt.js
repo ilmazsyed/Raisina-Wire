@@ -5,6 +5,7 @@
 // Each sentence is translated once and kept in D1 (mt_cache); a daily character cap
 // (MT_DAILY_CHARS) keeps use inside the free allowance. When the model cannot be reached or
 // the cap is spent, the English is shown, so nothing breaks.
+import { applyCharter } from "./charter.js";
 import { isLang } from "./translate.js";
 
 const MODEL = "@cf/ai4bharat/indictrans2-en-indic-1B";
@@ -69,7 +70,8 @@ const memo = new Map();   // per-isolate copy of recent translations
 function remember(k, v) { memo.set(k, v); if (memo.size > 4000) memo.delete(memo.keys().next().value); }
 
 // Translates a list of strings; returns the list with each string translated where possible.
-export async function translateTexts(env, lang, texts, { cacheOnly = false, from = "en" } = {}) {
+export async function translateTexts(env, lang, texts, opts = {}) { return applyCharter(env, await translateTextsRaw(env, lang, texts, opts)); }
+async function translateTextsRaw(env, lang, texts, { cacheOnly = false, from = "en" } = {}) {
   if (!isLang(lang) || !isLang(from) || from === lang || !mtReady(env)) return texts;
   const out = texts.slice();
   const want = [...new Set(texts.map(t => String(t || "").trim()).filter(t => needsMt(t, from)))];

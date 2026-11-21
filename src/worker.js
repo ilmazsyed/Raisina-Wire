@@ -55,6 +55,7 @@ import { serveClip, clipHousekeeping } from "./clips.js";
 import { progPlayed, handleProgs, progHousekeeping } from "./progs.js";
 import { adPlayed, seedBrandFilm } from "./ads.js";
 import { epaperStep, handleNewsprint, readerEdition, epaperSettings } from "./epaper.js";
+import { handleCharter } from "./charter.js";
 import { applyVoice, handleVoice } from "./voicelab.js";
 import { handleStudio } from "./studioapi.js";
 import { handleExtras, tvExtras } from "./extras.js";
@@ -1332,6 +1333,12 @@ async function api(request, env, ctx) {
   if (/^\/api\/(ws\/ctl|ctl|companion|admin\/(rundowns|templates|asrun|proof|clips|progs|ads|macros|companion|copy-image|inputs))(\/|$)/.test(url.pathname)) {
     const out = await handleControlRoom(request, env, url, { json, err, currentUser, isStaff, auditFn: (u, ...a) => audit(env, u, ...a) });
     if (out) return out;
+  }
+  // ---- The Editorial Charter (src/charter.js): the owner, and the people they choose.
+  if (url.pathname === "/api/admin/charter") {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    return handleCharter(request, env, user, { json, err, audit: (...a) => audit(env, user, ...a), isOwner: isOwner(env, user) });
   }
   // ---- The e-paper's control room, the Newsprint desk (src/epaper.js).
   if (url.pathname === "/api/admin/epaper" || url.pathname.startsWith("/api/admin/epaper/")) {

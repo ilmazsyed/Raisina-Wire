@@ -52,6 +52,7 @@ export default defineConfig({
         adsdesk: resolve(import.meta.dirname, "adsdesk.html"),
         newsprint: resolve(import.meta.dirname, "newsprint.html"),
         epaper: resolve(import.meta.dirname, "epaper.html"),
+        charter: resolve(import.meta.dirname, "charter.html"),
         oapdesk: resolve(import.meta.dirname, "oapdesk.html"),
         avorec: resolve(import.meta.dirname, "avorec.html")
       }
