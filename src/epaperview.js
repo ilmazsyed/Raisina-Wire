@@ -84,7 +84,13 @@ function zsStory(x, { size = 26, photo = 0, kbar = true, teaser = false, first =
   const ph = photo && pic(x) ? `<div class="zph" style="--ph:${photo}px">${media(pic(x), 0)}</div>` : "";
   return `<div class="zs${teaser ? " tz" : ""}${first ? " first" : ""}" data-ref="${esc(x.ref)}">${x.updated ? `<span class="stamp">${W.updated}</span>` : ""}<div class="zh">${k}<h3 class="hl" style="--hs:${teaser ? Math.min(size, 21) : size}px">${esc(x.title)}</h3>${ph}${teaser ? "" : byline(x)}</div><div class="txt">${teaser ? (x.dek ? `<p>${esc(x.dek)}</p>` : "") : body(x)}</div>${teaser ? "" : `<p class="jump">${W.cont} ›</p>`}</div>`;
 }
-const over = el => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+const over = el => {
+  let m = el.querySelector(":scope > i.zend"); if (!m) { m = document.createElement("i"); m.className = "zend"; }
+  el.appendChild(m);
+  const a = el.getBoundingClientRect(), b = m.getBoundingClientRect();
+  return b.left > a.right - 2 || b.top > a.bottom + 1 || el.scrollHeight > el.clientHeight + 4;
+};
+const lastItem = el => { const k = [...el.children].filter(c => !c.classList.contains("zend")); return k[k.length - 1]; };
 function fillZone(z, lists, opt = {}) {
   const put = (x, teaser) => { z.insertAdjacentHTML("beforeend", zs(x, { ...opt, teaser, photo: teaser ? 0 : opt.photo && z.querySelectorAll(".zph").length < (opt.photos || 1) ? opt.photo : 0 })); return z.lastElementChild; };
   const shorten = el => { const t = el.querySelector(".txt"); while (over(z) && t && t.children.length > 1) t.lastElementChild.remove(); if (over(z) && t?.firstElementChild) { const p = t.firstElementChild, words = p.textContent.split(" "); while (over(z) && words.length > 12) { words.splice(-6); p.textContent = words.join(" ") + "…"; } } return !over(z); };
@@ -104,7 +110,7 @@ function lines(z, lists) {
     for (let i = 0; i < list.length; i++) {
       const x = list[i];
       z.insertAdjacentHTML("beforeend", `<p class="zl" data-ref="${esc(x.ref)}"><b>${esc(x.pageName || desk(x))}${x.pageNo ? ` · ${W.page} ${D(x.pageNo)}` : ""}</b>${esc(x.title)}</p>`);
-      if (over(z)) { z.lastElementChild.remove(); continue; }
+      if (over(z)) { lastItem(z)?.remove(); continue; }
       list.splice(i--, 1);
     }
   }
@@ -176,7 +182,7 @@ function front(ed) {
     // (what the columns did not take first; then, if the day is thin, every page's headlines)
     for (const b of $$(".briefs", pg)) {
       const list = tq.length ? tq : allT;
-      while (list.length) { const x = list.shift(); b.insertAdjacentHTML("beforeend", `<p class="brief" data-ref="${esc(x.ref)}"><b>${esc(x.pageName)} · ${W.page} ${D(x.pageNo)}</b>${esc(x.title)}</p>`); if (over(b)) { b.lastElementChild.remove(); list.unshift(x); break; } }
+      while (list.length) { const x = list.shift(); b.insertAdjacentHTML("beforeend", `<p class="brief" data-ref="${esc(x.ref)}"><b>${esc(x.pageName)} · ${W.page} ${D(x.pageNo)}</b>${esc(x.title)}</p>`); if (over(b)) { lastItem(b)?.remove(); list.unshift(x); break; } }
       grow(b);
     }
   };

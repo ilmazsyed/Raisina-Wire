@@ -465,6 +465,13 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         el.dataset.fitKey = key; el.style.fontSize = "";
         let fs = fs0, n = 0;
         while (el.scrollHeight > el.clientHeight + 2 && fs > fs0 * 0.75 && n++ < 6) { fs *= 0.95; el.style.fontSize = `${fs.toFixed(1)}px`; }
+        // Still too long at the smallest size: whole sentences are taken off the end until the rest
+        // fits (never a cut sentence, never a "…"); a single sentence is left whole.
+        if (el.scrollHeight > el.clientHeight + 2 && el.children.length === 0) {
+          const parts = el.textContent.match(/[^।.!?]+[।.!?]+["'’”]?\s*|[^।.!?]+$/g) || [];
+          while (parts.length > 1 && el.scrollHeight > el.clientHeight + 2) { parts.pop(); el.textContent = parts.join("").trim(); }
+          el.dataset.fitKey = `${el.textContent.length}:${el.clientWidth}`;
+        }
       }
     }
   };
@@ -894,6 +901,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const AVO_INTRO = 4;
   const avoTotal = L => L.length ? AVO_INTRO + L.reduce((n, x) => n + avoLen(x), 0) : 0;
   const AVO_MIN = 4, AVO_EVERY = 3, AVO_REPEAT = 4, AVO_GAP = 15 * 60e3;
+  const VO_TAIL = 5;   // a voiced story stays on air five seconds after its line ends
   const avoSeen = (() => { try { return JSON.parse(localStorage.getItem(`rw-avo-seen-${channel}`) || "{}"); } catch { return {}; } })();
   // When this viewer last saw each story: a story does not come back within fifteen minutes.
   const avoLast = (() => { try { return JSON.parse(localStorage.getItem(`rw-avo-last-${channel}`) || "{}"); } catch { return {}; } })();
@@ -1003,7 +1011,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const need = { kolkata10: 4, numbers: 2, onthisday: 1 }[name] ?? 2;
       if (items.length < need) return null;
     }
-    const secs = items.map(x => x.secs ? Math.max(6, Math.min(14, x.secs + 1.2)) : SEG_ITEM[name] || 9), head = st.tv?.links?.[`seg:${name}`] ? 5.5 : 4;
+    const secs = items.map(x => x.secs ? Math.max(6, Math.min(40, x.secs + VO_TAIL)) : SEG_ITEM[name] || 9), head = st.tv?.links?.[`seg:${name}`] ? 5.5 : 4;
     return { name, head, items: items.map((x, i) => ({ ...x, d0: secs[i] })), dur: head + secs.reduce((a, b) => a + b, 0) };
   }
   // The audience on air: the open poll (the newest) full screen at :20 and :50, its bar over the
@@ -1054,6 +1062,17 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (unread.length >= 3) pool = unread.concat(pool.filter(b => before.has(b.title)));
     }
     return pool.slice(0, short ? 4 : 7);
+  }
+  // The bulletin's running plan: the opening (12 s), then each story for as long as the newsreader
+  // takes to read it plus five seconds (a story with no recorded line: its share of the time).
+  // When every story has its line, the bulletin ends with the last of them, not at a fixed length.
+  function bulletinPlan(slot, total, stories) {
+    const all = stories?.length ? stories : bulletinPick(slot, total < 100), intro = 12, plan = [];
+    const even = all.length ? (total - intro) / all.length : total;
+    let t = intro;
+    for (const x of all) { const d = x.secs ? Math.max(6, x.secs + VO_TAIL) : even; if (plan.length && t + d > total - 0.5) break; plan.push({ x, at: t, d }); t += d; }
+    if (plan.some(p => !p.x.secs)) { const spare = Math.max(0, total - t) / Math.max(1, plan.length); let a = intro; plan.forEach(p => { p.d += spare; p.at = a; a += p.d; }); t = a; }
+    return { plan, intro, end: Math.min(total, Math.max(intro + 8, t)) };
   }
   function localSeg() {
     const loop = st.tv?.loop || []; if (!loop.length) return null;
@@ -1139,7 +1158,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // An "up next" card that ended: its video plays after the bulletin block.
       if (q.item?.type === "upnext") q.resume = q.item.video;
       q.bDone = [...q.bDone.slice(-8), slot];
-      q.item = { type: "bulletin", dur: BULLETIN_MS / 1000, sting: true }; q.start = t; q.n++;
+      q.item = { type: "bulletin", dur: bulletinPlan(slot, BULLETIN_MS / 1000).end, sting: true }; q.start = t; q.n++;
       q.seg = { ...q.item, start: t, in: 0, n: q.n };
       q.block = blockFor();
       q.pending = (q.pending || []).filter(x => x.type !== "flash");
@@ -2143,13 +2162,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // The two-minute bulletins carry up to seven stories; the 65-second ones at :15 and :45, four.
       // Each story stays on screen as long as the newsreader takes to read it (when its line is
       // ready); as many stories as fit, the spare seconds shared out among them.
-      const total = sc.dur || 120, short = total < 100, all = g.stories?.length ? g.stories : bulletinPick(Math.floor((sc.playAt || sc.startAt || now()) / QUARTER) * QUARTER, short), intro = 12;
-      const even = all.length ? (total - intro) / all.length : total, plan = [];
-      { let t = intro;
-        for (const x of all) { const d = x.secs ? Math.max(8, x.secs + 1) : even; if (plan.length && t + d > total - 0.5) break; plan.push({ x, at: t, d }); t += d; }
-        const spare = Math.max(0, total - t) / Math.max(1, plan.length); let a = intro;
-        plan.forEach(p => { p.d += spare; p.at = a; a += p.d; }); }
-      const list = plan.map(p => p.x), per = plan[0]?.d || even;
+      const bslot = Math.floor((sc.playAt || sc.startAt || now()) / QUARTER) * QUARTER, full = bulletinMs(bslot) / 1000, short = full < 100;
+      const { plan, intro } = bulletinPlan(bslot, Math.max(sc.dur || 0, full), g.stories);
+      const list = plan.map(p => p.x), per = plan[0]?.d || 15;
       // The broadcast output records each bulletin it airs (the Segment & bulletin desk).
       if (output && !g.stories && list.length) progRecord("bulletin", "", Math.floor((sc.playAt || sc.startAt || now()) / QUARTER) * QUARTER, list, short);
       const at = new Date(sc.playAt || sc.startAt || now()), when = slotWords(new Date(Math.floor(at.getTime() / QUARTER) * QUARTER)), day = bnDate(at);

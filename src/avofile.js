@@ -131,7 +131,7 @@ function build(x, A, V) {
       const i = Math.min(slots - 1, Math.floor(lt2 / each)), m = media.length ? media[i % media.length] : null, k = (lt2 - i * each) / each;
       if (m) { cover(c, m, 0, 0, W, H, k, .12); const sh = c.createLinearGradient(0, H * .3, 0, H); sh.addColorStop(0, "rgba(10,2,3,0)"); sh.addColorStop(1, "rgba(10,2,3,.92)"); c.fillStyle = sh; c.fillRect(0, 0, W, H);
         const top = c.createLinearGradient(0, 0, 0, H * .22); top.addColorStop(0, "rgba(10,2,3,.6)"); top.addColorStop(1, "rgba(10,2,3,0)"); c.fillStyle = top; c.fillRect(0, 0, W, H * .22);
-        if (m.credit) { font(c, 500, 22); c.fillStyle = "rgba(255,255,255,.7)"; c.textAlign = "right"; c.fillText(m.credit, W - pad, (V ? H - 330 : H - 180) - 34); c.textAlign = "left"; }
+        if (false && m.credit) { font(c, 500, 22); c.fillStyle = "rgba(255,255,255,.7)"; c.textAlign = "right"; c.fillText(m.credit, W - pad, (V ? H - 330 : H - 180) - 34); c.textAlign = "left"; }
       } else backdrop(c, W, H, tt, A.map);
       const a = eo(pr(lt2, .2, .9)), sy = strap(c, tt, a), tw = W - pad * 2, bottom = sy - (V ? 50 : 40);
       jacket(c, a);

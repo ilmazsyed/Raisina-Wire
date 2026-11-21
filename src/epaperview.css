@@ -252,3 +252,5 @@ body{background:radial-gradient(ellipse at 50% 20%,#f3f4f6 0%,#dcdee2 70%,#cdd0d
 .redbox .zl{color:#fff;border-bottom-color:rgba(255,255,255,.35)}
 .redbox .zl b{color:#ffe2a8}
 .hl{text-wrap:balance}
+.zend{display:block;height:0;width:100%;margin:0;padding:0;break-before:auto}
+.zs:has(+ .zend){border-bottom:0}
