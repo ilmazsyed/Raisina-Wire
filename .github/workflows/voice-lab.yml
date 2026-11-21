@@ -1,0 +1,29 @@
+# Voice lab (branch voice-lab only, not for main): renders Chatterbox samples of Tara and commits
+# them back to the branch for listening.
+name: Voice lab
+on:
+  push:
+    branches: [voice-lab]
+    paths: ["video/voice-lab/*.py", "video/voice-lab/*.wav", ".github/workflows/voice-lab.yml"]
+permissions:
+  contents: write
+jobs:
+  samples:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: |
+          sudo apt-get install -y -qq ffmpeg > /dev/null
+          pip install -q torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install -q chatterbox-tts==0.1.7 --extra-index-url https://download.pytorch.org/whl/cpu
+      - name: Render
+        run: python video/voice-lab/chatterbox_samples.py
+      - name: Commit the samples
+        run: |
+          git config user.name "raisina-voice-lab"; git config user.email "actions@users.noreply.github.com"
+          git add video/voice-lab/out && git commit -m "Voice lab samples [skip ci]" && git push
