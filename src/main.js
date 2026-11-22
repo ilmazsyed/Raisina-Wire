@@ -629,9 +629,12 @@ function phLive() {
 }
 function phToday() {
   const host = $("#phToday"); if (!host) return;
+  // One sleek line: the day, the Bengali date (without the year), Kolkata's weather and the time.
   const x = state.homeX || {}, now = new Date();
-  const day = now.toLocaleDateString(LOCALE, { ...IST, weekday: "long", day: "numeric", month: "long" });
-  host.innerHTML = `<span>${esc(day)}</span>${x.bangabda ? `<i aria-hidden="true">·</i><span data-no-tr>${esc(x.bangabda)}</span>` : ""}${x.weather ? `<i aria-hidden="true">·</i><span><span>Kolkata</span> <span data-no-tr>${digits(x.weather.temp)}°</span></span>` : ""}<i aria-hidden="true">·</i><b data-no-tr>${digits(clock(now.toISOString()))}</b>`;
+  const day = now.toLocaleDateString(LOCALE, { ...IST, weekday: "short", day: "numeric", month: "short" });
+  const bng = String(x.bangabda || "").split(" ").slice(0, 2).join(" ");
+  const I = d => `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  host.innerHTML = `<span class="pt">${I('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>')}<b>${esc(day)}</b></span>${bng ? `<span class="pt" data-no-tr>${esc(bng)}</span>` : ""}${x.weather ? `<span class="pt">${I('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6L19 19M5 19l1.4-1.4M17.6 6.4L19 5"/>')}<span>Kolkata</span>&nbsp;<span data-no-tr>${digits(x.weather.temp)}°</span></span>` : ""}<span class="pt pt-clock">${I('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>')}<b data-no-tr>${digits(clock(now.toISOString()))}</b></span>`;
 }
 // What Rashtrix TV has on: the channel's fixed item (bulletin, HEADLINES, a segment) when one is
 // on, else what the player shows; and the next item with its time.
@@ -685,7 +688,7 @@ function phPromo() {
   const cards = [
     `<a class="hpr-card hpr-tv" href="${withLang("/watch")}"><img src="/brand/studio-wide.webp" alt="" loading="lazy"><span class="hpr-body"><span class="hpr-tag" data-no-tr><i></i>LIVE</span><b>Rashtrix TV, live round the clock</b><span>Bulletins, HEADLINES and the news as it happens</span><span class="hpr-go">Watch now →</span></span></a>`,
     `<a class="hpr-card hpr-shorts" href="${withLang("/watch?ch=v")}"><span class="hpr-phone" aria-hidden="true"><img src="/brand/logo-sm.webp" alt=""><i></i></span><span class="hpr-body"><span class="hpr-tag" data-no-tr><i></i>LIVE</span><b>Rashtrix Shorts, live</b><span>Short videos and the news on a vertical screen</span><span class="hpr-go">Watch Shorts →</span></span></a>`,
-    ...(fronts.length ? ["bn", "en", "hi"].filter(l => fronts.includes(l)).map(l => `<a class="hpr-card hpr-ep" href="${epHref(l, e)}"><img src="/og/epaper-${l}.jpg?v=${encodeURIComponent(`${e.day}${e.slot}`)}" alt="" loading="lazy"><span class="hpr-body"><span class="hpr-tag gold">E-paper</span><b>${tr(`${EP_LANG[l]} e-paper`)}</b><span>Today's paper, morning and evening</span><span class="hpr-go">Read today's paper →</span></span></a>`)
+    ...(fronts.length ? ["bn", "en", "hi"].filter(l => fronts.includes(l)).map(l => `<a class="hpr-card hpr-ep" href="${epHref(l, e)}"><img src="/og/epaper-${l}.jpg?v=${encodeURIComponent(`${e.day}${e.slot}2x`)}" alt="" loading="lazy"><span class="hpr-body"><span class="hpr-tag gold">E-paper</span><b>${tr(`${EP_LANG[l]} e-paper`)}</b><span>Today's paper, morning and evening</span><span class="hpr-go">Read today's paper →</span></span></a>`)
       : [`<a class="hpr-card hpr-ep" href="${withLang("/epaper")}"><img src="/og/epaper.jpg" alt="" loading="lazy"><span class="hpr-body"><span class="hpr-tag gold">E-paper</span><b>Rashtrix e-papers</b><span>Bengali, English and Hindi, morning and evening</span><span class="hpr-go">Read today's paper →</span></span></a>`])
   ];
   const keep = host.querySelector(".hpr-track")?.scrollLeft || 0;
@@ -712,7 +715,7 @@ function phFronts() {
   if (!fronts.length) return;
   const slotName = e.slot === "morning" ? "Morning edition" : "Evening edition";
   host.innerHTML = `<div class="ph-sec-head"><h2 id="phFrontsT">Today's front pages</h2><a href="${withLang("/epaper")}">E-paper</a></div>
-    <div class="fp-row">${fronts.map(l => `<a class="fp-card" href="${epHref(l, e)}"><span class="fp-img"><img src="/og/epaper-${l}.jpg?v=${encodeURIComponent(`${e.day}${e.slot}`)}" alt="" loading="lazy"></span><span class="fp-meta"><b>${tr(EP_LANG[l])}</b><span><span>${slotName}</span> · <span data-no-tr>${esc(shortDate(e.day))}</span></span></span></a>`).join("")}</div>`;
+    <div class="fp-row">${fronts.map(l => `<a class="fp-card" href="${epHref(l, e)}"><span class="fp-img"><img src="/og/epaper-${l}.jpg?v=${encodeURIComponent(`${e.day}${e.slot}2x`)}" alt="" loading="lazy"></span><span class="fp-meta"><b>${tr(EP_LANG[l])}</b><span><span>${slotName}</span> · <span data-no-tr>${esc(shortDate(e.day))}</span></span></span></a>`).join("")}</div>`;
 }
 async function phExtras() {
   try {

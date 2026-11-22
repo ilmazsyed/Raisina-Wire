@@ -1317,7 +1317,7 @@ async function api(request, env, ctx) {
     let pages = 0; try { pages = JSON.parse(ed?.pages || "[]").length; } catch { /* none */ }
     return json({ breaking, bangabda: ex?.bangabda || "", weather: wx && wx.temp != null ? { temp: wx.temp, text: wx.text } : null,
       poll: (ex?.polls || []).find(q => q.status === "open") || null, popular: (pop || []).map(r => r.slug), tv,
-      epaper: ed ? { day: ed.day, slot: ed.slot, pages, fronts: (await env.DB.prepare("SELECT slug FROM og_cards WHERE slug IN ('__epf_bn','__epf_en','__epf_hi') AND title=?").bind(ed.id).all().catch(() => ({ results: [] }))).results.map(r => r.slug.slice(6)) } : null }, 200, { "cache-control": "public, max-age=30" });
+      epaper: ed ? { day: ed.day, slot: ed.slot, pages, fronts: (await env.DB.prepare("SELECT slug FROM og_cards WHERE slug IN ('__epf_bn','__epf_en','__epf_hi') AND title=?").bind(`${ed.id}@2x`).all().catch(() => ({ results: [] }))).results.map(r => r.slug.slice(6)) } : null }, 200, { "cache-control": "public, max-age=30" });
   }
   if (url.pathname === "/api/tv/videos" && request.method === "GET") {
     const { results } = await env.DB.prepare(`SELECT i.channel, i.yt_id AS id, i.title, i.thumb, i.duration, i.published_at AS publishedAt FROM tv_items i JOIN tv_sources s ON s.id=i.source_id

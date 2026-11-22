@@ -66,7 +66,10 @@ function masthead(ed, y0, ears = []) {
   const no = D(Math.max(1, (ed.editions || []).length));
   const left = `${W.city} · ${esc(day)}${LANG === "bn" && ed.bangabda ? ` · ${esc(ed.bangabda)}` : ""}`;
   return at(0, y0, 1180, 238, `<div class="mh"><div class="top"><span>${left}</span><span class="red">${esc(ed.name)}</span><span>${W.vol} · ${LANG === "en" ? "No." : LANG === "bn" ? "সংখ্যা" : "अंक"} ${no}</span></div>
-<div class="row${ears.length ? " eared" : ""}">${ear(ears[0], "l")}<div class="np"><div class="w d">${W.daily}</div><span class="crestw"><img class="crest" src="${CREST}" alt="Rashtrix"></span><div class="w">${W.name}</div></div>${ear(ears[1], "r")}</div>
+<div class="row${ears.length ? " eared" : ""}">${ear(ears[0], "l")}<div class="np">${LANG === "en"
+  // (the English paper's nameplate is the paper's own Old English lettering, the crest between the words)
+  ? `<img class="olde d" src="/brand/mh-en-daily.webp" alt="Daily"><span class="crestw"><img class="crest" src="${CREST}" alt="Rashtrix"></span><img class="olde" src="/brand/mh-en-rashtrix.webp" alt="Rashtrix">`
+  : `<div class="w d">${W.daily}</div><span class="crestw"><img class="crest" src="${CREST}" alt="Rashtrix"></span><div class="w">${W.name}</div>`}</div>${ear(ears[1], "r")}</div>
 <div class="rules"><i class="gd"></i><i class="bk"></i></div>
 <div class="bot"><span>rashtrix.live${ed.weather && ed.weather.temp != null ? ` · ${D(ed.weather.temp)}°` : ""}</span><span class="red">${W.tag}</span><span>${D(PAGES_N)} ${W.pages} · ${W.free}</span></div></div>`);
 }
@@ -202,7 +205,7 @@ const zs = (x, o) => x.lead ? zsLead(x) : zsStory(x, o);
 /* ---------- an inside page: the section's lead, then its stories down six columns ---------- */
 function runningHead(ed, title, n) {
   const day = new Date(ed.at).toLocaleDateString(LOCALE, { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
-  return at(0, 0, 1180, 64, `<div class="rh"><div class="nm"><img src="${CREST.replace(".webp", "-sm.webp")}" alt="">${W.daily} ${W.name}</div><div class="meta">${W.city} · ${esc(day)}<br><b>${esc(ed.name)}</b> · ${W.page} ${D(n)}</div></div>`)
+  return at(0, 0, 1180, 64, `<div class="rh"><div class="nm"><img src="${CREST.replace(".webp", "-sm.webp")}" alt="">${LANG === "en" ? `<img class="olde-s" src="/brand/mh-en-daily.webp" alt="Daily"><img class="olde-s" src="/brand/mh-en-rashtrix.webp" alt="Rashtrix">` : `${W.daily} ${W.name}`}</div><div class="meta">${W.city} · ${esc(day)}<br><b>${esc(ed.name)}</b> · ${W.page} ${D(n)}</div></div>`)
     + at(0, 72, 1180, 50, `<div class="sec"><b>${esc(title)}</b><i></i></div>`);
 }
 function inside(ed, p, n) {
@@ -256,10 +259,14 @@ ${ed ? `<select id="epPrint" class="hide-s" aria-label="${W2.print}"><option val
 <select id="epLang" aria-label="Language">${L3.map(([l, n]) => `<option value="${l}" ${l === LANG ? "selected" : ""}>${n}</option>`).join("")}</select></div>`;
 }
 function fit() {
-  const w = Math.min(window.innerWidth - (window.innerWidth < 700 ? 12 : 40), 1400);
+  // (the screen's own width: a page wider than the screen must not make itself wider still)
+  const vw = Math.min(window.innerWidth, document.documentElement.clientWidth || 1e5, screen.width || 1e5, window.visualViewport?.width || 1e5);
+  const w = Math.min(vw - (vw < 700 ? 12 : 40), 1400);
   scale = zoom || w / 1240;
   const sheet = $(".ep-sheet"); if (!sheet) return;
-  sheet.style.transform = `scale(${scale})`;
+  // (zoom, not a scaled picture of the page: the type is set again at the size it is read, so it
+  //  stays sharp on a phone)
+  sheet.style.transform = ""; sheet.style.zoom = String(scale);
   $(".ep-holder").style.width = 1240 * scale + "px"; $(".ep-holder").style.height = 2010 * scale + "px";
 }
 function show(i, dir = 0) {

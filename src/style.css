@@ -2394,3 +2394,53 @@ html.tvp-fs-lock .watch .wrap>:not(.tv-watch),html.tvp-fs-lock .tv-interact,html
 .fp-img img{width:100%;height:100%;object-fit:cover;object-position:top}
 .fp-meta{display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--muted)}
 .fp-meta b{font-size:15px;color:var(--ink)}
+
+/* The home player's "tap for sound" label: a small pill over the picture, clear of the tickers */
+.hl-player .tvp-sound,.ph-tv-screen .tvp-sound{left:50%;right:auto;top:auto;bottom:22%;transform:translateX(-50%);width:auto;max-width:86%;padding:7px 14px;border-radius:999px;font:600 12.5px/1.2 "Hind Siliguri",var(--sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(10,10,12,.62);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:0 6px 18px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.18);animation:snd-in .4s ease both}
+@keyframes snd-in{from{opacity:0;transform:translate(-50%,6px)}to{opacity:1;transform:translate(-50%,0)}}
+
+/* ---------- The phone header (redesigned): the full logo with the tagline beside it, then one row
+   of actions on a glass bar (LIVE TV, E-paper, language, light/dark, alerts, account), and a red
+   and gold rule that shimmers. Every element of the old header is kept. ---------- */
+@media(max-width:760px){
+  #app>header.wrap{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"logo tl" "logo ts" "acts acts" "rule rule";column-gap:12px;row-gap:1px;align-items:center;padding-top:12px;padding-bottom:0;position:relative}
+  #app>header.wrap::before{content:"";position:absolute;inset:0 -16px;z-index:-1;background:radial-gradient(120% 90% at 100% 0%,rgba(170,4,4,.08),transparent 55%),radial-gradient(90% 80% at 0% 100%,rgba(212,160,23,.10),transparent 60%)}
+  #app>header .utility,#app>header .masthead,#app>header .nameplate,#app>header .nameplate-tag{display:contents}
+  #app>header .utility-left,#app>header .tag-sub,#app>header .ep-tagbtn,#app>header .live-circ{display:none!important}
+  #app>header .nameplate-link{grid-area:logo;display:block;line-height:0}
+  #app>header .nameplate-link .mast-logo,#app>header .nameplate-link img{height:66px;width:auto}
+  #app>header .tagline{grid-area:tl;align-self:end;margin:0;font-size:17.5px;line-height:1.25;letter-spacing:-.005em}
+  #app>header .tagline-sub{grid-area:ts;align-self:start;margin:2px 0 0;font-size:12.5px;line-height:1.3}
+  #app>header .utility-right{grid-area:acts;display:flex;align-items:center;gap:7px;margin-top:12px;padding:6px;border-radius:16px;background:var(--glass-bg);box-shadow:var(--glass-shadow);-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);min-width:0}
+  #app>header .live-tv-btn{display:inline-flex!important;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:11px;background:linear-gradient(135deg,#c8100f,#8f0303);color:#fff;font:800 12px/1 Montserrat,var(--sans);letter-spacing:.05em;box-shadow:0 6px 16px -6px rgba(170,4,4,.7);animation:hdr-live 2.4s ease-in-out infinite;flex:none}
+  #app>header .live-tv-btn svg{width:15px;height:15px}
+  @keyframes hdr-live{0%,100%{box-shadow:0 6px 16px -6px rgba(170,4,4,.7),0 0 0 0 rgba(200,16,15,.45)}50%{box-shadow:0 6px 16px -6px rgba(170,4,4,.7),0 0 0 6px rgba(200,16,15,0)}}
+  #app>header .utility .ep-btn{display:inline-flex!important;align-items:center;gap:6px;height:34px;padding:0 10px 0 4px;border-radius:11px;background:linear-gradient(135deg,#f6e7b8,#e3c25c);color:#4a3804;font:700 12.5px/1 var(--sans);text-decoration:none;flex:none}
+  #app>header .utility .ep-btn .ep-circ{width:26px;height:26px}
+  #app>header .utility .ep-btn .ep-word{display:inline!important}
+  #app>header .lang-menu{margin-left:auto}
+  #app>header .utility-right .icon-btn{width:34px;height:34px;border-radius:11px;flex:none}
+  #app>header .guest{gap:6px;flex:none}
+  #app>header .guest .btn{display:none}
+  #app>header .guest .text-btn{height:34px;padding:0 10px;border-radius:11px;font-size:13px;font-weight:700;background:var(--ink);color:var(--bg)}
+  #app>header .avatar{width:34px;height:34px;border-radius:11px}
+  #app>header .mast-rule{grid-area:rule;display:block;height:3px;margin:12px 0 0;border-radius:2px;background:linear-gradient(90deg,#AA0404 0%,#AA0404 55%,#D4A017 55%,#D4A017 62%,#AA0404 62%);background-size:200% 100%;animation:hdr-rule 6s linear infinite}
+  @keyframes hdr-rule{to{background-position:-200% 0}}
+  #app>header .live-tv-btn .live-dot{width:7px;height:7px;border-radius:50%;background:#fff;animation:blink 1s infinite}
+}
+@media(max-width:760px) and (prefers-reduced-motion:reduce){#app>header .live-tv-btn,#app>header .mast-rule{animation:none}}
+/* the day, one sleek line */
+.ph-today{flex-wrap:nowrap;gap:0;padding:7px 16px;font-size:12.5px;white-space:nowrap;overflow-x:auto;scrollbar-width:none}
+.ph-today::-webkit-scrollbar{display:none}
+.ph-today .pt{display:inline-flex;align-items:center;gap:5px;flex:none}
+.ph-today .pt+.pt::before{content:"";width:3px;height:3px;border-radius:50%;background:currentColor;opacity:.45;margin:0 9px}
+.ph-today .pt b{font-weight:700}
+.ph-today .pt-clock{margin-left:auto;padding-left:12px}
+.ph-today .pt-clock::before{display:none}
+.ph-today svg{opacity:.8;flex:none}
+@media(max-width:760px){
+  #app>header .utility-right{justify-content:flex-start;overflow:hidden}
+  #app>header .live-tv-btn{margin:0;position:static;padding:0 11px}
+  #app>header .live-tv-btn .live-tv-word{display:none}
+}
+@media(max-width:760px){#app>header .utility .ep-btn,#app>header .utility .ep-btn .ep-word{color:#4a3804!important}}
