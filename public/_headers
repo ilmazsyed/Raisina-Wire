@@ -34,3 +34,17 @@
 /epaper.html
   ! X-Frame-Options
   X-Frame-Options: SAMEORIGIN
+# The Explainer desk: lines are recorded here with the microphone.
+/explainer.html
+  ! Permissions-Policy
+  Permissions-Policy: camera=(), microphone=(self), autoplay=*, fullscreen=*, geolocation=()
+/explainer
+  ! Permissions-Policy
+  Permissions-Policy: camera=(), microphone=(self), autoplay=*, fullscreen=*, geolocation=()
+# The AVO recorder: it records the screen (a story with a YouTube video) with its sound.
+/avorec.html
+  ! Permissions-Policy
+  Permissions-Policy: camera=(), microphone=(self), display-capture=(self), autoplay=*, fullscreen=*, geolocation=()
+/avorec
+  ! Permissions-Policy
+  Permissions-Policy: camera=(), microphone=(self), display-capture=(self), autoplay=*, fullscreen=*, geolocation=()

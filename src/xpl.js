@@ -349,7 +349,10 @@ export async function playExplainer(host, x, { orient = "h", startAt = Date.now(
   cv.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
   host.append(cv); const c = cv.getContext("2d");
   let alive = true, raf = 0, cur = null, voiceEl = null, ytEl = null, bed = null;
-  const stopVoice = () => { try { voiceEl?.pause(); } catch { /* none */ } voiceEl = null; };
+  // (every line's voice loaded ahead, so each starts on its cue; a line still finishing its last word when
+  //  the next shot comes is let end, unless more than a second of it is left)
+  const voices = new Map(); if (!muted) for (const s of F.shots) if (s.voice?.url && !voices.has(s.voice.url)) { const a = new Audio(); a.preload = "auto"; a.src = s.voice.url; voices.set(s.voice.url, a); }
+  const stopVoice = (all = false) => { const v = voiceEl; voiceEl = null; if (!v) return; try { if (all || !(v.duration - v.currentTime < 1.0)) v.pause(); } catch { /* none */ } };
   const ctx = audio || (() => { try { return new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } })();
   if (ctx && !muted) { try { if (ctx.state !== "running") ctx.resume(); bed = newsBed(ctx, F.total, { style: F.style.bed, duck: 0.45 }); } catch { /* no music */ } }
   const frame = () => {
@@ -361,7 +364,7 @@ export async function playExplainer(host, x, { orient = "h", startAt = Date.now(
     if (s !== cur) {
       cur = s; stopVoice(); if (ytEl) { ytEl.remove(); ytEl = null; }
       A.vid.forEach(v => { if (v && !v.paused) v.pause(); });
-      if (s?.voice?.url && !muted) { voiceEl = new Audio(s.voice.url); voiceEl.currentTime = Math.max(0, t - s.t0); voiceEl.play().catch(() => {}); }
+      if (s?.voice?.url && !muted) { voiceEl = voices.get(s.voice.url) || new Audio(s.voice.url); try { voiceEl.currentTime = Math.max(0, t - s.t0); } catch { /* not loaded yet */ } voiceEl.play().catch(() => {}); }
       if (s && (s.t === "video" || s.t === "byte")) {
         const v = A.vid.get(s.media);
         if (v) { v.muted = s.t !== "byte" || muted; v.currentTime = Math.max(0, t - s.t0 - (s.t === "byte" ? .3 : 0)); v.play().catch(() => { v.muted = true; v.play().catch(() => {}); }); }
@@ -376,7 +379,7 @@ export async function playExplainer(host, x, { orient = "h", startAt = Date.now(
     F.draw(c, t);
     raf = requestAnimationFrame(frame);
   };
-  function destroy() { alive = false; cancelAnimationFrame(raf); stopVoice(); try { bed?.(); } catch { /* none */ } ytEl?.remove(); A.vid.forEach(v => { if (v) { v.pause(); v.removeAttribute("src"); v.load(); } }); cv.remove(); if (!audio) try { ctx?.close(); } catch { /* closed */ } }
+  function destroy() { alive = false; cancelAnimationFrame(raf); stopVoice(true); voices.forEach(a => { a.pause(); a.removeAttribute("src"); }); try { bed?.(); } catch { /* none */ } ytEl?.remove(); A.vid.forEach(v => { if (v) { v.pause(); v.removeAttribute("src"); v.load(); } }); cv.remove(); if (!audio) try { ctx?.close(); } catch { /* closed */ } }
   frame();
   return { destroy, total: F.total, film: F };
 }
