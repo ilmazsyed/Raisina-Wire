@@ -200,9 +200,10 @@ async function moveBy(id, d) {
 // The library: the Content Library's YouTube videos and AVO stories (its 36 hours, and what is kept).
 function libraryDialog() {
   if (!S.rd) return toast("Open a rundown first.");
-  libraryPicker({ title: "Add from the Content Library", note: `${S.ch === "h" ? "Rashtrix TV" : "Rashtrix Shorts"}: it goes in after the selected item.`, types: ["video", "avo"], channel: S.ch, keepOpen: true,
+  libraryPicker({ title: "Add from the Content Library", note: `${S.ch === "h" ? "Rashtrix TV" : "Rashtrix Shorts"}: it goes in after the selected item.`, types: ["video", "avo", "xpl"], channel: S.ch, keepOpen: true,
     onPick: (x, b) => x.type === "video"
       ? addFromLib(b, { type: "video", title: x.title.slice(0, 200), duration: x.dur || 60, data: { ytId: x.id } })
+      : x.type === "xpl" ? addFromLib(b, { type: "explainer", title: x.title.slice(0, 200), duration: Math.ceil(x.dur || 120) + 1, data: { xplId: x.id } })
       : addFromLib(b, { type: "avo", title: x.title.slice(0, 200), duration: avoDur(x.story), data: { story: x.story, avoId: x.id } }) });
 }
 async function addFromLib(btn, body) {

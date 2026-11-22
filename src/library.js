@@ -15,6 +15,9 @@
 import { LIB_HOURS } from "./tvchannel.js";
 import { screenStory, avoManualDelete } from "./avo.js";
 import { adClips } from "./ads.js";
+import { explainerList } from "./explainer.js";
+// Explainers take an editor's work: they stay seven days (not 36 hours) unless kept.
+const XPL_DAYS = 7;
 
 const iso = t => new Date(t).toISOString();
 const ms = v => { if (!v) return 0; const s = String(v); return Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : `${s.replace(" ", "T")}Z`) || 0; };
@@ -58,6 +61,8 @@ export async function libraryData(env) {
     env.DB.prepare("SELECT type, title, at FROM asrun WHERE at>=? AND type IN ('video','avo','clip','ad') ORDER BY at DESC LIMIT 6000").bind(cutIso).all().then(r => r.results).catch(() => []),
     upcoming(env), adClips(env).catch(() => [])
   ]);
+  const xpls = (await explainerList(env, 120).catch(() => [])).filter(e => e.keep || ms(e.createdAt) >= now - XPL_DAYS * 864e5)
+    .map(e => ({ ...e, inRundowns: usedIn(up, e.id), clearsAt: e.keep ? null : iso(ms(e.createdAt) + XPL_DAYS * 864e5) }));
   // (aired: from the as-run log, by title, in the library's 36 hours)
   const airs = new Map();
   for (const r of runs) { const k = `${r.type === "ad" ? "clip" : r.type}|${String(r.title || "").trim()}`; const a = airs.get(k) || { n: 0, last: r.at }; a.n++; airs.set(k, a); }
@@ -89,7 +94,7 @@ export async function libraryData(env) {
       at: iso(t || now), aired: a.n, lastAired: a.last, inRundowns: usedIn(up, url), clearsAt: c.keep || ad ? null : iso(t + LIB_HOURS * 3600e3) };
   }).filter(c => c.keep || c.ad || ms(c.at) >= cut || c.inRundowns.length);
 
-  return { hours: LIB_HOURS, now: iso(now), playlists, lives, avo, clips };
+  return { hours: LIB_HOURS, now: iso(now), playlists, lives, avo, clips, explainers: xpls };
 }
 
 // Hourly: what is older than 36 hours and not kept leaves the library (and the clip store). Nothing
@@ -120,7 +125,11 @@ export async function libraryPurge(env) {
       await env.CLIPS.delete(c.r2_key).catch(() => {}); await env.DB.prepare("DELETE FROM clips WHERE id=?").bind(c.id).run(); clipGone++;
     }
   }
-  return { avo: avoGone, clips: clipGone };
+  // Explainers older than seven days and not kept (and not still to air)
+  let xplGone = 0;
+  const { results: xs } = await env.DB.prepare("SELECT id, created_at FROM explainers WHERE keep=0 AND created_at<datetime('now','-7 days') LIMIT 100").all().catch(() => ({ results: [] }));
+  for (const r of xs) { if (busy(r.id)) continue; await env.DB.prepare("DELETE FROM explainers WHERE id=?").bind(r.id).run(); xplGone++; }
+  return { avo: avoGone, clips: clipGone, explainers: xplGone };
 }
 
 // PUT /api/admin/library/avo/<id> {keep}

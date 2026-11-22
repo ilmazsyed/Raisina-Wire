@@ -22,7 +22,7 @@ export const LAYOUTS = {
 };
 export const ITEM_TYPES = {
   video: "YouTube video", clip: "App clip", live: "Live segment", breaking: "Full-screen breaking",
-  headlines: "Headline set", lband: "L-band", promo: "Promo card", adbreak: "Ad break", slate: "Slate", avo: "AVO story",
+  headlines: "Headline set", lband: "L-band", promo: "Promo card", adbreak: "Ad break", slate: "Slate", avo: "AVO story", explainer: "Explainer",
   bulletin: "News bulletin", segment: "Segment"
 };
 export const TRANSITIONS = { cut: "Cut", mix: "Mix", wipe: "Red slash wipe", stinger: "Stinger" };
@@ -55,6 +55,7 @@ export function itemScene(item) {
     case "bulletin": return { ...base, layout: "graphic", sources: [], full: true, graphic: { kind: "bulletin" } };
     case "segment": return { ...base, layout: "graphic", sources: [], full: true, graphic: { kind: "seg", name: d.name || "world" } };
     case "avo": return { ...base, layout: "graphic", sources: [], full: true, graphic: { kind: "avo", stories: d.story ? [d.story] : [] } };
+    case "explainer": return { ...base, layout: "graphic", sources: [], full: true, graphic: { kind: "explainer", id: d.xplId || "" } };
     case "slate": return { ...base, layout: "graphic", sources: [], graphic: { kind: "slate", text: d.text || item.title, image: d.image || "" } };
     default: return { ...base, layout: "graphic", sources: [], graphic: { kind: "slate", text: item.title } };
   }

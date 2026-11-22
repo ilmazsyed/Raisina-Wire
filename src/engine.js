@@ -616,7 +616,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     // Music under everything the channel draws itself; only YouTube videos (and live sources) carry
     // their own sound. A graphic with no music of its own gets the soft bed; a breaking card plays
     // its sting (its own music); the channel ID plays its signature.
-    const spec = BEDS[kind] || (sc?.graphic && !(sc.sources || []).length && !["breaking", "ident"].includes(kind) && !(kind === "breaking" && sc.graphic.music) ? { style: "avo", duck: 0.6 } : null);
+    const spec = BEDS[kind] || (sc?.graphic && !(sc.sources || []).length && !["breaking", "ident", "explainer"].includes(kind) && !(kind === "breaking" && sc.graphic.music) ? { style: "avo", duck: 0.6 } : null);
     if (!spec || st.muted || !st.audio || !loud || st.bed || Date.now() < (st.breakUntil || 0)) return;
     wake();
     const gone = (now() - (sc.startAt || now())) / 1000, left = Math.max(2, (sc.dur || 10) - gone);
@@ -2521,6 +2521,16 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     } else if (g.kind === "breaking") {
       el.innerHTML = channel === "h" ? `<div class="tv-breaking static"><div class="br-slash"></div><div class="br-in"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(g.text)}</b><img src="${LOGO}" alt=""></div><div class="br-bar"></div></div>` : vJacket(`<div class="br-v"><span class="br-tag">এইমাত্র পাওয়া খবর</span><b>${esc(g.text)}</b></div>`, "এইমাত্র পাওয়া খবর");
       if (g.music && !st.muted) breakingSting(st.audio, Math.min(8, sc.dur || 8));
+    } else if (g.kind === "explainer") {   // a long-form explainer (src/xpl.js): its own canvas, voice, bytes and music
+      el.innerHTML = `<div class="xpl-host" style="position:absolute;inset:0;background:#000"></div>`;
+      const at0 = sc.startAt || now(), hostEl = el.querySelector(".xpl-host");
+      (async () => {
+        const [{ playExplainer }, r] = await Promise.all([import("./xpl.js"), fetch(`/api/tv/explainer/${encodeURIComponent(g.id || "")}`).then(x => x.ok ? x.json() : null).catch(() => null)]);
+        if (!r?.explainer || !el.isConnected) return;
+        // (started where the channel is: a screen that joins late joins the film where it has got to)
+        const p = await playExplainer(hostEl, r.explainer, { orient: channel, startAt: Date.now() - (now() - at0), muted: !!st.muted, audio: st.audio });
+        const stop = setInterval(() => { if (!el.isConnected) { clearInterval(stop); p.destroy(); } }, 500);
+      })();
     } else if (g.kind === "slate") {
       el.innerHTML = g.image ? `<div class="tv-promo"><img src="${esc(g.image)}" alt=""></div>` : wrapV(`<div class="nu-title${channel === "v" ? " v" : ""}"><img src="${LOGO}" alt=""><b>${esc(g.text || "রাষ্ট্রিক্স")}</b></div>`, g.text || "");
     } else if (g.kind === "promo") {
