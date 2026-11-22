@@ -69,7 +69,7 @@ function masthead(ed, y0, ears = []) {
 <div class="row${ears.length ? " eared" : ""}">${ear(ears[0], "l")}<div class="np">${LANG === "en"
   // (the English paper's nameplate is the paper's own Old English lettering, the crest between the words)
   ? `<img class="olde d" src="/brand/mh-en-daily.webp" alt="Daily"><span class="crestw"><img class="crest" src="${CREST}" alt="Rashtrix"></span><img class="olde" src="/brand/mh-en-rashtrix.webp" alt="Rashtrix">`
-  : `<div class="w d">${W.daily}</div><span class="crestw"><img class="crest" src="${CREST}" alt="Rashtrix"></span><div class="w">${W.name}</div>`}</div>${ear(ears[1], "r")}</div>
+  : `<div class="w d"><img class="mhw" src="/brand/mh-${LANG}-daily.webp" alt="${W.daily}"></div><span class="crestw"><img class="crest" src="${CREST}" alt="Rashtrix"></span><div class="w"><img class="mhw" src="/brand/mh-${LANG}-rashtrix.webp" alt="${W.name}"></div>`}</div>${ear(ears[1], "r")}</div>
 <div class="rules"><i class="gd"></i><i class="bk"></i></div>
 <div class="bot"><span>rashtrix.live${ed.weather && ed.weather.temp != null ? ` · ${D(ed.weather.temp)}°` : ""}</span><span class="red">${W.tag}</span><span>${D(PAGES_N)} ${W.pages} · ${W.free}</span></div></div>`);
 }
