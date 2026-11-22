@@ -12,11 +12,12 @@ export async function libraryItems(force = false) {
     .map(v => ({ type: "video", id: v.ytId, ch: v.ch, title: v.title, dur: v.dur || 0, thumb: v.thumb, url: `https://www.youtube.com/watch?v=${v.ytId}`, at: v.addedAt, keep: !!(v.keep || v.keepAll || v.evergreen), meta: v.playlist, aired: v.aired, vertical: v.vertical }));
   const avo = d.avo.filter(x => ["ready", "off"].includes(x.status)).map(x => ({ type: "avo", id: x.id, title: x.title, dur: Math.round(x.secs || 0), thumb: x.images?.[0]?.src || "", at: x.made, keep: x.keep, meta: `${x.desk || ""}`, kind: x.kind, aired: x.aired, story: x }));
   const clips = d.clips.map(c => ({ type: "clip", id: c.id, title: c.title, dur: c.dur || 0, url: c.url, at: c.at, keep: c.keep || c.ad, meta: c.audio ? "Audio" : "Video file", audio: c.audio, aired: c.aired }));
-  cache = { videos, avo, clips, hours: d.hours }; cacheAt = Date.now();
+  const xpl = (d.explainers || []).filter(e => e.status === "voiced").map(e => ({ type: "xpl", id: e.id, title: e.title, dur: Math.round(e.secs || 0), thumb: "", at: e.createdAt, keep: e.keep, meta: "Explainer", aired: e.aired }));
+  cache = { videos, avo, clips, xpl, hours: d.hours }; cacheAt = Date.now();
   return cache;
 }
 
-const NAMES = { video: "YouTube videos", avo: "AVO stories", clip: "Clips" };
+const NAMES = { video: "YouTube videos", avo: "AVO stories", clip: "Clips", xpl: "Explainers" };
 const ago = t => { const h = (Date.now() - (Date.parse(t) || Date.now())) / 3600e3; return h < 1 ? `${digits(Math.max(1, Math.round(h * 60)))} min ago` : `${digits(Math.round(h))} h ago`; };
 
 // Opens the picker. types: some of "video", "avo", "clip"; channel: "h" or "v" to show only that
@@ -31,11 +32,11 @@ export async function libraryPicker({ title = "Content Library", note = "", type
   $("[data-close]", d).onclick = () => d.close(); d.addEventListener("close", () => d.remove());
   let L; try { L = await libraryItems(true); } catch (e) { $("#lpList", d).innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
   let tab = types[0], q = "";
-  const pool = () => (tab === "video" ? L.videos.filter(v => !channel || v.ch === channel) : tab === "avo" ? L.avo : L.clips).filter(x => !q || `${x.title} ${x.meta}`.toLowerCase().includes(q));
+  const pool = () => (tab === "video" ? L.videos.filter(v => !channel || v.ch === channel) : tab === "avo" ? L.avo : tab === "xpl" ? L.xpl : L.clips).filter(x => !q || `${x.title} ${x.meta}`.toLowerCase().includes(q));
   const draw = () => {
     const list = pool();
     $("#lpList", d).innerHTML = list.length ? list.map((x, i) => `<div class="lp-row">
-        <span class="lp-th">${x.thumb ? `<img src="${esc(x.thumb)}" alt="" loading="lazy">` : `<i>${x.type === "clip" ? (x.audio ? "AUDIO" : "MP4") : "AVO"}</i>`}<em>${x.type === "avo" ? `${digits(x.dur)} s` : digits(fmt(x.dur || 0))}</em></span>
+        <span class="lp-th">${x.thumb ? `<img src="${esc(x.thumb)}" alt="" loading="lazy">` : `<i>${x.type === "clip" ? (x.audio ? "AUDIO" : "MP4") : x.type === "xpl" ? "XPL" : "AVO"}</i>`}<em>${x.type === "avo" ? `${digits(x.dur)} s` : digits(fmt(x.dur || 0))}</em></span>
         <span class="lp-tx"><b data-no-tr>${esc(x.title)}</b><small data-no-tr>${esc(x.meta || "")}${x.meta ? " · " : ""}${ago(x.at)}${x.keep ? " · kept" : ""}${x.aired ? ` · aired ${digits(x.aired)}×` : ""}</small></span>
         <button class="btn sm green" data-lpuse="${i}">Use</button></div>`).join("")
       : `<p class="muted">Nothing in the library's ${digits(L.hours)} hours here. Keep items in the Content Library to hold them longer.</p>`;

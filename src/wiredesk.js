@@ -275,7 +275,7 @@ async function callGemini(env, text, retried = false, think = true, tries = 0, o
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: `${opt.system || RULES}\n\n${charterPrompt(charter)}` }] },
         contents: [{ role: "user", parts: [{ text }] }],
-        generationConfig: { temperature: 0.4, responseMimeType: "application/json", responseSchema: opt.schema || SCHEMA, maxOutputTokens: opt.schema ? 4096 : 16384, ...thinking }
+        generationConfig: { temperature: 0.4, responseMimeType: "application/json", responseSchema: opt.schema || SCHEMA, maxOutputTokens: opt.max || (opt.schema ? 4096 : 16384), ...thinking }
       })
     });
   } catch (e) {
@@ -314,7 +314,7 @@ async function callGemini(env, text, retried = false, think = true, tries = 0, o
 
 // A small JSON task for other parts of the site (the e-paper's horoscope): the same free model
 // chain, its own instructions and answer schema.
-export const geminiJSON = (env, system, text, schema) => callGemini(env, text, false, false, 0, { system, schema });
+export const geminiJSON = (env, system, text, schema, max) => callGemini(env, text, false, false, 0, { system, schema, max });
 
 // Copying check: no run of eight words in a row may come from a source.
 const words = s => String(s || "").toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s]+/gu, " ").split(/\s+/).filter(Boolean);

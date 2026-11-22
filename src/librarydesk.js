@@ -35,7 +35,7 @@ function draw() {
         <div><b>${digits(d.lives.length)}</b><span>Lives</span></div>
         <div class="lb-rule"><b>${digits(d.hours)} h</b><span>Everything not kept clears after ${digits(d.hours)} hours</span></div>
       </div>
-      <div class="lb-tabs" role="tablist">${[["yt", "YouTube playlists"], ["avo", "AVO stories"], ["clips", "Clips"], ["lives", "Lives"]].map(([k, l]) => `<button class="btn${S.tab === k ? " on" : ""}" data-tab="${k}" role="tab">${l}</button>`).join("")}</div>
+      <div class="lb-tabs" role="tablist">${[["yt", "YouTube playlists"], ["avo", "AVO stories"], ["xpl", "Explainers"], ["clips", "Clips"], ["lives", "Lives"]].map(([k, l]) => `<button class="btn${S.tab === k ? " on" : ""}" data-tab="${k}" role="tab">${l}</button>`).join("")}</div>
       <div class="lb-filters">
         <input type="search" id="lbQ" placeholder="Search" value="${esc(S.q)}">
         <select id="lbCh"><option value="all">TV and Shorts</option><option value="h" ${S.ch === "h" ? "selected" : ""}>TV only</option><option value="v" ${S.ch === "v" ? "selected" : ""}>Shorts only</option></select>
@@ -45,7 +45,7 @@ function draw() {
       </div>
       <div class="lb-bulk" ${S.sel.size ? "" : "hidden"}><b>${digits(S.sel.size)} selected</b><button class="btn sm green" data-bulk="keep">Keep</button><button class="btn sm" data-bulk="unkeep">Stop keeping</button><button class="btn sm red" data-bulk="del">Delete</button><button class="btn sm" data-bulk="none">Clear selection</button></div>
     </section>
-    <section class="lb-body">${S.tab === "yt" ? drawYT() : S.tab === "avo" ? drawAvo() : S.tab === "clips" ? drawClips() : drawLives()}</section></div>`;
+    <section class="lb-body">${S.tab === "yt" ? drawYT() : S.tab === "avo" ? drawAvo() : S.tab === "xpl" ? drawXpl() : S.tab === "clips" ? drawClips() : drawLives()}</section></div>`;
   wire();
 }
 
@@ -102,6 +102,16 @@ function aCard(x) {
     <div class="lb-acts"><button class="btn sm${x.keep ? " green" : ""}" data-akeep="${esc(x.id)}" data-v="${x.keep ? 0 : 1}">${x.keep ? "Kept" : "Keep"}</button>
       ${x.status === "ready" || x.status === "off" ? `<button class="btn sm" data-aplay="${esc(x.id)}">Play now</button>` : ""}
       <a class="btn sm" href="/avodesk.html#${encodeURIComponent(x.id)}">Edit</a><button class="btn sm red" data-adel="${esc(x.id)}">Delete</button></div></div>`;
+}
+
+/* ---------- Explainers ---------- */
+function drawXpl() {
+  const list = (S.d.explainers || []).filter(e => qOk(e.title) && ageOk(e.createdAt, e.keep));
+  return `<p class="muted">Long-form explainers from the <a href="/explainer.html">Explainer desk</a>. They stay seven days unless kept.</p>
+    <div class="lb-grid">${list.map(e => `<div class="lb-card"><a class="lb-thumb" href="/explainer.html#${esc(e.id)}" aria-label="Open"><span class="lb-noimg">EXPLAINER</span><em>${digits(fmt(e.secs || 0))}</em></a>
+      <div class="lb-meta"><div class="lb-tags"><span class="lb-kind">${esc(({ politics: "Hard Politics", crime: "Crime", govt: "Official Govt Reports", soft: "Good / Soft" })[e.style] || "")}</span>${e.status === "voiced" ? "" : `<span class="lb-badge warn">Draft</span>`}</div>
+        <b data-no-tr>${esc(e.title)}</b><small>Made ${ago(e.createdAt)} · ${digits(e.shotCount || 0)} shots</small><div class="lb-tags">${clears(e.clearsAt)}${used(e)}</div></div>
+      <div class="lb-acts"><button class="btn sm${e.keep ? " green" : ""}" data-xkeep="${esc(e.id)}" data-v="${e.keep ? 0 : 1}">${e.keep ? "Kept" : "Keep"}</button>${e.status === "voiced" ? `<button class="btn sm" data-xplay="${esc(e.id)}">Play now</button>` : ""}<a class="btn sm" href="/explainer.html#${esc(e.id)}">Open</a><button class="btn sm red" data-xdel="${esc(e.id)}">Delete</button></div></div>`).join("") || `<p class="muted">No explainers yet.</p>`}</div>`;
 }
 
 /* ---------- Clips ---------- */
@@ -198,6 +208,11 @@ function wire() {
   $$("[data-adel]").forEach(b => b.onclick = () => { if (confirm("Delete this AVO story for good? It goes off air at once.")) act(() => api(`/api/admin/tv/avo/${encodeURIComponent(b.dataset.adel)}`, { method: "DELETE" }), "Deleted."); });
   $$("[data-aplay]").forEach(b => b.onclick = () => { const ch = prompt("Play it now on which channel? Type TV, Shorts or both.", "both"); if (ch === null) return; const chs = /^tv$/i.test(ch.trim()) ? ["h"] : /^shorts$/i.test(ch.trim()) ? ["v"] : ["h", "v"];
     act(() => api(`/api/admin/tv/avo/${encodeURIComponent(b.dataset.aplay)}/play`, { method: "POST", body: { channels: chs } }), "On air now."); });
+  // explainers
+  $$("[data-xkeep]").forEach(b => b.onclick = () => act(() => api(`/api/admin/explainers/${encodeURIComponent(b.dataset.xkeep)}`, { method: "PUT", body: { keep: b.dataset.v === "1" } }), "Updated."));
+  $$("[data-xdel]").forEach(b => b.onclick = () => { if (confirm("Delete this explainer for good?")) act(() => api(`/api/admin/explainers/${encodeURIComponent(b.dataset.xdel)}`, { method: "DELETE" }), "Deleted."); });
+  $$("[data-xplay]").forEach(b => b.onclick = () => { const ch = prompt("Play it now on which channel? Type TV, Shorts or both.", "TV"); if (ch === null) return; const chs = /^tv$/i.test(ch.trim()) ? ["h"] : /^shorts$/i.test(ch.trim()) ? ["v"] : ["h", "v"];
+    act(() => api(`/api/admin/explainers/${encodeURIComponent(b.dataset.xplay)}/play`, { method: "POST", body: { channels: chs } }), "On air now."); });
   // clips
   $$("[data-ckeep]").forEach(b => b.onclick = () => act(() => api(`/api/admin/clips/${encodeURIComponent(b.dataset.ckeep)}`, { method: "PUT", body: { keep: b.dataset.v === "1" } }), "Updated."));
   $$("[data-cdel]").forEach(b => b.onclick = () => { if (confirm("Delete this clip for good?")) act(() => api(`/api/admin/clips/${encodeURIComponent(b.dataset.cdel)}`, { method: "DELETE" }), "Deleted."); });
@@ -209,7 +224,7 @@ function wire() {
 
 (async () => {
   const user = await shell("Content Library"); if (!user) return;
-  const t = location.hash.slice(1); if (["yt", "avo", "clips", "lives"].includes(t)) S.tab = t;
+  const t = location.hash.slice(1); if (["yt", "avo", "xpl", "clips", "lives"].includes(t)) S.tab = t;
   $("main").innerHTML = `<p class="muted" style="padding:20px">Loading the library…</p>`;
   await load();
   setInterval(() => { if (!document.hidden && !document.querySelector("dialog[open]") && document.activeElement?.id !== "lbQ") load(); }, 60e3);
