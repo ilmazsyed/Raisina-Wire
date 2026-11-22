@@ -1927,3 +1927,84 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 
 /* Picture credits are not shown on screen (kept in the database). */
 .avo-credit,.bs-credit{display:none!important}
+
+/* ---------- HEADLINES at :58 and :28 (the Headlines desk): an international look ---------- */
+/* The stinger: deep navy, light streaks, HEADLINES letter by letter, a gold rule, the time. */
+.hx-open{position:absolute;inset:0;overflow:hidden;color:#fff;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 46%,#13234a 0%,#070c1c 55%,#020309 100%)}
+.hx-open .nd{opacity:.35}
+.hx-o-bg{position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 1px,transparent 1px 96px),repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0 1px,transparent 1px 96px);animation:hxgrid 6s linear both}
+@keyframes hxgrid{from{transform:scale(1.25);opacity:0}30%{opacity:1}to{transform:scale(1)}}
+.hx-streak{position:absolute;left:-40%;width:180%;height:14px;transform:skewY(-8deg) translateX(-110%);background:linear-gradient(90deg,transparent,#e0101a 30%,#ff5a3c 50%,#e0101a 70%,transparent);filter:blur(1px);animation:hxstreak 1.1s cubic-bezier(.7,0,.2,1) both}
+.hx-streak.s1{top:30%;animation-delay:.05s}.hx-streak.s2{top:52%;height:6px;animation-delay:.22s;background:linear-gradient(90deg,transparent,#D4A017,transparent)}.hx-streak.s3{top:70%;height:22px;animation-delay:.35s;opacity:.8}
+@keyframes hxstreak{to{transform:skewY(-8deg) translateX(110%)}}
+.hx-o-ring{position:absolute;left:50%;top:46%;width:300px;height:300px;margin:-150px;border-radius:50%;border:3px solid rgba(212,160,23,.7);animation:hxring 2.4s .9s ease-out both}
+@keyframes hxring{from{transform:scale(.2);opacity:1}to{transform:scale(4.5);opacity:0}}
+.hx-o-in{position:relative;z-index:3;display:flex;flex-direction:column;align-items:center;gap:26px}
+.hx-o-logo{height:96px;padding:14px 26px;background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.55);animation:hxpop .7s .5s cubic-bezier(.2,1.5,.4,1) both}
+@keyframes hxpop{from{transform:scale(0);opacity:0}}
+.hx-o-word{display:flex;font:400 150px/1 Michroma,Montserrat,sans-serif;letter-spacing:.06em;text-shadow:0 10px 40px rgba(224,16,26,.55)}
+.hx-o-word b{font-weight:400;display:inline-block;animation:hxletter .6s calc(.9s + var(--i)*.07s) cubic-bezier(.2,1.2,.3,1) both}
+@keyframes hxletter{from{transform:translateY(-120px) scale(1.6);filter:blur(12px);opacity:0}}
+.hx-o-line{display:block;width:1250px;height:5px;background:linear-gradient(90deg,transparent,#D4A017 20%,#e0101a 50%,#D4A017 80%,transparent);transform:scaleX(0);animation:hxline .9s 1.7s cubic-bezier(.7,0,.2,1) forwards}
+@keyframes hxline{to{transform:scaleX(1)}}
+.hx-o-bn{font:800 70px "Noto Serif Bengali",serif;color:#f4d98c;animation:hxup .6s 2.1s cubic-bezier(.2,.9,.2,1) both}
+.hx-o-when{display:flex;gap:18px;animation:hxup .6s 2.4s cubic-bezier(.2,.9,.2,1) both}
+.hx-o-when span,.hx-o-when em{padding:10px 26px;border-radius:10px;font:700 40px Montserrat,"Hind Siliguri",sans-serif;font-style:normal}
+.hx-o-when span{background:#e0101a;letter-spacing:.08em}.hx-o-when em{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);font-family:"Hind Siliguri",sans-serif}
+@keyframes hxup{from{transform:translateY(46px);opacity:0}}
+.hx-flash{position:absolute;inset:0;z-index:5;background:#fff;opacity:0;animation:hxflash .5s 4.55s ease-out both}
+@keyframes hxflash{0%{opacity:0}25%{opacity:.85}100%{opacity:0}}
+.hx-open.v .hx-o-word{font-size:92px;letter-spacing:.03em}.hx-open.v .hx-o-line{width:900px}.hx-open.v .hx-o-bn{font-size:64px}
+.hx-open.v .hx-o-when{flex-direction:column;align-items:center}
+
+/* Each headline */
+.hx{position:absolute;inset:0;overflow:hidden;color:#fff;background:#060a16}
+.hx-bg{position:absolute;inset:0;background:radial-gradient(ellipse at 78% 30%,#1b2c5c 0%,#0a1128 45%,#04060e 100%)}
+.hx .nd{opacity:.55}
+.hx-m{position:absolute;inset:0;overflow:hidden}
+.hx-m img,.hx-m video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:hxken var(--d) linear both}
+@keyframes hxken{from{transform:scale(1.04) translate(0,0)}to{transform:scale(1.16) translate(-2%,-1.5%)}}
+.hx-shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(4,6,16,.94) 0%,rgba(4,6,16,.78) 38%,rgba(4,6,16,.2) 70%,rgba(4,6,16,.35) 100%),linear-gradient(0deg,rgba(4,6,16,.9) 0%,transparent 45%)}
+.hx:not(.has-m) .hx-shade{background:linear-gradient(0deg,rgba(4,6,16,.85) 0%,transparent 55%)}
+.hx-sweep{position:absolute;top:0;bottom:0;width:38%;left:-40%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.12),transparent);transform:skewX(-14deg);animation:hxsweep 1.6s .25s ease both}
+@keyframes hxsweep{to{left:120%}}
+.hx-big{position:absolute;right:70px;top:190px;font:900 330px/1 Montserrat,"Hind Siliguri",sans-serif;color:transparent;-webkit-text-stroke:3px rgba(255,255,255,.22);animation:hxbig .9s cubic-bezier(.2,.9,.2,1) both}
+.hx.has-m .hx-big{display:none}
+@keyframes hxbig{from{transform:translateX(160px);opacity:0}}
+.hx-bug{position:absolute;left:70px;top:150px;display:flex;align-items:stretch;border-radius:8px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.4);animation:hxin .5s cubic-bezier(.2,.9,.2,1) both}
+.hx-bug b{padding:12px 24px;background:#e0101a;font:400 34px Michroma,Montserrat,sans-serif;letter-spacing:.08em}
+.hx-bug span{padding:12px 22px;background:rgba(255,255,255,.95);color:#0a1128;font:800 34px "Noto Serif Bengali",serif}
+.hx-bug em{padding:12px 20px;background:rgba(6,10,22,.85);font:700 32px Montserrat,sans-serif;font-style:normal;display:grid;place-items:center}
+@keyframes hxin{from{transform:translateX(-60px);opacity:0}}
+.hx-main{position:absolute;left:70px;right:520px;bottom:190px;display:flex;flex-direction:column;gap:26px}
+.hx:not(.has-m) .hx-main{right:420px}
+.hx-tag{display:flex;align-items:center;gap:18px;animation:hxin .5s .1s cubic-bezier(.2,.9,.2,1) both}
+.hx-tag em{font:900 64px/1 Montserrat,"Hind Siliguri",sans-serif;font-style:normal;padding:10px 20px 12px;background:#e0101a;border-radius:10px;box-shadow:0 14px 34px rgba(224,16,26,.4)}
+.hx-tag em small{font-size:32px;opacity:.75;margin-left:4px}
+.hx-tag span{padding:8px 20px;border-left:6px solid #D4A017;background:rgba(255,255,255,.1);font:800 36px "Hind Siliguri",sans-serif}
+.hx-main h2{margin:0;font:800 76px/1.3 "Noto Serif Bengali",serif;text-shadow:0 4px 24px rgba(0,0,0,.6);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.hx-main h2 span{display:inline-block;animation:hxword .55s calc(.25s + var(--i)*.06s) cubic-bezier(.2,1.2,.3,1) both}
+@keyframes hxword{from{transform:translateY(60%);opacity:0;filter:blur(6px)}}
+.hx-strip{position:absolute;left:0;right:0;bottom:0;height:120px;display:flex;align-items:center;gap:26px;padding:0 70px;background:linear-gradient(0deg,rgba(2,3,9,.95),rgba(2,3,9,.6));border-top:2px solid rgba(212,160,23,.55)}
+.hx-strip img{height:62px;padding:6px 12px;background:#fff;border-radius:10px}
+.hx-steps{flex:1;display:flex;gap:8px}
+.hx-steps i{flex:1;height:44px;border-radius:6px;background:rgba(255,255,255,.1);position:relative;overflow:hidden;display:grid;place-items:center}
+.hx-steps i b{position:relative;z-index:1;font:700 24px "Hind Siliguri",sans-serif;color:rgba(255,255,255,.6)}
+.hx-steps i.done{background:rgba(212,160,23,.55)}.hx-steps i.done b{color:#fff}
+.hx-steps i.on{background:rgba(224,16,26,.35)}.hx-steps i.on b{color:#fff}
+.hx-steps i.on:after{content:"";position:absolute;left:0;top:0;bottom:0;width:0;background:#e0101a;animation:tvprog var(--d) linear forwards}
+.hx.v .hx-bug{left:50px;top:260px}.hx.v .hx-bug em{display:none}
+.hx.v .hx-big{right:40px;top:300px;font-size:260px}
+.hx.v .hx-shade{background:linear-gradient(0deg,rgba(4,6,16,.97) 0%,rgba(4,6,16,.85) 42%,rgba(4,6,16,.15) 72%,rgba(4,6,16,.45) 100%)}
+.hx.v .hx-main,.hx.v:not(.has-m) .hx-main{left:50px;right:50px;bottom:300px}
+.hx.v .hx-main h2{font-size:70px;-webkit-line-clamp:6}
+.hx.v .hx-strip{height:auto;flex-direction:column;align-items:stretch;padding:22px 50px 60px;gap:16px}
+.hx.v .hx-strip img{align-self:center}
+.hx.v .hx-steps i{height:34px}.hx.v .hx-steps i b{font-size:20px}
+/* Between headlines: a red, gold and navy slash with the logo */
+.hx-wipe{position:absolute;inset:0;z-index:12;pointer-events:none;overflow:hidden}
+.hx-wipe i{position:absolute;top:-10%;height:120%;width:160%;left:-30%;transform:skewX(-20deg) translateX(-125%);animation:hxwipe .9s cubic-bezier(.7,0,.3,1) both}
+.hx-wipe i:nth-child(1){background:#e0101a}.hx-wipe i:nth-child(2){background:#D4A017;animation-delay:.05s}.hx-wipe i:nth-child(3){background:#0a1128;animation-delay:.1s}
+.hx-wipe img{position:absolute;left:50%;top:50%;height:110px;transform:translate(-50%,-50%);padding:12px 22px;background:#fff;border-radius:16px;opacity:0;animation:hxwlogo .9s ease both}
+@keyframes hxwipe{to{transform:skewX(-20deg) translateX(125%)}}
+@keyframes hxwlogo{30%,60%{opacity:1}0%,100%{opacity:0}}

@@ -6,6 +6,7 @@
 //     pointers at 40. Up to 24 pointers in eight sets of three; each set is put live or taken off,
 //     and the sets on air take turns on screen. A change is on screen within a second
 //     (src/worker.js saveLiveDesk, src/control.js "split", src/engine.js drawSplit).
+import "./tv.css";
 import { lightenVideo } from "./lightclip.js";
 import { shell, api, toast, fail, esc, $, $$, istClock } from "./crshell.js";
 import { mountTV } from "./engine.js";

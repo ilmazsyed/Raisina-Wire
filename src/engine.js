@@ -189,6 +189,18 @@ const STYLES = {
       v.osc("sawtooth", (k % 2 ? ch[2] : ch[0]) * 2, at, s16 * 0.9, 0.06, 1800);                  // strings ostinato
       if (k % 4 === 0) v.osc("sawtooth", root, at, s16 * 3, 0.36, 450);
       if (k === 0 || k === 6) ch.forEach(f => v.osc("sawtooth", f, at, 0.32, 0.085, 2600, 0, 0.02)); // brass stabs
+    } },
+  // HEADLINES: its own signature, a driving countdown. A four-note motif (D–A–F–E) rings over a
+  // ticking clock and a pulsing bass, with a timpani roll and a brass hit every four bars.
+  heads: { bpm: 124, level: 0.9, roots: [73.42, 73.42, 58.27, 65.41], chords: [[293.7, 440, 349.2, 329.6], [293.7, 440, 349.2, 329.6], [233.1, 349.2, 293.7, 261.6], [261.6, 392, 329.6, 293.7]],
+    step(v, at, k, bar, ch, root, s16) {
+      if (k === 0 && bar % 4 === 0) { v.osc("sine", 62, at, 1.4, 0.9, 380, 30); v.hiss(at, 1.3, 0.26, "highpass", 5200, 0.5); [ch[0], ch[1], ch[2]].forEach(f => v.osc("sawtooth", f / 2, at, 0.5, 0.09, 2400, 0, 0.01)); }
+      if (k % 4 === 0) v.osc("sine", 140, at, 0.32, 0.85, 560, 46);                                 // kick
+      if (k === 4 || k === 12) v.hiss(at, 0.12, 0.34, "bandpass", 2600, 1.1);                        // snap
+      v.hiss(at, 0.02, k % 4 === 2 ? 0.12 : 0.06, "highpass", 9500);                                  // the clock
+      if (k % 2 === 0) v.osc("sawtooth", root * (k % 4 ? 2 : 1), at, s16 * 1.6, 0.3, 420);            // pulsing bass
+      if (k === 0 || k === 3 || k === 6 || k === 10) { const f = ch[[0, 3, 6, 10].indexOf(k)]; v.osc("triangle", f * 2, at, 0.5, 0.07, 6500); v.osc("sine", f * 4, at, 0.3, 0.025, 9000); } // the motif
+      if (bar % 4 === 3 && k >= 12) v.osc("sine", 96 + (k - 12) * 4, at, 0.16, 0.45, 600, 60);         // timpani roll into the next phrase
     } }
 };
 export function newsBed(ctx, seconds = 10, { style = "headlines", level = 0.85, delay = 0, duck = 1, all = false } = {}) {
@@ -233,6 +245,24 @@ function identSig(ctx) {
   [587.3, 880, 740, 1174.7].forEach((f, i) => { const at = t + 0.5 + i * 0.38; v.osc("sine", f, at, 1.6, 0.16, 8000); v.osc("triangle", f * 2, at, 0.8, 0.04, 9000); v.osc("sine", f, at + 0.3, 1.2, 0.05, 6000); });
   v.osc("sine", 55, t + 2.1, 2.4, 0.7, 300); v.hiss(t + 2.1, 2.6, 0.18, "highpass", 6000, 0.5);
   setTimeout(() => { try { out.disconnect(); } catch { /* done */ } }, 7000);
+}
+// HEADLINES's stinger (five seconds): a reversed swell into a deep hit, the programme's four-note
+// motif in brass and bells, a clock ticking through it, and a last hit as the first headline comes in.
+function headsSig(ctx) {
+  if (!ctx) return;
+  const out = ctx.createGain(); out.gain.value = 0.92; out.connect(busOf(ctx));
+  const v = voice(ctx, out), t = ctx.currentTime + 0.03;
+  const src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+  src.buffer = noise(ctx); bp.type = "bandpass"; bp.Q.value = 0.9; bp.frequency.setValueAtTime(260, t); bp.frequency.exponentialRampToValueAtTime(7000, t + 0.85);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.6, t + 0.82); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+  src.connect(bp).connect(g).connect(out); src.start(t, 0, 1);
+  v.osc("sine", 58, t + 0.9, 2.2, 1, 340, 26); v.hiss(t + 0.9, 1.6, 0.34, "highpass", 4800, 0.5);
+  [146.8, 220, 293.7].forEach(f => v.osc("sawtooth", f, t + 0.9, 1.1, 0.085, 2600, 0, 0.02));
+  [587.3, 880, 698.5, 659.3].forEach((f, i) => { const at = t + 1.3 + i * 0.42; v.osc("sawtooth", f / 2, at, 0.38, 0.07, 2400, 0, 0.02); v.osc("triangle", f * 2, at, 0.9, 0.06, 8000); v.osc("sine", f, at, 1.3, 0.12, 7000); });
+  for (let i = 0; i < 8; i++) v.hiss(t + 1.1 + i * 0.42, 0.02, i % 2 ? 0.1 : 0.16, "highpass", 9500);
+  [293.7, 440, 587.3].forEach(f => v.osc("sawtooth", f, t + 3.1, 1.6, 0.075, 2800, 0, 0.3));
+  v.osc("sine", 52, t + 4.55, 1.8, 0.95, 300, 26); v.hiss(t + 4.55, 1.2, 0.3, "highpass", 5200, 0.5);
+  setTimeout(() => { try { out.disconnect(); } catch { /* done */ } }, 8000);
 }
 // The stinger: a rising swoosh, then a deep hit with a metallic ring.
 export function stingerSound(ctx, { at = 0, keep = false } = {}) {
@@ -571,7 +601,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // Music under the headline flash, the "up next" card and the bulletin (faster for the bulletin).
   // Each kind of graphic has its own music; the channel ID plays its signature, and the bulletin
   // opens with the signature under its channel ID, then its own music.
-  const BEDS = { flash: { style: "headlines" }, upnext: { style: "upnext" }, bulletin: { style: "bulletin" }, weather: { style: "weather" }, market: { style: "market" }, avo: { style: "avo", duck: 0.7 },
+  const BEDS = { heads: { style: "heads", duck: 0.6 }, flash: { style: "headlines" }, upnext: { style: "upnext" }, bulletin: { style: "bulletin" }, weather: { style: "weather" }, market: { style: "market" }, avo: { style: "avo", duck: 0.7 },
     // The segments: each its own music (the newsreader's lines over it, softer).
     "seg:kolkata10": { style: "bulletin", duck: 0.6 }, "seg:city": { style: "weather", duck: 0.7 }, "seg:world": { style: "headlines", duck: 0.6 }, "seg:bangladesh": { style: "headlines", duck: 0.6 },
     "seg:sports": { style: "market", duck: 0.6 }, "seg:entertainment": { style: "market", duck: 0.7 }, "seg:lifestyle": { style: "avo", duck: 0.8 }, "seg:numbers": { style: "market", duck: 0.8 }, "seg:onthisday": { style: "avo", duck: 0.8 }, "seg:soth": { style: "avo", duck: 0.7 } };
@@ -587,6 +617,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     // With the newsreader reading the stories, the bulletin's music stays on as the bed under
     // the voice, a little softer so the words stay clear.
     const duck = kind === "bulletin" && (st.tv?.bulletin || []).some(b => b.voice) ? 0.62 : 1;
+    // HEADLINES opens with its own stinger, then its signature music under the newsreader.
+    if (kind === "heads" && gone < HEADS_STING) { headsSig(st.audio); st.bed = newsBed(st.audio, left - (HEADS_STING - gone), { ...spec, delay: HEADS_STING - gone }); return; }
     if (kind === "bulletin" && gone < 4.5) { identSig(st.audio); st.bed = newsBed(st.audio, left - (4.5 - gone), { ...spec, delay: 4.5 - gone, duck }); return; }
     st.bed = newsBed(st.audio, left, spec);
   }
@@ -889,6 +921,28 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   const QUARTER = 900e3, UPNEXT = 6;
   const bulletinMs = slot => (slot / 60e3) % 30 === 0 ? 120e3 : 65e3;   // :00 and :30 two minutes; :15 and :45 sixty-five seconds
   const upnext = v => ({ type: "upnext", video: v, dur: UPNEXT, sting: false });
+  // HEADLINES (the Headlines desk, src/headlines.js): at :58 and :28 India time (or the desk's
+  // times), straight into the bulletin at :00 and :30. Like the bulletin it never cuts into a video:
+  // it starts when the item on air ends, within four minutes of its time. A five-second stinger,
+  // then each headline for its ten seconds (longer when the newsreader needs it).
+  const HEADS_WIN = 4 * 60e3, HEADS_STING = 5, IST_MS = 5.5 * 3600e3;
+  const headsOn = () => !!(st.tv?.heads?.on && st.tv.heads.items?.length);
+  const headsMins = () => st.tv?.heads?.mins?.length ? st.tv.heads.mins : [58, 28];
+  // The headlines time at or before t (dir -1), or the first after it (dir 1).
+  const headsAt = (t, dir = -1) => {
+    const hr = Math.floor((t + IST_MS) / 3600e3) * 3600e3 - IST_MS; let best = dir < 0 ? -Infinity : Infinity;
+    for (const h of [hr - 3600e3, hr, hr + 3600e3]) for (const m of headsMins()) { const x = h + m * 60e3; if (dir < 0 ? x <= t && x > best : x > t && x < best) best = x; }
+    return best;
+  };
+  const hhmmOf = at => { const d = new Date(at + IST_MS); return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`; };
+  // The headlines for a time: the desk's own (for every HEADLINES, or for this time only), then the
+  // wire's by priority, up to the desk's number.
+  function headsPick(at) {
+    const H = st.tv?.heads; if (!H) return [];
+    const key = hhmmOf(at), per = H.secs || 10;
+    return (H.items || []).filter(x => !x.when || x.when.includes(key)).slice(0, H.count || 12).map(x => ({ ...x, d: Math.max(per, x.secs ? x.secs + 1.5 : 0) }));
+  }
+  const headsDur = list => Math.round((HEADS_STING + list.reduce((n, x) => n + x.d, 0) + 0.6) * 10) / 10;
   // AVO stories: how often this viewer (or this output) has seen each, kept on the device.
   // Each AVO story stays on screen exactly as long as its reading (plus a breath either side);
   // a story with no recording yet gets the time it takes to read its lines at news pace.
@@ -938,9 +992,14 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // fits, a short filler instead (marked fill).
   function toBulletin(t) {
     const q = st.seq || {}, sl = Math.floor(t / QUARTER) * QUARTER;
-    if (!(st.tv?.bulletin || []).length) return Infinity;
-    const next = (q.bDone || []).includes(sl) || t - sl >= 11 * 60e3 ? sl + QUARTER : sl;
-    return Math.max(0, next - t);
+    const hasB = (st.tv?.bulletin || []).length, hOn = headsOn();
+    st.cueHeads = false;
+    if (!hasB && !hOn) return Infinity;
+    const next = !hasB ? Infinity : (q.bDone || []).includes(sl) || t - sl >= 11 * 60e3 ? sl + QUARTER : sl;
+    let left = Math.max(0, next - t);
+    // (HEADLINES comes first at :58 and :28: the time to it, when it is still to play)
+    if (hOn) { const h0 = headsAt(t), hn = !(q.hDone || []).includes(h0) && t - h0 < HEADS_WIN ? h0 : headsAt(t, 1); if (hn - t <= left) { left = Math.max(0, hn - t); st.cueHeads = true; } }
+    return left;
   }
   function fitVideo(q, loop, x, t) {
     if (x?.type !== "video") return x;
@@ -1029,7 +1088,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     return null;
   }
   function segDue(t, q) {
-    if (!st.tv?.segs || q.resume || (q.pending || []).length || (q.block || []).length || ["upnext", "seg", "bulletin", "weather", "market"].includes(q.item?.type)) return null;
+    if (!st.tv?.segs || q.resume || (q.pending || []).length || (q.block || []).length || ["upnext", "seg", "heads", "bulletin", "weather", "market"].includes(q.item?.type)) return null;
     const half = Math.floor(t / 1800e3) * 1800e3, dp = daypart(t); if (!dp) return null;
     q.segDone ||= [];
     for (const k of ["a", "b"]) {
@@ -1080,13 +1139,15 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     // A full-screen breaking holds the running order: nothing new starts under it (the item on
     // air waits, a video paused), and it carries on from there when the breaking is over.
     if (q.seg && Date.now() < (st.breakUntil || 0)) return q.seg;
-    const slot = Math.floor(t / QUARTER) * QUARTER, BULLETIN_MS = bulletinMs(slot);
+    const slot0 = Math.floor(t / QUARTER) * QUARTER;
+    // (after HEADLINES, the bulletin it leads into starts at once, even a moment before its time)
+    q.bDone ||= []; q.hDone ||= [];
+    const slot = q.bNext && !q.bDone.includes(q.bNext) && q.bNext > slot0 ? q.bNext : slot0, BULLETIN_MS = bulletinMs(slot);
     // The bulletins at :00, :15, :30 and :45 never cut into a video, an AVO block or a segment: the
     // bulletin starts as soon as the item on air ends. At :00 and :30 the weather (45 seconds) and
     // the markets (20 seconds) follow it; at :15 and :45 a desk segment (slot c). A bulletin that
     // cannot start by eleven minutes past its quarter gives way to the next one. In the last minutes
     // before a bulletin the channel picks videos that end in time (fitVideo below).
-    q.bDone ||= [];
     const bulletinDue = () => (st.tv?.bulletin || []).length && !q.bDone.includes(slot) && t - slot < 11 * 60e3;
     const blockFor = () => {
       const out = [];
@@ -1154,11 +1215,27 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       st.preWant = after ? { id: after.ytId, at: 0 } : null;
       return q.seg;
     }
+    // HEADLINES at :58 and :28, when the item on air has ended; the bulletin follows it at once.
+    const hAt = headsAt(t);
+    if (headsOn() && !q.hDone.includes(hAt) && t - hAt < HEADS_WIN) {
+      q.hDone = [...q.hDone.slice(-8), hAt];
+      const list = headsPick(hAt);
+      if (list.length) {
+        if (q.item?.type === "upnext") q.resume = q.item.video;
+        const bs = Math.ceil((hAt + 1) / 1800e3) * 1800e3;
+        q.bNext = (st.tv?.bulletin || []).length && !q.bDone.includes(bs) ? bs : null;
+        q.n++; q.item = { type: "heads", dur: headsDur(list) }; q.start = t;
+        q.seg = { type: "heads", items: list, at: hAt, dur: q.item.dur, start: t, in: 0, sting: true, n: q.n };
+        q.pending = (q.pending || []).filter(x => x.type !== "flash");
+        st.preWant = null;
+        return q.seg;
+      }
+    }
     if (bulletinDue()) {
       // An "up next" card that ended: its video plays after the bulletin block.
       if (q.item?.type === "upnext") q.resume = q.item.video;
-      q.bDone = [...q.bDone.slice(-8), slot];
-      q.item = { type: "bulletin", dur: bulletinPlan(slot, BULLETIN_MS / 1000).end, sting: true }; q.start = t; q.n++;
+      q.bDone = [...q.bDone.slice(-8), slot]; q.bNext = null;
+      q.item = { type: "bulletin", dur: bulletinPlan(slot, BULLETIN_MS / 1000).end, sting: true, slot }; q.start = t; q.n++;
       q.seg = { ...q.item, start: t, in: 0, n: q.n };
       q.block = blockFor();
       q.pending = (q.pending || []).filter(x => x.type !== "flash");
@@ -1166,7 +1243,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       return q.seg;
     }
     // A quarter whose bulletin could not start in time is let go.
-    if ((st.tv?.bulletin || []).length && !q.bDone.includes(slot) && t - slot >= 11 * 60e3) q.bDone = [...q.bDone.slice(-8), slot];
+    if ((st.tv?.bulletin || []).length && !q.bDone.includes(slot0) && t - slot0 >= 11 * 60e3) q.bDone = [...q.bDone.slice(-8), slot0];
     // An ad break (the Ad library desk, src/ads.js): the ads due now play one after another, in the
     // break after the item on air has ended, never over it.
     if (!q.adQueue?.length) q.adQueue = adsDue(t, q);
@@ -1280,7 +1357,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (seg.type === "flash") return { layout: "graphic", graphic: { kind: "flash", n: seg.n || 0 }, startAt: seg.start, dur: seg.dur, key: `c:flash:${seg.start}`, transition };
     if (seg.type === "ident") return { layout: "graphic", graphic: { kind: "ident" }, startAt: seg.start, dur: seg.dur, key: `c:ident:${seg.start}`, transition: { type: "mix", ms: 200 }, full: true };
     if (seg.type === "upnext") return { layout: "graphic", graphic: { kind: "upnext", video: seg.video }, startAt: seg.start, dur: seg.dur, key: `c:upnext:${seg.start}`, transition: { type: "mix", ms: 250 }, full: true };
-    if (seg.type === "bulletin") return { layout: "graphic", graphic: { kind: "bulletin" }, startAt: seg.start, dur: seg.dur, key: `c:bulletin:${seg.start}`, transition, full: true };
+    if (seg.type === "heads") return { layout: "graphic", graphic: { kind: "heads", items: seg.items, at: seg.at }, startAt: seg.start, dur: seg.dur, key: `c:heads:${seg.start}`, transition, full: true };
+    if (seg.type === "bulletin") return { layout: "graphic", graphic: { kind: "bulletin", slot: seg.slot }, startAt: seg.start, dur: seg.dur, key: `c:bulletin:${seg.start}`, transition, full: true };
     if (seg.type === "avo") return { layout: "graphic", graphic: { kind: "avo", stories: seg.stories }, startAt: seg.start, dur: seg.dur, key: `c:avo:${seg.start}`, transition, full: true };
     if (seg.type === "market") return { layout: "graphic", graphic: { kind: "market" }, startAt: seg.start, dur: seg.dur, key: `c:market:${seg.start}`, transition, full: true };
     if (seg.type === "weather") return { layout: "graphic", graphic: { kind: "weather" }, startAt: seg.start, dur: seg.dur, key: `c:weather:${seg.start}`, transition, full: true };
@@ -2162,12 +2240,12 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // The two-minute bulletins carry up to seven stories; the 65-second ones at :15 and :45, four.
       // Each story stays on screen as long as the newsreader takes to read it (when its line is
       // ready); as many stories as fit, the spare seconds shared out among them.
-      const bslot = Math.floor((sc.playAt || sc.startAt || now()) / QUARTER) * QUARTER, full = bulletinMs(bslot) / 1000, short = full < 100;
+      const bslot = g.slot || Math.floor((sc.playAt || sc.startAt || now()) / QUARTER) * QUARTER, full = bulletinMs(bslot) / 1000, short = full < 100;
       const { plan, intro } = bulletinPlan(bslot, Math.max(sc.dur || 0, full), g.stories);
       const list = plan.map(p => p.x), per = plan[0]?.d || 15;
       // The broadcast output records each bulletin it airs (the Segment & bulletin desk).
-      if (output && !g.stories && list.length) progRecord("bulletin", "", Math.floor((sc.playAt || sc.startAt || now()) / QUARTER) * QUARTER, list, short);
-      const at = new Date(sc.playAt || sc.startAt || now()), when = slotWords(new Date(Math.floor(at.getTime() / QUARTER) * QUARTER)), day = bnDate(at);
+      if (output && !g.stories && list.length) progRecord("bulletin", "", bslot, list, short);
+      const at = new Date(sc.playAt || sc.startAt || now()), when = slotWords(new Date(bslot)), day = bnDate(at);
       const opening = () => `<div class="nb${channel === "v" ? " v" : ""}">${newsDeco()}<i class="nb-ray"></i><i class="nb-ray r2"></i><i class="nb-ring"></i><i class="nb-ring b"></i>
         <div class="nb-logo"><img src="${LOGO}" alt="রাষ্ট্রিক্স"></div>
         <div class="nb-word" data-no-tr><b class="w1">NEWS</b><b class="w2">BULLETIN</b></div><i class="nb-line"></i>
@@ -2208,6 +2286,46 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         stage.append(w); if (!st.muted) whoosh(st.audio);
         setTimeout(paint, 330); setTimeout(() => w.remove(), 900); };
       draw(); const t = setInterval(() => el.isConnected ? draw() : clearInterval(t), 250);
+    } else if (g.kind === "heads") {   // HEADLINES at :58 and :28 (the Headlines desk)
+      // The stinger (five seconds), then each headline: its picture or video full frame (or the
+      // channel's moving backdrop), its number, the headline set word by word, a progress strip of
+      // all of them, and the newsreader reading it.
+      const t0 = sc.startAt || now(), hAt = g.at || t0, per = st.tv?.heads?.secs || 10;
+      const list = (g.items?.length ? g.items : headsPick(hAt)).map(x => ({ ...x, d: x.d || Math.max(per, x.secs ? x.secs + 1.5 : 0) }));
+      const plan = []; { let a = HEADS_STING; for (const x of list) { plan.push({ x, at: a, d: x.d }); a += x.d; } }
+      if (output && !g.replay && list.length) progRecord("headlines", "", hAt, list.map(x => ({ id: x.id, auto: x.auto !== false, text: x.text, desk: x.desk, image: x.image, video: x.video, voice: x.voice, secs: x.secs, d: x.d })), false);
+      const d0 = new Date(hAt), en = d0.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+      const V = channel === "v" ? " v" : "", h12 = d0.toLocaleTimeString("en-US", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit", hour12: true }).replace(/\s*[AP]M$/i, "");
+      const clockBn = `${slotWords(d0).split(" ")[0]} ${bnDigits(h12)}`;
+      const word = "HEADLINES".split("").map((c, i) => `<b style="--i:${i}">${c}</b>`).join("");
+      const opening = () => `<div class="hx-open${V}"><i class="hx-o-bg"></i>${newsDeco()}<i class="hx-streak s1"></i><i class="hx-streak s2"></i><i class="hx-streak s3"></i><i class="hx-o-ring"></i>
+        <div class="hx-o-in"><img class="hx-o-logo" src="${LOGO}" alt="রাষ্ট্রিক্স"><div class="hx-o-word" data-no-tr>${word}</div><i class="hx-o-line"></i>
+        <div class="hx-o-bn">এক নজরে শিরোনাম</div><div class="hx-o-when"><span data-no-tr>${esc(en)} IST</span><em>${esc(clockBn)}</em></div></div><i class="hx-flash"></i></div>`;
+      const media = x => x.video ? `<video class="hx-vid" src="${esc(x.video)}" muted autoplay playsinline loop preload="auto"></video>` : x.image ? `<img class="hx-pic" src="${esc(x.image)}" alt="" referrerpolicy="no-referrer">` : "";
+      const story = (x, k) => `<div class="hx${V}${x.image || x.video ? " has-m" : ""}" style="--d:${plan[k].d}s">
+        <i class="hx-bg"></i>${x.image || x.video ? `<div class="hx-m">${media(x)}</div>` : newsDeco()}<i class="hx-shade"></i><i class="hx-sweep"></i>
+        <b class="hx-big" data-no-tr>${bnDigits(String(k + 1).padStart(2, "0"))}</b>
+        <div class="hx-bug"><b data-no-tr>HEADLINES</b><span>শিরোনাম</span><em data-no-tr>${esc(en)}</em></div>
+        <div class="hx-main"><div class="hx-tag"><em>${bnDigits(k + 1)}<small>/${bnDigits(list.length)}</small></em><span>${esc(deskOf(x))}</span></div>
+          <h2>${String(x.text || "").split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</h2></div>
+        <div class="hx-strip"><img src="${LOGO}" alt=""><div class="hx-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}"><b>${bnDigits(j + 1)}</b></i>`).join("")}</div></div></div>`;
+      let shown = -9;
+      const speak = x => {
+        st.voice?.pause(); st.voice = null;
+        if (!x?.voice || st.muted || !loud || !st.audio) return;
+        const tok = {}; st.voice = { pause() { tok.off = true; try { tok.src?.stop(); } catch { /* done */ } } };
+        voiceBuf(x.voice).then(buf => { if (tok.off || !buf || st.muted || st.alive === false) return; tok.src = voPlay(buf, 1.25); });
+      };
+      list.slice(0, mode === "app" ? 3 : list.length).forEach(x => x.voice && voiceBuf(x.voice));
+      const draw = () => { if (!el.isConnected && st.current) return; const e = (now() - t0) / 1000, k = e < HEADS_STING || !list.length ? -1 : Math.max(0, plan.findLastIndex(p => e >= p.at)); if (k === shown) return; const first = shown === -9; shown = k;
+        const paint = () => { el.innerHTML = k < 0 ? opening() : story(list[k], k); speak(k >= 0 ? list[k] : null); st.resumeVoice = () => { if (el.isConnected && k >= 0) speak(list[k]); };
+          // (the next headline's picture loaded ahead)
+          const nx = list[k + 1]; if (nx?.image) { const im = new Image(); im.src = nx.image; } };
+        if (first || !el.isConnected) return paint();
+        const w = document.createElement("div"); w.className = `hx-wipe${V}`; w.innerHTML = "<i></i><i></i><i></i><img src=\"" + LOGO + "\" alt=\"\">";
+        stage.append(w); if (!st.muted) whoosh(st.audio);
+        setTimeout(paint, 300); setTimeout(() => w.remove(), 950); };
+      draw(); const ti = setInterval(() => el.isConnected ? draw() : clearInterval(ti), 200);
     } else if (g.kind === "headlines") {
       const items = g.lines?.length ? g.lines : (st.tv?.headlines || []).slice(0, 5).map(h => h.text);
       el.innerHTML = wrapV(setHTML("শিরোনাম", g.title || "সর্বশেষ", items, sc.dur || 10), g.title || "শিরোনাম");
@@ -2389,8 +2507,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (onVideo && (st.tv?.bulletin || []).length) {
       const toQ = toBulletin(t) / 1000;
       const left = (q.start + ((q.item.dur || 0) - (q.item.in || 0)) * 1000 - t) / 1000;
-      if (toQ <= 300 && toQ > 60) cdText = `পরের বুলেটিন ${bnDigits(Math.ceil(toQ / 60))} মিনিটে`;
-      if (toQ <= 60) tease = { k: "আসছে", b: "খবরের বুলেটিন" };
+      if (toQ <= 300 && toQ > 60) cdText = `${st.cueHeads ? "শিরোনাম" : "পরের বুলেটিন"} ${bnDigits(Math.ceil(toQ / 60))} মিনিটে`;
+      if (toQ <= 60) tease = { k: "আসছে", b: st.cueHeads ? "এক নজরে শিরোনাম" : "খবরের বুলেটিন" };
       else {
         const sp = segPeek(t, q), NAMES = st.tv?.segNames || {};
         if (sp && (t >= sp.at || sp.at - t <= 90e3)) tease = { k: "একটু পরেই", b: NAMES[sp.name] || "" };

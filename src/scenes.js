@@ -46,7 +46,9 @@ export function itemScene(item) {
     case "clip": return { ...base, layout: "full", sources: [{ kind: "clip", url: d.url, in: num(d.in), out: num(d.out) || null }] };
     case "live": return { ...base, layout: d.layout || "full", sources: (d.sources || []).slice(0, 6) };
     case "breaking": return { ...base, layout: "graphic", sources: [], graphic: { kind: "breaking", text: d.text || item.title, music: d.music !== false } };
-    case "headlines": return { ...base, layout: "graphic", sources: [], graphic: { kind: "headlines", title: d.title || item.title, lines: lines(d.lines).slice(0, 5) } };
+    // (the channel's HEADLINES at :58 and :28, from the Headlines desk, as they are at air time)
+    case "headlines": if (d.fixed) return { ...base, layout: "graphic", sources: [], full: true, graphic: { kind: "heads" } };
+      return { ...base, layout: "graphic", sources: [], graphic: { kind: "headlines", title: d.title || item.title, lines: lines(d.lines).slice(0, 5) } };
     case "lband": return { ...base, layout: "lband", sources: d.source ? [d.source] : [{ kind: "continuity" }], graphic: { kind: "lband", text: d.text || item.title, lines: lines(d.lines).slice(0, 5) } };
     case "promo": return { ...base, layout: "graphic", sources: [], graphic: { kind: "promo", image: d.image } };
     case "adbreak": return { ...base, layout: "graphic", sources: [], graphic: { kind: "ads", items: (d.items || []).map(x => ({ image: x.image, url: x.url, seconds: num(x.seconds, 10), sponsorId: x.sponsorId || null })) } };

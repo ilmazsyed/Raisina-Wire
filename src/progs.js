@@ -3,7 +3,8 @@
 // two days (today and yesterday), and each can be edited (headlines and lines; a story whose words
 // change loses its recorded voice), played at once on TV and/or Shorts, archived (kept, and out of
 // the two-day list) or deleted. Unarchived records go after seven days (cron).
-const KINDS = ["bulletin", "segment"];
+import { headsAired } from "./headlines.js";
+const KINDS = ["bulletin", "segment", "headlines"];
 const clip = (v, n) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
 
 // From the broadcast output (checked by its key).
@@ -13,6 +14,8 @@ export async function progPlayed(env, b, outputOk) {
   if (items.length > 200000) return { ok: false };
   await env.DB.prepare("INSERT OR IGNORE INTO programmes (id,kind,name,title,channel,slot_at,short,items) VALUES (?,?,?,?,?,?,?,?)")
     .bind(crypto.randomUUID(), b.kind, clip(b.name, 40), clip(b.title, 120), b.ch, slot, b.short ? 1 : 0, items).run();
+  // (a HEADLINES: the desk's own headlines in it count one airing more, src/headlines.js)
+  if (b.kind === "headlines") await headsAired(env, b).catch(() => {});
   return { ok: true };
 }
 
@@ -24,6 +27,7 @@ const row = r => ({ id: r.id, kind: r.kind, name: r.name, title: r.title, channe
 
 // An item's length on air (the bulletin's stories; a segment's items).
 export function progDuration(p) {
+  if (p.kind === "headlines") return Math.min(300, Math.round(5 + p.items.reduce((n, x) => n + (Number(x.d) || 10), 0)));
   if (p.kind === "bulletin") return Math.min(300, Math.round(12 + p.items.reduce((n, x) => n + (x.secs ? Math.max(8, x.secs + 1) : 12), 0)));
   return Math.min(600, Math.round(4 + p.items.reduce((n, x) => n + (Number(x.d0) || 8), 0)));
 }
@@ -49,7 +53,8 @@ export async function handleProgs(request, env, url, user, { json, err, audit, p
     const items = (Array.isArray(b.items) ? b.items : []).slice(0, 20).map(x => {
       const o = old.get(Number(x.i)); if (!o) return null;
       const n = { ...o };
-      if (p.kind === "bulletin") { const t = clip(x.title ?? o.title, 300), tx = clip(x.text ?? o.text, 600); if (t !== o.title || tx !== (o.text || "")) { n.title = t; n.text = tx; delete n.voice; delete n.secs; } }
+      if (p.kind === "headlines") { const t = clip(x.title ?? o.text, 160); if (t !== o.text) { n.text = t; delete n.voice; delete n.secs; } }
+      else if (p.kind === "bulletin") { const t = clip(x.title ?? o.title, 300), tx = clip(x.text ?? o.text, 600); if (t !== o.title || tx !== (o.text || "")) { n.title = t; n.text = tx; delete n.voice; delete n.secs; } }
       else if (!o.lead && !o.map && !o.wx && !o.timeline && !o.pts && !o.photo) { const t = clip(x.title ?? o.t, 300), l = clip(x.text ?? o.line, 600); if (t !== (o.t || "") || l !== (o.line || "")) { n.t = t; n.line = l; delete n.voice; } }
       return n;
     }).filter(Boolean);
@@ -66,10 +71,10 @@ export async function handleProgs(request, env, url, user, { json, err, audit, p
   if (sub === "play" && m === "POST") {
     const chs = (Array.isArray(b.channels) ? b.channels : [p.channel]).filter(c => ["h", "v"].includes(c));
     if (!chs.length) return err("Choose a channel.");
-    const dur = progDuration(p), title = p.kind === "bulletin" ? "News bulletin" : `Segment: ${p.title || p.name}`;
+    const dur = progDuration(p), title = p.kind === "bulletin" ? "News bulletin" : p.kind === "headlines" ? "HEADLINES" : `Segment: ${p.title || p.name}`;
     const scene = { label: title, layout: "graphic", sources: [], full: true, dur,
-      graphic: p.kind === "bulletin" ? { kind: "bulletin", stories: p.items, replay: 1 } : { kind: "seg", name: p.name, head: 4, items: p.items, replay: 1 } };
-    for (const ch of chs) await play(ch, { id: `prog:${id}:${Date.now()}`, title: `${title} (again)`.slice(0, 120), items: [{ id: `prog:${id}`, type: p.kind === "bulletin" ? "bulletin" : "segment", title, dur, scene }] });
+      graphic: p.kind === "bulletin" ? { kind: "bulletin", stories: p.items, replay: 1 } : p.kind === "headlines" ? { kind: "heads", items: p.items, replay: 1 } : { kind: "seg", name: p.name, head: 4, items: p.items, replay: 1 } };
+    for (const ch of chs) await play(ch, { id: `prog:${id}:${Date.now()}`, title: `${title} (again)`.slice(0, 120), items: [{ id: `prog:${id}`, type: p.kind === "bulletin" ? "bulletin" : p.kind === "headlines" ? "headlines" : "segment", title, dur, scene }] });
     await env.DB.prepare("UPDATE programmes SET plays=plays+1 WHERE id=?").bind(id).run();
     await audit("prog.play", "prog", id, { channels: chs });
     return json({ ok: true, seconds: dur });
