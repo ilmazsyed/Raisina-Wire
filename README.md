@@ -155,6 +155,18 @@ An AVO story can carry a reporter's **phone-in** (AVO desk → Phone-in).
   - **Length:** 15 to 45 seconds. The pictures never stop before the reading ends.
 - **Breaking video** (Breaking desk): a video can play with its own sound, and in full. Playing in full makes the breaking last as long as the video, with its lines shared over it.
 
+### Live Rundown (`/liverundown.html`) and the as-run report
+
+Each channel's day as 48 half-hour wheels, India time (control room → TV → Live Rundown).
+
+- **The wheels:**
+  - Past half-hours show what aired.
+  - The current one marks now.
+  - The ones to come show the channel's clock: bulletins, HEADLINES and segments.
+- **Changes:** skip a fixed item, or put an AVO story, a video or a segment in at a minute. Autopilot follows within seconds (`src/engine.js`, `st.tv.lrd`; `settings` `lrd:<channel>`). An item put in plays when the item on air ends.
+- **As-run log:** the broadcast output now logs every autopilot item (`POST /api/tv/asrun`), next to what the control room logs.
+- **As-run report:** any day's log, printed or downloaded as CSV.
+
 ### Headlines desk (`/headlines.html`)
 
 HEADLINES goes on air at :58 and :28 (India time; the desk can change the minutes) and leads

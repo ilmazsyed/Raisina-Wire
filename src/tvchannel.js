@@ -7,6 +7,7 @@ import { segmentsData, clockOf, SEG_NAMES } from "./segments.js";
 import { bnLine } from "./bnline.js";
 import { adsOnAir } from "./ads.js";
 import { headsSettings, buildHeads, headVoices } from "./headlines.js";
+import { lrdForScreens } from "./liverundown.js";
 // Rashtrix TV, Phase 2: two channels, each on or off, each with its own secret output address
 // for OBS / vMix.
 //   h  horizontal 1920×1080: long videos, with the full designable jacket (bug, LIVE, clock,
@@ -330,6 +331,8 @@ export async function tvState(env, ch) {
     programs: (s.programs || []).filter(p => p.on),
     ticker: [...s.ticker, ...headlines.slice(0, 14).map(h => h.text)],
     headlines, bulletin, heads,
+    // The Live Rundown's changes: fixed items skipped, items put in at a time (src/liverundown.js).
+    lrd: s.on ? await lrdForScreens(env, ch).catch(() => null) : null,
     // The app plays its own copy of the order for each viewer, newest video first (src/engine.js).
     loop: s.on ? loop : [],
     // Scheduled cut-ins (the control room's Scheduler): at each time, these videos go on air.
