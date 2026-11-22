@@ -50,9 +50,10 @@ export class TvControl {
       const role = request.headers.get("x-ctl-role") || "viewer", who = request.headers.get("x-ctl-who") || crypto.randomUUID();
       this.ctx.acceptWebSocket(server, [role, who]);
       server.send(JSON.stringify(this.isRoom ? { type: "room", state: this.state.room || {} } : { type: "state", state: this.state, serverTime: now() }));
+      if (!this.isRoom && this.onair) server.send(JSON.stringify({ type: "onair", onair: this.onair }));
       return new Response(null, { status: 101, webSocket: client });
     }
-    if (url.pathname === "/state") return Response.json({ state: this.isRoom ? this.state.room || {} : this.state, health: this.health, serverTime: now() });
+    if (url.pathname === "/state") return Response.json({ state: this.isRoom ? this.state.room || {} : this.state, health: this.health, serverTime: now(), onair: this.isRoom ? null : this.onair || null });
     if (url.pathname === "/cmd" && request.method === "POST") {
       const b = await request.json();
       try { const out = this.isRoom ? await this.roomCommand(b) : await this.command(b.cmd, b.args || {}, b.by || "", b.how || ""); return Response.json({ ok: true, ...(out || {}) }); }
@@ -241,6 +242,18 @@ export class TvControl {
       const prev = this.health[who] || {};
       this.health[who] = { role, seen: now(), playing: !!m.playing, stalledFor: Number(m.stalledFor) || 0, item: String(m.item || "").slice(0, 120), ua: String(m.ua || "").slice(0, 80), alerted: prev.alerted && now() - prev.seen > 30000 };
       if (role === "output" && (m.stalledFor >= 10) !== (prev.stalledFor >= 10) && this.checkHealth()) await this.save();
+      return;
+    }
+    // What the broadcast output has on air (the channel's own running order), passed to every
+    // viewer so the app and the site show the same item at the same moment. One output leads; another
+    // takes over when the first has been silent for a minute.
+    if (m.type === "onair" && role === "output" && m.seg && typeof m.seg === "object") {
+      if (this.onair && this.onair.who !== who && now() - this.onair.at < 60e3) return;
+      const raw = JSON.stringify(m.seg); if (raw.length > 120000) return;
+      const changed = !this.onair || this.onair.seg?.n !== m.seg.n || this.onair.seg?.start !== m.seg.start || this.onair.who !== who;
+      this.onair = { seg: m.seg, at: now(), who };
+      // (every change goes out at once; otherwise a beat every 30 seconds keeps the viewers following)
+      if (changed || now() - (this.onairSent || 0) > 25e3) { this.onairSent = now(); this.broadcast({ type: "onair", onair: this.onair }, ["viewer", "pcr"]); }
       return;
     }
     if (this.isRoom) return this.roomMessage(ws, role, who, m);

@@ -191,6 +191,15 @@ Each channel's day as 48 half-hour wheels, India time (control room → TV → L
   - Access: the English and Hindi front pages need a sign-in, so the browser opens them with a key only the server knows (the `x-rw-card` header).
   - Framing: `/epaper` may be framed by the site's own pages only (`X-Frame-Options: SAMEORIGIN`).
 
+### One channel for everyone
+
+The broadcast output (the OBS page with the channel's key) leads the channel. Every viewer, in the app and on the site, and the control room's monitors, show the same item at the same moment.
+
+- **How it reaches viewers:** the output tells the channel's realtime control room (`src/control.js`, message `onair`) what it puts on air. It does this at once when the item changes, and every 30 seconds. The control room passes it to every screen.
+- **AVO stories** are sent as their ids, and each screen draws them from the channel's own list.
+- **Without an output:** if no output has spoken for 75 seconds, each screen runs the channel's order itself, as before.
+- **Several outputs:** one leads, and another takes over when the first has been silent for a minute.
+
 ### Headlines desk (`/headlines.html`)
 
 HEADLINES goes on air at :58 and :28 (India time; the desk can change the minutes) and leads
