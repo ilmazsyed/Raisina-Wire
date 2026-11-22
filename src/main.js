@@ -354,6 +354,7 @@ async function route({ restoreY = null } = {}) {
   }
   if (["account", "discussion", "community", "my", "saved", "tag"].includes(r.page)) await Promise.race([userReady, new Promise(res => setTimeout(res, 2500))]);
   document.body.classList.toggle("is-reading", ["edition", "article"].includes(r.page));
+  document.documentElement.classList.toggle("on-home", r.page === "home");
   const main = $("#view");
   main.classList.remove("view-enter"); void main.offsetWidth; main.classList.add("view-enter");
   await view(r);
@@ -659,24 +660,34 @@ function mastLiveSlides(x) {
 function mastLive() {
   const host = document.getElementById("mastLive"); if (!host || host.dataset.on) return;
   host.dataset.on = "1";
-  host.innerHTML = `<span class="ml-top"><i></i>LIVE<em>IST</em></span><span class="ml-clock"></span><span class="ml-line"><b></b></span>`;
-  const clock = host.querySelector(".ml-clock"), line = host.querySelector(".ml-line");
+  host.innerHTML = `<span class="ml-top"><i></i>LIVE<em>IST</em></span><span class="ml-clock"><span class="ml-hm"></span><span class="ml-sec"></span></span><span class="ml-rule"></span><span class="ml-line"><b></b></span>`;
+  const hm = host.querySelector(".ml-hm"), sec = host.querySelector(".ml-sec"), line = host.querySelector(".ml-line");
+  // It runs only where it is seen: the phone home page, with the app in front.
+  const phone = matchMedia("(max-width:760px)"), calm = matchMedia("(prefers-reduced-motion:reduce)");
+  const shown = () => !document.hidden && phone.matches && document.documentElement.classList.contains("on-home");
+  // (a digit that changes drops in from above; transform and opacity only, no layout work)
+  const put = (box, txt) => {
+    if (box.children.length !== txt.length) box.innerHTML = [...txt].map(c => `<span class="${c === ":" ? "ml-col" : "ml-d"}">${c}</span>`).join("");
+    [...txt].forEach((c, i) => { const el = box.children[i]; if (el.textContent === c) return; el.textContent = c;
+      if (!calm.matches && el.animate) el.animate([{ transform: "translateY(-45%)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 320, easing: "cubic-bezier(.2,.8,.2,1)" }); });
+  };
   const tick = () => {
-    const t = new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }), txt = ML_BN(t);
-    if (clock.children.length !== txt.length) clock.innerHTML = [...txt].map(c => `<span class="${c === ":" ? "ml-col" : "ml-d"}">${c}</span>`).join("");
-    // (a digit that changes turns over like a flip clock)
-    [...txt].forEach((c, i) => { const el = clock.children[i]; if (el.textContent !== c) { el.textContent = c; el.classList.remove("flip"); void el.offsetWidth; el.classList.add("flip"); } });
+    const t = ML_BN(new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }));
+    put(hm, t.slice(0, 5)); put(sec, t.slice(6, 8));
   };
   const turn = async () => {
     const slides = mastLiveSlides(await mastLiveData()); if (!slides.length) return;
     const text = slides[mlI++ % slides.length]; if (text === mlLast) return; mlLast = text;
-    const b = document.createElement("b"); b.textContent = text; b.className = "in"; b.style.color = /°/.test(text) ? "#c8100f" : "#111";
-    const old = line.querySelector("b"); if (old) { old.className = "out"; setTimeout(() => old.remove(), 450); }
+    const b = document.createElement("b"); b.textContent = text; if (/°/.test(text)) b.className = "wx";
+    const old = line.querySelector("b");
     line.append(b);
+    if (calm.matches || !b.animate) { old?.remove(); return; }
+    b.animate([{ transform: "translateY(100%)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 420, easing: "cubic-bezier(.2,.8,.2,1)" });
+    if (old) old.animate([{ transform: "none", opacity: 1 }, { transform: "translateY(-100%)", opacity: 0 }], { duration: 360, easing: "ease-in", fill: "forwards" }).onfinish = () => old.remove();
   };
-  tick(); turn();
-  setInterval(() => { if (!document.hidden) tick(); }, 1000);
-  setInterval(() => { if (!document.hidden) turn(); }, 3500);
+  let n = 0;
+  setInterval(() => { if (!shown()) return; tick(); if (n++ % 4 === 0 || !line.firstChild) turn(); }, 1000);
+  if (shown()) { tick(); turn(); }
 }
 
 function phToday() {
