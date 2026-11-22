@@ -144,6 +144,17 @@ An AVO story can carry a reporter's **phone-in** (AVO desk → Phone-in).
 - **Length:** the story's own pictures never run past 45 seconds. Bytes and phone-ins always play in full.
 - **Storage:** the settings are kept in `avo_stories.extra` (`src/avo.js` `cleanExtra`).
 
+### AVO full-length videos and look; breaking videos with sound
+
+- **Full-length video in an AVO** (AVO desk → Full-length video). It plays instead of the pictures, for at most 45 seconds.
+  - **Sound:** either with its own sound (the music and the newsreader stop) or muted under the reading.
+  - **Captions:** the headline and the story's lines come over the video as animated captions.
+- **Look** (AVO desk → Look): set separately for each story.
+  - **Scene:** automatic, explainer, motion graphics or photos.
+  - **Background:** the colour of the story's text cards, Rashtrix red by default.
+  - **Length:** 15 to 45 seconds. The pictures never stop before the reading ends.
+- **Breaking video** (Breaking desk): a video can play with its own sound, and in full. Playing in full makes the breaking last as long as the video, with its lines shared over it.
+
 ### Headlines desk (`/headlines.html`)
 
 HEADLINES goes on air at :58 and :28 (India time; the desk can change the minutes) and leads

@@ -57,6 +57,7 @@ function drawBreak() {
       ${S.media ? `<div class="bd-mprev">${S.media.kind === "image" ? `<img src="${esc(S.media.url)}" alt="">` : `<span class="tag">${S.media.kind === "yt" ? "YOUTUBE" : "VIDEO"}</span>`}<small data-no-tr>${esc(S.media.url)}</small><button class="btn sm red" type="button" id="bMx">Remove</button></div>` : ""}
       <div class="row" style="flex-wrap:wrap"><label class="btn sm">Upload picture<input type="file" id="bImg" accept="image/*" hidden></label><label class="btn sm">Upload video (plays muted)<input type="file" id="bVid" accept="video/mp4,video/webm,video/quicktime" hidden></label></div>
       <div class="row"><input id="bLink" placeholder="or paste a picture, video or YouTube link (https://…)" style="flex:1" data-no-tr><button class="btn sm" type="button" id="bLinkAdd">Add link</button></div>
+      ${S.media && S.media.kind !== "image" ? `<div class="row" style="gap:14px;flex-wrap:wrap"><label class="chk"><input type="checkbox" id="bSnd" ${S.media.sound ? "checked" : ""}> With its own sound</label><label class="chk"><input type="checkbox" id="bFull" ${S.media.full ? "checked" : ""}> Play the whole video (the breaking lasts as long as it does)</label>${S.media.full ? `<label>Length <input id="bVSecs" value="${S.media.secs ? `${Math.floor(S.media.secs / 60)}:${String(S.media.secs % 60).padStart(2, "0")}` : ""}" placeholder="m:ss" style="width:80px"></label>` : ""}</div>` : ""}
       <div class="bd-prog" id="bProg" hidden><i></i></div></div>
     <div class="row" style="flex-wrap:wrap;gap:14px">
       <label class="chk"><input type="checkbox" id="bH" checked> Rashtrix TV</label>
@@ -71,6 +72,9 @@ function drawBreak() {
   $$("[data-blrm]").forEach(b => b.onclick = () => { S.lines.splice(+b.dataset.blrm, 1); drawBreak(); });
   $("#bAdd")?.addEventListener("click", () => { if (S.lines.length < 5) { S.lines.push(""); drawBreak(); $(`[data-bl="${S.lines.length - 1}"]`)?.focus(); } });
   $("#bMx")?.addEventListener("click", () => { S.media = null; drawBreak(); });
+  $("#bSnd")?.addEventListener("change", e => { S.media.sound = e.target.checked; });
+  $("#bFull")?.addEventListener("change", async e => { S.media.full = e.target.checked; if (S.media.full && !S.media.secs && S.media.kind === "video") S.media.secs = await new Promise(res => { const v = document.createElement("video"); v.preload = "metadata"; v.onloadedmetadata = () => res(Math.round(v.duration || 0)); v.onerror = () => res(0); v.src = S.media.url; setTimeout(() => res(0), 8000); }); drawBreak(); });
+  $("#bVSecs")?.addEventListener("input", e => { const p = e.target.value.trim().split(":").map(Number); S.media.secs = p.some(isNaN) ? 0 : p.reduce((a, x) => a * 60 + x, 0); });
   $("#bLinkAdd").onclick = () => { const u = $("#bLink").value.trim(); if (!/^https:\/\//.test(u)) return toast("Paste a link that starts with https://", true); S.media = { kind: /youtube\.com|youtu\.be/.test(u) ? "yt" : /\.(mp4|webm|mov|m3u8)(\?|$)/i.test(u) ? "video" : "image", url: u }; drawBreak(); };
   $("#bImg").onchange = async e => { const f = e.target.files[0]; if (!f) return; try { toast("Uploading the picture…"); S.media = { kind: "image", url: await uploadImage(f) }; drawBreak(); } catch (err) { fail(err); } };
   $("#bVid").onchange = async e => { const f = e.target.files[0]; if (!f) return; try { S.media = { kind: "video", url: await uploadVideo(f, $("#bProg")) }; toast("Video uploaded."); drawBreak(); } catch (err) { fail(err); } };
