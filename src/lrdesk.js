@@ -12,6 +12,7 @@
 import "./tv.css";
 import { shell, api, toast, fail, esc, $, $$, istDay, printDoc } from "./crshell.js";
 import { digits } from "./i18n.js";
+import { libraryItems } from "./libpick.js";
 
 const S = { ch: "h", day: istDay(), d: null, avo: [], videos: [], heads: [], open: new Set(), pick: null, edit: null, noteFor: null, undo: [], drag: null };
 const IST = 5.5 * 3600e3, DAY = 864e5;
@@ -218,8 +219,9 @@ async function report() {
 const busy = () => S.pick || S.edit || S.noteFor || S.drag || document.activeElement?.closest?.(".lr-ed, .lr-pick");
 async function load(force) {
   try {
-    const [d, avo, vids, heads] = await Promise.all([api(`/api/admin/lrd?ch=${S.ch}&day=${S.day}`), api("/api/admin/tv/avo").catch(() => ({ stories: [] })), api("/api/tv/videos").catch(() => ({ videos: [] })), api("/api/admin/heads").catch(() => ({ onAir: [] }))]);
-    S.d = d; S.avo = (avo.stories || []).filter(x => ["ready", "off"].includes(x.status)); S.videos = (vids.videos || []).filter(v => v.channel === S.ch).slice(0, 120);
+    // (AVO stories and videos: the Content Library's, the same 36 hours every desk sees)
+    const [d, lib, heads] = await Promise.all([api(`/api/admin/lrd?ch=${S.ch}&day=${S.day}`), libraryItems(force).catch(() => ({ avo: [], videos: [] })), api("/api/admin/heads").catch(() => ({ onAir: [] }))]);
+    S.d = d; S.avo = lib.avo.map(x => ({ id: x.id, title: x.title, desk: x.meta })); S.videos = lib.videos.filter(v => v.ch === S.ch).slice(0, 160).map(v => ({ id: v.id, title: v.title, duration: v.dur }));
     S.heads = [...(heads.onAir || []), ...(heads.items || [])].filter((x, i, all) => x?.text && all.findIndex(y => y.text === x.text) === i);
     if (force || !busy()) draw();
   } catch (e) { $("main").innerHTML = `<div class="cr-denied"><h2>Live Rundown</h2><p>${esc(e.message)}</p></div>`; }
