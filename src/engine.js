@@ -909,7 +909,30 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   /* ---------- the channel's own running order (no rundown on air) ---------- */
   // The app and the OBS outputs run the full order (up next, channel ID, headlines, bulletins);
   // the control room's monitors follow the shared schedule.
-  function continuitySeg() { if (mode === "app" || output) return localSeg(); const t = now(); return st.tv?.schedule?.find(x => x.start <= t && t < x.start + x.dur * 1000) || null; }
+  function continuitySeg() {
+    // Viewers (the app and the site) show what the broadcast output has on air, item for item, at
+    // the same moment; with no output running, each screen runs the channel's order itself.
+    if ((mode === "app" || mode === "program") && !output) { const m = masterSeg(); if (m) return m; }
+    if (mode === "app" || output) return localSeg(); const t = now(); return st.tv?.schedule?.find(x => x.start <= t && t < x.start + x.dur * 1000) || null;
+  }
+  // The broadcast output's item (src/control.js "onair"), as this screen can draw it: AVO stories are
+  // sent as their ids and taken from the channel's own list.
+  function masterSeg() {
+    const o = st.onair; if (!o?.seg || Date.now() - (o.recv || 0) > 75e3) return null;
+    const sg = { ...o.seg };
+    if (sg.type === "avo") { sg.stories = (sg.ids || []).map(id => (st.tv?.avo || []).find(x => x.id === id)).filter(Boolean); if (!sg.stories.length) return null; }
+    if (st.seq) st.seq.seg = sg;
+    return sg;
+  }
+  // The broadcast output tells the control room what it has on air: at once when it changes, and
+  // every 30 seconds.
+  function sendOnair(sg, force = false) {
+    if (!output || !sg || st.ws?.readyState !== 1) return;
+    if (!force && st.onairSentN === sg.n && st.onairSentStart === sg.start) return;
+    st.onairSentN = sg.n; st.onairSentStart = sg.start; st.onairAt = Date.now();
+    const slim = sg.type === "avo" ? { ...sg, stories: undefined, ids: (sg.stories || []).map(x => x.id) } : sg;
+    try { st.ws.send(JSON.stringify({ type: "onair", seg: slim })); } catch { /* reconnects */ }
+  }
   // In the app each viewer has their own running order: it starts at the newest video when the
   // viewer opens the channel and goes down the list; a video moves on only when it has played
   // to its end; a headline flash (with the stinger) comes after every video, and an animated
@@ -1375,6 +1398,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const s = st.tv; if (!s) return null;
     if (s.live) return { layout: "full", sources: [String(s.live.ytId).startsWith("fb:") ? { kind: "fb", url: String(s.live.ytId).slice(3) } : { kind: "yt", id: s.live.ytId }], label: s.live.title, key: `live:${s.live.ytId}` };
     const seg = continuitySeg(); if (!seg) return { layout: "graphic", graphic: { kind: "headlines" }, key: "c:none" };
+    if (output) sendOnair(seg);
+    // (the item on air, for checking that every screen shows the same one)
+    if (stage.dataset.seg !== `${seg.type}:${seg.start}`) stage.dataset.seg = `${seg.type}:${seg.start}`;
     // (each item autopilot puts on air goes in the as-run log, from the broadcast output; the AVO
     //  stories are logged one by one as they come on)
     if (output && seg.n !== st.asrunN && !["upnext", "ident", "avo"].includes(seg.type)) {
@@ -2909,12 +2935,12 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const q = new URLSearchParams({ ...(key ? { key } : {}), ...(guestToken ? { t: guestToken } : {}) });
     let ws; try { ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/ws/ctl/${channel}?${q}`); } catch { return setTimeout(connect, 5000); }
     st.ws = ws;
-    ws.onmessage = e => { try { const m = JSON.parse(e.data); if (m.type === "state") applyCtl(m.state, m.serverTime); if (m.type === "room") st.room = m.state; } catch { /* bad message */ } };
+    ws.onmessage = e => { try { const m = JSON.parse(e.data); if (m.type === "state") applyCtl(m.state, m.serverTime); if (m.type === "room") st.room = m.state; if (m.type === "onair") st.onair = m.onair ? { ...m.onair, recv: Date.now() } : null; } catch { /* bad message */ } };
     ws.onclose = () => { st.ws = null; if (st.alive) setTimeout(connect, 3000); };
   }
   // Without WebSockets the state is read every five seconds.
-  async function poll() { if (st.ws?.readyState === 1 || mode === "scene") return; try { const r = await fetch(`/api/ctl/${channel}/state`, { cache: "no-store" }); if (r.ok) { const d = await r.json(); applyCtl(d.state, d.serverTime); } } catch { /* offline */ } }
-  function heartbeat() { if (!output || st.ws?.readyState !== 1) return; st.ws.send(JSON.stringify({ type: "hb", playing: st.current?.slots.some(s => s.playing?.()) || !!st.current?.scene?.graphic, stalledFor: st.stalledSince ? Math.round((Date.now() - st.stalledSince) / 1000) : 0, item: st.current?.scene?.label || "", ua: navigator.userAgent })); }
+  async function poll() { if (st.ws?.readyState === 1 || mode === "scene") return; try { const r = await fetch(`/api/ctl/${channel}/state`, { cache: "no-store" }); if (r.ok) { const d = await r.json(); applyCtl(d.state, d.serverTime); if (d.onair) st.onair = { ...d.onair, recv: Date.now() }; } } catch { /* offline */ } }
+  function heartbeat() { if (!output || st.ws?.readyState !== 1) return; if (Date.now() - (st.onairAt || 0) > 30e3 && st.seq?.seg) sendOnair(st.seq.seg, true); st.ws.send(JSON.stringify({ type: "hb", playing: st.current?.slots.some(s => s.playing?.()) || !!st.current?.scene?.graphic, stalledFor: st.stalledSince ? Math.round((Date.now() - st.stalledSince) / 1000) : 0, item: st.current?.scene?.label || "", ua: navigator.userAgent })); }
 
   // A remounted player that already has the channel's data draws its first frame at once.
   if (st.tv) tick();
