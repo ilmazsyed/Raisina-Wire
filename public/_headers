@@ -27,3 +27,10 @@
 /studio
   ! Permissions-Policy
   Permissions-Policy: camera=(self "https://vdo.ninja"), microphone=(self "https://vdo.ninja"), autoplay=*, fullscreen=*, geolocation=()
+# The e-paper: framed by the site's own share card (src/ogcard.js), never by another site.
+/epaper
+  ! X-Frame-Options
+  X-Frame-Options: SAMEORIGIN
+/epaper.html
+  ! X-Frame-Options
+  X-Frame-Options: SAMEORIGIN

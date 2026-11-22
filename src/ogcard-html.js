@@ -139,3 +139,25 @@ html,body{width:1200px;height:630px;overflow:hidden;background:#140304}
 <div class="cta"><i></i>এখনই দেখুন <small>rashtrix.live</small></div></div>
 </div></body></html>`;
 }
+
+// The e-paper's share card (1200×630): today's three front pages (Bengali, English, Hindi) side by
+// side, each drawn by the e-paper itself (/epaper?card=1), with the English ad line.
+export function epaperCardHTML(edition) {
+  const pg = (lang, i, name) => `<div class="pg" style="left:${150 + i * 306}px"><iframe src="/epaper?lang=${lang}&card=1${edition ? `&ed=${encodeURIComponent(edition)}` : ""}" scrolling="no"></iframe><span>${name}</span></div>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;800;900&display=swap" rel="stylesheet"><style>
+html,body{margin:0;width:1200px;height:630px;overflow:hidden}
+body{background:radial-gradient(ellipse at 50% 18%,#3a0b0e 0%,#14070a 45%,#07070b 100%);font-family:Inter,Arial,sans-serif;color:#fff;position:relative}
+.pg{position:absolute;top:22px;width:288px;height:467px;border-radius:4px;overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.12);background:#f6f2ea}
+.pg:nth-child(2){top:12px;transform:scale(1.04);z-index:2;box-shadow:0 26px 50px rgba(0,0,0,.65),0 0 0 2px #D4A017}
+.pg iframe{position:absolute;left:0;top:0;width:1240px;height:2010px;border:0;transform:scale(.2323);transform-origin:0 0}
+.pg span{position:absolute;left:8px;top:8px;padding:3px 9px;border-radius:4px;background:#AA0404;font:800 13px Inter,sans-serif;letter-spacing:.04em}
+.band{position:absolute;left:0;right:0;bottom:0;height:120px;display:flex;align-items:center;gap:22px;padding:0 44px;background:linear-gradient(90deg,#AA0404,#7d0303);border-top:4px solid #D4A017}
+.band img{height:78px;background:#fff;border-radius:10px;padding:6px 10px}
+.band b{display:block;font:900 34px/1.1 Inter,sans-serif;letter-spacing:-.01em}
+.band em{display:block;font:600 19px/1.35 Inter,sans-serif;font-style:normal;color:#ffe6a6;margin-top:6px}
+.band .go{margin-left:auto;padding:12px 20px;border-radius:10px;background:#fff;color:#AA0404;font:900 20px Inter,sans-serif;white-space:nowrap}
+</style></head><body>
+<div class="pages">${pg("bn", 0, "বাংলা")}${pg("en", 1, "English")}${pg("hi", 2, "हिन्दी")}</div>
+<div class="band"><img src="/brand/logo-sm.webp" alt="Rashtrix 24×7 News"><div><b>Today's Rashtrix News e-papers</b><em>Bengali · English · Hindi. Morning and evening editions, free to read.</em></div><span class="go">rashtrix.live/epaper</span></div>
+</body></html>`;
+}

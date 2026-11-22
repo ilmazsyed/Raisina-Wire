@@ -177,6 +177,20 @@ Each channel's day as 48 half-hour wheels, India time (control room → TV → L
 - **Charter warnings**: before a story or an AVO is saved, the desk sees the Editorial Charter's warnings: words it never uses, and facts its corrections would change. Nothing is changed for them (`POST /api/admin/charter/check`).
 - **Weather beside the clock**: Kolkata is always shown, next to each of the other places in turn.
 
+### E-paper: mastheads, printing and the share card
+
+- **Mastheads.**
+  - In colour: a red top band, the first word in red, the crest centred and sized to the nameplate.
+  - The Bengali and Hindi front pages carry a colour picture teaser either side of the nameplate (page and headline). The nameplate is set smaller to fit between them.
+- **Printing.**
+  - Print A4 or A3: every page is scaled to fill the sheet, one page to a sheet.
+  - The owner also gets "For the press (22×34 in)": the whole paper at full size, saved as a PDF from the print dialog.
+- **The share card** (`/og/epaper.jpg`).
+  - What it is: today's three front pages side by side with the English ad line "Today's Rashtrix News e-papers". It is the e-paper's share picture, and the toolbar's Share button shares it.
+  - How it is made: the minute cron draws it again for each new edition with Cloudflare's headless browser.
+  - Access: the English and Hindi front pages need a sign-in, so the browser opens them with a key only the server knows (the `x-rw-card` header).
+  - Framing: `/epaper` may be framed by the site's own pages only (`X-Frame-Options: SAMEORIGIN`).
+
 ### Headlines desk (`/headlines.html`)
 
 HEADLINES goes on air at :58 and :28 (India time; the desk can change the minutes) and leads

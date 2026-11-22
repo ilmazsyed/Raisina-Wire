@@ -49,7 +49,7 @@ import { bulletinImages, bulletinImageRoute } from "./bulletinimg.js";
 import { prepareBulletinVoices, prepareLinks, voiceRoute } from "./bulletinvoice.js";
 import { avoStep, avoImageRoute, avoPlayed, avoLog, avoFromBreaking, avoManualAdd, avoManualEdit, avoManualDelete, avoFromArticle, avoScript, screenStory } from "./avo.js";
 import { marketBrief } from "./markets.js";
-import { ogRoute, renderCards, renderSiteCard } from "./ogcard.js";
+import { ogRoute, renderCards, renderSiteCard, renderEpaperCard, cardKey } from "./ogcard.js";
 import { indexNow } from "./indexnow.js";
 import { handleControlRoom, control as ctlCommand } from "./controlroom.js";
 import { serveClip, clipHousekeeping } from "./clips.js";
@@ -1380,7 +1380,9 @@ async function api(request, env, ctx) {
   if (url.pathname === "/api/epaper" || url.pathname.startsWith("/api/epaper/")) {
     if (request.method !== "GET") return err("Not found.", 404);
     const [, , , day, slot] = url.pathname.split("/"), lang = ["en", "hi"].includes(url.searchParams.get("lang")) ? url.searchParams.get("lang") : "bn";
-    if (lang !== "bn" && !(await currentUser(request, env).catch(() => null))) return json({ signin: true }, 401, { "cache-control": "no-store" });
+    // (the e-paper's share card, drawn by the server's headless browser, shows all three front pages)
+    const cardOk = !!request.headers.get("x-rw-card") && request.headers.get("x-rw-card") === await cardKey(env).catch(() => "");
+    if (lang !== "bn" && !cardOk && !(await currentUser(request, env).catch(() => null))) return json({ signin: true }, 401, { "cache-control": "no-store" });
     const ed = await readerEdition(env, { day: /^\d{4}-\d{2}-\d{2}$/.test(day || "") ? day : "", slot: ["morning", "evening"].includes(slot) ? slot : "", lang });
     if (!ed) return json({ edition: null }, 404, { "cache-control": "no-store" });
     return json({ edition: ed }, 200, { "cache-control": lang === "bn" ? "public, max-age=60" : "private, max-age=60" });
@@ -2017,6 +2019,11 @@ async function scheduled(env) {
     const origin = env.SITE_URL || (await env.DB.prepare("SELECT value FROM settings WHERE key='site_origin'").first())?.value;
     return renderSiteCard(env, String(origin || "").replace(/\/$/, ""));
   });
+  // The e-paper's share card: the three front pages, for each new edition (src/ogcard.js).
+  await step("e-paper card", async () => {
+    const origin = env.SITE_URL || (await env.DB.prepare("SELECT value FROM settings WHERE key='site_origin'").first())?.value;
+    return renderEpaperCard(env, String(origin || "").replace(/\/$/, ""));
+  });
 }
 // 9 am and 9 pm India time, every day (unless switched off in the control room).
 // The settings row makes each one send exactly once, even if two cron runs overlap.
@@ -2048,7 +2055,7 @@ export default {
     const url = new URL(request.url);
     // The share cards (src/ogcard.js); the cron needs the site's own address to photograph them.
     if (url.pathname.startsWith("/og/")) {
-      try { await ensureSchema(env); const r = await ogRoute(url, env, ctx); if (r) return r; } catch (e) { console.error("og", e?.stack || e); return Response.redirect(`${url.origin}/og-image.jpg`, 302); }
+      try { await ensureSchema(env); const r = await ogRoute(url, env, ctx, request); if (r) return r; } catch (e) { console.error("og", e?.stack || e); return Response.redirect(`${url.origin}/og-image.jpg`, 302); }
     }
     if (!env.SITE_URL && !originSaved && env.DB && /^https:/.test(url.origin) && !/localhost|127\.0\.0\.1/.test(url.host)) { originSaved = true; ctx.waitUntil(env.DB.prepare("INSERT INTO settings (key,value) VALUES ('site_origin',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(url.origin).run().catch(() => {})); }
     if (url.pathname.startsWith("/oauth/") || url.pathname.startsWith("/.well-known/oauth-")) { try { await ensureSchema(env); const response=await oauthHandle(request,env); if(response)return response; } catch(e) { return err("OAuth service temporarily unavailable.",503); } }
