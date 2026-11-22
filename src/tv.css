@@ -2077,3 +2077,29 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .avo.bg-teal .avo-brk{background:#021514}.avo.bg-teal .avo-brk .s1{background:linear-gradient(115deg,rgba(6,96,92,.95) 0 54%,transparent 54%)}
 .avo.bg-gold .avo-brk{background:#1a1203}.avo.bg-gold .avo-brk .s1{background:linear-gradient(115deg,rgba(176,124,10,.95) 0 54%,transparent 54%)}
 .hx-brk{padding:8px 18px;border-radius:8px;background:#fff;color:#e0101a;font:900 38px "Hind Siliguri",sans-serif;animation:tvblink 1.1s ease-in-out infinite}
+
+/* The live split's pointers (LiveFeed desk): a white panel, black type with red, a red glow that
+   pulses; the pointers share the panel's height, so it is full whatever their length. */
+.sp-panel{background:#fff;color:#111;border:3px solid #c8100f;padding:0 0 22px;gap:0;overflow:visible;
+  box-shadow:0 0 46px 6px rgba(200,16,15,.45),0 30px 70px rgba(0,0,0,.5)}
+.sp-panel::before{content:"";position:absolute;inset:-9px;border-radius:30px;border:6px solid #ff2a2a;pointer-events:none;animation:spglow 1.6s ease-in-out infinite}
+@keyframes spglow{0%,100%{opacity:.15;transform:scale(.995)}50%{opacity:1;transform:scale(1.008)}}
+.sp-head{margin:0;padding:18px 26px;background:#c8100f;border-bottom:0;border-radius:18px 18px 0 0;position:relative;overflow:hidden}
+.sp-head::after{content:"";position:absolute;top:0;bottom:0;width:38%;left:-40%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent);animation:spsweep 3.2s ease-in-out infinite}
+@keyframes spsweep{0%{left:-40%}60%,100%{left:110%}}
+.sp-live{background:#fff;color:#c8100f}
+.sp-live i{background:#c8100f}
+.sp-head b{color:#fff;font-size:38px}
+.sp-count{color:rgba(255,255,255,.9)}
+.sp-body{padding:0 26px;gap:12px}
+.sp-list{gap:0}
+.sp-list{min-height:0;overflow:hidden}
+.sp-list li{flex:1 0 auto;align-items:center;gap:20px;padding:14px 0;border-bottom:2px solid #f2d3d3}
+.sp-list li:last-child{border-bottom:0}
+.sp-no{width:66px;height:66px;border-radius:16px;background:#c8100f;color:#fff;font-size:34px;box-shadow:0 8px 18px rgba(200,16,15,.35)}
+.sp-list p{color:#111;font:800 var(--spf,42px)/1.3 "Noto Serif Bengali",serif;display:block;-webkit-line-clamp:unset;overflow:visible}
+.sp-list li:first-child p{color:#c8100f}
+.sp-bar{background:#f6dcdc;height:8px;border-radius:4px}
+.sp-bar i{background:#c8100f}
+.sp-wait{color:#8a8a8f}
+@media (prefers-reduced-motion: reduce){.sp-panel::before,.sp-head::after{animation:none}}

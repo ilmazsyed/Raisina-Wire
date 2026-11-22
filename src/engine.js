@@ -2815,6 +2815,18 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     put(".tvp-split .sp-body", sets.length ? `<ol class="sp-list" data-k="${k}">${sets[k].map((t, i) => `<li style="--n:${i}"><span class="sp-no">${bnDigits(first + i + 1)}</span><p>${esc(t)}</p></li>`).join("")}</ol>
       ${sets.length > 1 ? `<div class="sp-bar"><i style="animation-duration:${every}s"></i></div>` : ""}` : `<div class="sp-wait">আপডেট আসছে…</div>`);
     put(".tvp-split .sp-tl", title ? `<div class="sp-title"><span>LIVE</span><b>${esc(title)}</b></div>` : "");
+    // (the pointers' type as large as the panel holds: short pointers fill it, long ones fit)
+    // (measured again whenever the pointers or the panel's height change, so it is right once the
+    //  panel has come in and the type has loaded)
+    const ol = layer.querySelector(".sp-list"), key = ol ? `${ol.innerHTML.length}:${k}:${ol.clientHeight}:${document.fonts?.status || ""}` : "";
+    if (ol && ol.clientHeight > 120 && ol.dataset.fit !== key) {
+      let fs = channel === "v" ? 60 : 58;
+      ol.style.setProperty("--spf", `${fs}px`);
+      // (the pointers' own heights, not the list's scroll height: their slide-in would count as overflow)
+      const need = () => [...ol.children].reduce((n, li) => n + Math.max(66, li.querySelector("p")?.offsetHeight || 0) + 30, 0);
+      while (fs > 28 && need() > ol.clientHeight) { fs -= 2; ol.style.setProperty("--spf", `${fs}px`); }
+      ol.dataset.fit = `${ol.innerHTML.length}:${k}:${ol.clientHeight}:${document.fonts?.status || ""}`;
+    }
   }
   function autoLband(sc, video, L) {
     const cfg = st.tv?.lbandAuto, layer = $(".tvp-lbl");
