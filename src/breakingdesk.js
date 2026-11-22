@@ -1,21 +1,17 @@
-// The Breaking desk (control room): every breaking goes out from here, and the live desk.
-//   - Break in: the headline on both channels or one (with music), cleared from here too; the
-//     desk's log of every breaking. Each breaking is also read as an AVO story (src/avo.js).
-//   - Lives: the YouTube lives (paste a link, cut it on air, back to the running order).
-//   - The live split: a live on air at 60 (left on Rashtrix TV, top on Shorts) and the desk's
-//     pointers at 40. Up to 24 pointers in eight sets of three; each set is put live or taken off,
-//     and the sets on air take turns on screen. A change is on screen within a second
-//     (src/worker.js saveLiveDesk, src/control.js "split", src/engine.js drawSplit).
+// The Breaking desk (control room): every breaking goes out from here.
+//   - Break in: the headline full screen on both channels or one (with music), cleared from here
+//     too; the desk's log of every breaking. Each breaking is also read as an AVO story (src/avo.js).
+//   - BIG BREAKING over the ticker.
+// The lives, the live split and its pointers are on the LiveFeed desk (src/livefeed.js).
+// The page refreshes every twenty seconds without touching what is being typed.
 import "./tv.css";
 import { lightenVideo } from "./lightclip.js";
 import { shell, api, toast, fail, esc, $, $$, istClock } from "./crshell.js";
 import { mountTV } from "./engine.js";
 import { digits } from "./i18n.js";
 
-const S = { d: null, sets: [], dirty: false, mon: {}, lines: [""], media: null, bb: null, bbDirty: false };
+const S = { d: null, mon: {}, lines: [""], media: null, bb: null, bbDirty: false };
 const CH = { h: "Rashtrix TV", v: "Rashtrix Shorts" };
-const SETS = 8, PER = 3, MAX = 24;
-const blankSets = () => Array.from({ length: SETS }, (_, i) => ({ id: `s${i + 1}`, live: false, points: ["", "", ""] }));
 const when = t => { try { return istClock(Date.parse(t), false); } catch { return ""; } };
 
 async function uploadImage(file) {
@@ -49,6 +45,7 @@ async function uploadVideo(file, bar) {
 
 function drawBreak() {
   const d = S.d, on = Object.entries(d.breaking || {}).filter(([, b]) => b);
+  const keep = $("#bH") ? { h: $("#bH").checked, v: $("#bV").checked, m: $("#bMusic").checked, sec: $("#bSec").value, link: $("#bLink").value } : null;
   $(".bd-break").innerHTML = `<h2>Break in now</h2>
     ${on.length ? `<div class="bd-onair"><span class="tag red">BREAKING ON AIR</span>${on.map(([ch, b]) => `<span><b data-no-tr>${esc(b.text)}</b> <small class="muted">${CH[ch]} · ${when(b.at)}</small></span>`).join("")}</div>` : ""}
     <div class="bd-lines">${S.lines.map((t, i) => `<label class="bd-line"><span>${digits(i + 1)}</span><textarea rows="2" maxlength="160" data-bl="${i}" data-no-tr placeholder="${i ? "পরের লাইন (ঐচ্ছিক)" : "ব্রেকিং শিরোনাম লিখুন"}">${esc(t)}</textarea>${i ? `<button class="btn sm" type="button" data-blrm="${i}" aria-label="Remove">✕</button>` : ""}</label>`).join("")}</div>
@@ -68,6 +65,7 @@ function drawBreak() {
     <div class="row"><button class="btn red bd-fire" id="bGo">Break in</button><button class="btn" id="bClear">Clear breaking</button></div>
     <p class="muted" style="margin:0">It goes on every screen of the channels chosen at once, and is read as an AVO story within a minute.</p>
     <details ${d.log?.length ? "open" : ""}><summary class="muted">Breaking log (${digits((d.log || []).filter(x => x.act !== "clear").length)}) · every breaking, played again with one click</summary><ul class="bd-log">${(d.log || []).map(x => `<li><small class="muted">${when(x.at)} · ${(x.channels || []).map(c => CH[c]).join(", ")} · ${esc(x.by || "")}</small>${x.act === "clear" ? `<span class="muted">Cleared</span>` : `<b data-no-tr>${esc(x.text)}</b>${x.replay ? ` <span class="tag amber">PLAYED AGAIN</span>` : ""}${x.media ? ` <span class="tag">${x.media === "yt" ? "YOUTUBE" : x.media.toUpperCase()}</span>` : ""}<span><button class="btn sm red" data-again="${esc(x.at)}">▶ Play again</button> <button class="btn sm" data-np="${esc(x.at)}">Send to newsprint</button></span>${x.avoId ? (x.avoDeleted ? `<small class="muted">AVO deleted</small>` : `<span><button class="btn sm red" data-delavo="${esc(x.avoId)}">Delete its AVO</button></span>`) : ""}`}</li>`).join("") || `<li class="muted">Nothing yet.</li>`}</ul></details>`;
+  if (keep) { $("#bH").checked = keep.h; $("#bV").checked = keep.v; $("#bMusic").checked = keep.m; $("#bSec").value = keep.sec; $("#bLink").value = keep.link; }
   $$("[data-bl]").forEach(t => t.oninput = () => { S.lines[+t.dataset.bl] = t.value; });
   $$("[data-blrm]").forEach(b => b.onclick = () => { S.lines.splice(+b.dataset.blrm, 1); drawBreak(); });
   $("#bAdd")?.addEventListener("click", () => { if (S.lines.length < 5) { S.lines.push(""); drawBreak(); $(`[data-bl="${S.lines.length - 1}"]`)?.focus(); } });
@@ -142,42 +140,6 @@ function drawBig() {
   $("#bbOff")?.addEventListener("click", () => send(false));
 }
 
-function drawLives() {
-  const L = S.d.lives || [];
-  $(".bd-lives").innerHTML = `<h2>Lives</h2>
-    <form class="row" id="lAdd" style="flex-wrap:wrap"><input name="ref" required placeholder="YouTube or Facebook live link" style="flex:3;min-width:220px" data-no-tr><select name="channel"><option value="h">Rashtrix TV</option><option value="v">Rashtrix Shorts</option></select><input name="title" placeholder="Name on screen (optional)" style="flex:2;min-width:160px" data-no-tr><button class="btn">Add live</button></form>
-    <div class="bd-livelist">${L.map(x => `<div class="bd-live${x.on_air ? " on" : ""}"><div><b data-no-tr>${esc(x.title || x.yt_id)}</b><small class="muted">${String(x.yt_id).startsWith("fb:") ? '<span class="tag">FACEBOOK</span> ' : '<span class="tag">YOUTUBE</span> '}${CH[x.channel]} · ${String(x.yt_id).startsWith("fb:") ? "" : x.live_now ? '<span class="tag green">BROADCASTING</span>' : '<span class="tag">NOT LIVE</span>'}${x.on_air ? ' <span class="tag red">ON AIR</span>' : ""}${x.last_error ? ` · <span style="color:#ff6b6b">${esc(x.last_error)}</span>` : ""}</small></div>
-      ${x.on_air ? `<button class="btn" data-air="${esc(x.id)}" data-v="0">Back to the running order</button>` : `<button class="btn red" data-air="${esc(x.id)}" data-v="1">Cut live</button>`}</div>`).join("") || `<p class="muted">No lives yet. Paste a YouTube or Facebook live link above.</p>`}</div>
-    <p class="muted" style="margin:0">A YouTube live goes on screen only while it is broadcasting; a Facebook live goes on screen when you cut to it (Facebook does not say when it starts or ends). With the split on, it plays at 60 and the pointers at 40.</p>`;
-  $("#lAdd").onsubmit = async e => { e.preventDefault(); const v = Object.fromEntries(new FormData(e.currentTarget)); try { await api("/api/admin/tv/sources", { method: "POST", body: { channel: v.channel, ref: v.ref, title: v.title, kind: "live" } }); toast("Live added."); load(); } catch (err) { fail(err); } };
-  $$("[data-air]").forEach(b => b.onclick = async () => { const on = b.dataset.v === "1"; if (on && !confirm("Cut every screen on this channel to this live now?")) return;
-    try { await api(`/api/admin/tv/sources/${encodeURIComponent(b.dataset.air)}`, { method: "PUT", body: { onAir: on } }); toast(on ? "The live is on air." : "Back to the running order."); load(); } catch (e) { fail(e); } });
-}
-
-function drawSplit() {
-  const d = S.d.desk, n = S.sets.reduce((k, x) => k + x.points.filter(p => p.trim()).length, 0), live = S.sets.filter(x => x.live && x.points.some(p => p.trim())).length;
-  $(".bd-split").innerHTML = `<div class="row" style="justify-content:space-between;flex-wrap:wrap"><h2>Live split 60:40</h2><span class="muted">${digits(n)} / ${digits(MAX)} pointers · ${digits(live)} sets on air</span></div>
-    <div class="row" style="flex-wrap:wrap;gap:10px">${Object.entries(CH).map(([ch, name]) => `<button class="btn ${d.split[ch] ? "green" : ""}" data-split="${ch}" data-v="${d.split[ch] ? 0 : 1}">${name}: ${d.split[ch] ? "Split on" : "Split off"}</button>`).join("")}
-      <label style="flex-direction:row;align-items:center;gap:6px">Each set on screen<select id="spEvery">${[6, 8, 10, 12, 15, 20, 30].map(s => `<option value="${s}"${d.every === s ? " selected" : ""}>${digits(s)} s</option>`).join("")}</select></label></div>
-    <label>Line under the live (optional; the live's name if empty)<input id="spTitle" maxlength="80" value="${esc(d.title || "")}" data-no-tr></label>
-    <div class="bd-sets">${S.sets.map((x, i) => `<div class="bd-set${x.live ? " live" : ""}" data-set="${i}"><div class="row" style="justify-content:space-between"><b>Set ${digits(i + 1)}</b>${x.live ? '<span class="tag red">ON AIR</span>' : '<span class="tag">OFF</span>'}</div>
-      ${x.points.map((p, j) => `<label class="bd-pt"><span>${digits(i * PER + j + 1)}</span><textarea rows="2" maxlength="160" data-pt="${i}:${j}" data-no-tr placeholder="পয়েন্টার লিখুন">${esc(p)}</textarea></label>`).join("")}
-      <div class="row"><button class="btn sm ${x.live ? "" : "red"}" data-live="${i}">${x.live ? "Take off air" : "Put live"}</button><button class="btn sm" data-clr="${i}">Clear</button></div></div>`).join("")}</div>
-    <div class="row" style="flex-wrap:wrap"><button class="btn green" id="spSave">Save pointers${S.dirty ? " •" : ""}</button><button class="btn" id="spAll">Put all filled sets live</button><button class="btn" id="spNone">Take all off air</button></div>
-    <p class="muted" style="margin:0">Write the pointers, then put a set live: it is on screen within a second. The sets on air take turns, three pointers at a time. Turn the split on for the channel the live is on.</p>`;
-  $$("[data-pt]").forEach(t => t.oninput = () => { const [i, j] = t.dataset.pt.split(":").map(Number); S.sets[i].points[j] = t.value; S.dirty = true; $("#spSave").textContent = "Save pointers •"; });
-  $$("[data-live]").forEach(b => b.onclick = () => { const x = S.sets[+b.dataset.live]; if (!x.live && !x.points.some(p => p.trim())) return toast("Write a pointer in this set first.", true); x.live = !x.live; save(x.live ? "Set is on air." : "Set taken off air."); });
-  $$("[data-clr]").forEach(b => b.onclick = () => { const x = S.sets[+b.dataset.clr]; x.points = ["", "", ""]; x.live = false; save("Set cleared."); });
-  $$("[data-split]").forEach(b => b.onclick = () => saveRaw({ split: { [b.dataset.split]: b.dataset.v === "1" } }, b.dataset.v === "1" ? "Split on." : "Split off."));
-  $("#spEvery").onchange = e => saveRaw({ every: Number(e.target.value) }, "Saved.");
-  $("#spTitle").onchange = e => saveRaw({ title: e.target.value }, "Saved.");
-  $("#spSave").onclick = () => save("Pointers saved. Sets on air update at once.");
-  $("#spAll").onclick = () => { S.sets.forEach(x => { x.live = x.points.some(p => p.trim()); }); save("Every filled set is on air."); };
-  $("#spNone").onclick = () => { S.sets.forEach(x => { x.live = false; }); save("All sets off air."); };
-}
-async function saveRaw(body, msg) { try { const r = await api("/api/admin/tv/desk/live", { method: "PUT", body }); S.d.desk = r.desk; toast(msg); drawSplit(); } catch (e) { fail(e); } }
-async function save(msg) { try { const r = await api("/api/admin/tv/desk/live", { method: "PUT", body: { sets: S.sets } }); S.d.desk = r.desk; S.dirty = false; toast(msg); drawSplit(); } catch (e) { fail(e); } }
-
 // Program monitors: what each channel has on air now (muted).
 function monitors() {
   $(".bd-mons").innerHTML = Object.entries(CH).map(([ch, n]) => `<div class="bd-mon ${ch}"><small class="muted">${n} · on air</small><div class="bd-screen" id="mon-${ch}"></div></div>`).join("");
@@ -187,16 +149,17 @@ function monitors() {
 async function load() {
   try {
     S.d = await api("/api/admin/tv/desk");
-    if (!S.dirty) { const g = S.d.desk.sets || []; S.sets = blankSets().map((b, i) => g[i] ? { id: g[i].id || b.id, live: !!g[i].live, points: [0, 1, 2].map(j => g[i].points?.[j] || "") } : b); }
-    drawBreak(); if (!document.activeElement?.closest?.(".bd-big")) drawBig(); drawLives();
-    if (!document.activeElement?.closest?.(".bd-split")) drawSplit();
+    // (a panel being typed in is left as it is)
+    if (!document.activeElement?.closest?.(".bd-break")) drawBreak();
+    if (!document.activeElement?.closest?.(".bd-big")) drawBig();
   } catch (e) { fail(e); }
 }
 
 (async () => {
   const user = await shell("Breaking desk");
   if (!user) return;
-  $("main").innerHTML = `<div class="bd-wrap"><div class="bd-col"><section class="panel bd-break"><p class="muted">Loading…</p></section><section class="panel bd-big"></section><section class="panel bd-lives"></section><section class="panel bd-monp"><h2>On air</h2><div class="bd-mons"></div></section></div>
-    <section class="panel bd-split"></section></div>`;
+  $("main").innerHTML = `<div class="bd-wrap"><div class="bd-col"><section class="panel bd-break"><p class="muted">Loading…</p></section></div>
+    <div class="bd-col"><section class="panel bd-monp"><h2>On air</h2><div class="bd-mons"></div></section><section class="panel bd-big"></section>
+    <p class="muted" style="margin:0">Lives, the live split and its pointers are on the <a href="/livefeed.html">LiveFeed desk</a>.</p></div></div>`;
   await load(); monitors(); setInterval(load, 20000);
 })();

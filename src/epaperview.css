@@ -183,6 +183,9 @@ body{background:radial-gradient(ellipse at 50% 20%,#f3f4f6 0%,#dcdee2 70%,#cdd0d
 .z1{column-count:1}.z2{column-count:2}.z4{column-count:4}.z6{column-count:6;column-gap:18px}
 .zs{position:relative;margin:0 0 10px;padding-bottom:9px;border-bottom:.6px solid #cfcfd2;cursor:pointer}
 .zs:last-child{border-bottom:0}
+/* (Safari does not paint a positioned block's text in the columns after the first: the lead's
+   text under the big picture stays plain, so it shows in every column) */
+.zs.lead{position:static}
 .zs .zh{break-inside:avoid;break-after:avoid}
 .zs .kick{margin-bottom:3px}
 .zs .hl{font-size:calc(var(--hs, 26px) * var(--k));margin-bottom:5px;overflow-wrap:anywhere;hyphens:auto}
