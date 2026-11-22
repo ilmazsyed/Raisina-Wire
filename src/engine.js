@@ -921,6 +921,16 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const o = st.onair; if (!o?.seg || Date.now() - (o.recv || 0) > 75e3) return null;
     const sg = { ...o.seg };
     if (sg.type === "avo") { sg.stories = (sg.ids || []).map(id => (st.tv?.avo || []).find(x => x.id === id)).filter(Boolean); if (!sg.stories.length) return null; }
+    // A YouTube video this screen cannot start (an iPhone that wants a tap first, a video YouTube
+    // refuses here, or one that has not moved in twelve seconds) is not waited on: the screen runs
+    // the channel's order itself until the output moves on to its next item. (Waiting on it, the
+    // iPhone app sat on a stuck player and was closed by the phone, again and again.)
+    if (mode === "app" && sg.ytId && (sg.type === "video" || sg.type === "ad")) {
+      const k = `${sg.ytId}:${sg.start}`;
+      if (st.masterSkip === k) return null;
+      const drawn = st.current?.scene?.key === (sg.type === "ad" ? `c:ad:${sg.start}` : `c:${sg.ytId}:${sg.start}`) ? st.current.drawnAt || 0 : 0;
+      if (ytIsBad(sg.ytId) || host.querySelector(".tvp-ytlayer")?.classList.contains("tap") || (drawn && Date.now() - drawn > 12000 && !((st.ytMovedAt || 0) > drawn))) { st.masterSkip = k; return null; }
+    }
     if (st.seq) st.seq.seg = sg;
     return sg;
   }

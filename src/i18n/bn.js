@@ -1848,4 +1848,5 @@ export default {
   "A picture: paste an https picture address, or an uploaded one.": "ছবি: https ছবির ঠিকানা, বা আপলোড করা ছবির ঠিকানা বসান।",
   "Give it a name and press Save. Click the source to put it in the preview, check it there, then TAKE.": "একটি নাম দিয়ে সেভ করুন। উৎসটিতে ক্লিক করলে তা প্রিভিউতে আসবে। সেখানে দেখে নিয়ে TAKE করুন।",
   "In a layout with several windows, choose each window's source, and which window carries the sound, under Windows next to the layouts.": "কয়েকটি জানালার লেআউটে প্রতিটি জানালার উৎস, আর কোন জানালার আওয়াজ যাবে, তা লেআউটের পাশে ‘জানালা’-য় বাছুন।",
+  "Watch Rashtrix TV": "রাষ্ট্রিক্স টিভি দেখুন",
 };
