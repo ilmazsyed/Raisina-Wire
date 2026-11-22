@@ -2277,6 +2277,10 @@ function tvCrashGuard() {
   const before = tvBoots();
   if (!tvBootNoted) {
     tvBootNoted = true;
+    // (a page the reader closes or leaves is not a crash: its note is cleared; a page the phone
+    //  kills out of memory never gets to do this)
+    addEventListener("pagehide", () => tvBoots(true));
+    document.addEventListener("visibilitychange", () => { if (document.hidden) tvBoots(true); });
     try { localStorage.setItem("rw-tv-boots", JSON.stringify([...before, Date.now()])); } catch { /* private mode */ }
     setTimeout(() => tvBoots(true), 90e3);
   }
