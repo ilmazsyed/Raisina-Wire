@@ -55,7 +55,14 @@ export function buildHeads(cfg, pool, more = []) {
     .map(x => ({ id: x.id, auto: false, text: x.text, desk: x.desk || "", image: x.image || "", video: x.video || "", when: x.when?.length ? x.when : null, top: !!x.top, repeat: x.repeat || 0, aired: x.aired || 0 }));
   // (the desk's own headlines first, those marked "top" before the rest; then the wire's)
   own.sort((a, b) => (b.top ? 1 : 0) - (a.top ? 1 : 0));
-  return { auto, items: [...own, ...auto.filter(a => !a.hidden).slice(0, 20)] };
+  let all = [...own, ...auto.filter(a => !a.hidden)];
+  // The desk's order: the headlines it placed keep their places, new ones from the wire come after
+  // them (none at all while the list is locked). BREAKING headlines always lead.
+  const order = (cfg.order || []).filter(id => all.some(x => x.id === id));
+  if (order.length) { const placed = order.map(id => all.find(x => x.id === id)); all = cfg.lock ? placed : [...placed, ...all.filter(x => !order.includes(x.id))]; }
+  const brk = new Set(cfg.brk || []), hold = cfg.secsOf || {};
+  all = [...all.filter(x => brk.has(x.id)), ...all.filter(x => !brk.has(x.id))].map(x => ({ ...x, brk: brk.has(x.id), hold: Number(hold[x.id]) || 0 }));
+  return { auto, items: all.slice(0, 30) };
 }
 
 // The newsreader's line for each headline, when it is ready: id → { voice, secs }.
@@ -97,11 +104,24 @@ export async function headsAired(env, b) {
   if (changed) await putHeads(env, cfg);
 }
 
+const ids = (v, n) => [...new Set((Array.isArray(v) ? v : []).map(x => clean(x, 60)).filter(Boolean))].slice(0, n);
+// The desk's "record again": a headline's line made afresh now (after its words were changed).
+export async function headVoiceAgain(env, text) {
+  if (!ttsEnabled(env)) throw new Error("The newsreader's voice is not set up.");
+  const t = clean(text, 160); if (!t) throw new Error("Nothing to read.");
+  const kf = await keyOf(env, t, "f"), km = await keyOf(env, t, "m");
+  await env.DB.prepare("DELETE FROM tts_audio WHERE key IN (?,?)").bind(kf, km).run();
+  const line = lineOf(t), audio = await synthesize(env, line, tvVoice(env, "f"), "bn-IN", voiceRate(env));
+  await env.DB.prepare("INSERT OR REPLACE INTO tts_audio (key,voice,chars,data) VALUES (?,?,?,?)").bind(kf, tvVoice(env, "f"), line.length, audio.buffer).run();
+  await chargeVoice(env, line.length);
+  return { ok: true, voice: `/api/tv/voice/${kf}.mp3` };
+}
 // /api/admin/heads: GET the desk (settings, the automatic headlines, the desk's own); PUT saves it.
 export async function handleHeads(request, env, user, { json, err, audit, state }) {
   if (request.method === "GET") {
     const cfg = await headsSettings(env), s = await state();
-    return json({ settings: { on: cfg.on, mins: cfg.mins, count: cfg.count, secs: cfg.secs }, items: cfg.items, edits: cfg.edits || {}, hidden: cfg.hidden || [], auto: s?.heads?.auto || [], onAir: s?.heads?.items || [] }, 200, { "cache-control": "no-store" });
+    return json({ settings: { on: cfg.on, mins: cfg.mins, count: cfg.count, secs: cfg.secs }, items: cfg.items, edits: cfg.edits || {}, hidden: cfg.hidden || [], order: cfg.order || [], lock: !!cfg.lock, brk: cfg.brk || [], secsOf: cfg.secsOf || {}, runs: cfg.runs || {},
+      auto: s?.heads?.auto || [], onAir: s?.heads?.items || [], pool: (s?.avo || []).map(x => ({ id: x.id, title: x.title, desk: x.desk, image: x.images?.[0]?.src || "" })).slice(0, 40) }, 200, { "cache-control": "no-store" });
   }
   if (request.method === "PUT") {
     const b = await request.json().catch(() => ({})), cfg = await headsSettings(env);
@@ -109,7 +129,7 @@ export async function handleHeads(request, env, user, { json, err, audit, state 
     const mins = [...new Set((Array.isArray(b.mins) ? b.mins : cfg.mins).map(v => int(v, 0, 59, -1)).filter(v => v >= 0))].slice(0, 4);
     const items = (Array.isArray(b.items) ? b.items : []).slice(0, 40).map(x => {
       const id = /^[\w-]{6,40}$/.test(String(x?.id || "")) ? String(x.id) : crypto.randomUUID();
-      return { id, text: clean(x?.text, 160), desk: clean(x?.desk, 40), image: mediaUrl(x?.image), video: mediaUrl(x?.video),
+      return { id, ref: clean(x?.ref, 80), text: clean(x?.text, 160), desk: clean(x?.desk, 40), image: mediaUrl(x?.image), video: mediaUrl(x?.video),
         when: (Array.isArray(x?.when) ? x.when : []).map(hhmm).filter(Boolean).slice(0, 48), top: !!x?.top,
         repeat: int(x?.repeat, 0, 999, 0), aired: x?.resetCount ? 0 : old.get(id)?.aired || 0, at: old.get(id)?.at || new Date().toISOString(), by: old.get(id)?.by || user.id };
     }).filter((x, i, all) => x.text && all.findIndex(y => y.id === x.id) === i);
@@ -119,7 +139,11 @@ export async function handleHeads(request, env, user, { json, err, audit, state 
       if (v.text || v.image || v.video || v.noimg) edits[clean(id, 60)] = v;
     }
     const next = { on: b.on === undefined ? cfg.on : !!b.on, mins: mins.length ? mins : HEADS_DEFAULT.mins, count: int(b.count, 6, 15, cfg.count), secs: int(b.secs, 6, 20, cfg.secs),
-      items, hidden: (Array.isArray(b.hidden) ? b.hidden : []).map(v => clean(v, 60)).filter(Boolean).slice(0, 200), edits };
+      items, hidden: (Array.isArray(b.hidden) ? b.hidden : []).map(v => clean(v, 60)).filter(Boolean).slice(0, 200), edits,
+      // the on-air order, its lock, the BREAKING headlines, seconds per headline, and runs planned one by one
+      order: ids(b.order, 60), lock: !!b.lock, brk: ids(b.brk, 20),
+      secsOf: Object.fromEntries(Object.entries(b.secsOf && typeof b.secsOf === "object" ? b.secsOf : {}).slice(0, 80).map(([k, v]) => [clean(k, 60), int(v, 6, 30, 0)]).filter(([k, v]) => k && v)),
+      runs: Object.fromEntries(Object.entries(b.runs && typeof b.runs === "object" ? b.runs : {}).filter(([k]) => hhmm(k)).slice(0, 48).map(([k, v]) => [k, ids(v, 15)]).filter(([, v]) => v.length)) };
     await putHeads(env, next);
     await audit("heads.update", "settings", KEY, { items: items.length });
     return json({ ok: true }, 200, { "cache-control": "no-store" });

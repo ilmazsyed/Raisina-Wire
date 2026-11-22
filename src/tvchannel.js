@@ -303,7 +303,7 @@ export async function tvState(env, ch) {
   if (hcfg) {
     const hb = buildHeads(hcfg, top.map(r => ({ id: r.id, title: r.title, category: r.category, image: picOf(r) })), stories.map(r => ({ id: r.id, title: r.title, category: r.category })));
     const hv = await headVoices(env, hb.items).catch(() => new Map());
-    heads = { on: hcfg.on !== false, mins: hcfg.mins, count: hcfg.count, secs: hcfg.secs, items: hb.items.map(x => ({ ...x, ...(hv.get(x.id) || {}) })), auto: hb.auto };
+    heads = { on: hcfg.on !== false, mins: hcfg.mins, count: hcfg.count, secs: hcfg.secs, runs: hcfg.runs || {}, items: hb.items.map(x => ({ ...x, ...(hv.get(x.id) || {}) })), auto: hb.auto };
   }
   // The newsreader's line for each story, when it is ready (src/bulletinvoice.js).
   const voices = await readyVoices(env, bulletin).catch(() => new Map());

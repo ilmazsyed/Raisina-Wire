@@ -18,13 +18,25 @@ const key = ch => `lrd:${ch}`;
 export async function lrdEdits(env, ch) {
   let v = {};
   try { v = JSON.parse((await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(key(ch)).first())?.value || "{}"); } catch { /* none */ }
-  const cut = Date.now() - 3 * 3600e3;
-  return { skip: (v.skip || []).filter(k => Number(String(k).split(":")[1]) > cut), adds: (v.adds || []).filter(a => a.at > cut) };
+  const cut = Date.now() - 3 * 3600e3, live = k => Number(String(k).split(":")[1]) > cut;
+  return { skip: (v.skip || []).filter(live), adds: (v.adds || []).filter(a => a.daily || a.at > cut),
+    shift: Object.fromEntries(Object.entries(v.shift || {}).filter(([k]) => live(k))), notes: Object.fromEntries(Object.entries(v.notes || {}).filter(([k]) => !/^[bhsc]:/.test(k) || live(k))) };
+}
+// An item repeated daily, at its time of day: today's and tomorrow's.
+const DAY = 864e5;
+function expandDaily(adds) {
+  const out = [];
+  for (const a of adds) {
+    if (!a.daily) { out.push(a); continue; }
+    const tod = ((a.at + IST) % DAY + DAY) % DAY, d0 = dayStart(istDayOf());
+    for (const at of [d0 + tod - DAY, d0 + tod, d0 + tod + DAY]) out.push({ ...a, at, id: `${a.id}@${istDayOf(at)}` });
+  }
+  return out;
 }
 // What the screens get with the channel's state: the changes still to come (and the last hour's).
 export async function lrdForScreens(env, ch) {
   const e = await lrdEdits(env, ch), cut = Date.now() - 3600e3;
-  return { skip: e.skip.filter(k => Number(String(k).split(":")[1]) > cut), adds: e.adds.filter(a => a.at > cut) };
+  return { skip: e.skip.filter(k => Number(String(k).split(":")[1]) > cut), adds: expandDaily(e.adds).filter(a => a.at > cut), shift: e.shift };
 }
 
 // The channel's clock for a day: each fixed item with its time (ms), kind and key.
@@ -66,17 +78,25 @@ export async function handleLrd(request, env, url, user, { json, err, audit, set
   if (request.method === "GET") {
     const s = await settingsOf(ch), heads = await headsSettings(env).catch(() => null);
     const items = plan(day, clockOf(s), heads?.on === false ? [] : heads?.mins || [58, 28]);
-    const edits = await lrdEdits(env, ch);
+    const edits = await lrdEdits(env, ch); edits.adds = expandDaily(edits.adds).filter(a => a.at >= dayStart(day) - 3600e3 && a.at < dayStart(day) + DAY + 3600e3);
+    let log = []; try { log = JSON.parse((await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(`lrdlog:${ch}`).first())?.value || "[]"); } catch { /* none */ }
     const { results } = await env.DB.prepare("SELECT at, ended_at, type, title, planned, actual, how FROM asrun WHERE channel=? AND day=? ORDER BY at LIMIT 5000").bind(ch, day).all().catch(() => ({ results: [] }));
-    return json({ day, ch, now: Date.now(), items, edits, asrun: results }, 200, { "cache-control": "no-store" });
+    return json({ day, ch, now: Date.now(), items, edits, asrun: results, log }, 200, { "cache-control": "no-store" });
   }
   if (request.method === "PUT") {
     const b = await request.json().catch(() => ({})), c = ["h", "v"].includes(b.ch) ? b.ch : ch, cut = Date.now() - 3600e3;
     const skip = [...new Set((Array.isArray(b.skip) ? b.skip : []).map(String).filter(k => /^[bhsc]:\d{12,14}$/.test(k) && Number(k.split(":")[1]) > cut))].slice(0, 500);
-    const adds = (Array.isArray(b.adds) ? b.adds : []).map(a => ({ id: /^[\w-]{6,40}$/.test(String(a?.id || "")) ? String(a.id) : crypto.randomUUID(), at: Math.round(Number(a?.at) || 0), kind: ["avo", "video", "seg"].includes(a?.kind) ? a.kind : "", ref: String(a?.ref || "").slice(0, 120), title: String(a?.title || "").replace(/\s+/g, " ").trim().slice(0, 160), dur: Math.max(0, Math.min(7200, Math.round(Number(a?.dur) || 0))) }))
-      .filter(a => a.kind && a.ref && a.at > cut && (a.kind !== "seg" || SEG_NAMES[a.ref])).sort((x, y) => x.at - y.at).slice(0, 200);
-    await env.DB.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(key(c), JSON.stringify({ skip, adds })).run();
-    await audit("lrd.update", "settings", key(c), { skip: skip.length, adds: adds.length });
+    // (an item repeated daily keeps its first id; the copies the screens see carry the day after "@")
+    const adds = (Array.isArray(b.adds) ? b.adds : []).map(a => ({ id: /^[\w-]{6,40}$/.test(String(a?.id || "").split("@")[0]) ? String(a.id).split("@")[0] : crypto.randomUUID(), at: Math.round(Number(a?.at) || 0), kind: ["avo", "video", "seg", "card"].includes(a?.kind) ? a.kind : "", ref: String(a?.ref || "").slice(0, 200), title: String(a?.title || "").replace(/\s+/g, " ").trim().slice(0, 160), dur: Math.max(0, Math.min(7200, Math.round(Number(a?.dur) || 0))), daily: !!a?.daily }))
+      .filter((a, i, all) => a.kind && a.ref && (a.daily || a.at > cut) && (a.kind !== "seg" || SEG_NAMES[a.ref]) && all.findIndex(x => x.id === a.id) === i).sort((x, y) => x.at - y.at).slice(0, 200);
+    const shift = Object.fromEntries(Object.entries(b.shift && typeof b.shift === "object" ? b.shift : {}).filter(([k, v]) => /^[bhs]:\d{12,14}$/.test(k) && Number(k.split(":")[1]) > cut && Number(v) > 0).slice(0, 200).map(([k, v]) => [k, Math.min(10, Math.round(Number(v)))]));
+    const notes = Object.fromEntries(Object.entries(b.notes && typeof b.notes === "object" ? b.notes : {}).map(([k, v]) => [String(k).slice(0, 60), String(v || "").replace(/\s+/g, " ").trim().slice(0, 300)]).filter(([, v]) => v).slice(0, 300));
+    await env.DB.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(key(c), JSON.stringify({ skip, adds, shift, notes })).run();
+    // The history: who changed what, the last 60 changes.
+    let log = []; try { log = JSON.parse((await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(`lrdlog:${c}`).first())?.value || "[]"); } catch { /* none */ }
+    log = [{ at: new Date().toISOString(), by: user.display_name || user.email || "", what: String(b.what || "Changed the rundown").slice(0, 160) }, ...log].slice(0, 60);
+    await env.DB.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(`lrdlog:${c}`, JSON.stringify(log)).run();
+    await audit("lrd.update", "settings", key(c), { skip: skip.length, adds: adds.length, what: String(b.what || "").slice(0, 80) });
     return json({ ok: true }, 200, { "cache-control": "no-store" });
   }
   return err("Not found.", 404);
