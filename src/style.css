@@ -2193,7 +2193,7 @@ header.wrap .nameplate-tag p.tagline-sub{margin:0;font:700 21px/1.3 "Noto Serif 
 /* ---------- The phone home page (src/main.js, viewHomePhone) ---------- */
 .ph-home{display:flex;flex-direction:column;padding-bottom:28px;--ph-card:#faf6ec;--ph-card-line:rgba(212,160,23,.4);--ph-gold-ink:#5a4508}
 :root[data-theme=dark] .ph-home{--ph-card:#1b1910;--ph-card-line:rgba(212,160,23,.3);--ph-gold-ink:#e3bd52}
-.ph-home h2{margin:0;font-family:var(--serif);font-weight:800;font-size:21px;line-height:1.25;color:var(--ink)}
+.ph-home h2:not(.tvp h2){margin:0;font-family:var(--serif);font-weight:800;font-size:21px;line-height:1.25;color:var(--ink)}
 .ph-home .ph-h{font-family:var(--serif);font-weight:700;font-size:17px;line-height:1.42;color:var(--ink)}
 .ph-home .ph-h.big{font-size:20px;line-height:1.35}
 .ph-meta{font-size:12.5px;color:var(--muted)}
@@ -2240,13 +2240,14 @@ header.wrap .nameplate-tag p.tagline-sub{margin:0;font:700 21px/1.3 "Noto Serif 
 
 /* the desks as story bubbles */
 .ph-bubbles{padding:14px 0 2px}
-.ph-bub-row{display:flex;gap:12px;padding:0 16px;overflow-x:auto;scrollbar-width:none;scroll-snap-type:x proximity}
+.ph-bub-row{display:flex;gap:10px;padding:0 16px;overflow-x:auto;scrollbar-width:none;scroll-snap-type:x proximity}
 .ph-bub-row::-webkit-scrollbar{display:none}
-.ph-bub{display:flex;flex-direction:column;align-items:center;gap:6px;width:70px;flex-shrink:0;background:none;border:0;padding:0;cursor:pointer;scroll-snap-align:start;font-family:var(--sans)}
-.ph-bub-ring{width:66px;height:66px;border-radius:50%;border:3px solid var(--red);display:flex;align-items:center;justify-content:center;background:var(--bg);box-sizing:border-box}
+.ph-bub{display:flex;flex-direction:column;align-items:center;gap:5px;width:60px;flex-shrink:0;background:none;border:0;padding:0;cursor:pointer;scroll-snap-align:start;font-family:var(--sans)}
+.ph-bub-ring{width:54px;height:54px;border-radius:50%;border:2.5px solid var(--red);display:flex;align-items:center;justify-content:center;background:var(--bg);box-sizing:border-box}
 .ph-bub.seen .ph-bub-ring{border-color:color-mix(in srgb,var(--muted) 45%,transparent)}
-.ph-bub-face{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12.5px;line-height:1.1;text-align:center;overflow:hidden;padding:0 4px;box-sizing:border-box}
-.ph-bub-name{font-size:12.5px;font-weight:600;color:var(--ink);text-align:center;line-height:1.2;max-width:74px}
+.ph-bub-face svg{width:21px;height:21px}
+.ph-bub-face{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12.5px;line-height:1.1;text-align:center;overflow:hidden;padding:0 4px;box-sizing:border-box}
+.ph-bub-name{font-size:11.5px;font-weight:600;color:var(--ink);text-align:center;line-height:1.2;max-width:64px}
 .ph-bub.seen .ph-bub-name{color:var(--muted)}
 .ph-bub:active .ph-bub-ring{transform:scale(.94)}
 
@@ -2359,6 +2360,8 @@ body.ds-open{overflow:hidden}
    out of the picture, so its images and moving parts let go of memory. */
 html.tvp-fs-lock body:before{display:none}
 html.tvp-fs-lock .ticker-move{animation:none}
+/* Full screen on a phone: only the player is drawn; the page behind it (ticker, header, menus) is not. */
+html.tvp-fs-lock #app>.ticker,html.tvp-fs-lock #app>header,html.tvp-fs-lock #app>.nav-dock,html.tvp-fs-lock #app>.read-progress{display:none!important}
 html.tvp-fs-lock .watch .wrap>:not(.tv-watch),html.tvp-fs-lock .tv-interact,html.tvp-fs-lock .site-footer,html.tvp-fs-lock .tabbar,html.tvp-fs-lock .ph-home>:not(.ph-tv){display:none!important}
 
 /* the app's own cards, swiped like ads (phone home) */

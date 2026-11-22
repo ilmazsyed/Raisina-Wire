@@ -104,7 +104,8 @@ export async function fetchSources(env, { force = false } = {}) {
     try {
       const r = await fetch(s.feed_url, { headers: { "user-agent": UA, accept: "application/rss+xml, application/xml, text/xml, */*" }, signal: AbortSignal.timeout(9000) });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const items = parseFeed(await r.text(), s.name).filter(i => !i.publishedAt || Date.now() - Date.parse(i.publishedAt) < MAX_AGE_H * 3600e3);
+      const items = parseFeed(await r.text(), s.name).filter(i => !i.publishedAt || Date.now() - Date.parse(i.publishedAt) < MAX_AGE_H * 3600e3)
+        .filter(i => s.desk !== "Probashi Bangali" || forProbashi(`${i.title} ${i.summary || ""}`));
       const stmts = items.slice(0, 60).map(i => env.DB.prepare("INSERT OR IGNORE INTO wire_items (id,source_id,source_name,lang,url,title,summary,published_at,status) VALUES (?,?,?,?,?,?,?,?,?)")
         .bind(id(), s.id, s.name, s.lang || scriptLang(i.title), i.url, i.title.slice(0, 400), (i.summary || "").slice(0, 1200), i.publishedAt, blocked(i, rules) ? "blocked" : "new"));
       const res = stmts.length ? await env.DB.batch(stmts) : [];
@@ -184,6 +185,9 @@ const isKolkata = t => KOLKATA_NF.test(nf(t)), isStateLevel = t => STATE_LEVEL.t
 const IN_INDIA = /^(india|bharat|ভারত|भारत)$/i;
 const BEAT_DESK = { entertainment: "Entertainment", sports: "Sports", lifestyle: "Lifestyle" };
 export function deskFor(out) {
+  // Bengalis abroad: their festivals, culture, associations and troubles, and the rules that affect
+  // Indians living abroad, go to Probashi Bangali whatever the beat (sport excepted).
+  if (out?.beat !== "sports" && (out?.scope === "diaspora" || isProbashi(`${out?.en?.title || ""} ${out?.bn?.title || ""} ${out?.en?.dek || ""}`))) return "Probashi Bangali";
   // Entertainment, sport and lifestyle have their own desks, wherever the story happened.
   if (BEAT_DESK[out?.beat]) return BEAT_DESK[out.beat];
   if (SUBJECT_DESKS.includes(out?.desk)) return out.desk;
@@ -232,7 +236,7 @@ Also file the story correctly. First give "place": where the main event happened
 - "state": anywhere else in West Bengal, or about West Bengal as a whole: the state government, Nabanna, the chief minister, the state assembly, state-wide politics and parties, the Calcutta High Court, a district — even if the announcement was made in Kolkata.
 - "national": India outside West Bengal, or India as a whole: the central government, Parliament, the Supreme Court, other states, national politics, the economy, national sport.
 - "international": events outside India, including Bangladesh and the rest of South Asia, and foreign affairs where the event happened abroad.
-- "diaspora": Bengalis living outside West Bengal, in other states or abroad, as the subject of the story (their associations, festivals, troubles, migrant workers from Bengal elsewhere).
+- "diaspora": Bengalis living outside West Bengal, above all abroad (NRI and Probashi Bengalis), as the subject of the story: their associations and festivals (Durga Puja, Poila Baisakh, Rabindra Jayanti abroad), Bengali language, schools, music, theatre and food abroad, their achievements and troubles, migrant workers from Bengal elsewhere; and developments that affect Indians living abroad (visas, immigration, OCI cards, passports, NRI taxes and remittances, the safety of Indian students and workers abroad). This applies whatever the beat, except sport.
 Then "beat", the kind of story:
 - "entertainment": films, television and web series, music, theatre, celebrities and their work, film festivals, box office.
 - "sports": every sport and sportsperson: cricket, football (Mohun Bagan, East Bengal, Mohammedan Sporting), the Olympics, tennis, chess and the rest, at any level.
@@ -341,7 +345,9 @@ export async function writeJob(env, job, { onAlert } = {}) {
   for (const it of items) { const t = await sourceText(it.url); it.text = t?.text || ""; }
   const usable = items.filter(it => (it.text || it.summary || "").length >= 120 || it.title.length > 20);
   if (!usable.length) throw new Error("the sources had no readable text");
-  let out = await callGemini(env, prompt(job.kind, usable));
+  const srcDesk = await env.DB.prepare(`SELECT desk FROM wire_sources WHERE id IN (${items.map(() => "?").join(",")})`).bind(...items.map(it => it.source_id)).all().then(r => r.results.map(x => x.desk || "")).catch(() => []);
+  const probashiOnly = srcDesk.length && srcDesk.every(d => d === "Probashi Bangali");
+  let out = await callGemini(env, prompt(job.kind, usable) + (probashiOnly ? PROBASHI_NOTE : ""));
   if (out.unusable) { const e = new Error(`not usable: ${out.reason || "no reason given"}`); e.skip = true; throw e; }
   const srcTexts = usable.flatMap(it => [it.title, it.summary, it.text]);
   let copied = ["bn", "en", "hi"].map(l => copiedRun(`${out[l]?.title}\n${out[l]?.body}`, srcTexts)).find(Boolean);
@@ -352,7 +358,8 @@ export async function writeJob(env, job, { onAlert } = {}) {
   }
   const bn = out.bn || {}, en = out.en || {}, hi = out.hi || {};
   if (!bn.title || wordCount(bn.body) < (job.kind === "brief" ? 50 : 80)) throw new Error("the Bengali text came back too short");
-  const desk = deskFor(out) || categorize(`${en.title} ${bn.title}`);
+  if (probashiOnly && out.scope !== "diaspora" && !isProbashi(`${en.title} ${bn.title} ${en.dek || ""}`)) { const e = new Error("not for the Probashi Bangali desk"); e.skip = true; throw e; }
+  const desk = probashiOnly ? "Probashi Bangali" : deskFor(out) || categorize(`${en.title} ${bn.title}`);
   const tags = splitTags((out.tags || []).join(",")).join(",");
   const auto = (await setting(env, "wire_autopublish", "on")) !== "off";
   const aid = id(), slug = await uniqueSlug(env, latinSlug(en.title) || `news-${aid.slice(0, 8)}`), at = now();
@@ -464,6 +471,37 @@ export async function videoHeadlines(env, n = 15) {
   return { done: stmts.length, written: Object.keys(lines).length };
 }
 
+
+/* ---------- The Probashi Bangali desk ---------- */
+// Stories about Bengalis abroad, and developments that affect Indians living abroad.
+const PROBASHI_RE = /\b(bengali (diaspora|community|association|associations|families|expats?|students?|doctors?|engineers?)|bengalis? (in|abroad|living|settled|across) [a-z]|non-resident bengalis?|nri bengalis?|probashi|prabasi|bong (diaspora|community)|durga puja (in|at|across) (london|uk|britain|england|new york|new jersey|california|texas|usa|us|america|canada|toronto|australia|sydney|melbourne|dubai|uae|singapore|germany|berlin|paris|japan|tokyo)|(bengali|bangla) school abroad)\b|প্রবাসী বাঙালি|প্রবাসে বাঙালি|প্রবাসের বাঙালি|প্রবাসী বঙ্গ|বিদেশে বাঙালি|বিদেশের মাটিতে বাঙালি|বিদেশে দুর্গাপুজো|বিদেশে পুজো|প্রবাসে পুজো|প্রবাসে দুর্গা|প্রবাসী ভারতীয়|অনাবাসী ভারতীয়|प्रवासी बंगाली|प्रवासी भारतीय/i;
+// What a Probashi-only source may bring in: Bengal and Bengali culture abroad, or a rule or
+// development that touches Indians living abroad. A crime story about someone of Indian origin is not.
+const BENGAL_ABROAD = /\b(bengal|bengali|bengalis|bangla|kolkata|calcutta|durga puja|pujo|tagore|rabindra|poila baisakh|pohela boishakh)\b|বাঙালি|বাংলা|কলকাতা|দুর্গাপুজো|রবীন্দ্র|প্রবাস/i;
+const INDIANS = /\b(india|indians?|indian-origin|nris?|overseas indians?|indian diaspora|pravasi bharatiya)\b|ভারতীয়|প্রবাসী/i;
+const NRI_RULES = /\b(visas?|h-1b|h1b|green cards?|oci|passports?|immigration|immigrants?|deport\w*|citizenship|remittances?|study permits?|work permits?|students?|workers?|tax|consulate|embassy|safety|advisory)\b|ভিসা|পাসপোর্ট|অভিবাসন|দূতাবাস|পড়ুয়া|শ্রমিক/i;
+const nfc = t => String(t || "").normalize("NFC");
+export const isProbashi = t => PROBASHI_RE.test(String(t || "").normalize("NFC"));
+export const forProbashi = t => isProbashi(t) || BENGAL_ABROAD.test(nfc(t)) || (INDIANS.test(nfc(t)) && NRI_RULES.test(nfc(t)));
+const PROBASHI_NOTE = `
+
+These sources come from a feed for the Probashi Bangali desk (Bengalis and Indians living abroad). File the story with scope "diaspora" if it is about Bengalis living outside India, about Bengali culture abroad, or a development that affects Indians living abroad (visas, immigration, OCI cards, passports, NRI taxes and remittances, the safety of Indian students and workers abroad). If it is none of these (for example a crime or human-interest story about one person of Indian origin), set "unusable": true with the reason "not for the Probashi Bangali desk".`;
+
+// Once: stories already on other desks that are plainly about Bengalis abroad move to Probashi Bangali,
+// and a public NRI feed is added as a Probashi-only source (the owner can switch it off in the control room).
+const PROBASHI_KEY = "desks_probashi_v1";
+export async function refileProbashi(env) {
+  const done = await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(PROBASHI_KEY).first().catch(() => null);
+  if (done) return { done: 0 };
+  const { results } = await env.DB.prepare("SELECT id, title, dek FROM articles WHERE category IN ('World','India','Lifestyle','Entertainment','West Bengal','Kolkata') ORDER BY published_at DESC LIMIT 3000").all();
+  const ids = results.filter(r => isProbashi(`${r.title || ""} ${r.dek || ""}`)).map(r => r.id);
+  for (let i = 0; i < ids.length; i += 50) await env.DB.batch(ids.slice(i, i + 50).map(id => env.DB.prepare("UPDATE articles SET category='Probashi Bangali', topic='Probashi Bangali' WHERE id=?").bind(id)));
+  const note = "Probashi Bangali desk: only stories about Bengalis abroad or rules affecting Indians abroad are used.";
+  for (const [name, feed] of [["Times of India — NRI", "https://timesofindia.indiatimes.com/rssfeeds/7098551.cms"], ["Indian Express — World", "https://indianexpress.com/section/world/feed/"], ["Hindustan Times — World", "https://www.hindustantimes.com/feeds/rss/world-news/rssfeed.xml"]])
+    await env.DB.prepare("INSERT OR IGNORE INTO wire_sources (id,name,feed_url,lang,active,notes,desk) VALUES (?,?,?,'en',1,?,'Probashi Bangali')").bind(id(), name, feed, note).run().catch(() => {});
+  await env.DB.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(PROBASHI_KEY, String(ids.length)).run();
+  return { done: ids.length };
+}
 
 /* ---------- The Kolkata desk: earlier Kolkata stories filed under West Bengal (once) ---------- */
 // Until the rule above, almost every Kolkata story went to the West Bengal desk (the model seldom
