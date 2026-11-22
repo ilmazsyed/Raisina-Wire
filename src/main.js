@@ -740,7 +740,7 @@ function phPromo() {
   const cards = [
     `<a class="hpr-card hpr-tv" href="${withLang("/watch")}"><img src="/brand/studio-wide.webp" alt="" loading="lazy"><span class="hpr-body"><span class="hpr-tag" data-no-tr><i></i>LIVE</span><b>Rashtrix TV, live round the clock</b><span>Bulletins, HEADLINES and the news as it happens</span><span class="hpr-go">Watch now →</span></span></a>`,
     `<a class="hpr-card hpr-shorts" href="${withLang("/watch?ch=v")}"><span class="hpr-phone" aria-hidden="true"><img src="/brand/logo-sm.webp" alt=""><i></i></span><span class="hpr-body"><span class="hpr-tag" data-no-tr><i></i>LIVE</span><b>Rashtrix Shorts, live</b><span>Short videos and the news on a vertical screen</span><span class="hpr-go">Watch Shorts →</span></span></a>`,
-    ...(fronts.length ? ["bn", "en", "hi"].filter(l => fronts.includes(l)).map(l => `<a class="hpr-card hpr-ep" href="${epHref(l, e)}"><img src="/og/epaper-${l}.jpg?v=${encodeURIComponent(`${e.day}${e.slot}2xf`)}" alt="" loading="lazy"><span class="hpr-body"><span class="hpr-tag gold">E-paper</span><b>${tr(`${EP_LANG[l]} e-paper`)}</b><span>Today's paper, morning and evening</span><span class="hpr-go">Read today's paper →</span></span></a>`)
+    ...(fronts.length ? ["bn", "en", "hi"].filter(l => fronts.includes(l)).map(l => `<a class="hpr-card hpr-ep" href="${epHref(l, e)}"><img src="/og/epaper-${l}.jpg?v=${encodeURIComponent(`${e.day}${e.slot}2xm`)}" alt="" loading="lazy"><span class="hpr-body"><span class="hpr-tag gold">E-paper</span><b>${tr(`${EP_LANG[l]} e-paper`)}</b><span>Today's paper, morning and evening</span><span class="hpr-go">Read today's paper →</span></span></a>`)
       : [`<a class="hpr-card hpr-ep" href="${withLang("/epaper")}"><img src="/og/epaper.jpg" alt="" loading="lazy"><span class="hpr-body"><span class="hpr-tag gold">E-paper</span><b>Rashtrix e-papers</b><span>Bengali, English and Hindi, morning and evening</span><span class="hpr-go">Read today's paper →</span></span></a>`])
   ];
   const keep = host.querySelector(".hpr-track")?.scrollLeft || 0;
@@ -767,7 +767,7 @@ function phFronts() {
   if (!fronts.length) return;
   const slotName = e.slot === "morning" ? "Morning edition" : "Evening edition";
   host.innerHTML = `<div class="ph-sec-head"><h2 id="phFrontsT">Today's front pages</h2><a href="${withLang("/epaper")}">E-paper</a></div>
-    <div class="fp-row">${fronts.map(l => `<a class="fp-card" href="${epHref(l, e)}"><span class="fp-img"><img src="/og/epaper-${l}.jpg?v=${encodeURIComponent(`${e.day}${e.slot}2xf`)}" alt="" loading="lazy"></span><span class="fp-meta"><b>${tr(EP_LANG[l])}</b><span><span>${slotName}</span> · <span data-no-tr>${esc(shortDate(e.day))}</span></span></span></a>`).join("")}</div>`;
+    <div class="fp-row">${fronts.map(l => `<a class="fp-card" href="${epHref(l, e)}"><span class="fp-img"><img src="/og/epaper-${l}.jpg?v=${encodeURIComponent(`${e.day}${e.slot}2xm`)}" alt="" loading="lazy"></span><span class="fp-meta"><b>${tr(EP_LANG[l])}</b><span><span>${slotName}</span> · <span data-no-tr>${esc(shortDate(e.day))}</span></span></span></a>`).join("")}</div>`;
 }
 async function phExtras() {
   try {
