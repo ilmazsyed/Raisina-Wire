@@ -254,3 +254,41 @@ body{background:radial-gradient(ellipse at 50% 20%,#f3f4f6 0%,#dcdee2 70%,#cdd0d
 .hl{text-wrap:balance}
 .zend{display:block;height:0;width:100%;margin:0;padding:0;break-before:auto}
 .zs:has(+ .zend){border-bottom:0}
+
+/* ---------- the masthead in colour: the red band, the red first word, the crest centred ---------- */
+.mh .top{background:var(--red);color:#fff;border:0;padding:5px 12px;border-radius:2px}
+.mh .top .red{color:#ffe08a}
+.mh .row{position:relative}
+.mh .np{display:flex;align-items:center;justify-content:center;gap:24px;height:100%}
+.mh .crestw{display:flex;align-items:center;justify-content:center}
+.mh .crest{display:block;height:160px;width:auto;object-fit:contain}
+.mh .w.d{color:var(--red)}
+.ed-hi .mh .w.d{-webkit-text-stroke-color:var(--red)}
+/* the teasers either side of the nameplate (Bengali and Hindi) */
+.mh .eared .np{position:absolute;left:226px;right:226px;top:0;bottom:0;overflow:hidden}
+.mh .eared .w{font-size:92px}
+.mh .eared .crest{height:138px}
+.mh .ear{position:absolute;top:12px;width:212px;height:154px;display:flex;flex-direction:column;gap:5px;cursor:pointer}
+.mh .ear.l{left:0;padding-right:12px;border-right:1px solid #d9d2c3}.mh .ear.r{right:0;padding-left:12px;border-left:1px solid #d9d2c3}
+.mh .ear .eph{position:relative;height:86px;overflow:hidden;background:#ddd}
+.mh .ear .eph i,.mh .ear .eph video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background-size:cover;background-position:center}
+.mh .ear .ek{font:800 11px var(--lab),sans-serif;color:var(--red);letter-spacing:.03em}
+.mh .ear b{font:700 15px/1.25 var(--hd,serif);color:#111;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+/* the share card's view: the front page alone */
+.ep-card,.ep-card body{margin:0;background:#f6f2ea}
+body.ep-card .ep-page{position:relative;box-shadow:none}
+body.ep-card .ep-page::after{display:none}
+body.ep-card *{animation-duration:0s!important;animation-delay:0s!important;transition:none!important}
+/* print: one page to a sheet, scaled to fill it */
+.ep-print{display:none}
+@media print{
+  body.printing > *:not(.ep-print){display:none!important}
+  body.printing{margin:0;background:#fff}
+  .ep-print{display:block}
+  .ep-print .pp{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;page-break-after:always;break-after:page}
+  .ep-print .pp:last-child{page-break-after:auto;break-after:auto}
+  .ep-print .ep-page{position:relative;left:auto;top:auto;flex:none;box-shadow:none;transform:none!important}
+  .ep-print .ep-page::after{display:none}
+  .ep-print .ep-page *{animation:none!important;transition:none!important;opacity:1!important;filter:none!important}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}

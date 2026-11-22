@@ -54,12 +54,19 @@ const byline = (x, def = false) => x.byline ? `<p class="by">${esc(x.byline)}</p
 const desk = x => esc((DESKS[x.desk] || [])[LI] || x.desk || "");
 const body = x => paras(x.text) || (x.dek ? `<p>${esc(x.dek)}</p>` : "");
 
-function masthead(ed, y0) {
+// A teaser beside the nameplate (the Bengali and Hindi editions): a colour picture, the page it is
+// on and its headline.
+function ear(x, side) {
+  if (!x) return "";
+  const m = pic(x), src = m?.kind === "yt" ? yt(m.id) : m?.kind === "video" ? "" : m?.url || "";
+  return `<div class="ear ${side}" data-ref="${esc(x.ref || "")}"><div class="eph">${src ? `<i style="background-image:url('${esc(src)}')"></i>` : m ? `<video src="${esc(m.url)}" muted playsinline preload="metadata"></video>` : ""}</div><div class="et"><span class="ek">${W.inside} · ${W.page} ${D(x.pageNo)}</span><b>${esc(x.title || "")}</b></div></div>`;
+}
+function masthead(ed, y0, ears = []) {
   const day = new Date(ed.at).toLocaleDateString(LOCALE, { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
   const no = D(Math.max(1, (ed.editions || []).length));
   const left = `${W.city} · ${esc(day)}${LANG === "bn" && ed.bangabda ? ` · ${esc(ed.bangabda)}` : ""}`;
   return at(0, y0, 1180, 238, `<div class="mh"><div class="top"><span>${left}</span><span class="red">${esc(ed.name)}</span><span>${W.vol} · ${LANG === "en" ? "No." : LANG === "bn" ? "সংখ্যা" : "अंक"} ${no}</span></div>
-<div class="row"><div class="w">${W.daily}</div><span class="crestw"><img class="crest" src="${CREST}" alt="Rashtrix"></span><div class="w">${W.name}</div></div>
+<div class="row${ears.length ? " eared" : ""}">${ear(ears[0], "l")}<div class="np"><div class="w d">${W.daily}</div><span class="crestw"><img class="crest" src="${CREST}" alt="Rashtrix"></span><div class="w">${W.name}</div></div>${ear(ears[1], "r")}</div>
 <div class="rules"><i class="gd"></i><i class="bk"></i></div>
 <div class="bot"><span>rashtrix.live${ed.weather && ed.weather.temp != null ? ` · ${D(ed.weather.temp)}°` : ""}</span><span class="red">${W.tag}</span><span>${D(PAGES_N)} ${W.pages} · ${W.free}</span></div></div>`);
 }
@@ -136,7 +143,7 @@ function front(ed) {
     tq.filter(pic).slice(0, 4).forEach((x, i) => { const m = pic(x), src = m.kind === "yt" ? yt(m.id) : m.kind === "img" ? m.url : ""; h += at(i * 298, 0, 286, 78, `<div class="sky" data-ref="${esc(x.ref)}"><div class="ph">${src ? `<i style="background-image:url('${esc(src)}')"></i>` : `<video src="${esc(m.url)}" muted autoplay loop playsinline></video>`}</div><div><div class="kick">${esc(x.pageName)} · ${W.page} ${D(x.pageNo)}</div><div class="skyt">${esc(x.title)}</div></div></div>`); });
     h += hr(86); y = 96;
   }
-  h += masthead(ed, y); y += 246;
+  h += masthead(ed, y, LANG === "en" ? [] : tq.filter(pic).slice(0, 2)); y += 246;
   const zones = [];   // [selector, queue, options] filled in order after the page is built
   if (LANG === "bn" || LANG === "hi") {
     const Y = y, H1 = 770;
@@ -245,6 +252,7 @@ function bar(ed) {
   return `<div class="ep-bar"><a class="home" href="${LANG === "bn" ? "/" : `/${LANG}/`}" aria-label="Rashtrix"><img src="/brand/logo-xs.webp" alt="Rashtrix 24×7 News"><span class="hide-s">${W.epaper}</span></a>
 ${opts ? `<select id="epEd" aria-label="Edition">${opts}</select>` : ""}<span class="sp"></span>
 ${ed ? `<div class="nav"><button id="epPrev" aria-label="${W.prev}">‹</button><span class="pg" id="epPg"></span><button id="epNext" aria-label="${W.next}">›</button></div><button id="epZo" class="hide-s" aria-label="Zoom out">−</button><button id="epZi" class="hide-s" aria-label="Zoom in">+</button>` : ""}
+${ed ? `<select id="epPrint" class="hide-s" aria-label="${W2.print}"><option value="">🖨 ${W2.print}</option><option value="A4">A4</option><option value="A3">A3</option></select><button id="epShareEd" type="button">⤴ ${W2.share}</button>` : ""}
 <select id="epLang" aria-label="Language">${L3.map(([l, n]) => `<option value="${l}" ${l === LANG ? "selected" : ""}>${n}</option>`).join("")}</select></div>`;
 }
 function fit() {
@@ -299,6 +307,28 @@ ${mediaHtml}<div class="txt" id="epRtext">${paras(x.body || x.text || x.dek)}</d
   $("#epListen").onclick = () => { const s = window.speechSynthesis; if (!s) return; if (s.speaking) { s.cancel(); return; } const u = new SpeechSynthesisUtterance(`${x.title}. ${($("#epRtext")?.innerText || "")}`); u.lang = LOCALE; s.speak(u); };
 }
 
+function fitMast(pg) {
+  const np = pg.querySelector(".mh .eared .np"); if (!np) return;
+  const ws = [...np.querySelectorAll(".w")], cr = np.querySelector(".crest"); let s = parseFloat(getComputedStyle(ws[0]).fontSize);
+  while (np.scrollWidth > np.clientWidth + 1 && s > 56) { s -= 3; ws.forEach(w => { w.style.fontSize = s + "px"; }); if (cr) cr.style.height = Math.round(s * 1.5) + "px"; }
+}
+
+/* ---------- print (A4, A3; the owner's full-size press sheet, 22×34 inches) and the share card ---------- */
+const W2 = { bn: { print: "প্রিন্ট", press: "ছাপাখানার জন্য (২২×৩৪ ইঞ্চি)", share: "শেয়ার" }, en: { print: "Print", press: "For the press (22×34 in)", share: "Share" }, hi: { print: "प्रिंट", press: "प्रेस के लिए (22×34 इंच)", share: "शेयर" } }[LANG];
+function printAs(size) {
+  const [w, h, u] = { A4: [210, 297, "mm"], A3: [297, 420, "mm"], press: [22, 34, "in"] }[size], k = u === "mm" ? 3.7795 : 96;
+  const margin = size === "press" ? 0 : 6 * 3.7795, sw = w * k, sh = h * k, sc = Math.min((sw - 2 * margin) / 1240, (sh - 2 * margin) / 2010);
+  document.querySelector(".ep-print")?.remove(); document.getElementById("epPrintCss")?.remove();
+  const box = document.createElement("div"); box.className = "ep-print";
+  for (const pg of pages) { const wrap = document.createElement("div"); wrap.className = "pp"; const c = pg.cloneNode(true); c.style.zoom = sc.toFixed(4); wrap.append(c); box.append(wrap); }
+  const css = document.createElement("style"); css.id = "epPrintCss";
+  css.textContent = `@page{size:${w}${u} ${h}${u};margin:0}@media print{.ep-print .pp{width:${w}${u};height:${h}${u}}}`;
+  document.head.append(css); document.body.append(box); document.body.classList.add("printing");
+  const done = () => { box.remove(); css.remove(); document.body.classList.remove("printing"); window.removeEventListener("afterprint", done); };
+  window.addEventListener("afterprint", done);
+  setTimeout(() => window.print(), 300);
+}
+
 /* ---------- the faces, loaded before the pages are measured (else they are laid out in a stand-in) ---------- */
 async function loadFaces() {
   const S = { bn: "বাংলা খবর", hi: "हिन्दी ख़बर", en: "Daily News" }[LANG];
@@ -331,8 +361,10 @@ async function start() {
   PAGES_N = 1 + inner.length;
   pages = [front(EDN)];
   inner.forEach(p => pages.push(p.key === "stars" ? horoscope(EDN, pages.length + 1) : inside(EDN, p, pages.length + 1)));
-  for (const pg of pages) { stage.appendChild(pg); try { pg._fill(); } catch (e) { console.error(e); } prepareInk(pg); }
+  for (const pg of pages) { stage.appendChild(pg); try { pg._fill(); } catch (e) { console.error(e); } fitMast(pg); prepareInk(pg); }
   pages.forEach(p => p.remove()); stage.remove();
+  // The share card's view (src/ogcard.js): the front page alone, at full size, finished.
+  if (q.has("card")) { app.innerHTML = ""; document.body.classList.add("ep-card"); app.appendChild(pages[0]); window.__epReady = true; return; }
   const want = Math.max(0, Math.min(pages.length - 1, (+q.get("p") || 1) - 1));
   if (want === 0 && !q.has("p")) { $(".ep-sheet").appendChild(folded(pages[0])); cur = 0; $("#epPg").textContent = `${W.page} ${D(1)} / ${D(pages.length)}`; }
   else show(want);
@@ -340,6 +372,10 @@ async function start() {
   $("#epPrev").onclick = () => show(cur - 1, -1); $("#epNext").onclick = () => show(cur + 1, 1);
   $("#epZi").onclick = () => { zoom = Math.min(2.5, scale * 1.25); fit(); }; $("#epZo").onclick = () => { zoom = Math.max(.25, scale / 1.25); fit(); };
   $("#epEd")?.addEventListener("change", e => { location.href = `/epaper?lang=${LANG}&ed=${e.target.value}`; });
+  $("#epPrint")?.addEventListener("change", e => { const v = e.target.value; e.target.value = ""; if (v) printAs(v); });
+  $("#epShareEd")?.addEventListener("click", () => { const u = `${location.origin}/epaper`, t = "Today's Rashtrix News e-papers: Bengali, English and Hindi"; if (navigator.share) navigator.share({ title: t, text: t, url: u }).catch(() => {}); else navigator.clipboard?.writeText(u).then(() => { $("#epShareEd").textContent = "✓"; }); });
+  // The owner: the whole paper at full size for the press (22×34 inches), saved as a PDF from the print dialog.
+  fetch("/api/auth/me").then(r => r.json()).then(d => { if (d.user?.owner) $("#epPrint")?.insertAdjacentHTML("beforeend", `<option value="press">${W2.press}</option>`); }).catch(() => {});
   window.addEventListener("resize", () => { zoom = 0; fit(); });
   document.addEventListener("keydown", e => { if ($("#epReader").classList.contains("on")) { if (e.key === "Escape") $("#epReader").classList.remove("on"); return; } if (e.key === "ArrowRight") show(cur + 1, 1); if (e.key === "ArrowLeft") show(cur - 1, -1); });
   let sx = null; $(".ep-stage").addEventListener("touchstart", e => { sx = e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });

@@ -9,7 +9,8 @@
 import puppeteer from "@cloudflare/puppeteer";
 import { getBySlug, isPublic } from "./store.js";
 
-import { cardHTML, siteCardHTML } from "./ogcard-html.js";
+import { cardHTML, siteCardHTML, epaperCardHTML } from "./ogcard-html.js";
+import { tvSettings } from "./tvchannel.js";
 import { bulletinRank } from "./labels.js";
 
 // ---- The site's own card (/og/site.jpg): Rashtrix TV live as the hero, with what is on now. It
@@ -52,7 +53,32 @@ export async function renderSiteCard(env, origin) {
 // not been made yet is made on the spot when it is first asked for (a share, or WhatsApp
 // fetching the preview); if that fails, the story's photo or the site card is sent as a picture
 // (not a redirect, which some apps do not follow).
-export async function ogRoute(url, env, ctx) {
+// The e-paper's share card (/og/epaper.jpg): today's three front pages, drawn again for each new
+// edition. The English and Hindi editions are for signed-in readers, so the card's page and the
+// e-paper it shows are opened by the headless browser with a key only the server knows.
+const EP_SLUG = "__epaper";
+export const cardKey = async env => (await tvSettings(env, "h")).key;
+export async function renderEpaperCard(env, origin) {
+  if (!env.BROWSER || !origin) return { skipped: true };
+  const ed = await env.DB.prepare("SELECT id FROM epaper_editions WHERE status='published' ORDER BY published_at DESC LIMIT 1").first().catch(() => null);
+  if (!ed) return { none: true };
+  const row = await env.DB.prepare("SELECT title FROM og_cards WHERE slug=?").bind(EP_SLUG).first().catch(() => null);
+  if (row?.title === ed.id) return { kept: true };
+  const made = await renderSlugs(env, origin, [{ slug: EP_SLUG, title: ed.id }], { headers: { "x-rw-card": await cardKey(env) }, wait: 7000 });
+  return { done: !!made[0] };
+}
+export async function ogRoute(url, env, ctx, request) {
+  if (url.pathname === `/og/card/${EP_SLUG}`) {
+    if (!request || request.headers.get("x-rw-card") !== await cardKey(env)) return new Response("Not found", { status: 404 });
+    const ed = await env.DB.prepare("SELECT day, slot FROM epaper_editions WHERE status='published' ORDER BY published_at DESC LIMIT 1").first().catch(() => null);
+    return new Response(epaperCardHTML(ed ? `${ed.day}/${ed.slot}` : ""), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
+  }
+  if (url.pathname === "/og/epaper.jpg") {
+    const row = await env.DB.prepare("SELECT img FROM og_cards WHERE slug=?").bind(EP_SLUG).first().catch(() => null);
+    if (row?.img) return new Response(new Uint8Array(row.img), { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=900" } });
+    const site = await env.ASSETS.fetch(new Request(new URL("/og-image.jpg", url.origin)));
+    return new Response(site.body, { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=600" } });
+  }
   if (url.pathname === `/og/card/${SITE_SLUG}`) {
     return new Response(siteCardHTML({ ...await siteData(env), at: Date.now() }), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
   }
@@ -88,15 +114,17 @@ export async function ogRoute(url, env, ctx) {
 }
 
 // Photographs the cards of the given stories in one browser session; returns their JPEGs.
-async function renderSlugs(env, origin, rows) {
+async function renderSlugs(env, origin, rows, { headers, wait = 0 } = {}) {
   const browser = await puppeteer.launch(env.BROWSER), out = [], now = new Date().toISOString();
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1200, height: 630, deviceScaleFactor: 1 });
+    if (headers) await page.setExtraHTTPHeaders(headers);
     for (const r of rows) {
       try {
         await page.goto(`${origin}/og/card/${encodeURIComponent(r.slug)}`, { waitUntil: "networkidle0", timeout: 20000 });
         await page.evaluate(() => document.fonts.ready);
+        if (wait) await new Promise(r => setTimeout(r, wait));
         const shot = await page.screenshot({ type: "jpeg", quality: 84 });
         const bytes = shot instanceof Uint8Array ? shot : new Uint8Array(shot);
         await env.DB.prepare("INSERT INTO og_cards (slug,title,img,created_at) VALUES (?,?,?,?) ON CONFLICT(slug) DO UPDATE SET title=excluded.title,img=excluded.img,created_at=excluded.created_at")
