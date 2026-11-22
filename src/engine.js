@@ -973,9 +973,14 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   function headsPick(at) {
     const H = st.tv?.heads; if (!H) return [];
     const key = hhmmOf(at), per = H.secs || 10;
-    return (H.items || []).filter(x => !x.when || x.when.includes(key)).slice(0, H.count || 12).map(x => ({ ...x, d: Math.max(per, x.secs ? x.secs + 1.5 : 0) }));
+    // (a run the desk planned on its own: exactly its headlines, in its order)
+    const run = H.runs?.[key]?.map(id => (H.items || []).find(x => x.id === id)).filter(Boolean);
+    const list = run?.length ? run : (H.items || []).filter(x => !x.when || x.when.includes(key)).slice(0, H.count || 12);
+    return list.map(x => ({ ...x, d: Math.max(x.hold || per, x.secs ? x.secs + 1.5 : 0) }));
   }
   const lrdSkip = k => (st.tv?.lrd?.skip || []).includes(k);
+  // (a fixed item the Live Rundown moved later by some minutes)
+  const lrdShift = k => (Number(st.tv?.lrd?.shift?.[k]) || 0) * 60e3;
   const headsDur = list => Math.round((HEADS_STING + list.reduce((n, x) => n + x.d, 0) + 0.6) * 10) / 10;
   // AVO stories: how often this viewer (or this output) has seen each, kept on the device.
   // Each AVO story stays on screen exactly as long as its reading (plus a breath either side);
@@ -1140,7 +1145,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     q.segDone ||= [];
     for (const k of ["a", "b"]) {
       const at = half + SLOT_MIN[k] * 60e3;
-      if (t < at || t >= at + 6 * 60e3 || q.segDone.includes(at)) continue;
+      const sh = lrdShift(`s:${at}`);
+      if (t < at + sh || t >= at + sh + 6 * 60e3 || q.segDone.includes(at)) continue;
       if (lrdSkip(`s:${at}`)) { q.segDone = [...q.segDone.slice(-8), at]; continue; }
       q.segDone = [...q.segDone.slice(-8), at];
       const list = dp[k] || [], r = Math.floor(t / 1800e3) % Math.max(1, list.length);
@@ -1196,7 +1202,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     // the markets (20 seconds) follow it; at :15 and :45 a desk segment (slot c). A bulletin that
     // cannot start by eleven minutes past its quarter gives way to the next one. In the last minutes
     // before a bulletin the channel picks videos that end in time (fitVideo below).
-    const bulletinDue = () => (st.tv?.bulletin || []).length && !q.bDone.includes(slot) && t - slot < 11 * 60e3;
+    const bSh = lrdShift(`b:${slot}`);
+    const bulletinDue = () => (st.tv?.bulletin || []).length && !q.bDone.includes(slot) && (!bSh || t >= slot + bSh) && t - slot < 11 * 60e3 + bSh;
     const blockFor = () => {
       const out = [];
       if (BULLETIN_MS === 120e3) {
@@ -1268,7 +1275,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (lrdSkip(`b:${slot}`) && !q.bDone.includes(slot)) { q.bDone = [...q.bDone.slice(-8), slot]; if (q.bNext === slot) q.bNext = null; }
     // HEADLINES at :58 and :28, when the item on air has ended; the bulletin follows it at once.
     const hAt = headsAt(t);
-    if (headsOn() && !q.hDone.includes(hAt) && t - hAt < HEADS_WIN) {
+    if (headsOn() && !q.hDone.includes(hAt) && t >= hAt + lrdShift(`h:${hAt}`) && t - hAt < HEADS_WIN + lrdShift(`h:${hAt}`)) {
       q.hDone = [...q.hDone.slice(-8), hAt];
       const list = headsPick(hAt);
       if (list.length) {
@@ -1303,9 +1310,11 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       if (add.kind === "avo") { const x = (st.tv?.avo || []).find(y => y.id === add.ref); if (x) { q.sinceAvo = 0; q.n++; q.item = { type: "avo", dur: avoTotal([x]), stories: [x] }; q.start = t; q.seg = { type: "avo", stories: [x], dur: avoTotal([x]), start: t, in: 0, sting: true, n: q.n }; after(); return q.seg; } }
       if (add.kind === "seg") { const b = segBuild(add.ref); if (b) { q.n++; q.item = { type: "seg", dur: b.dur }; q.start = t; q.seg = { type: "seg", name: b.name, head: b.head, items: b.items, dur: b.dur, start: t, in: 0, sting: true, n: q.n }; after(); return q.seg; } }
       if (add.kind === "video" && add.dur > 0) (q.pending ||= []).unshift({ type: "video", ytId: add.ref, title: add.title, line: add.title, dur: add.dur, in: 0 });
+      // (a headline card: one headline on screen, read as HEADLINES reads it)
+      if (add.kind === "card") { q.n++; const dur = Math.max(6, Math.min(60, add.dur || 10)); q.item = { type: "card", dur }; q.start = t; q.seg = { type: "card", text: add.ref, title: add.ref, dur, start: t, in: 0, sting: true, n: q.n }; after(); return q.seg; }
     }
     // A quarter whose bulletin could not start in time is let go.
-    if ((st.tv?.bulletin || []).length && !q.bDone.includes(slot0) && t - slot0 >= 11 * 60e3) q.bDone = [...q.bDone.slice(-8), slot0];
+    if ((st.tv?.bulletin || []).length && !q.bDone.includes(slot0) && t - slot0 >= 11 * 60e3 + lrdShift(`b:${slot0}`)) q.bDone = [...q.bDone.slice(-8), slot0];
     // An ad break (the Ad library desk, src/ads.js): the ads due now play one after another, in the
     // break after the item on air has ended, never over it.
     if (!q.adQueue?.length) q.adQueue = adsDue(t, q);
@@ -1429,6 +1438,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (seg.type === "flash") return { layout: "graphic", graphic: { kind: "flash", n: seg.n || 0 }, startAt: seg.start, dur: seg.dur, key: `c:flash:${seg.start}`, transition };
     if (seg.type === "ident") return { layout: "graphic", graphic: { kind: "ident" }, startAt: seg.start, dur: seg.dur, key: `c:ident:${seg.start}`, transition: { type: "mix", ms: 200 }, full: true };
     if (seg.type === "upnext") return { layout: "graphic", graphic: { kind: "upnext", video: seg.video }, startAt: seg.start, dur: seg.dur, key: `c:upnext:${seg.start}`, transition: { type: "mix", ms: 250 }, full: true };
+    if (seg.type === "card") return { layout: "graphic", graphic: { kind: "headlines", title: "শিরোনাম", lines: [seg.text] }, startAt: seg.start, dur: seg.dur, key: `c:card:${seg.start}`, transition };
     if (seg.type === "heads") return { layout: "graphic", graphic: { kind: "heads", items: seg.items, at: seg.at }, startAt: seg.start, dur: seg.dur, key: `c:heads:${seg.start}`, transition, full: true };
     if (seg.type === "bulletin") return { layout: "graphic", graphic: { kind: "bulletin", slot: seg.slot }, startAt: seg.start, dur: seg.dur, key: `c:bulletin:${seg.start}`, transition, full: true };
     if (seg.type === "avo") return { layout: "graphic", graphic: { kind: "avo", stories: seg.stories }, startAt: seg.start, dur: seg.dur, key: `c:avo:${seg.start}`, transition, full: true };
@@ -2465,7 +2475,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         <i class="hx-bg"></i>${x.image || x.video ? `<div class="hx-m">${media(x)}</div>` : newsDeco()}<i class="hx-shade"></i><i class="hx-sweep"></i>
         <b class="hx-big" data-no-tr>${bnDigits(String(k + 1).padStart(2, "0"))}</b>
         <div class="hx-bug"><b data-no-tr>HEADLINES</b><span>শিরোনাম</span><em data-no-tr>${esc(en)}</em></div>
-        <div class="hx-main"><div class="hx-tag"><em>${bnDigits(k + 1)}<small>/${bnDigits(list.length)}</small></em><span>${esc(deskOf(x))}</span></div>
+        <div class="hx-main"><div class="hx-tag"><em>${bnDigits(k + 1)}<small>/${bnDigits(list.length)}</small></em>${x.brk ? `<b class="hx-brk">এইমাত্র</b>` : ""}<span>${esc(deskOf(x))}</span></div>
           <h2>${String(x.text || "").split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</h2></div>
         <div class="hx-strip"><img src="${LOGO}" alt=""><div class="hx-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}"><b>${bnDigits(j + 1)}</b></i>`).join("")}</div></div></div>`;
       let shown = -9;

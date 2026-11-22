@@ -490,3 +490,32 @@ body.rec-on>header,body.rec-on>main,body.rec-on>nav,body.rec-on .cr-top{visibili
 .in-guide summary{cursor:pointer;font-weight:700}
 .in-guide ol{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.45}
 .in-guide code{font-size:12px;word-break:break-all}
+/* The Headlines desk: the on-air order and the story pool */
+.hd-order{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.hd-o{display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line,#2a2f3a);border-radius:10px;background:rgba(255,255,255,.02)}
+.hd-o.brk{border-color:#e0101a;background:rgba(224,16,26,.1)}
+.hd-o.dragging{opacity:.4}.hd-o.over{outline:2px dashed var(--gold,#D4A017)}
+.hd-o b{font-weight:600}
+.hd-grip{cursor:grab;color:var(--muted,#9aa3b2);letter-spacing:-2px;user-select:none}
+.hd-cut{list-style:none;height:0;border-top:2px dashed var(--gold,#D4A017);margin:6px 0}
+.hd-pool{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.hd-pl{display:flex;gap:8px;align-items:center;padding:8px;border:1px solid var(--line,#2a2f3a);border-radius:10px}
+.hd-pl img{width:64px;height:40px;object-fit:cover;border-radius:6px}
+.hd-pl b{flex:1;font-weight:600;font-size:14px;min-width:0}
+@media(max-width:760px){.hd-o{flex-wrap:wrap}.hd-grip{display:none}}
+/* The Live Rundown: moving, the picker, notes and the history */
+.lr-act{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
+.lr-grip{width:14px;color:var(--muted,#9aa3b2);letter-spacing:-2px;cursor:grab;user-select:none}
+.lr-grip.off{cursor:default}
+.lr-row.dragging{opacity:.4}.lr-row.over,.lr-add.over{outline:2px dashed var(--gold,#D4A017)}
+.lr-note{flex-basis:100%;color:var(--gold,#D4A017);font-size:13px}
+.lr-note span:first-child{font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:.06em}
+.lr-ed{flex-basis:100%;flex-wrap:wrap;gap:8px;padding:8px;border-radius:8px;background:rgba(255,255,255,.04)}
+.lr-add{display:flex;gap:6px;flex-wrap:wrap;padding:4px;border-radius:8px}
+.lr-pick{display:flex;flex-direction:column;gap:8px;width:100%;padding:10px;border:1px solid var(--line,#2a2f3a);border-radius:10px}
+.lr-pool{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;max-height:360px;overflow:auto}
+.lr-pool li{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.03)}
+.lr-pool li b{flex:1;min-width:180px;font-weight:600}
+.lr-log summary{cursor:pointer;font-weight:600}
+.lr-log .lr-list{margin-top:8px;max-height:300px;overflow:auto}
+@media(max-width:760px){.lr-grip{display:none}.lr-act{margin-left:0}}

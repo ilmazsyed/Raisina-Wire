@@ -2076,3 +2076,4 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .avo.bg-maroon .avo-brk{background:#1a0306}.avo.bg-maroon .avo-brk .s1{background:linear-gradient(115deg,rgba(110,8,22,.96) 0 54%,transparent 54%)}
 .avo.bg-teal .avo-brk{background:#021514}.avo.bg-teal .avo-brk .s1{background:linear-gradient(115deg,rgba(6,96,92,.95) 0 54%,transparent 54%)}
 .avo.bg-gold .avo-brk{background:#1a1203}.avo.bg-gold .avo-brk .s1{background:linear-gradient(115deg,rgba(176,124,10,.95) 0 54%,transparent 54%)}
+.hx-brk{padding:8px 18px;border-radius:8px;background:#fff;color:#e0101a;font:900 38px "Hind Siliguri",sans-serif;animation:tvblink 1.1s ease-in-out infinite}

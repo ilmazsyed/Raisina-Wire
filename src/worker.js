@@ -57,7 +57,7 @@ import { progPlayed, handleProgs, progHousekeeping } from "./progs.js";
 import { adPlayed, seedBrandFilm } from "./ads.js";
 import { epaperStep, handleNewsprint, readerEdition, epaperSettings } from "./epaper.js";
 import { handleCharter, charterCheck, getCharter } from "./charter.js";
-import { handleHeads, prepareHeadVoices } from "./headlines.js";
+import { handleHeads, prepareHeadVoices, headVoiceAgain } from "./headlines.js";
 import { handleLrd, asrunPost } from "./liverundown.js";
 import { applyVoice, handleVoice } from "./voicelab.js";
 import { handleStudio } from "./studioapi.js";
@@ -1352,6 +1352,12 @@ async function api(request, env, ctx) {
     return res;
   }
   // ---- The Headlines desk (src/headlines.js): HEADLINES at :58 and :28.
+  if (url.pathname === "/api/admin/heads/voice" && request.method === "POST") {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const b = await request.json().catch(() => ({}));
+    try { const r = await headVoiceAgain(env, b.text); clearTvCache(); return json(r, 200, { "cache-control": "no-store" }); } catch (e) { return err(e.message || "Could not record it.", 400); }
+  }
   if (url.pathname === "/api/admin/heads") {
     const user = await currentUser(request, env);
     if (!isStaff(user)) return err("Editor access required.", 403);

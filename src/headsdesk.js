@@ -9,7 +9,7 @@ import { shell, api, toast, fail, esc, $, $$ } from "./crshell.js";
 import { mountTV } from "./engine.js";
 import { digits } from "./i18n.js";
 
-const S = { d: null, items: [], edits: {}, hidden: [], set: null, dirty: false, pv: null, open: null };
+const S = { d: null, items: [], edits: {}, hidden: [], set: null, dirty: false, pv: null, open: null, order: [], lock: false, brk: [], secsOf: {}, runs: {}, run: "", drag: "" };
 const pad = n => String(n).padStart(2, "0");
 const IST = 5.5 * 3600e3;
 const hhmm = t => { const d = new Date(t + IST); return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`; };
@@ -21,12 +21,27 @@ function nextAt(mins) {
   return best;
 }
 // What goes on air at a time: the desk's own headlines (every HEADLINES, or that time), then the wire's.
-function lineup(at) {
-  const key = hhmm(at), per = S.set.secs;
-  const own = S.items.filter(x => x.text && (!x.repeat || (x.aired || 0) < x.repeat) && (!x.when?.length || x.when.includes(key))).sort((a, b) => (b.top ? 1 : 0) - (a.top ? 1 : 0)).map(x => ({ ...x, auto: false }));
+// Every headline, in the order it goes on air: the desk's order (new wire headlines after the ones
+// it placed, none while the list is locked), BREAKING first.
+function allHeads() {
+  const own = S.items.filter(x => x.text && (!x.repeat || (x.aired || 0) < x.repeat)).sort((a, b) => (b.top ? 1 : 0) - (a.top ? 1 : 0)).map(x => ({ ...x, auto: false }));
   const auto = (S.d.auto || []).filter(a => !S.hidden.includes(a.id)).map(a => { const e = S.edits[a.id] || {}; const voice = (S.d.onAir || []).find(o => o.id === a.id); return { ...a, auto: true, text: e.text || a.orig, image: e.noimg ? "" : e.image || a.wireImage, video: e.video || "", voice: voice && voice.text === (e.text || a.orig) ? voice.voice : "", secs: voice?.secs || 0 }; });
-  return [...own, ...auto].slice(0, S.set.count).map(x => ({ ...x, d: Math.max(per, x.secs ? x.secs + 1.5 : 0) }));
+  let all = [...own, ...auto];
+  const order = S.order.filter(id => all.some(x => x.id === id));
+  if (order.length) { const placed = order.map(id => all.find(x => x.id === id)); all = S.lock ? placed : [...placed, ...all.filter(x => !order.includes(x.id))]; }
+  const air = id => (S.d.onAir || []).find(o => o.id === id);
+  return [...all.filter(x => S.brk.includes(x.id)), ...all.filter(x => !S.brk.includes(x.id))]
+    .map(x => ({ ...x, brk: S.brk.includes(x.id), hold: S.secsOf[x.id] || 0, voice: x.voice || (air(x.id)?.text === x.text ? air(x.id)?.voice : ""), secs: x.secs || (air(x.id)?.text === x.text ? air(x.id)?.secs : 0) }));
 }
+// What goes on air at a time: a run planned on its own, else the list (the desk's own headlines
+// kept for other times left out), up to the desk's number.
+function lineup(at) {
+  const key = hhmm(at), per = S.set.secs, all = allHeads();
+  const run = S.runs[key]?.map(id => all.find(x => x.id === id)).filter(Boolean);
+  const list = run?.length ? run : all.filter(x => x.auto || !x.when?.length || x.when.includes(key)).slice(0, S.set.count);
+  return list.map(x => ({ ...x, d: Math.max(x.hold || per, x.secs ? x.secs + 1.5 : 0) }));
+}
+const nextTimes = n => { const t = hhmm(nextAt(S.set.mins)), all = dayTimes(S.set.mins), k = Math.max(0, all.indexOf(t)); return [...all.slice(k), ...all.slice(0, k)].slice(0, n); };
 
 async function uploadImage(file) {
   const bmp = await createImageBitmap(file);
@@ -83,10 +98,32 @@ function draw() {
     </div>
   </section>
   <section class="panel pd hd-wrap">
-    <div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3 style="margin:0">Next HEADLINES <small class="muted" data-no-tr>${digits(hhmm(nx))} IST · ${digits(list.length)} · ${digits(Math.round(5 + list.reduce((n, x) => n + x.d, 0)))} s</small></h3>
-      <button class="btn sm red" id="hdPv" type="button">▶ Preview with sound</button></div>
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3 style="margin:0">On air, in this order <small class="muted" data-no-tr>${digits(hhmm(nx))} IST · ${digits(list.length)} · ${digits(Math.round(5 + list.reduce((n, x) => n + x.d, 0)))} s</small></h3>
+      <div class="row" style="flex-wrap:wrap"><label class="row" style="gap:6px"><input type="checkbox" id="hdLock" ${S.lock ? "checked" : ""}> Lock the list</label>${S.order.length ? `<button class="btn sm" id="hdAutoOrder" type="button">Back to the automatic order</button>` : ""}<button class="btn sm red" id="hdPv" type="button">▶ Preview with sound</button></div></div>
+    <p class="muted" style="margin:0">Drag a headline, or use ▲ ▼, to set the order. The ones you place keep their places; new wire headlines come after them${S.lock ? " (none while the list is locked)" : ""}. BREAKING headlines always lead. The line marks where the next HEADLINES ends.</p>
     <div class="hd-screen" ${S.pv ? "" : "hidden"}></div>
-    <ol class="hd-next">${list.map(x => `<li><b data-no-tr>${esc(x.text)}</b> ${x.auto ? "" : '<span class="tag amber">DESK</span>'}${x.image || x.video ? '<span class="tag">MEDIA</span>' : ""}${x.voice ? "" : '<span class="tag">NO VOICE YET</span>'}</li>`).join("") || '<li class="muted">No headlines yet.</li>'}</ol>
+    <ol class="hd-order">${allHeads().map((x, i) => `${i === S.set.count ? '<li class="hd-cut" aria-hidden="true"></li>' : ""}<li class="hd-o${x.brk ? " brk" : ""}" draggable="true" data-oi="${esc(x.id)}">
+      <span class="hd-grip" aria-hidden="true">⋮⋮</span><span class="hd-n">${digits(i + 1)}</span>
+      <div class="stack" style="flex:1;gap:4px;min-width:0"><b data-no-tr>${esc(x.text)}</b>
+        <div class="row" style="flex-wrap:wrap;gap:6px">${x.auto ? '<span class="tag">WIRE</span>' : '<span class="tag amber">DESK</span>'}${x.image || x.video ? '<span class="tag">MEDIA</span>' : ""}${x.voice ? '<span class="tag green">VOICE</span>' : '<span class="tag">NO VOICE YET</span>'}
+          <button class="btn sm ${x.brk ? "red" : ""}" type="button" data-brk="${esc(x.id)}">${x.brk ? "BREAKING ✓" : "BREAKING"}</button>
+          <select data-hold="${esc(x.id)}" title="Seconds on screen"><option value="0">${digits(S.set.secs)} s (usual)</option>${[6, 8, 12, 15, 20, 25, 30].map(n => `<option value="${n}" ${x.hold === n ? "selected" : ""}>${digits(n)} s</option>`).join("")}</select>
+          <button class="btn sm" type="button" data-rec="${esc(x.id)}">Record the voice again</button></div></div>
+      <div class="row" style="gap:4px">${i ? `<button class="btn sm" type="button" data-up="${esc(x.id)}" aria-label="Move up">▲</button>` : ""}<button class="btn sm" type="button" data-dn="${esc(x.id)}" aria-label="Move down">▼</button><button class="btn sm red" type="button" data-off="${esc(x.id)}">${x.auto ? "Drop" : "Delete"}</button></div></li>`).join("") || '<li class="muted">No headlines yet.</li>'}</ol>
+  </section>
+  <section class="panel pd hd-wrap">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3 style="margin:0">Plan one HEADLINES on its own</h3>
+      <label class="row" style="gap:6px">Time <select id="hdRun">${nextTimes(8).map(tm => `<option value="${tm}" ${S.run === tm ? "selected" : ""}>${digits(tm)}${S.runs[tm] ? " ✓" : ""}</option>`).join("")}</select></label></div>
+    ${(() => { const tm = S.run || nextTimes(1)[0], plan = S.runs[tm], all = allHeads(); return plan ? `<p class="muted" style="margin:0">At ${digits(tm)} exactly these headlines go on air, in this order. Every other HEADLINES follows the list above.</p>
+      <ol class="hd-order">${plan.map((id, i) => { const x = all.find(y => y.id === id); return x ? `<li class="hd-o"><span class="hd-n">${digits(i + 1)}</span><b data-no-tr style="flex:1">${esc(x.text)}</b>${i ? `<button class="btn sm" type="button" data-rup="${i}">▲</button>` : ""}<button class="btn sm red" type="button" data-rrm="${i}">✕</button></li>` : ""; }).join("")}</ol>
+      <div class="row" style="flex-wrap:wrap"><select id="hdRunAdd" style="flex:1;min-width:200px" data-no-tr>${all.filter(x => !plan.includes(x.id)).map(x => `<option value="${esc(x.id)}">${esc(x.text)}</option>`).join("")}</select><button class="btn sm green" type="button" id="hdRunAddGo">+ Add</button><button class="btn sm red" type="button" id="hdRunClear">Clear this plan</button></div>`
+      : `<p class="muted" style="margin:0">The HEADLINES at ${digits(tm)} follows the list above. Plan it on its own to choose exactly its headlines and their order.</p><button class="btn sm" type="button" id="hdRunMake">Plan the ${digits(tm)} HEADLINES</button>`; })()}
+  </section>
+  <section class="panel pd hd-wrap">
+    <h3 style="margin:0">Add from the stories on air</h3>
+    <p class="muted" style="margin:0">The AVO stories in rotation and the wire headlines you dropped. One tap puts one on the list.</p>
+    <div class="hd-pool">${[...(S.d.pool || []).filter(p => !S.items.some(x => x.ref === p.id)).map(p => `<div class="hd-pl">${p.image ? `<img src="${esc(p.image)}" alt="">` : ""}<b data-no-tr>${esc(p.title)}</b><span class="tag green">AVO</span><button class="btn sm green" type="button" data-pool="${esc(p.id)}">+ Add</button></div>`),
+      ...(S.d.auto || []).filter(a => S.hidden.includes(a.id)).map(a => `<div class="hd-pl"><b data-no-tr>${esc(a.orig)}</b><span class="tag">WIRE</span><button class="btn sm green" type="button" data-unhide="${esc(a.id)}">+ Add back</button></div>`)].join("") || '<p class="muted">Nothing to add right now.</p>'}</div>
   </section>
   <section class="panel pd hd-wrap">
     <div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3 style="margin:0">The desk's own headlines</h3><button class="btn sm green" id="hdAdd" type="button">+ Add a headline</button></div>
@@ -133,6 +170,37 @@ function wire() {
   $("#hdSecs").onchange = e => { S.set.secs = Math.max(6, Math.min(20, +e.target.value || 10)); mark(); draw(); };
   $("#hdAdd").onclick = () => { S.items.unshift({ id: crypto.randomUUID(), text: "", desk: "", image: "", video: "", when: [], top: false, repeat: 0, aired: 0 }); mark(); draw(); $("[data-own='0']")?.focus(); };
   $("#hdPv").onclick = preview;
+  // The order: drag, ▲ ▼, BREAKING, seconds, voice again, drop
+  const moveTo = (id, to) => { const ids = allHeads().map(x => x.id).filter(x => x !== id); ids.splice(Math.max(0, Math.min(ids.length, to)), 0, id); S.order = ids; mark(); draw(); };
+  const idx = id => allHeads().findIndex(x => x.id === id);
+  $$("[data-up]").forEach(b => b.onclick = () => moveTo(b.dataset.up, idx(b.dataset.up) - 1));
+  $$("[data-dn]").forEach(b => b.onclick = () => moveTo(b.dataset.dn, idx(b.dataset.dn) + 1));
+  $$(".hd-o[data-oi]").forEach(li => {
+    li.ondragstart = e => { S.drag = li.dataset.oi; e.dataTransfer.effectAllowed = "move"; li.classList.add("dragging"); };
+    li.ondragend = () => li.classList.remove("dragging");
+    li.ondragover = e => { e.preventDefault(); li.classList.add("over"); };
+    li.ondragleave = () => li.classList.remove("over");
+    li.ondrop = e => { e.preventDefault(); if (S.drag && S.drag !== li.dataset.oi) moveTo(S.drag, idx(li.dataset.oi)); S.drag = ""; };
+  });
+  $("#hdLock").onchange = e => { S.lock = e.target.checked; if (S.lock && !S.order.length) S.order = allHeads().slice(0, S.set.count).map(x => x.id); mark(); draw(); };
+  $("#hdAutoOrder")?.addEventListener("click", () => { S.order = []; S.lock = false; mark(); draw(); });
+  $$("[data-brk]").forEach(b => b.onclick = () => { const id = b.dataset.brk; S.brk = S.brk.includes(id) ? S.brk.filter(x => x !== id) : [...S.brk, id]; mark(); draw(); });
+  $$("[data-hold]").forEach(sel => sel.onchange = () => { const n = Number(sel.value); if (n) S.secsOf[sel.dataset.hold] = n; else delete S.secsOf[sel.dataset.hold]; mark(); draw(); });
+  $$("[data-rec]").forEach(b => b.onclick = async () => { const x = allHeads().find(y => y.id === b.dataset.rec); if (!x) return; b.disabled = true; try { await api("/api/admin/heads/voice", { method: "POST", body: { text: x.text } }); toast("Recorded again."); load(); } catch (e) { fail(e); b.disabled = false; } });
+  $$("[data-off]").forEach(b => b.onclick = () => { const id = b.dataset.off, x = allHeads().find(y => y.id === id); if (!x) return;
+    if (x.auto) S.hidden = [...S.hidden, id]; else { if (!confirm("Delete this headline?")) return; S.items = S.items.filter(y => y.id !== id); }
+    S.order = S.order.filter(y => y !== id); S.brk = S.brk.filter(y => y !== id); mark(); draw(); });
+  // A run planned on its own
+  $("#hdRun").onchange = e => { S.run = e.target.value; draw(); };
+  const runTm = () => S.run || nextTimes(1)[0];
+  $("#hdRunMake")?.addEventListener("click", () => { S.runs[runTm()] = lineup(Date.now()).map(x => x.id); S.run = runTm(); mark(); draw(); });
+  $("#hdRunClear")?.addEventListener("click", () => { delete S.runs[runTm()]; mark(); draw(); });
+  $("#hdRunAddGo")?.addEventListener("click", () => { const v = $("#hdRunAdd")?.value; if (v) { S.runs[runTm()] = [...S.runs[runTm()], v]; mark(); draw(); } });
+  $$("[data-rup]").forEach(b => b.onclick = () => { const L = S.runs[runTm()], i = Number(b.dataset.rup); [L[i - 1], L[i]] = [L[i], L[i - 1]]; mark(); draw(); });
+  $$("[data-rrm]").forEach(b => b.onclick = () => { S.runs[runTm()].splice(Number(b.dataset.rrm), 1); if (!S.runs[runTm()].length) delete S.runs[runTm()]; mark(); draw(); });
+  // From the stories on air
+  $$("[data-pool]").forEach(b => b.onclick = () => { const p = (S.d.pool || []).find(x => x.id === b.dataset.pool); if (!p) return; S.items.push({ id: crypto.randomUUID(), ref: p.id, text: p.title, desk: "", image: p.image && /^(https:|\/media\/|\/api\/)/.test(p.image) ? p.image : "", video: "", when: [], top: false, repeat: 0, aired: 0 }); mark(); draw(); toast("Added. Save to put it on air."); });
+  $$("[data-unhide]").forEach(b => b.onclick = () => { S.hidden = S.hidden.filter(x => x !== b.dataset.unhide); mark(); draw(); });
   $$("[data-own]").forEach(t => t.oninput = () => { S.items[+t.dataset.own].text = t.value; mark(); });
   $$("[data-odesk]").forEach(t => t.oninput = () => { S.items[+t.dataset.odesk].desk = t.value; mark(); });
   $$("[data-orep]").forEach(t => t.onchange = () => { S.items[+t.dataset.orep].repeat = Math.max(0, +t.value || 0); mark(); draw(); });
@@ -166,7 +234,7 @@ function preview() {
 async function save() {
   for (const x of S.items) if (!x.text.trim()) return toast("Give every headline of the desk its words (or delete it).", true);
   try {
-    await api("/api/admin/heads", { method: "PUT", body: { ...S.set, items: S.items, hidden: S.hidden, edits: S.edits } });
+    await api("/api/admin/heads", { method: "PUT", body: { ...S.set, items: S.items, hidden: S.hidden, edits: S.edits, order: S.order, lock: S.lock, brk: S.brk, secsOf: S.secsOf, runs: S.runs } });
     S.dirty = false; toast("Saved. HEADLINES uses it from the next airing."); load();
   } catch (e) { fail(e); }
 }
@@ -175,6 +243,7 @@ async function load() {
     S.d = await api("/api/admin/heads");
     S.set = { ...S.d.settings }; S.items = structuredClone(S.d.items || []);
     S.hidden = [...(S.d.hidden || [])]; S.edits = structuredClone(S.d.edits || {});
+    S.order = [...(S.d.order || [])]; S.lock = !!S.d.lock; S.brk = [...(S.d.brk || [])]; S.secsOf = { ...(S.d.secsOf || {}) }; S.runs = structuredClone(S.d.runs || {});
     S.dirty = false; draw();
   } catch (e) { $("main").innerHTML = `<div class="cr-denied"><h2>Headlines desk</h2><p>${esc(e.message)}</p></div>`; }
 }
