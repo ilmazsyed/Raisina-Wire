@@ -97,6 +97,19 @@ export function fixFacts(c, v) {
   return walk(v);
 }
 export async function applyCharter(env, v) { return fixFacts(await getCharter(env), v); }
+// A story the desk wrote, checked against the charter before it is saved: the words the charter
+// says never to use, and what its corrections would change (the desk decides; nothing is changed).
+export function charterCheck(c, text) {
+  const t = String(text || ""), out = [];
+  for (const w of c?.avoid || []) if (w && t.toLowerCase().includes(String(w).toLowerCase())) out.push(`Uses "${w}", which the charter says never to use.`);
+  for (const r of c?.corrections || []) {
+    if (!r?.find || !t.includes(r.find)) continue;
+    let i = -1, hit = false;
+    while ((i = t.indexOf(r.find, i + 1)) >= 0) { const before = t.slice(Math.max(0, i - 25), i); if (!(r.unless && before.includes(r.unless))) { hit = true; break; } }
+    if (hit) out.push(`"${r.find}" should read "${r.replace}" (the charter's correction).`);
+  }
+  return [...new Set(out)].slice(0, 20);
+}
 
 // /api/admin/charter: the owner, and the people they gave access to.
 export async function handleCharter(request, env, user, { json, err, audit, isOwner }) {

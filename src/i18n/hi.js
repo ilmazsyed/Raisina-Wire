@@ -1779,4 +1779,21 @@ export default {
   "Nothing to choose": "चुनने को कुछ नहीं",
   "Choose what to put in, and when.": "क्या डालना है और कब, चुनें।",
   "Saved. The channel follows it within seconds.": "सहेजा गया। चैनल कुछ सेकंड में इसे मानेगा।",
+  // PCR freeze.
+  "Freeze": "फ़्रीज़",
+  "Release freeze": "फ़्रीज़ हटाएँ",
+  // PCR windows and the live-input guide.
+  "Windows": "विंडो",
+  "Swap with the window above": "ऊपर वाली विंडो से बदलें",
+  "YouTube live or video link": "YouTube लाइव या वीडियो लिंक",
+  "Facebook Live link": "Facebook लाइव लिंक",
+  "How to bring a live source in by its link": "लिंक से लाइव स्रोत कैसे लाएँ",
+  // PCR live-input guide.
+  "YouTube live: open the live on YouTube, press Share and copy the link. Choose “YouTube live or video link” and paste it.": "YouTube लाइव: YouTube पर लाइव खोलें, शेयर दबाकर लिंक कॉपी करें। “YouTube लाइव या वीडियो लिंक” चुनकर लिंक डालें।",
+  "Facebook Live: open the live post, press ⋯ then Copy link. The video must be public. Choose “Facebook Live link” and paste it.": "Facebook लाइव: लाइव पोस्ट खोलें, ⋯ दबाकर लिंक कॉपी करें। वीडियो सार्वजनिक होना चाहिए। “Facebook लाइव लिंक” चुनकर लिंक डालें।",
+  "A reporter's phone (VDO.Ninja, free): on the phone open the first address below and allow the camera. Here, choose “VDO.Ninja view link” and paste the second.": "रिपोर्टर का फ़ोन (VDO.Ninja, मुफ़्त): फ़ोन पर नीचे का पहला पता खोलें और कैमरे की अनुमति दें। यहाँ “VDO.Ninja view link” चुनकर दूसरा पता डालें।",
+  "The studio's OBS: stream from OBS to the media server, then paste its HLS address (ending .m3u8) or its WebRTC (WHEP) address.": "स्टूडियो का OBS: OBS से मीडिया सर्वर पर स्ट्रीम करें, फिर उसका HLS पता (.m3u8 पर ख़त्म) या WebRTC (WHEP) पता डालें।",
+  "A picture: paste an https picture address, or an uploaded one.": "तस्वीर: https तस्वीर का पता, या अपलोड की गई तस्वीर का पता डालें।",
+  "Give it a name and press Save. Click the source to put it in the preview, check it there, then TAKE.": "एक नाम देकर सेव करें। स्रोत पर क्लिक करने से वह प्रीव्यू में आएगा। वहाँ देखकर TAKE करें।",
+  "In a layout with several windows, choose each window's source, and which window carries the sound, under Windows next to the layouts.": "कई विंडो वाले लेआउट में हर विंडो का स्रोत, और किस विंडो की आवाज़ जाएगी, लेआउट के पास ‘विंडो’ में चुनें।",
 };

@@ -481,3 +481,12 @@ body.rec-on>header,body.rec-on>main,body.rec-on>nav,body.rec-on .cr-top{visibili
 .lr-now{display:flex;align-items:center;gap:8px;color:#ff5a5a;font-weight:700;font-size:13px}
 .lr-now i{flex:1;height:2px;background:#e0101a}
 @media(max-width:760px){.lr-row b{min-width:0;flex-basis:100%}}
+/* PCR: each window of a layout; the live-input guide */
+.windows h3{margin:10px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted,#9aa3b2)}
+.win-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 0}
+.win-row b{min-width:58px;font-size:13px}
+.win-row select{flex:1;min-width:140px}
+.in-guide{border:1px solid var(--line,#2a2f3a);border-radius:10px;padding:8px 12px}
+.in-guide summary{cursor:pointer;font-weight:700}
+.in-guide ol{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.45}
+.in-guide code{font-size:12px;word-break:break-all}
