@@ -40,7 +40,7 @@ async function companionToken(env, make = false) {
 async function companion(env, ch, action, audit) {
   const map = {
     take: ["take", {}], auto: ["auto", {}], next: ["rundown.next", {}], prev: ["rundown.prev", {}], skip: ["rundown.skip", {}],
-    dump: ["dump", {}], standby: ["standby", { on: true }], "standby-off": ["standby", { on: false }],
+    dump: ["dump", {}], standby: ["standby", { on: true }], "standby-off": ["standby", { on: false }], freeze: ["freeze", { on: true }], unfreeze: ["freeze", { on: false }],
     cut: ["transition", { type: "cut", ms: 0 }], mix: ["transition", { type: "mix", ms: 600 }], wipe: ["transition", { type: "wipe", ms: 700 }], stinger: ["transition", { type: "stinger", ms: 1200 }],
     "breaking-clear": ["breaking", { clear: true }], "lower-clear": ["lower", {}]
   };
@@ -138,7 +138,7 @@ export async function handleControlRoom(request, env, url, { json, err, currentU
     const key = `pcr_inputs:${inp[1]}`;
     if (request.method === "PUT") {
       const b = await request.json().catch(() => ({}));
-      const list = (Array.isArray(b.inputs) ? b.inputs : []).slice(0, 24).map(x => ({ id: String(x.id || crypto.randomUUID()).slice(0, 40), kind: ["hls", "whep", "vdo", "image", "yt"].includes(x.kind) ? x.kind : "hls", name: String(x.name || "").slice(0, 60), url: String(x.url || "").slice(0, 800) })).filter(x => /^https:\/\/|^\/(media|clips)\//.test(x.url) || x.kind === "yt");
+      const list = (Array.isArray(b.inputs) ? b.inputs : []).slice(0, 24).map(x => ({ id: String(x.id || crypto.randomUUID()).slice(0, 40), kind: ["hls", "whep", "vdo", "image", "yt", "fb"].includes(x.kind) ? x.kind : "hls", name: String(x.name || "").slice(0, 60), url: String(x.url || "").slice(0, 800) })).filter(x => /^https:\/\/|^\/(media|clips)\//.test(x.url) || x.kind === "yt");
       await env.DB.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(key, JSON.stringify(list)).run();
       await audit("pcr.inputs", "channel", inp[1], { n: list.length });
       return json({ ok: true, inputs: list });

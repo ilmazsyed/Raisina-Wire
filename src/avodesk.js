@@ -246,6 +246,9 @@ async function save() {
   if (!body.title) return toast("Write the headline.");
   if (body.brief.length < 20) return toast("Write the brief to be read.");
   if (body.brief.length > maxFor(S.edit)) return toast(`The brief is longer than ${maxFor(S.edit)} characters.`);
+  // The Editorial Charter: words it never uses, facts its corrections fix. The desk is warned and decides.
+  const w = await api("/api/admin/charter/check", { method: "POST", body: { text: `${body.title}\n${body.brief}` } }).catch(() => null);
+  if (w?.warnings?.length && !confirm(`Editorial Charter:\n\n• ${w.warnings.join("\n• ")}\n\nSave anyway?`)) return;
   try {
     if (S.edit) await api(`/api/admin/tv/avo/${encodeURIComponent(S.edit.id)}`, { method: "PUT", body });
     else await api("/api/admin/tv/avo", { method: "POST", body });

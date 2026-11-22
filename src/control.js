@@ -135,6 +135,8 @@ export class TvControl {
       case "bigbreak": s.bigBreak = a && a.on ? { on: true, lines: (Array.isArray(a.lines) ? a.lines : []).map(t => String(t || "").replace(/\s+/g, " ").trim().slice(0, 160)).filter(Boolean).slice(0, 7), continuous: !!a.continuous, at: a.at && !isNaN(Date.parse(a.at)) ? a.at : iso() } : null;
         if (s.bigBreak && !s.bigBreak.lines.length) s.bigBreak = null; break;
       case "delay": s.delay = Math.max(0, Math.min(10, Math.round(Number(a.seconds) || 0))); break;
+      // FREEZE: every screen holds what is on air now (no new item starts) until it is released.
+      case "freeze": s.freeze = a.on ? { on: true, at: iso() } : null; if (a.on) await this.asrun({ label: "FREEZE", graphic: { kind: "freeze" } }, "freeze"); break;
       case "dump": s.dumpAt = now(); s.standby = { on: true, auto: false, reason: "dump" }; await this.asrun({ label: "DUMP", graphic: { kind: "standby" } }, "dump"); break;
       case "standby": s.standby = { on: !!a.on, auto: !!a.auto, reason: String(a.reason || "").slice(0, 120) }; if (a.on) await this.asrun({ label: "Standby", graphic: { kind: "standby" } }, "standby"); break;
       case "overlay": s.overlay = { ...s.overlay, ...Object.fromEntries(["poll", "results", "comments"].filter(k => k in a).map(k => [k, a[k] || null])) }; break;

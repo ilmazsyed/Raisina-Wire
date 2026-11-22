@@ -193,6 +193,8 @@ async function render(view){
     form.addEventListener("submit",async e=>{e.preventDefault();clearTimeout(saveTimer);const f=Object.fromEntries(new FormData(form));for(const k of Object.keys(f))if(/^(bn|en|hi)_/.test(k))delete f[k];f.notify=!!form.elements.notify?.checked;f.publishedAt=f.publishedAt?new Date(f.publishedAt).toISOString():"";
       // A half-written language version would be lost: check it before saving anything.
       for(const l of OTHER){const x=langFields(form,l);if((x.title||x.body)&&!(x.title&&x.body)){notice(`The ${LANG_NAME[l]} version needs both a headline and the text (or leave both empty).`);return}}
+      // The Editorial Charter: words it never uses, facts its corrections fix. The desk is warned and decides.
+      {const w=await api("/api/admin/charter/check",{method:"POST",body:JSON.stringify({text:[f.title,f.dek,f.body].filter(Boolean).join("\n")})}).catch(()=>null);if(w?.warnings?.length&&!confirm(`Editorial Charter:\n\n• ${w.warnings.join("\n• ")}\n\nSave anyway?`))return}
       try{let res;if(editing){res=await api(`/api/admin/articles/${encodeURIComponent(editing.id)}`,{method:"PUT",body:JSON.stringify(f)});state.editId=null}else{res=await api("/api/admin/articles",{method:"POST",body:JSON.stringify(f)})}
       const id=editing?.id||res.id;let langNote="";
       for(const l of OTHER){const x=langFields(form,l);if(JSON.stringify(x)===JSON.stringify(langStart[l]))continue; // unchanged

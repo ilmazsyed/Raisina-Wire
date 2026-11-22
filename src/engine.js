@@ -1466,7 +1466,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         const r = rects[i] || rects[0]; if (!r) return;
         const el = document.createElement("div"); el.className = `tvs ${rects.length > 1 ? "multi" : ""}`;
         el.style.cssText = `left:${r[0]}%;top:${r[1]}%;width:${r[2]}%;height:${r[3]}%`;
-        box.append(el); slots.push(makeSource(el, src, offset, i === 0, (sc.sources || []).length === 1 && r[0] === 0 && r[1] === 0 && r[2] === 100 && r[3] === 100));
+        // (the sound comes from the window the PCR chose, the main one by default)
+        box.append(el); slots.push(makeSource(el, src, offset, i === (Number.isInteger(sc.audio) && sc.audio < (sc.sources || []).length ? sc.audio : 0), (sc.sources || []).length === 1 && r[0] === 0 && r[1] === 0 && r[2] === 100 && r[3] === 100));
       });
       if (sc.graphic) box.append(graphic(sc));
     }
@@ -2538,7 +2539,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   function fillWx() {
     const P = st.tv?.weatherPlaces || [], slot = stage.querySelector(".tv-wxslot");
     if (!slot || !P.length) return;
-    const sets = Math.ceil(P.length / 2), k = Math.floor(Date.now() / 8000) % sets, pair = P.slice(k * 2, k * 2 + 2);
+    // (Kolkata always, beside each of the other places in turn)
+    const kol = P.find(p => p.en === "Kolkata"), rest = P.filter(p => p !== kol), k = Math.floor(Date.now() / 8000) % Math.max(1, rest.length);
+    const pair = kol ? [kol, rest[k]].filter(Boolean) : P.slice((k % Math.ceil(P.length / 2)) * 2, (k % Math.ceil(P.length / 2)) * 2 + 2);
     const html = pair.map(p => `<span class="wx-mini k-${p.kind}"><i class="wx-ico k-${p.kind}"></i><span class="wm-n">${flip(esc(p.en), esc(p.bn), "wm")}</span><b>${flip(`${p.temp}°C`, `${bnDigits(p.temp)}°সে`, "wm")}</b></span>`).join("");
     if (slot.__html === html) return;
     slot.innerHTML = `<div class="wx-pair">${html}</div>`; slot.__html = html;
@@ -2872,6 +2875,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     // Outputs apply realtime changes after the broadcast delay.
     while (st.queue.length && st.queue[0].at <= Date.now()) { st.ctl = st.queue.shift().state; onState?.(st.ctl); }
     let sc = resolve();
+    // FREEZE (the PCR): the screen holds what is on air; nothing new starts until it is released.
+    if (st.ctl?.freeze?.on && st.current?.scene && mode !== "scene") sc = st.current.scene;
     // The running-order simulator (scripts/playout-sim.mjs) records each item put on air.
     if (window.__rwPlayout && st.seq?.seg && st.seq.seg !== st.lastSeg) { const g = st.lastSeg = st.seq.seg; window.__rwPlayout.push({ type: g.type, start: g.start, dur: g.dur, title: g.title || "", yt: g.ytId || "", eg: !!g.eg, resumed: !!g.resumed, name: g.name || "", items: (g.items || []).length, stories: (g.stories || []).map(x => ({ id: x.id, dk: x.dk, weight: x.weight })) }); }
     if (window.__rwScenes && sc?.key !== st.current?.key) window.__rwScenes.push({ at: now(), key: sc?.key || "", seg: st.seq?.seg?.type || "", item: st.seq?.item?.type || "" });

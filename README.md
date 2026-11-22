@@ -167,6 +167,16 @@ Each channel's day as 48 half-hour wheels, India time (control room → TV → L
 - **As-run log:** the broadcast output now logs every autopilot item (`POST /api/tv/asrun`), next to what the control room logs.
 - **As-run report:** any day's log, printed or downloaded as CSV.
 
+### PCR: freeze, windows and the live-input guide; charter warnings; Kolkata weather
+
+- **FREEZE** (PCR, Shift+F, Companion `freeze` / `unfreeze`): every screen holds what is on air, and nothing new starts until it is released. It is logged in the as-run log.
+- **Windows** (PCR, under the layouts): in a layout with several windows, choose each window's source and which window carries the sound. Windows can be swapped and cleared.
+- **Live inputs**:
+  - The PCR's Live inputs dialog has a step-by-step guide to bringing a source in by its link: YouTube live, Facebook Live, a reporter's phone through VDO.Ninja, the studio's OBS, and pictures.
+  - Facebook Live links are now an input type.
+- **Charter warnings**: before a story or an AVO is saved, the desk sees the Editorial Charter's warnings: words it never uses, and facts its corrections would change. Nothing is changed for them (`POST /api/admin/charter/check`).
+- **Weather beside the clock**: Kolkata is always shown, next to each of the other places in turn.
+
 ### Headlines desk (`/headlines.html`)
 
 HEADLINES goes on air at :58 and :28 (India time; the desk can change the minutes) and leads

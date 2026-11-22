@@ -69,6 +69,16 @@ function updatePreview() {
   const n = LAYOUTS[S.pv.layout]?.slots || 0;
   $(".layouts").innerHTML = Object.entries(LAYOUTS).map(([k, l]) => `<button class="btn sm ${S.pv.layout === k ? "on" : ""}" data-layout="${k}">${l.name}</button>`).join("");
   $(".slots").innerHTML = n > 1 ? `<span class="muted">Next source goes to:</span>${Array.from({ length: n }, (_, i) => `<button class="btn sm ${S.slot === i ? "sel" : ""}" data-slot="${i}">${i === 0 ? "Main" : `Box ${digits(i + 1)}`}</button>`).join("")}` : "";
+  // Each window of the layout: its source, which window carries the sound, a swap and a clear.
+  const pickable = S.sources.filter(s => s.src), keyOf = src => { const m = pickable.find(s => JSON.stringify(s.src) === JSON.stringify(src)); return m ? m.key : src?.kind === "continuity" ? "continuity" : ""; };
+  $(".windows").innerHTML = n > 1 ? `<h3>Windows</h3>${Array.from({ length: n }, (_, i) => { const src = S.pv.sources?.[i] || { kind: "continuity" }; return `<div class="win-row"><b>${i === 0 ? "Main" : `Box ${digits(i + 1)}`}</b>
+      <select data-win="${i}"><option value="continuity" ${keyOf(src) === "continuity" ? "selected" : ""}>Running order</option>${pickable.filter(s => s.src.kind !== "continuity").map(s => `<option value="${esc(s.key)}" ${keyOf(src) === s.key ? "selected" : ""} data-no-tr>${esc(s.name)}</option>`).join("")}</select>
+      <label class="chk"><input type="radio" name="winAudio" data-wa="${i}" ${(Number.isInteger(S.pv.audio) ? S.pv.audio : 0) === i ? "checked" : ""}> Sound</label>
+      ${i ? `<button class="btn sm" type="button" data-wup="${i}" title="Swap with the window above">▲</button>` : ""}<button class="btn sm" type="button" data-wclr="${i}">Clear</button></div>`; }).join("")}` : "";
+  $$("[data-win]").forEach(sel => sel.onchange = () => { const i = Number(sel.dataset.win), s = pickable.find(x => x.key === sel.value); S.pv.sources = [...(S.pv.sources || [])]; for (let k = 0; k <= i; k++) S.pv.sources[k] ||= { kind: "continuity" }; S.pv.sources[i] = s ? structuredClone(s.src) : { kind: "continuity" }; updatePreview(); });
+  $$("[data-wa]").forEach(r => r.onchange = () => { S.pv.audio = Number(r.dataset.wa); updatePreview(); });
+  $$("[data-wup]").forEach(b => b.onclick = () => { const i = Number(b.dataset.wup), L = S.pv.sources; [L[i - 1], L[i]] = [L[i] || { kind: "continuity" }, L[i - 1] || { kind: "continuity" }]; if (S.pv.audio === i) S.pv.audio = i - 1; else if (S.pv.audio === i - 1) S.pv.audio = i; updatePreview(); });
+  $$("[data-wclr]").forEach(b => b.onclick = () => { S.pv.sources[Number(b.dataset.wclr)] = { kind: "continuity" }; updatePreview(); });
   $$("[data-layout]").forEach(b => b.onclick = () => setLayout(b.dataset.layout));
   $$("[data-slot]").forEach(b => b.onclick = () => { S.slot = Number(b.dataset.slot); updatePreview(); });
   $("#pvLabel").textContent = S.pv.label || "";
@@ -103,6 +113,7 @@ function drawState() {
   $$("[data-layer]").forEach(b => b.onclick = () => cmd("layers", { [b.dataset.layer]: !c.layers?.[b.dataset.layer] }));
   $("#delay").value = String(c.delay || 0);
   $("#standby").classList.toggle("on", !!c.standby?.on);
+  const fz = $("#freeze"); if (fz) { fz.classList.toggle("on", !!c.freeze?.on); fz.classList.toggle("red", !!c.freeze?.on); fz.textContent = c.freeze?.on ? "Release freeze" : "Freeze"; }
   $("#lowerNow").innerHTML = c.lower ? `On air: <b data-no-tr>${esc(c.lower.name)}</b>` : "";
   $("#breakNow").innerHTML = c.breaking && Date.now() - Date.parse(c.breaking.at) < 90e3 ? `<span class="tag red">BREAKING</span> <span data-no-tr>${esc(c.breaking.text)}</span>` : "";
   const r = c.rundown;
@@ -143,13 +154,15 @@ async function loadGuests() {
 /* ---------- inputs and macros ---------- */
 function inputsDialog() {
   const d = document.createElement("dialog");
-  const row = x => `<div class="src-row"><select data-k="kind">${["hls", "whep", "vdo", "yt", "image"].map(k => `<option value="${k}" ${x.kind === k ? "selected" : ""}>${{ hls: "HLS stream (.m3u8)", whep: "WebRTC (WHEP)", vdo: "VDO.Ninja view link", yt: "YouTube video ID or link", image: "Picture" }[k]}</option>`).join("")}</select><input data-k="url" value="${esc(x.url || "")}" placeholder="https://…"><input class="full" data-k="name" value="${esc(x.name || "")}" placeholder="Name (e.g. Studio camera, Reporter Howrah)"></div>`;
-  d.innerHTML = `<div class="stack"><h3>Live inputs</h3><p class="muted">Streams the PCR can cut to: the studio's own stream from OBS through the media server (HLS or WHEP), VDO.Ninja view links, YouTube lives, pictures.</p><div class="stack" id="inl">${S.inputs.map(row).join("")}</div><div class="row"><button class="btn" id="inAdd">+ Add input</button><button class="btn green" id="inSave">Save</button><button class="btn" id="inClose">Close</button></div></div>`;
+  const row = x => `<div class="src-row"><select data-k="kind">${["yt", "fb", "vdo", "hls", "whep", "image"].map(k => `<option value="${k}" ${x.kind === k ? "selected" : ""}>${{ hls: "HLS stream (.m3u8)", whep: "WebRTC (WHEP)", vdo: "VDO.Ninja view link", yt: "YouTube live or video link", fb: "Facebook Live link", image: "Picture" }[k]}</option>`).join("")}</select><input data-k="url" value="${esc(x.url || "")}" placeholder="https://…"><input class="full" data-k="name" value="${esc(x.name || "")}" placeholder="Name (e.g. Studio camera, Reporter Howrah)"></div>`;
+  d.innerHTML = `<div class="stack"><h3>Live inputs</h3><p class="muted">Streams the PCR can cut to: the studio's own stream from OBS through the media server (HLS or WHEP), VDO.Ninja view links, YouTube lives, pictures.</p><details class="in-guide"><summary>How to bring a live source in by its link</summary>
+    <ol><li>YouTube live: open the live on YouTube, press Share and copy the link. Choose “YouTube live or video link” and paste it.</li><li>Facebook Live: open the live post, press ⋯ then Copy link. The video must be public. Choose “Facebook Live link” and paste it.</li><li>A reporter's phone (VDO.Ninja, free): on the phone open the first address below and allow the camera. Here, choose “VDO.Ninja view link” and paste the second.<br><code data-no-tr>https://vdo.ninja/?push=rashtrix1</code><br><code data-no-tr>https://vdo.ninja/?view=rashtrix1&amp;solo</code></li><li>The studio's OBS: stream from OBS to the media server, then paste its HLS address (ending .m3u8) or its WebRTC (WHEP) address.</li><li>A picture: paste an https picture address, or an uploaded one.</li><li>Give it a name and press Save. Click the source to put it in the preview, check it there, then TAKE.</li><li>In a layout with several windows, choose each window's source, and which window carries the sound, under Windows next to the layouts.</li></ol></details>
+    <div class="stack" id="inl">${S.inputs.map(row).join("")}</div><div class="row"><button class="btn" id="inAdd">+ Add input</button><button class="btn green" id="inSave">Save</button><button class="btn" id="inClose">Close</button></div></div>`;
   document.body.append(d); d.showModal();
   $("#inAdd", d).onclick = () => $("#inl", d).insertAdjacentHTML("beforeend", row({ kind: "hls" }));
   $("#inClose", d).onclick = () => d.close(); d.addEventListener("close", () => d.remove());
   $("#inSave", d).onclick = async () => {
-    const inputs = $$("#inl .src-row", d).map(r => ({ kind: $("[data-k=kind]", r).value, url: $("[data-k=kind]", r).value === "yt" ? ($("[data-k=url]", r).value.match(/(?:v=|youtu\.be\/|live\/)([\w-]{11})/)?.[1] || $("[data-k=url]", r).value.trim()) : $("[data-k=url]", r).value.trim(), name: $("[data-k=name]", r).value.trim() })).filter(x => x.url);
+    const inputs = $$("#inl .src-row", d).map(r => ({ kind: $("[data-k=kind]", r).value, url: $("[data-k=kind]", r).value === "yt" ? ($("[data-k=url]", r).value.match(/(?:v=|youtu\.be\/|live\/|shorts\/|embed\/)([\w-]{11})/)?.[1] || $("[data-k=url]", r).value.trim()) : $("[data-k=url]", r).value.trim(), name: $("[data-k=name]", r).value.trim() })).filter(x => x.url);
     try { S.inputs = (await api(`/api/admin/inputs/${ch}`, { method: "PUT", body: { inputs } })).inputs; buildSources(); drawSources(); d.close(); toast("Inputs saved."); } catch (e) { fail(e); }
   };
 }
@@ -177,7 +190,7 @@ async function companionDialog() {
   const draw = async (make = false) => {
     const t = await api("/api/admin/companion", { method: make ? "POST" : "GET" }).catch(e => ({ error: e.message }));
     const base = t.token ? `${t.base}${ch}/ACTION?token=${t.token}` : "";
-    d.innerHTML = `<div class="stack"><h3>Bitfocus Companion and Stream Deck</h3><p class="muted">In Companion, add the “Generic HTTP” connection and make each button send a GET request to the address below, with ACTION replaced by one of: take, auto, next, prev, skip, dump, standby, standby-off, cut, mix, wipe, stinger, breaking-clear, lower-clear, ticker-on, ticker-off, bug-on, bug-off, ad-on, ad-off, delay-0 … delay-10, macro-&lt;id&gt;. Keep the address private.</p>
+    d.innerHTML = `<div class="stack"><h3>Bitfocus Companion and Stream Deck</h3><p class="muted">In Companion, add the “Generic HTTP” connection and make each button send a GET request to the address below, with ACTION replaced by one of: take, auto, next, prev, skip, dump, standby, standby-off, freeze, unfreeze, cut, mix, wipe, stinger, breaking-clear, lower-clear, ticker-on, ticker-off, bug-on, bug-off, ad-on, ad-off, delay-0 … delay-10, macro-&lt;id&gt;. Keep the address private.</p>
       ${base ? `<input readonly value="${esc(base)}" onclick="this.select()">` : `<p>No token yet.</p>`}
       <p class="muted">Macro ids: ${S.macros.filter(m => m.channel === ch).map(m => `${esc(m.title)} = <code>${m.id}</code>`).join(", ") || "none"}</p>
       <div class="row"><button class="btn" id="cNew">${base ? "Make a new token (the old one stops)" : "Make a token"}</button><button class="btn" id="cClose">Close</button></div></div>`;
@@ -196,7 +209,7 @@ function onKey(e) {
   const map = {
     " ": take, Enter: () => cmd("auto"), N: () => cmd("rundown.next"), B: () => cmd("rundown.prev"), K: () => cmd("rundown.skip"),
     X: () => cmd("transition", { type: "cut", ms: 0 }), M: () => cmd("transition", { type: "mix", ms: 600 }), W: () => cmd("transition", { type: "wipe", ms: 700 }), G: () => cmd("transition", { type: "stinger", ms: 1200 }),
-    "Shift+D": () => dump(), "Shift+S": () => cmd("standby", { on: !S.ctl?.standby?.on }), L: () => $("#lowerShow").click(), "Shift+L": () => cmd("lower", {}),
+    "Shift+D": () => dump(), "Shift+S": () => cmd("standby", { on: !S.ctl?.standby?.on }), "Shift+F": () => cmd("freeze", { on: !S.ctl?.freeze?.on }), L: () => $("#lowerShow").click(), "Shift+L": () => cmd("lower", {}),
     Escape: () => { S.pv = { layout: "full", sources: [], label: "" }; S.slot = 0; updatePreview(); }
   };
   const f = map[e.key === " " ? " " : k];
@@ -216,7 +229,7 @@ async function dump() { await cmd("dump"); toast("DUMP: the outputs threw away t
       <div class="mon pg"><header><span>PROGRAM</span><span>before delay</span></header><div class="host" id="pgHost" data-no-tr></div></div></div>
     <div class="switcher"><div class="stack">
       <div class="panel" data-open><h2>Sources <small class="muted">(1–9)</small></h2><div class="sources"></div></div>
-      <div class="panel"><h2>Layout <small class="muted">(Shift+1–9)</small></h2><div class="layouts"></div><div class="slots" style="margin-top:6px"></div></div>
+      <div class="panel"><h2>Layout <small class="muted">(Shift+1–9)</small></h2><div class="layouts"></div><div class="slots" style="margin-top:6px"></div><div class="windows"></div></div>
       <div class="panel"><h2>Transition <small class="muted">(X M W G)</small></h2><div class="trans"></div></div>
       <div class="panel"><h2>Graphics</h2><div class="layers"></div>
         <div class="row" style="margin-top:8px"><input id="lowerName" placeholder="Name strap: name" data-no-tr><input id="lowerTitle" placeholder="Title" data-no-tr><button class="btn" id="lowerShow">Show (L)</button><button class="btn" id="lowerClear">Clear</button><span id="lowerNow" class="muted"></span></div>
@@ -228,7 +241,7 @@ async function dump() { await cmd("dump"); toast("DUMP: the outputs threw away t
     <div class="panel" data-open><h2>Breaking</h2><div class="stack"><div id="breakNow"></div><a class="btn red" href="/breaking.html">Breaking desk</a><p class="muted" style="font-size:12px;margin:0">Breaking news, the lives and the live split go out from the Breaking desk.</p></div></div>
     <div class="panel" data-open><h2>Rundown</h2><div id="rdTitle"></div><div class="countdown">—</div><p class="muted" id="rdLeft" style="text-align:center;margin:0 0 6px"></p>
       <div class="row" style="margin-bottom:6px"><button class="btn sm" id="rdPrev">◀ Prev (B)</button><button class="btn sm" id="rdNext">Next ▶ (N)</button><button class="btn sm" id="rdSkip">Skip (K)</button><button class="btn sm" id="rdAuto">Auto advance</button><button class="btn sm" id="rdStop">Stop</button><a class="btn sm" href="/producer.html">Producer</a></div><div class="rdlist"></div></div>
-    <div class="panel"><h2>Delay and safety</h2><div class="row"><label>Broadcast delay<select id="delay">${Array.from({ length: 11 }, (_, i) => `<option value="${i}" data-no-tr>${digits(i)} s</option>`).join("")}</select></label><button class="btn red dump" id="dump" title="Shift+D">DUMP</button><button class="btn amber" id="standby" title="Shift+S">Standby slate</button></div>
+    <div class="panel"><h2>Delay and safety</h2><div class="row"><label>Broadcast delay<select id="delay">${Array.from({ length: 11 }, (_, i) => `<option value="${i}" data-no-tr>${digits(i)} s</option>`).join("")}</select></label><button class="btn red dump" id="dump" title="Shift+D">DUMP</button><button class="btn amber" id="standby" title="Shift+S">Standby slate</button><button class="btn" id="freeze" title="Shift+F">Freeze</button></div>
       <p class="muted" style="font-size:12px">With a delay, the outputs run behind the PCR. DUMP throws away what is waiting and puts the standby slate up. If an output's source stops for 10 seconds, the standby slate goes up by itself and the newsroom gets an alert.</p></div>
     <div class="panel"><h2>Outputs</h2><div class="health"></div></div>
     <div class="panel pc-keys"><h2>Keys</h2><div class="keys"><div><kbd>Space</kbd> TAKE</div><div><kbd>Enter</kbd> AUTO</div><div><kbd>1–9</kbd> source</div><div><kbd>Shift+1–9</kbd> layout</div><div><kbd>N</kbd> next</div><div><kbd>B</kbd> previous</div><div><kbd>K</kbd> skip</div><div><kbd>X M W G</kbd> transitions</div><div><kbd>L</kbd> name strap</div><div><kbd>Shift+L</kbd> strap off</div><div><kbd>Shift+D</kbd> DUMP</div><div><kbd>Shift+S</kbd> standby</div><div><kbd>Esc</kbd> clear preview</div></div></div>
@@ -248,6 +261,8 @@ async function dump() { await cmd("dump"); toast("DUMP: the outputs threw away t
   $("#delay").onchange = e => cmd("delay", { seconds: Number(e.target.value) });
   $("#dump").onclick = dump;
   $("#standby").onclick = () => cmd("standby", { on: !S.ctl?.standby?.on });
+  // FREEZE holds what is on air on every screen (nothing new starts) until it is released.
+  $("#freeze").onclick = () => cmd("freeze", { on: !S.ctl?.freeze?.on });
   $("#inputsBtn").onclick = inputsDialog; $("#compBtn").onclick = companionDialog;
   document.addEventListener("keydown", onKey);
   pollHealth(); setInterval(pollHealth, 5000); setInterval(tickClock, 250);

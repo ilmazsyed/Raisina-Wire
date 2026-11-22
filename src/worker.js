@@ -56,7 +56,7 @@ import { serveClip, clipHousekeeping } from "./clips.js";
 import { progPlayed, handleProgs, progHousekeeping } from "./progs.js";
 import { adPlayed, seedBrandFilm } from "./ads.js";
 import { epaperStep, handleNewsprint, readerEdition, epaperSettings } from "./epaper.js";
-import { handleCharter } from "./charter.js";
+import { handleCharter, charterCheck, getCharter } from "./charter.js";
 import { handleHeads, prepareHeadVoices } from "./headlines.js";
 import { handleLrd, asrunPost } from "./liverundown.js";
 import { applyVoice, handleVoice } from "./voicelab.js";
@@ -1356,6 +1356,13 @@ async function api(request, env, ctx) {
     const user = await currentUser(request, env);
     if (!isStaff(user)) return err("Editor access required.", 403);
     return handleHeads(request, env, user, { json, err, audit: (...a) => audit(env, user, ...a), state: async () => { clearTvCache(); return tvState(env, "h"); } });
+  }
+  // A story the desk wrote, checked against the Editorial Charter before it is saved (any editor).
+  if (url.pathname === "/api/admin/charter/check" && request.method === "POST") {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const b = await request.json().catch(() => ({}));
+    return json({ warnings: charterCheck(await getCharter(env), String(b.text || "").slice(0, 60000)) }, 200, { "cache-control": "no-store" });
   }
   // ---- The Editorial Charter (src/charter.js): the owner, and the people they choose.
   if (url.pathname === "/api/admin/charter") {

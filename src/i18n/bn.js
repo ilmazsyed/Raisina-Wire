@@ -1831,4 +1831,21 @@ export default {
   "Nothing to choose": "বাছার মতো কিছু নেই",
   "Choose what to put in, and when.": "কী ঢোকাবেন আর কখন, তা বাছুন।",
   "Saved. The channel follows it within seconds.": "সেভ হয়েছে। কয়েক সেকেন্ডের মধ্যে চ্যানেল তা মেনে চলবে।",
+  // PCR freeze.
+  "Freeze": "ফ্রিজ",
+  "Release freeze": "ফ্রিজ ছাড়ুন",
+  // PCR windows and the live-input guide.
+  "Windows": "জানালা",
+  "Swap with the window above": "উপরের জানালার সঙ্গে বদলান",
+  "YouTube live or video link": "YouTube লাইভ বা ভিডিওর লিঙ্ক",
+  "Facebook Live link": "Facebook লাইভের লিঙ্ক",
+  "How to bring a live source in by its link": "লিঙ্ক দিয়ে লাইভ উৎস কীভাবে আনবেন",
+  // PCR live-input guide.
+  "YouTube live: open the live on YouTube, press Share and copy the link. Choose “YouTube live or video link” and paste it.": "YouTube লাইভ: YouTube-এ লাইভটি খুলুন, শেয়ার টিপে লিঙ্ক কপি করুন। “YouTube লাইভ বা ভিডিওর লিঙ্ক” বেছে লিঙ্কটি বসান।",
+  "Facebook Live: open the live post, press ⋯ then Copy link. The video must be public. Choose “Facebook Live link” and paste it.": "Facebook লাইভ: লাইভের পোস্টটি খুলুন, ⋯ টিপে লিঙ্ক কপি করুন। ভিডিওটি সবার জন্য খোলা হতে হবে। “Facebook লাইভের লিঙ্ক” বেছে লিঙ্কটি বসান।",
+  "A reporter's phone (VDO.Ninja, free): on the phone open the first address below and allow the camera. Here, choose “VDO.Ninja view link” and paste the second.": "সাংবাদিকের ফোন (VDO.Ninja, বিনামূল্যে): ফোনে নীচের প্রথম ঠিকানাটি খুলে ক্যামেরার অনুমতি দিন। এখানে “VDO.Ninja view link” বেছে দ্বিতীয় ঠিকানাটি বসান।",
+  "The studio's OBS: stream from OBS to the media server, then paste its HLS address (ending .m3u8) or its WebRTC (WHEP) address.": "স্টুডিওর OBS: OBS থেকে মিডিয়া সার্ভারে স্ট্রিম করুন, তারপর তার HLS ঠিকানা (.m3u8-এ শেষ) বা WebRTC (WHEP) ঠিকানা বসান।",
+  "A picture: paste an https picture address, or an uploaded one.": "ছবি: https ছবির ঠিকানা, বা আপলোড করা ছবির ঠিকানা বসান।",
+  "Give it a name and press Save. Click the source to put it in the preview, check it there, then TAKE.": "একটি নাম দিয়ে সেভ করুন। উৎসটিতে ক্লিক করলে তা প্রিভিউতে আসবে। সেখানে দেখে নিয়ে TAKE করুন।",
+  "In a layout with several windows, choose each window's source, and which window carries the sound, under Windows next to the layouts.": "কয়েকটি জানালার লেআউটে প্রতিটি জানালার উৎস, আর কোন জানালার আওয়াজ যাবে, তা লেআউটের পাশে ‘জানালা’-য় বাছুন।",
 };
