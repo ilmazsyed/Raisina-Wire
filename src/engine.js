@@ -950,7 +950,13 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const n = (x?.lines || []).join(" ").length || String(x?.title || "").length; return Math.max(10, Math.min(40, Math.round(n / 14))); };
   // (AVO + byte: each byte plays in full after the reading, the Rashtrix wipe before it)
   const BYTE_WIPE = 1.2, bytesLen = x => (x?.bytes || []).reduce((n, b) => n + BYTE_WIPE + Math.max(3, Number(b.secs) || 30), 0);
-  const avoLen = x => Math.round((avoVoiceLen(x) + bytesLen(x)) * 10) / 10;
+  // An AVO story's parts, in the order the desk set (src/avo.js cleanExtra): the story (its reading
+  // over its pictures, never more than 45 seconds), the bytes, the reporter's phone-in.
+  const AVO_VIS_MAX = 45, PHONE_WIPE = 1.2;
+  const storyLen = x => Math.min(AVO_VIS_MAX, avoVoiceLen(x));
+  const phoneLen = x => x?.phone?.url ? PHONE_WIPE + Math.max(3, Number(x.phone.secs) || 30) : 0;
+  const partsOf = x => { let a = 0; return (x?.order?.length ? x.order : ["story", "bytes", "phone"]).map(kind => { const len = kind === "story" ? storyLen(x) : kind === "bytes" ? bytesLen(x) : kind === "phone" ? phoneLen(x) : 0; const p = { kind, at: a, len }; a += len; return p; }).filter(p => p.len > 0); };
+  const avoLen = x => Math.round(partsOf(x).reduce((n, p) => n + p.len, 0) * 10) / 10;
   // Every AVO block opens with the NEWS NOW sting (four seconds), then its stories.
   const AVO_INTRO = 4;
   const avoTotal = L => L.length ? AVO_INTRO + L.reduce((n, x) => n + avoLen(x), 0) : 0;
@@ -2055,9 +2061,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         const bl = x.bytes; let bi = 0, acc = 0;
         while (bi < bl.length - 1 && t >= acc + BYTE_WIPE + Math.max(3, Number(bl[bi].secs) || 30)) { acc += BYTE_WIPE + Math.max(3, Number(bl[bi].secs) || 30); bi++; }
         const bkey = `${at0}:${k}:${bi}`; if (st.byteKey === bkey && el.querySelector(".avo-byte")) return;
-        st.byteKey = bkey; shownS = -1;
+        st.byteKey = bkey; st.phoneKey = ""; shownS = -1;
         // (this byte on the story's clock: from after its wipe to its planned end)
-        const run = st.byteRun = { key: bkey, at0, base: starts[k] + avoVoiceLen(x), end: acc + BYTE_WIPE + Math.max(3, Number(bl[bi].secs) || 30), started: false, ended: false, t0: Date.now() };
+        const run = st.byteRun = { key: bkey, at0, base: starts[k] + (partsOf(x).find(p => p.kind === "bytes")?.at || 0), end: acc + BYTE_WIPE + Math.max(3, Number(bl[bi].secs) || 30), started: false, ended: false, t0: Date.now() };
         voStop(); st.voice?.pause?.(); st.voice = null; st.bed?.(); st.bed = null;
         const w = document.createElement("div"); w.className = "tvp-stinger avo-sting";
         w.innerHTML = `<img src="${LOGO}" alt="">`;
@@ -2127,6 +2133,54 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         // (whatever happens, the stinger never stays longer than five seconds)
         setTimeout(lift, 5000);
       };
+      // The reporter's phone-in: the Rashtrix wipe, then the call on screen over the story's own
+      // pictures (muted, moving): the reporter's picture with rings pulsing to the voice, ফোনে, the name
+      // and place, the call's running time, a moving sound wave and, when given, the transcript line
+      // by line as it is spoken. The music and the newsreader stop while the call plays.
+      const phoneStep = (x, k, t) => {
+        const p = x.phone, pkey = `${at0}:${k}:ph`, secs = Math.max(3, Number(p.secs) || 30);
+        const tick = () => {
+          const box = el.querySelector(".avo-phone"); if (!box) return;
+          const s = Math.max(0, Math.min(secs, t - PHONE_WIPE)), tm = box.querySelector(".ph-time");
+          if (tm) tm.textContent = bnDigits(`${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`);
+          // (the story's pictures take turns underneath, six seconds each)
+          const pp = box.querySelectorAll(".ph-bg.cyc .ph-pic"); if (pp.length) { const on = Math.floor(Math.max(0, t) / 6) % pp.length; pp.forEach((n, j) => n.classList.toggle("on", j === on)); }
+          const lines = box.__lines; if (!lines?.length) return;
+          const li = Math.min(lines.length - 1, Math.floor(s / (secs / lines.length))), tx = box.querySelector(".ph-tx");
+          if (tx && tx.dataset.i !== String(li)) { tx.dataset.i = li; tx.innerHTML = `<p>${lines[li].split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</p>`; }
+        };
+        if (st.phoneKey === pkey && el.querySelector(".avo-phone")) { tick(); return; }
+        st.phoneKey = pkey; st.byteKey = ""; shownS = -1;
+        voStop(); st.voice?.pause?.(); st.voice = null; st.bed?.(); st.bed = null;
+        const w = document.createElement("div"); w.className = "tvp-stinger avo-sting"; w.innerHTML = `<img src="${LOGO}" alt="">`;
+        stage.append(w); if (!st.muted && st.audio && loud && t < PHONE_WIPE) stingerSound(st.audio);
+        setTimeout(() => { w.classList.add("out"); setTimeout(() => w.remove(), 450); }, Math.max(300, (PHONE_WIPE - t) * 1000));
+        const V = channel === "v" ? " v" : "", pics = imgsOf(x).filter(i => i.video || imgState.get(i.src) === "ok").slice(0, 4);
+        const bg = pics.length ? pics.map((i, n) => `<div class="ph-pic" style="--n:${n};--c:${pics.length}">${mediaTag(i)}</div>`).join("") : newsDeco(x.ex ? "world" : "radar");
+        const face = p.photo ? `<img src="${esc(p.photo)}" alt="" referrerpolicy="no-referrer">` : `<svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>`;
+        const paint = () => { if (!el.isConnected || st.phoneKey !== pkey) return;
+          el.innerHTML = `<div class="avo-phone${V}${p.transcript ? " has-tx" : ""}"><div class="ph-bg${pics.length > 1 ? " cyc" : ""}">${bg}</div><i class="ph-shade"></i>
+            <div class="ph-card"><div class="ph-who"><div class="ph-face">${face}<i class="ph-ring"></i><i class="ph-ring r2"></i><i class="ph-ring r3"></i></div>
+              <div class="ph-id"><span class="ph-tag"><svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>ফোনে</span>${p.name ? `<b>${esc(p.name)}</b>` : ""}${p.place ? `<small>${esc(p.place)}</small>` : ""}</div>
+              <em class="ph-time">০০:০০</em></div>
+              <div class="ph-wave">${Array.from({ length: 36 }, (_, i) => `<i style="--i:${i};--h:${(30 + ((i * 37) % 70))}%"></i>`).join("")}</div>
+              ${p.transcript ? `<div class="ph-tx"></div>` : ""}</div>
+            <div class="avo-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>${calm(x) ? "বিস্তারিত" : "এই মুহূর্তে"}</small></span><span class="lt-text">${esc(x.title)}</span></div></div>`;
+          el.querySelector(".avo-phone").__lines = String(p.transcript || "").split(/\n+|(?<=[।!?])\s+/).map(v => v.trim()).filter(Boolean);
+          tick();
+          // The call itself, from where it should be by the clock, through the sound engine (an
+          // address that will not be read that way plays as an ordinary audio player).
+          if (st.muted || !loud) return;
+          const off = Math.max(0, now() / 1000 - (at0 / 1000 + AVO_INTRO + starts[k] + (partsOf(x).find(q => q.kind === "phone")?.at || 0) + PHONE_WIPE) - lag / 1000);
+          const tok = {}; st.voice = { pause() { tok.off = true; try { tok.h?.stop(); } catch { /* done */ } try { tok.a?.pause(); } catch { /* done */ } } };
+          voiceBuf(p.url).then(buf => {
+            if (tok.off || st.phoneKey !== pkey || st.muted) return;
+            if (buf) { tok.h = voPlay(buf, 1.15, null, { offset: off }); return; }
+            const a = new Audio(p.url); tok.a = a; a.addEventListener("loadedmetadata", () => { try { a.currentTime = Math.min(off, Math.max(0, a.duration - 0.2)); } catch { /* none */ } }, { once: true }); a.play().catch(() => {});
+          });
+        };
+        setTimeout(paint, t < PHONE_WIPE ? 550 : 0);
+      };
       // Uploaded bytes and their elements, loaded in advance: each story's bytes start loading the
       // moment the story is on screen (while the newsreader reads), so a byte plays at once.
       const bytePre = url => {
@@ -2179,8 +2233,11 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         // A story with few pictures has fewer, longer slides rather than the BREAKING card again; the
         // count is fixed when the story goes on screen, so the slide times never shift under it.
         const real = slidesOf(x).filter((sl, i) => !(sl.brk && i > 0));
-        const into = e - starts[k], vlen = avoVoiceLen(x);
-        if ((x.bytes || []).length && into >= vlen) { byteStep(x, k, into - vlen); return; }
+        // (which part of the story is on: the bytes and the phone-in have their own screens)
+        const parts = partsOf(x), part = parts.findLast(p => e - starts[k] >= p.at) || parts[0] || { kind: "story", at: 0 };
+        if (part.kind === "bytes") { byteStep(x, k, e - starts[k] - part.at); return; }
+        if (part.kind === "phone") { phoneStep(x, k, e - starts[k] - part.at); return; }
+        const into = e - starts[k] - part.at, vlen = storyLen(x);
         const cap = Math.max(2, Math.min(7, Math.floor(vlen / 4.5))), want = Math.max(2, Math.min(cap, real.length));
         // A picture that finishes loading may add a slide, only when that leaves the slide on screen as it is.
         if (!slideN.has(k) || (want > slideN.get(k) && (shownS < 0 || Math.floor(into / (vlen / want)) === shownS))) slideN.set(k, want);
@@ -2192,7 +2249,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           // A fresh frame always gets its first slide (a slide drawn into the old frame during the
           // wipe must not count, or the new story stays black until its second slide).
           stage.classList.toggle("ex-on", !!x.ex); stage.classList.remove("byte-on");
-          const paint = () => { el.innerHTML = storyHTML(x, k); shownS = -1; st.byteKey = ""; if (stage.classList.contains("byte-on")) { stage.classList.remove("byte-on"); drawJacket(); } if (!st.bed) startBed(st.current?.scene); speakAvo(x); st.resumeVoice = () => { if (el.isConnected) speakAvo(x); }; drawA(); };
+          const paint = () => { el.innerHTML = storyHTML(x, k); shownS = -1; st.byteKey = ""; st.phoneKey = ""; if (stage.classList.contains("byte-on")) { stage.classList.remove("byte-on"); drawJacket(); } if (!st.bed) startBed(st.current?.scene); speakAvo(x); st.resumeVoice = () => { if (el.isConnected) speakAvo(x); }; drawA(); };
           // Each story is logged: an airing from the broadcast output, a view from the app or site.
           const logKey = `${x.id}@${Math.round(at0 + starts[k] * 1000)}`;
           if ((mode === "app" || output) && !avoLogged.has(logKey)) { avoLogged.add(logKey); markAvoSeen(x.id); fetch("/api/tv/avo/played", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: x.id, ch: channel, key: output ? key : "" }), keepalive: true }).catch(() => {}); }
@@ -2214,7 +2271,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         if (si !== shownS) {
           const firstSlide = !box.querySelector(".avo-pics > .avo-slide"); shownS = si; const pics = box.querySelector(".avo-pics"), sl = slides[si];
           const put = () => {
-            pics.insertAdjacentHTML("beforeend", slideHTML(x, sl, lens[k] / slides.length).replace(/class="avo-slide([^"]*)"/, `class="avo-slide$1" style="--d:${(lens[k] / slides.length + 1.5).toFixed(1)}s"`));
+            pics.insertAdjacentHTML("beforeend", slideHTML(x, sl, vlen / slides.length).replace(/class="avo-slide([^"]*)"/, `class="avo-slide$1" style="--d:${(vlen / slides.length + 1.5).toFixed(1)}s"`));
             [...pics.querySelectorAll(":scope > .avo-slide")].slice(0, -1).forEach(n => n.remove());
             countUp(pics);
             if (sl.g === "map" || sl.ex === "map") { const svg = pics.lastElementChild?.querySelector(".so-mapbox svg"); if (svg) soMap(svg, x.places || [], channel === "v"); }
@@ -2223,7 +2280,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           if (firstSlide) put();
           else if (x.ex) {
             const cut = ["hard", "whip", "hard", "zoom"][si % 4];
-            pics.insertAdjacentHTML("beforeend", slideHTML(x, sl, lens[k] / slides.length).replace(/class="avo-slide([^"]*)"/, `class="avo-slide$1 cut-${cut}" style="--d:${(lens[k] / slides.length + 1.5).toFixed(1)}s"`));
+            pics.insertAdjacentHTML("beforeend", slideHTML(x, sl, vlen / slides.length).replace(/class="avo-slide([^"]*)"/, `class="avo-slide$1 cut-${cut}" style="--d:${(vlen / slides.length + 1.5).toFixed(1)}s"`));
             const olds = [...pics.querySelectorAll(":scope > .avo-slide")].slice(0, -1);
             setTimeout(() => olds.forEach(n => n.remove()), cut === "hard" ? 60 : 520);
             countUp(pics);
@@ -2381,14 +2438,14 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // scene stops it, nothing is read over breaking news (st.breakUntil), and a link never talks
   // over a reading already going.
   const voStop = () => { const h = st.vo; st.vo = null; try { h?.stop(); } catch { /* done */ } };
-  const voPlay = (buf, gain = 1.25, onended, { yieldTo = false } = {}) => {
+  const voPlay = (buf, gain = 1.25, onended, { yieldTo = false, offset = 0 } = {}) => {
     if (!st.audio || !buf || st.muted || Date.now() < (st.breakUntil || 0)) return null;
     if (yieldTo && st.vo) return null;
     voStop();
     const src = st.audio.createBufferSource(), gn = st.audio.createGain(); gn.gain.value = gain; src.buffer = buf; src.connect(gn).connect(st.audio.destination);
     const h = { off: false, stop() { h.off = true; src.onended = null; try { src.stop(); } catch { /* done */ } } };
     src.onended = () => { if (st.vo === h) st.vo = null; if (!h.off) onended?.(); };
-    src.start(); st.vo = h; return h;
+    src.start(0, Math.max(0, Math.min(offset, buf.duration - 0.05))); st.vo = h; return h;
   };
   const playLink = (id, box) => { const url = st.tv?.links?.[id]; if (!url || st.muted || !st.audio) return; setTimeout(() => voiceBuf(url).then(buf => { if (!buf || st.muted || (box && !box.isConnected)) return; voPlay(buf, 1.2, null, { yieldTo: true }); }), 600); };
   const voiceBuf = url => { if (!st.audio) return Promise.resolve(null);

@@ -55,8 +55,10 @@ export async function handleClips(request, env, url, user, { json, err, audit })
   }
   if (!id && m === "POST") {   // start an upload: { title, filename, size, mime, duration }
     const b = await request.json().catch(() => ({}));
-    const mime = /^video\/(mp4|quicktime|webm)$/.test(b.mime || "") ? b.mime : "video/mp4";
-    const key = `clips/${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${mime === "video/webm" ? "webm" : "mp4"}`;
+    // (videos, and audio for the AVO phone-ins)
+    const AUDIO = { "audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/aac": "aac", "audio/wav": "wav", "audio/x-wav": "wav", "audio/ogg": "ogg", "audio/webm": "weba" };
+    const mime = /^video\/(mp4|quicktime|webm)$/.test(b.mime || "") || AUDIO[b.mime] ? (b.mime === "audio/mp3" ? "audio/mpeg" : b.mime) : "video/mp4";
+    const key = `clips/${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${AUDIO[mime] || (mime === "video/webm" ? "webm" : "mp4")}`;
     const up = await env.CLIPS.createMultipartUpload(key, { httpMetadata: { contentType: mime } });
     const cid = crypto.randomUUID();
     await env.DB.prepare("INSERT INTO clips (id,title,r2_key,mime,bytes,duration,source,status,upload_id,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(cid, String(b.title || b.filename || "Clip").slice(0, 160), key, mime, Number(b.size) || 0, Number(b.duration) || 0, "upload", "uploading", up.uploadId, user.id).run();

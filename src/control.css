@@ -459,3 +459,4 @@ body.rec-on>header,body.rec-on>main,body.rec-on>nav,body.rec-on .cr-top{visibili
 #hdSave.pulse{box-shadow:0 0 0 3px rgba(212,160,23,.6)}
 @media(max-width:760px){.hd-row{flex-direction:column}.hd-n{display:none}}
 .hd-screen .tvp-fit{width:100%}
+.ad-order{margin:6px 0 0;padding-left:24px;display:flex;flex-direction:column;gap:6px}.ad-order li span{margin-right:8px}

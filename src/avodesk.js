@@ -10,7 +10,7 @@ import { mountTV } from "./engine.js";
 import { digits } from "./i18n.js";
 import { lightenVideo } from "./lightclip.js";
 
-const S = { list: [], quota: {}, today: {}, daily: 45, edit: null, images: [], rundowns: [], filter: (() => { try { return localStorage.getItem("avoFilter") || "all"; } catch { return "all"; } })(), send: [], sendQ: "", videos: [], bytes: [], byteMode: "avo", byteCount: 1 };
+const S = { list: [], quota: {}, today: {}, daily: 45, edit: null, images: [], rundowns: [], filter: (() => { try { return localStorage.getItem("avoFilter") || "all"; } catch { return "all"; } })(), send: [], sendQ: "", videos: [], bytes: [], byteMode: "avo", byteCount: 1, phone: null, order: ["story", "bytes", "phone"] };
 const secsOf = v => { const p = String(v || "").trim().split(":").map(Number); if (p.some(isNaN)) return 0; return p.reduce((a, x) => a * 60 + x, 0); };
 const mmss = n => n ? `${Math.floor(n / 60)}:${String(Math.round(n % 60)).padStart(2, "0")}` : "";
 // An AVO story's length on air: its reading, then its bytes (with the wipe before each).
@@ -20,7 +20,7 @@ const DESKS = { Kolkata: "কলকাতা", "West Bengal": "রাজ্য",
 const DK = { kolkata: "Kolkata", bengal: "Bengal", india: "India", bangladesh: "Bangladesh", world: "World", sports: "Sports", business: "Business", other: "Other" };
 const WT = { heavy: "Heavy", mid: "Medium", light: "Light" };
 const ORIGIN = { auto: "Wire", manual: "Desk", breaking: "Breaking", edited: "Wire · edited", sent: "Sent" };
-const MAX = 450, MAX_EDIT = 900;
+const MAX = 450, MAX_EDIT = 650;   // (about 30 and 45 seconds: an AVO's own pictures never run past 45 seconds)
 // A story told without a single picture of its own (on air in motion graphics).
 const noPics = x => ["ready", "off"].includes(x.status) && !x.nImages;
 const maxFor = e => e && e.origin !== "manual" ? MAX_EDIT : MAX;
@@ -43,6 +43,22 @@ async function upload(file) {
   const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || "Upload failed."); return d.url;
 }
 
+// A sound file's length in seconds (0 when it cannot be read).
+const audioSecs = src => new Promise(res => { const a = new Audio(); a.preload = "metadata"; a.onloadedmetadata = () => res(Math.round(a.duration || 0)); a.onerror = () => res(0); a.src = src; setTimeout(() => res(0), 8000); });
+// A phone-in's audio to the clip store (kept: the AVO uses it).
+async function uploadAudio(file, bar, title) {
+  if (!/^audio\//.test(file.type)) throw new Error("Choose an audio file (MP3, M4A, WAV or OGG).");
+  const url0 = URL.createObjectURL(file), dur = await audioSecs(url0); URL.revokeObjectURL(url0);
+  const start = await api("/api/admin/clips", { method: "POST", body: { title: title.slice(0, 150), filename: file.name, size: file.size, mime: file.type, duration: dur } });
+  const parts = [], n = Math.ceil(file.size / start.partSize); bar.hidden = false;
+  try {
+    for (let i = 0; i < n; i++) { const out = await api(`/api/admin/clips/${start.id}/part/${i + 1}`, { method: "PUT", body: file.slice(i * start.partSize, (i + 1) * start.partSize), raw: true }); parts.push(out.part); $("i", bar).style.width = `${Math.round((i + 1) / n * 100)}%`; }
+    const done = await api(`/api/admin/clips/${start.id}/complete`, { method: "POST", body: { parts } });
+    await api(`/api/admin/clips/${start.id}`, { method: "PUT", body: { keep: true, duration: dur } }).catch(() => {});
+    return { url: done.url, secs: dur };
+  } catch (e) { await api(`/api/admin/clips/${start.id}/abort`, { method: "POST" }).catch(() => {}); throw e; }
+  finally { setTimeout(() => { bar.hidden = true; $("i", bar).style.width = "0"; }, 800); }
+}
 // A video file from this computer to the channel's clip store (Cloudflare R2), in 20 MB parts; kept
 // (never deleted for lack of use, since an AVO uses it), with its length read from the file.
 async function uploadClip(file, bar, title) {
@@ -145,6 +161,15 @@ function drawForm() {
         <div class="row" style="gap:6px"><input data-bf="name" data-bi="${i}" value="${esc(b.name || "")}" placeholder="Name (on screen)" style="flex:2" data-no-tr><input data-bf="title" data-bi="${i}" value="${esc(b.title || "")}" placeholder="Title (e.g. মুখ্যমন্ত্রী)" style="flex:2" data-no-tr><input data-bf="secs" data-bi="${i}" value="${esc(mmss(b.secs))}" placeholder="Length m:ss" style="width:110px" title="Empty: the YouTube video's own length"></div></div><button class="btn sm red" type="button" data-brm="${i}">✕</button></div>`).join("")}
       ${S.bytes.length < 3 ? `<button class="btn" type="button" id="fByteAdd">+ Add a byte</button>` : ""}
       ${S.bytes.length ? `<label style="flex-direction:row;align-items:center;gap:8px">Bytes to play<select id="fByteN">${S.bytes.map((_, i) => `<option value="${i + 1}" ${S.byteCount === i + 1 ? "selected" : ""}>${digits(i + 1)}</option>`).join("")}</select></label>` : ""}` : ""}</div>
+    <div class="ad-byte ad-phone"><b>Phone-in</b> <small class="muted">(a reporter's call: plays with their picture, name and place, over this story's pictures)</small>
+      ${S.phone ? `<div class="stack" style="gap:8px">
+        <div class="row" style="gap:6px;flex-wrap:wrap"><input id="pUrl" value="${esc(S.phone.url || "")}" placeholder="The call's audio link (https://…mp3), or upload" style="flex:1;min-width:220px" data-no-tr><label class="btn sm">Upload audio<input type="file" id="pUp" accept="audio/*" hidden></label>${S.phone.url ? `<audio src="${esc(S.phone.url)}" controls preload="none" style="height:32px"></audio>` : ""}</div>
+        <div class="row" style="gap:6px;flex-wrap:wrap"><input id="pName" value="${esc(S.phone.name || "")}" placeholder="Reporter's name" style="flex:2" data-no-tr><input id="pPlace" value="${esc(S.phone.place || "")}" placeholder="Place or title (e.g. বর্ধমান)" style="flex:2" data-no-tr><input id="pSecs" value="${esc(mmss(S.phone.secs))}" placeholder="Length m:ss" style="width:110px"></div>
+        <div class="row" style="gap:6px;align-items:center">${S.phone.photo ? `<img src="${esc(S.phone.photo)}" alt="" style="width:54px;height:54px;border-radius:50%;object-fit:cover">` : ""}<label class="btn sm">Reporter's picture<input type="file" id="pPic" accept="image/*" hidden></label>${S.phone.photo ? `<button class="btn sm" type="button" id="pPicRm">Remove picture</button>` : ""}</div>
+        <label>Transcript (optional: shown line by line as the call plays)<textarea id="pTx" rows="3" data-no-tr>${esc(S.phone.transcript || "")}</textarea></label>
+        <button class="btn sm red" type="button" id="pRm" style="align-self:flex-start">Remove the phone-in</button></div>` : `<button class="btn" type="button" id="pAdd">+ Add a phone-in</button>`}</div>
+    ${(() => { const has = { story: true, bytes: S.byteMode === "byte" && S.bytes.length, phone: !!S.phone }, ord = S.order.filter(k => has[k]); return ord.length > 1 ? `<div class="ad-byte"><b>Order on air</b> <small class="muted">(the story's own pictures never run past 45 seconds; bytes and phone-ins play in full)</small>
+      <ol class="ad-order">${ord.map((k, i) => `<li><span>${{ story: "The story (reading over its pictures)", bytes: "The bytes", phone: "The phone-in" }[k]}</span>${i ? `<button class="btn sm" type="button" data-oup="${k}" aria-label="Move up">▲</button>` : ""}</li>`).join("")}</ol></div>` : ""; })()}
     <div class="bd-prog" id="fProg" hidden><i></i></div>
     <div class="row"><button class="btn green" id="fSave">${e ? "Save and put on air" : "Make the AVO story"}</button>${e ? `<button class="btn" id="fCancel">Cancel</button>` : ""}<span class="muted" id="fNote"></span></div>`;
   const brief = $("#fBrief"), count = () => { const n = brief.value.trim().length; $("#fCount").textContent = `${digits(n)} / ${digits(MAXF)} characters`; $("#fCount").style.color = n > MAXF ? "#ff6b6b" : ""; };
@@ -157,7 +182,7 @@ function drawForm() {
     for (const f of files) { try { S.images.push({ url: await upload(f), credit: "" }); } catch (err) { toast(err.message); } }
     drawForm(); };
   $("#fAddLink").onclick = () => { const u = $("#fLink").value.trim(); if (!/^https:\/\//.test(u)) return toast("Paste a link that starts with https://"); keep(); S.images.push({ url: u, credit: "" }); drawForm(); };
-  $("#fCancel")?.addEventListener("click", () => { S.edit = null; S.images = []; S.videos = []; S.bytes = []; S.byteMode = "avo"; S.byteCount = 1; drawForm(); });
+  $("#fCancel")?.addEventListener("click", () => { S.edit = null; S.images = []; S.videos = []; S.bytes = []; S.byteMode = "avo"; S.byteCount = 1; S.phone = null; S.order = ["story", "bytes", "phone"]; drawForm(); });
   $$("[data-vrm]").forEach(b => b.onclick = () => { keep(); S.videos.splice(+b.dataset.vrm, 1); drawForm(); });
   $("#fVidFile")?.addEventListener("change", async e => { const f = e.target.files[0]; if (!f) return; keep(); toast("Uploading the video…");
     try { const r = await uploadClip(f, $("#fProg"), `AVO: ${$("#fTitle").value.trim() || f.name}`); S.videos.push(r.url); toast("Video uploaded."); drawForm(); } catch (err) { fail(err); } });
@@ -172,6 +197,17 @@ function drawForm() {
   $("#fByteAdd")?.addEventListener("click", () => { keep(); S.bytes.push({ url: "", name: "", title: "", secs: 0 }); S.byteCount = S.bytes.length; drawForm(); });
   $("#fByteN")?.addEventListener("change", e => { S.byteCount = Number(e.target.value); });
   $("#fSave").onclick = save;
+  // The phone-in
+  $("#pAdd")?.addEventListener("click", () => { keep(); S.phone = { url: "", name: "", place: "", photo: "", secs: 0, transcript: "" }; drawForm(); });
+  $("#pRm")?.addEventListener("click", () => { keep(); S.phone = null; drawForm(); });
+  [["pUrl", "url"], ["pName", "name"], ["pPlace", "place"], ["pTx", "transcript"]].forEach(([id, f]) => $(`#${id}`)?.addEventListener("input", e => { S.phone[f] = e.target.value; }));
+  $("#pSecs")?.addEventListener("input", e => { S.phone.secs = secsOf(e.target.value); });
+  $("#pUrl")?.addEventListener("change", e => { const u = e.target.value.trim(); if (!/^https:\/\//.test(u)) return; audioSecs(u).then(n => { if (n && S.phone) { S.phone.secs = n; const f = $("#pSecs"); if (f) f.value = mmss(n); } }); });
+  $("#pUp")?.addEventListener("change", async e => { const f = e.target.files[0]; if (!f) return; keep(); toast("Uploading the call…");
+    try { const r = await uploadAudio(f, $("#fProg"), `Phone-in: ${S.phone.name || f.name}`); Object.assign(S.phone, { url: r.url, secs: r.secs || S.phone.secs }); toast("Call uploaded."); drawForm(); } catch (err) { fail(err); } });
+  $("#pPic")?.addEventListener("change", async e => { const f = e.target.files[0]; if (!f) return; keep(); try { S.phone.photo = await upload(f); drawForm(); } catch (err) { fail(err); } });
+  $("#pPicRm")?.addEventListener("click", () => { keep(); S.phone.photo = ""; drawForm(); });
+  $$("[data-oup]").forEach(b => b.onclick = () => { keep(); const has = { story: true, bytes: S.byteMode === "byte" && S.bytes.length, phone: !!S.phone }, ord = S.order.filter(k => has[k]), i = ord.indexOf(b.dataset.oup); [ord[i - 1], ord[i]] = [ord[i], ord[i - 1]]; S.order = [...ord, ...S.order.filter(k => !ord.includes(k))]; drawForm(); });
   // Keep what is typed while the pictures redraw.
   function keep() { S.draft = { title: $("#fTitle").value, brief: brief.value, region: $("#fRegion").value, desk: $("#fDesk").value, more: $("#fMore").checked }; }
   if (S.draft) { $("#fTitle").value = S.draft.title; brief.value = S.draft.brief; $("#fRegion").value = S.draft.region; $("#fDesk").value = S.draft.desk; $("#fMore").checked = S.draft.more; S.draft = null; count(); }
@@ -181,7 +217,8 @@ async function save() {
   if (S.byteMode === "byte" && !bytes.length) return toast("Add a byte link, or choose AVO only.");
   if (bytes.some(b => !/^(https:\/\/|\/clips\/)/.test(b.url.trim()))) return toast("Each byte needs a link that starts with https://, or an uploaded video.");
   const body = { title: $("#fTitle").value.trim(), brief: $("#fBrief").value.trim(), region: $("#fRegion").value, desk: $("#fDesk").value, findMore: $("#fMore").checked, images: S.images,
-    videos: S.videos, bytes, byteMode: S.byteMode, byteCount: Math.min(S.byteCount, bytes.length || 1) };
+    videos: S.videos, bytes, byteMode: S.byteMode, byteCount: Math.min(S.byteCount, bytes.length || 1), extra: { phone: S.phone?.url ? S.phone : null, order: S.order } };
+  if (S.phone && !S.phone.url) return toast("Add the phone-in's audio (upload or link), or remove the phone-in.");
   if (!body.title) return toast("Write the headline.");
   if (body.brief.length < 20) return toast("Write the brief to be read.");
   if (body.brief.length > maxFor(S.edit)) return toast(`The brief is longer than ${maxFor(S.edit)} characters.`);
@@ -189,7 +226,7 @@ async function save() {
     if (S.edit) await api(`/api/admin/tv/avo/${encodeURIComponent(S.edit.id)}`, { method: "PUT", body });
     else await api("/api/admin/tv/avo", { method: "POST", body });
     toast(S.edit ? "Saved. It is made again and goes on air within a minute or two." : "Made. It is voiced and goes into rotation within a minute.");
-    S.edit = null; S.images = []; S.videos = []; S.bytes = []; S.byteMode = "avo"; S.byteCount = 1; drawForm(); load();
+    S.edit = null; S.images = []; S.videos = []; S.bytes = []; S.byteMode = "avo"; S.byteCount = 1; S.phone = null; S.order = ["story", "bytes", "phone"]; drawForm(); load();
   } catch (e) { fail(e); }
 }
 
@@ -234,17 +271,19 @@ function drawList() {
   const relabel = async (id, part) => { const x = find(id); const cur = { dk: x.dk, weight: x.weight, ...(x.labelsSet || {}) }; try { await api(`/api/admin/tv/avo/${encodeURIComponent(id)}`, { method: "PUT", body: { labels: { ...cur, ...part } } }); toast("Relabelled."); } catch (e) { fail(e); } };
   $$("[data-dk]").forEach(b => b.onchange = () => relabel(b.dataset.dk, { dk: b.value }));
   $$("[data-wt]").forEach(b => b.onchange = () => relabel(b.dataset.wt, { weight: b.value }));
-  $$("[data-edit]").forEach(b => b.onclick = () => { const x = find(b.dataset.edit); S.edit = x; S.images = (x.given || []).map(g => ({ url: g.url, credit: g.credit || "" })); S.videos = (x.videosSet || []).map(v => v.url); S.bytes = (x.bytesSet || []).map(b => ({ url: b.url, name: b.name || "", title: b.title || "", secs: b.secs || 0 })); S.byteMode = x.byteMode || "avo"; S.byteCount = x.byteCount || 1; drawForm(); window.scrollTo({ top: 0, behavior: "smooth" });
+  $$("[data-edit]").forEach(b => b.onclick = () => { const x = find(b.dataset.edit); S.edit = x; S.images = (x.given || []).map(g => ({ url: g.url, credit: g.credit || "" })); S.videos = (x.videosSet || []).map(v => v.url); S.bytes = (x.bytesSet || []).map(b => ({ url: b.url, name: b.name || "", title: b.title || "", secs: b.secs || 0 })); S.byteMode = x.byteMode || "avo"; S.byteCount = x.byteCount || 1; S.phone = x.extraSet?.phone ? { ...x.extraSet.phone } : null; S.order = x.extraSet?.order || ["story", "bytes", "phone"]; drawForm(); window.scrollTo({ top: 0, behavior: "smooth" });
     if (b.dataset.pics) setTimeout(() => { $(".ad-pics")?.parentElement?.scrollIntoView({ block: "center", behavior: "smooth" }); $("#fFiles")?.click(); }, 250); });
   $$("[data-del]").forEach(b => b.onclick = async () => { if (!confirm("Delete this AVO story for good? It goes off air at once and is not made again.")) return; try { await api(`/api/admin/tv/avo/${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" }); toast("Deleted for good."); load(); } catch (e) { fail(e); } });
 }
-// Preview: the story on the channel's own engine (silent; use Listen for the voice).
+// Preview: the story on the channel's own engine, with its sound, as long as it plays on air.
 let pv = null;
 function preview(x) {
   const d = document.createElement("dialog"); d.className = "ad-preview";
   d.innerHTML = `<div class="stack"><div class="ad-screen"></div><div class="row"><button class="btn" data-close>Close</button></div></div>`;
   document.body.append(d); d.showModal();
-  pv = mountTV($(".ad-screen", d), { channel: "h", mode: "scene", scene: { layout: "graphic", sources: [], full: true, dur: Math.ceil((x.secs > 0 ? Math.max(8, x.secs + 2) : 20) + 4), startAt: Date.now(), key: `pv:${x.id}:${Date.now()}`, graphic: { kind: "avo", stories: [x] } } });
+  // (as long as it plays on air: the story's own pictures, at most 45 seconds, then its bytes and phone-in, in full)
+  const len = Math.min(45, x.secs > 0 ? Math.max(8, x.secs + 2) : 20) + (x.bytes || []).reduce((n, y) => n + 1.2 + Math.max(3, Number(y.secs) || 30), 0) + (x.phone?.url ? 1.2 + Math.max(3, Number(x.phone.secs) || 30) : 0);
+  pv = mountTV($(".ad-screen", d), { channel: "h", mode: "scene", sound: true, muted: false, tapUnmute: false, scene: { layout: "graphic", sources: [], full: true, dur: Math.ceil(len + 4), startAt: Date.now(), key: `pv:${x.id}:${Date.now()}`, graphic: { kind: "avo", stories: [x] } } });
   const close = () => { try { pv?.destroy(); } catch { /* gone */ } pv = null; d.remove(); };
   $("[data-close]", d).onclick = () => d.close(); d.addEventListener("close", close);
 }

@@ -134,6 +134,16 @@ the PCR and the app's story tools no longer have their own breaking button.
   on screen (6–30 seconds each). Changes are on screen within a second. The pointers are kept in
   `settings` (`tv:livedesk`) and sent to each channel's realtime state (`split`).
 
+### AVO phone-ins and the order of parts
+
+An AVO story can carry a reporter's **phone-in** (AVO desk → Phone-in).
+
+- **Setting it up:** add the call's audio (upload an MP3, M4A, WAV or OGG file, or paste a link), the reporter's name, place and picture, and an optional transcript.
+- **On air:** after the Rashtrix wipe, the call plays over the story's own pictures. The card shows the reporter's picture with pulsing rings, ফোনে, the name and place, the running time and a moving sound wave. If there is a transcript, it appears line by line.
+- **Order:** the desk sets the order of the story, the bytes and the phone-in (by default the story, then the bytes, then the phone-in).
+- **Length:** the story's own pictures never run past 45 seconds. Bytes and phone-ins always play in full.
+- **Storage:** the settings are kept in `avo_stories.extra` (`src/avo.js` `cleanExtra`).
+
 ### Headlines desk (`/headlines.html`)
 
 HEADLINES goes on air at :58 and :28 (India time; the desk can change the minutes) and leads
