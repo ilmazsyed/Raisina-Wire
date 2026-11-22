@@ -307,3 +307,7 @@ body.ep-card *{animation-duration:0s!important;animation-delay:0s!important;tran
 .ep-bar::-webkit-scrollbar{display:none}
 .ep-bar>*{flex:none}
 html,body{overflow-x:clip}
+/* (iPhone Safari enlarges small type by itself when a page is zoomed; the paper's type keeps the size
+   it was set at, so nothing spills out of its column) */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.ep-sheet,.ep-sheet *{-webkit-text-size-adjust:100%;text-size-adjust:100%}

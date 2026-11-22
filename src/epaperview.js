@@ -264,9 +264,10 @@ function fit() {
   const w = Math.min(vw - (vw < 700 ? 12 : 40), 1400);
   scale = zoom || w / 1240;
   const sheet = $(".ep-sheet"); if (!sheet) return;
-  // (zoom, not a scaled picture of the page: the type is set again at the size it is read, so it
-  //  stays sharp on a phone)
-  sheet.style.transform = ""; sheet.style.zoom = String(scale);
+  // (the page is laid out at its full size, exactly as it was set, and shown smaller: a zoomed page
+  //  is laid out again at the small size, and Safari then sets the type differently, so it spilled
+  //  out of its columns. Nothing moves on the page on a phone, so the type is drawn sharp.)
+  sheet.style.zoom = ""; sheet.style.transform = `scale(${scale})`;
   $(".ep-holder").style.width = 1240 * scale + "px"; $(".ep-holder").style.height = 2010 * scale + "px";
 }
 function show(i, dir = 0) {
