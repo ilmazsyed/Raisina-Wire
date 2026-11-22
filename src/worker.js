@@ -56,6 +56,7 @@ import { progPlayed, handleProgs, progHousekeeping } from "./progs.js";
 import { adPlayed, seedBrandFilm } from "./ads.js";
 import { epaperStep, handleNewsprint, readerEdition, epaperSettings } from "./epaper.js";
 import { handleCharter } from "./charter.js";
+import { handleHeads, prepareHeadVoices } from "./headlines.js";
 import { applyVoice, handleVoice } from "./voicelab.js";
 import { handleStudio } from "./studioapi.js";
 import { handleExtras, tvExtras } from "./extras.js";
@@ -1334,6 +1335,12 @@ async function api(request, env, ctx) {
     const out = await handleControlRoom(request, env, url, { json, err, currentUser, isStaff, auditFn: (u, ...a) => audit(env, u, ...a) });
     if (out) return out;
   }
+  // ---- The Headlines desk (src/headlines.js): HEADLINES at :58 and :28.
+  if (url.pathname === "/api/admin/heads") {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    return handleHeads(request, env, user, { json, err, audit: (...a) => audit(env, user, ...a), state: async () => { clearTvCache(); return tvState(env, "h"); } });
+  }
   // ---- The Editorial Charter (src/charter.js): the owner, and the people they choose.
   if (url.pathname === "/api/admin/charter") {
     const user = await currentUser(request, env);
@@ -1965,6 +1972,8 @@ async function scheduled(env) {
   // The e-paper: drafts four hours before the deadline, reminders, printing at 7:00 and 17:00.
   await step("e-paper", () => epaperStep(env, env.CRON_TEST_NOW ? Date.parse(env.CRON_TEST_NOW) : Date.now()));
   await step("tv links", () => prepareLinks(env));
+  // The newsreader's lines for HEADLINES (src/headlines.js).
+  await step("headline voices", async () => prepareHeadVoices(env, (await tvState(env, "h")).heads?.items || []));
   // The AVO Breaking Engine: major new stories, their reading and pictures (src/avo.js).
   await step("avo engine", () => avoStep(env));
   // The control room: midnight archive and the day's rundowns from templates; old clips go.

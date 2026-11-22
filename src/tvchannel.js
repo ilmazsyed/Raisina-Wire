@@ -6,6 +6,7 @@ import { labelsOf, bulletinRank } from "./labels.js";
 import { segmentsData, clockOf, SEG_NAMES } from "./segments.js";
 import { bnLine } from "./bnline.js";
 import { adsOnAir } from "./ads.js";
+import { headsSettings, buildHeads, headVoices } from "./headlines.js";
 // Rashtrix TV, Phase 2: two channels, each on or off, each with its own secret output address
 // for OBS / vMix.
 //   h  horizontal 1920×1080: long videos, with the full designable jacket (bug, LIVE, clock,
@@ -292,7 +293,17 @@ export async function tvState(env, ch) {
   const top = pool, pics = new Map();
   if (top.length) (await env.DB.prepare(`SELECT article_id, url, credit FROM bulletin_images WHERE url<>'' AND article_id IN (${top.map(() => "?").join(",")})`).bind(...top.map(r => r.id)).all().catch(() => ({ results: [] }))).results.forEach(r => pics.set(r.article_id, r));
   const updated = r => r.updated_at && Date.parse(r.updated_at) - Date.parse(r.published_at) > 10 * 60e3 ? r.updated_at : "";
-  const bulletin = top.map(r => ({ title: noDots(r.title), desk: r.category, kind: r.kind, at: r.published_at, upd: updated(r), pri: r.pri, ...lab(r), text: firstWords(r.body), image: pics.has(r.id) ? `/api/tv/bimg/${encodeURIComponent(r.id)}?v=${encodeURIComponent(pics.get(r.id).url.length + (pics.get(r.id).url.split("/").pop() || "").slice(-12))}` : "", credit: cleanCredit(pics.get(r.id)?.credit) }));
+  const picOf = r => pics.has(r.id) ? `/api/tv/bimg/${encodeURIComponent(r.id)}?v=${encodeURIComponent(pics.get(r.id).url.length + (pics.get(r.id).url.split("/").pop() || "").slice(-12))}` : "";
+  const bulletin = top.map(r => ({ title: noDots(r.title), desk: r.category, kind: r.kind, at: r.published_at, upd: updated(r), pri: r.pri, ...lab(r), text: firstWords(r.body), image: picOf(r), credit: cleanCredit(pics.get(r.id)?.credit) }));
+  // HEADLINES at :58 and :28 (the Headlines desk, src/headlines.js): the wire's stories by
+  // priority, with the desk's changes and its own headlines, each with its newsreader's line.
+  const hcfg = await headsSettings(env).catch(() => null);
+  let heads = null;
+  if (hcfg) {
+    const hb = buildHeads(hcfg, top.map(r => ({ id: r.id, title: r.title, category: r.category, image: picOf(r) })), stories.map(r => ({ id: r.id, title: r.title, category: r.category })));
+    const hv = await headVoices(env, hb.items).catch(() => new Map());
+    heads = { on: hcfg.on !== false, mins: hcfg.mins, count: hcfg.count, secs: hcfg.secs, items: hb.items.map(x => ({ ...x, ...(hv.get(x.id) || {}) })), auto: hb.auto };
+  }
   // The newsreader's line for each story, when it is ready (src/bulletinvoice.js).
   const voices = await readyVoices(env, bulletin).catch(() => new Map());
   bulletin.forEach(b => { const v = voices.get(b); if (v) { b.voice = `/api/tv/voice/${v.key}.mp3`; b.secs = v.secs; } });
@@ -318,7 +329,7 @@ export async function tvState(env, ch) {
     ad: s.ad, sets: s.sets, setSeconds: s.setSeconds,
     programs: (s.programs || []).filter(p => p.on),
     ticker: [...s.ticker, ...headlines.slice(0, 14).map(h => h.text)],
-    headlines, bulletin,
+    headlines, bulletin, heads,
     // The app plays its own copy of the order for each viewer, newest video first (src/engine.js).
     loop: s.on ? loop : [],
     // Scheduled cut-ins (the control room's Scheduler): at each time, these videos go on air.

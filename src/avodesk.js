@@ -4,6 +4,7 @@
 // pictures and airings, with the ones told without a single picture marked. Preview it, listen to
 // it, add it to a rundown, take it out of rotation; edit any of them (words, pictures: it is made
 // again and goes back on air); delete the hand-written ones (src/avo.js).
+import "./tv.css";
 import { shell, api, toast, fail, esc, $, $$, fmt, istDay } from "./crshell.js";
 import { mountTV } from "./engine.js";
 import { digits } from "./i18n.js";

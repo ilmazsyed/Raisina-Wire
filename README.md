@@ -134,6 +134,22 @@ the PCR and the app's story tools no longer have their own breaking button.
   on screen (6–30 seconds each). Changes are on screen within a second. The pointers are kept in
   `settings` (`tv:livedesk`) and sent to each channel's realtime state (`split`).
 
+### Headlines desk (`/headlines.html`)
+
+HEADLINES goes on air at :58 and :28 (India time; the desk can change the minutes) and leads
+straight into the bulletin at :00 and :30. Like the bulletin, it never cuts into a video.
+
+- **On air:** a five-second stinger with its own signature music, then 10–12 headlines of ten
+  seconds each (longer when the newsreader needs it), read in the bulletin's two voices.
+- **Wire headlines:** made from the wire by priority (`src/labels.js` `bulletinRank`), last two hours
+  first. The desk can rewrite one (it is read again), drop it, or attach a picture or a muted video.
+- **The desk's own headlines:** they come first. Each airs at every HEADLINES or only at chosen
+  times, for a set number of airings.
+- **Records:** every HEADLINES aired is recorded on the Segment & bulletin desk, and can be played
+  again from there. The Producer places it as a fixed item at :58 and :28.
+- **Storage:** the settings live in `settings` (`headlines_desk`). The code is in `src/headlines.js`
+  and in `src/engine.js` (kind `heads`).
+
 ## Phase 3: bulletin producer and PCR
 
 - **Realtime control** (`src/control.js`): each channel has a Durable Object that holds what is on

@@ -21,7 +21,7 @@ function cleanData(type, d = {}) {
   if (type === "clip") { s("clipId", 64); s("url", 500); n("in"); n("out"); }
   if (type === "live") { out.layout = String(d.layout || "full").slice(0, 10); out.sources = (Array.isArray(d.sources) ? d.sources : []).slice(0, 6).map(x => ({ kind: String(x.kind || "").slice(0, 12), id: String(x.id || "").slice(0, 64), url: String(x.url || "").slice(0, 800), name: String(x.name || "").slice(0, 80), title: String(x.title || "").slice(0, 120) })); }
   if (type === "breaking") { s("text", 160); out.music = d.music !== false; }
-  if (type === "headlines") { s("title", 80); s("lines", 2000); }
+  if (type === "headlines") { s("title", 80); s("lines", 2000); s("at", 5); out.fixed = !!d.fixed; }
   if (type === "lband") { s("text", 160); s("lines", 2000); if (d.source) out.source = { kind: String(d.source.kind || "").slice(0, 12), id: String(d.source.id || "").slice(0, 64), url: String(d.source.url || "").slice(0, 800) }; }
   if (type === "promo" || type === "slate") { s("image", 800); s("text", 160); }
   // An AVO story: its id (the story is read afresh from the AVO engine when it goes on air) and a
@@ -60,7 +60,7 @@ export async function rundownForAir(env, id) {
 // and :45 (the quick one), and the clock's segments (slot a at :08/:38, b at :22/:52, c after the
 // quick bulletins), at their times within the rundown's slot. They keep their place by time as
 // stories are moved, and can be skipped or put back.
-const FIXED_LEN = { full: 120, short: 65, seg: 70, soth: 75 };
+const FIXED_LEN = { full: 120, short: 65, seg: 70, soth: 75, heads: 125 };
 function clockItems(r) {
   const [hh, mm] = String(r.slot_start || "").split(":").map(Number);
   if (!Number.isFinite(hh)) return [];
@@ -70,6 +70,8 @@ function clockItems(r) {
     const seg = (slot, list) => { const name = list[(slot === "c" ? Math.floor(t / 15) : half) % list.length]; if (name) out.push({ type: "segment", at, off: off + (slot === "c" ? 1 : 0), title: SEG_NAMES[name] || name, duration: name === "soth" ? FIXED_LEN.soth : FIXED_LEN.seg, data: { name, at, fixed: true } }); };
     if (m % 15 === 0) { const short = m % 30 !== 0; out.push({ type: "bulletin", at, off, title: short ? "খবর সংক্ষেপে" : "সংবাদ বুলেটিন", duration: short ? FIXED_LEN.short : FIXED_LEN.full, data: { short, at, fixed: true } }); if (short) seg("c", c.c); }
     if (m === 8 || m === 38) seg("a", c.a);
+    // HEADLINES (the Headlines desk), straight before the bulletins at :00 and :30.
+    if (m === 58 || m === 28) out.push({ type: "headlines", at, off, title: "HEADLINES", duration: FIXED_LEN.heads, data: { at, fixed: true } });
     if (m === 22 || m === 52) seg("b", c.b);
   }
   return out;
