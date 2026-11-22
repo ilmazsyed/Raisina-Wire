@@ -569,16 +569,17 @@ function viewHomePhone() {
     ${desks.length ? `<section class="ph-bubbles" aria-label="Desks" id="phBubbles"></section>` : ""}
     <section class="ph-shorts" id="phShorts" aria-label="Shorts" hidden></section>
     ${top.length ? `<section class="ph-top" aria-label="Top stories">${top.map(e => `<a class="ph-row" href="${edHref(e)}"><span class="ph-row-body"><span class="ph-kick" style="color:${DESK_TONE[e.category] || "var(--red)"}">${newTag(e)}${esc(e.category)}</span><b class="ph-h">${esc(e.title)}</b><span class="ph-meta">${ago(e.publishedAt)}</span></span>${e.image ? `<span class="ph-thumb">${img(e.image)}</span>` : ""}</a>`).join("")}</section>` : ""}
+    <section class="ph-promo" id="phPromo" aria-roledescription="carousel" aria-label="Rashtrix"></section>
     ${glance.length ? `<section class="ph-glance" aria-labelledby="phGlanceT"><div class="ph-glance-head"><h2 id="phGlanceT">At a glance</h2><span>Today's news in thirty seconds</span></div>
       <ol>${glance.map((e, i) => `<li><span class="ph-num" data-no-tr>${digits(i + 1)}</span><a href="${edHref(e)}">${esc(e.title)}</a></li>`).join("")}</ol></section>` : ""}
+    <section class="ph-fronts" id="phFronts" aria-labelledby="phFrontsT" hidden></section>
     <section class="ph-live-list" id="phLive" aria-label="Live updates" hidden></section>
     ${desks.map(d => phDesk(d, used)).join("")}
     <section class="ph-popular" id="phPopular" aria-labelledby="phPopT" hidden></section>
     <section class="ph-poll" id="phPoll" aria-label="Poll of the day" hidden></section>
-    <a class="ph-epaper" id="phEpaper" href="${withLang("/epaper")}" hidden></a>
     <p class="ph-end">You are all caught up.</p>
   </div>`;
-  mountHomeTV(); phBubbles(); phShorts(); phLive(); phExtras(); phToday();
+  mountHomeTV(); phBubbles(); phShorts(); phLive(); phPromo(); phExtras(); phToday();
   clearInterval(phTimer);
   phTimer = setInterval(() => { if (!document.getElementById("phToday")) { clearInterval(phTimer); return; } phToday(); phTvNow(); }, 15e3);
 }
@@ -674,12 +675,44 @@ function phPoll() {
       return `<button type="button" class="ph-opt${mine === i ? " mine" : ""}" data-action="ph-vote" data-i="${i}" ${show ? "disabled" : ""}>${show ? `<i style="width:${pc}%"></i>` : ""}<span data-no-tr>${esc(o)}</span>${show ? `<em data-no-tr>${digits(pc)}%</em>` : ""}</button>`; }).join("")}</div>
     ${show ? `<span class="ph-meta"><span data-no-tr>${digits(total.toLocaleString("en-IN"))}</span> <span>votes</span></span>` : `<span class="ph-meta">Tap an answer to vote</span>`}`;
 }
-function phEpaper() {
-  const host = $("#phEpaper"); if (!host) return;
-  const e = state.homeX?.epaper; host.hidden = !e;
-  if (!e) return;
-  host.innerHTML = `<span class="ph-ep-page" aria-hidden="true"><i class="r"></i><i class="p"></i><i></i><i></i><i class="s"></i><i class="p2"></i></span>
-    <span class="ph-ep-body"><span class="ph-kick gold">E-paper</span><b>Read today's paper</b><span class="ph-meta" data-no-tr>${esc(shortDate(e.day))}${e.pages ? ` · ${digits(e.pages)} ${tr("pages")}` : ""}</span></span>${ICON_GO}`;
+// The app's own cards, swiped like ads: Rashtrix TV, Shorts live and each e-paper with today's
+// front page. They move on by themselves every six seconds until the reader touches them.
+const EP_LANG = { bn: "Bengali", en: "English", hi: "Hindi" };
+const epHref = (l, e) => `/epaper?lang=${l}${e ? `&ed=${encodeURIComponent(`${e.day}/${e.slot}`)}` : ""}`;
+function phPromo() {
+  const host = $("#phPromo"); if (!host) return;
+  const e = state.homeX?.epaper, fronts = e?.fronts || [];
+  const cards = [
+    `<a class="hpr-card hpr-tv" href="${withLang("/watch")}"><img src="/brand/studio-wide.webp" alt="" loading="lazy"><span class="hpr-body"><span class="hpr-tag" data-no-tr><i></i>LIVE</span><b>Rashtrix TV, live round the clock</b><span>Bulletins, HEADLINES and the news as it happens</span><span class="hpr-go">Watch now →</span></span></a>`,
+    `<a class="hpr-card hpr-shorts" href="${withLang("/watch?ch=v")}"><span class="hpr-phone" aria-hidden="true"><img src="/brand/logo-sm.webp" alt=""><i></i></span><span class="hpr-body"><span class="hpr-tag" data-no-tr><i></i>LIVE</span><b>Rashtrix Shorts, live</b><span>Short videos and the news on a vertical screen</span><span class="hpr-go">Watch Shorts →</span></span></a>`,
+    ...(fronts.length ? ["bn", "en", "hi"].filter(l => fronts.includes(l)).map(l => `<a class="hpr-card hpr-ep" href="${epHref(l, e)}"><img src="/og/epaper-${l}.jpg?v=${encodeURIComponent(`${e.day}${e.slot}`)}" alt="" loading="lazy"><span class="hpr-body"><span class="hpr-tag gold">E-paper</span><b>${tr(`${EP_LANG[l]} e-paper`)}</b><span>Today's paper, morning and evening</span><span class="hpr-go">Read today's paper →</span></span></a>`)
+      : [`<a class="hpr-card hpr-ep" href="${withLang("/epaper")}"><img src="/og/epaper.jpg" alt="" loading="lazy"><span class="hpr-body"><span class="hpr-tag gold">E-paper</span><b>Rashtrix e-papers</b><span>Bengali, English and Hindi, morning and evening</span><span class="hpr-go">Read today's paper →</span></span></a>`])
+  ];
+  const keep = host.querySelector(".hpr-track")?.scrollLeft || 0;
+  host.innerHTML = `<div class="hpr-track">${cards.join("")}</div><div class="hpr-dots">${cards.map((_, i) => `<i class="${i ? "" : "on"}"></i>`).join("")}</div>`;
+  const track = host.querySelector(".hpr-track"); track.scrollLeft = keep;
+  const at = () => Math.round(track.scrollLeft / (track.firstElementChild.offsetWidth + 12));
+  track.addEventListener("scroll", () => host.querySelectorAll(".hpr-dots i").forEach((d, k) => d.classList.toggle("on", k === at())), { passive: true });
+  ["pointerdown", "touchstart", "wheel"].forEach(ev => track.addEventListener(ev, () => { phPromo.still = true; }, { passive: true }));
+  clearInterval(phPromo.t);
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) phPromo.t = setInterval(() => {
+    if (!track.isConnected) return clearInterval(phPromo.t);
+    const r = track.getBoundingClientRect();
+    if (phPromo.still || document.hidden || r.bottom < 0 || r.top > innerHeight) return;
+    const n = track.children.length, i = (at() + 1) % n;
+    track.scrollTo({ left: i * (track.firstElementChild.offsetWidth + 12), behavior: "smooth" });
+  }, 6000);
+}
+// Today's front pages: the top half of each language's latest front page, masthead and lead; a tap
+// opens that paper.
+function phFronts() {
+  const host = $("#phFronts"); if (!host) return;
+  const e = state.homeX?.epaper, fronts = ["bn", "en", "hi"].filter(l => (e?.fronts || []).includes(l));
+  host.hidden = !fronts.length;
+  if (!fronts.length) return;
+  const slotName = e.slot === "morning" ? "Morning edition" : "Evening edition";
+  host.innerHTML = `<div class="ph-sec-head"><h2 id="phFrontsT">Today's front pages</h2><a href="${withLang("/epaper")}">E-paper</a></div>
+    <div class="fp-row">${fronts.map(l => `<a class="fp-card" href="${epHref(l, e)}"><span class="fp-img"><img src="/og/epaper-${l}.jpg?v=${encodeURIComponent(`${e.day}${e.slot}`)}" alt="" loading="lazy"></span><span class="fp-meta"><b>${tr(EP_LANG[l])}</b><span><span>${slotName}</span> · <span data-no-tr>${esc(shortDate(e.day))}</span></span></span></a>`).join("")}</div>`;
 }
 async function phExtras() {
   try {
@@ -687,7 +720,7 @@ async function phExtras() {
     if (r.ok) state.homeX = await r.json();
   } catch { /* the page shows without them */ }
   if (!document.getElementById("phToday")) return;
-  phToday(); phTvNow(); phBreak(); phPopular(); phPoll(); phEpaper();
+  phToday(); phTvNow(); phBreak(); phPopular(); phPoll(); phPromo(); phFronts();
   clearTimeout(phExtras.t); phExtras.t = setTimeout(() => { if (document.getElementById("phToday")) phExtras(); }, 60e3);
 }
 async function phVote(i) {
@@ -2250,7 +2283,15 @@ function mountWatchTV() {
   const host = $("#tvWatch"); if (!host) return;
   // The same player, still in its place on the same channel, plays on.
   if (tvInstance && host === tvHost && tvHostCh === tvChannel()) { drawTvInteract(); return; }
-  tvInstance?.destroy(); tvInstance = mountTV(host, { channel: tvChannel() }); tvHost = host; tvHostCh = tvChannel();
+  tvInstance?.destroy(); tvInstance = null;
+  // A page the phone closed twice in a few minutes (out of memory) does not start the channel by
+  // itself again: the reader taps to watch, so the page never goes round in a crash loop.
+  if (tvCrashGuard()) {
+    host.innerHTML = `<button class="tv-safe-start" type="button"><span>▶</span> ${tr("Watch Rashtrix TV")}</button>`;
+    host.querySelector("button").onclick = () => { tvBoots(true); host.innerHTML = ""; tvInstance = mountTV(host, { channel: tvChannel() }); tvHost = host; tvHostCh = tvChannel(); };
+    tvHost = host; tvHostCh = tvChannel(); drawTvInteract(); return;
+  }
+  tvInstance = mountTV(host, { channel: tvChannel() }); tvHost = host; tvHostCh = tvChannel();
   drawTvInteract();
 }
 // Under the player: the channel's open poll (one vote per device a day) and a comment box

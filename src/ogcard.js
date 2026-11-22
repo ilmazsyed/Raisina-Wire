@@ -9,7 +9,7 @@
 import puppeteer from "@cloudflare/puppeteer";
 import { getBySlug, isPublic } from "./store.js";
 
-import { cardHTML, siteCardHTML, epaperCardHTML } from "./ogcard-html.js";
+import { cardHTML, siteCardHTML, epaperCardHTML, epaperFrontHTML } from "./ogcard-html.js";
 import { tvSettings } from "./tvchannel.js";
 import { bulletinRank } from "./labels.js";
 
@@ -63,15 +63,33 @@ export async function renderEpaperCard(env, origin) {
   const ed = await env.DB.prepare("SELECT id FROM epaper_editions WHERE status='published' ORDER BY published_at DESC LIMIT 1").first().catch(() => null);
   if (!ed) return { none: true };
   const row = await env.DB.prepare("SELECT title FROM og_cards WHERE slug=?").bind(EP_SLUG).first().catch(() => null);
-  if (row?.title === ed.id) return { kept: true };
-  const made = await renderSlugs(env, origin, [{ slug: EP_SLUG, title: ed.id }], { headers: { "x-rw-card": await cardKey(env) }, wait: 7000 });
-  return { done: !!made[0] };
+  const key = await cardKey(env);
+  let done = false;
+  if (row?.title !== ed.id) done = !!(await renderSlugs(env, origin, [{ slug: EP_SLUG, title: ed.id }], { headers: { "x-rw-card": key }, wait: 7000 }))[0];
+  // The top half of each language's front page, for the app's home page.
+  const fronts = [];
+  for (const l of EP_LANGS) { const r = await env.DB.prepare("SELECT title FROM og_cards WHERE slug=?").bind(`__epf_${l}`).first().catch(() => null); if (r?.title !== ed.id) fronts.push({ slug: `__epf_${l}`, title: ed.id }); }
+  if (fronts.length) await renderSlugs(env, origin, fronts, { headers: { "x-rw-card": key }, wait: 7000, viewport: { width: 744, height: 603 } });
+  return { done, fronts: fronts.length };
 }
+const EP_LANGS = ["bn", "en", "hi"];
 export async function ogRoute(url, env, ctx, request) {
   if (url.pathname === `/og/card/${EP_SLUG}`) {
     if (!request || request.headers.get("x-rw-card") !== await cardKey(env)) return new Response("Not found", { status: 404 });
     const ed = await env.DB.prepare("SELECT day, slot FROM epaper_editions WHERE status='published' ORDER BY published_at DESC LIMIT 1").first().catch(() => null);
     return new Response(epaperCardHTML(ed ? `${ed.day}/${ed.slot}` : ""), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
+  }
+  const ef = url.pathname.match(/^\/og\/card\/__epf_(bn|en|hi)$/);
+  if (ef) {
+    if (!request || request.headers.get("x-rw-card") !== await cardKey(env)) return new Response("Not found", { status: 404 });
+    const ed = await env.DB.prepare("SELECT day, slot FROM epaper_editions WHERE status='published' ORDER BY published_at DESC LIMIT 1").first().catch(() => null);
+    return new Response(epaperFrontHTML(ef[1], ed ? `${ed.day}/${ed.slot}` : ""), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
+  }
+  const efj = url.pathname.match(/^\/og\/epaper-(bn|en|hi)\.jpg$/);
+  if (efj) {
+    const row = await env.DB.prepare("SELECT img FROM og_cards WHERE slug=?").bind(`__epf_${efj[1]}`).first().catch(() => null);
+    if (row?.img) return new Response(new Uint8Array(row.img), { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=900" } });
+    return new Response("Not made yet", { status: 404, headers: { "cache-control": "no-store" } });
   }
   if (url.pathname === "/og/epaper.jpg") {
     const row = await env.DB.prepare("SELECT img FROM og_cards WHERE slug=?").bind(EP_SLUG).first().catch(() => null);
@@ -114,11 +132,11 @@ export async function ogRoute(url, env, ctx, request) {
 }
 
 // Photographs the cards of the given stories in one browser session; returns their JPEGs.
-async function renderSlugs(env, origin, rows, { headers, wait = 0 } = {}) {
+async function renderSlugs(env, origin, rows, { headers, wait = 0, viewport = { width: 1200, height: 630 } } = {}) {
   const browser = await puppeteer.launch(env.BROWSER), out = [], now = new Date().toISOString();
   try {
     const page = await browser.newPage();
-    await page.setViewport({ width: 1200, height: 630, deviceScaleFactor: 1 });
+    await page.setViewport({ ...viewport, deviceScaleFactor: 1 });
     if (headers) await page.setExtraHTTPHeaders(headers);
     for (const r of rows) {
       try {

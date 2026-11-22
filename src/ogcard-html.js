@@ -142,6 +142,13 @@ html,body{width:1200px;height:630px;overflow:hidden;background:#140304}
 
 // The e-paper's share card (1200×630): today's three front pages (Bengali, English, Hindi) side by
 // side, each drawn by the e-paper itself (/epaper?card=1), with the English ad line.
+// The top half of one language's front page (the masthead and the lead), for the app's home page.
+export function epaperFrontHTML(lang, edition) {
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;width:744px;height:603px;overflow:hidden;background:#f6f2ea}
+iframe{position:absolute;left:0;top:0;width:1240px;height:2010px;border:0;transform:scale(.6);transform-origin:0 0}
+</style></head><body><iframe src="/epaper?lang=${lang}&card=1${edition ? `&ed=${encodeURIComponent(edition)}` : ""}" scrolling="no"></iframe></body></html>`;
+}
 export function epaperCardHTML(edition) {
   const pg = (lang, i, name) => `<div class="pg" style="left:${150 + i * 306}px"><iframe src="/epaper?lang=${lang}&card=1${edition ? `&ed=${encodeURIComponent(edition)}` : ""}" scrolling="no"></iframe><span>${name}</span></div>`;
   return `<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;800;900&display=swap" rel="stylesheet"><style>

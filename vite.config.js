@@ -48,6 +48,7 @@ export default defineConfig({
         prompter: resolve(import.meta.dirname, "prompter.html"),
         avodesk: resolve(import.meta.dirname, "avodesk.html"),
         breaking: resolve(import.meta.dirname, "breaking.html"),
+        livefeed: resolve(import.meta.dirname, "livefeed.html"),
         progdesk: resolve(import.meta.dirname, "progdesk.html"),
         adsdesk: resolve(import.meta.dirname, "adsdesk.html"),
         newsprint: resolve(import.meta.dirname, "newsprint.html"),

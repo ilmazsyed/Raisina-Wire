@@ -19,6 +19,9 @@ body:before{content:"";position:fixed;inset:-40px;z-index:-1;pointer-events:none
   radial-gradient(circle,rgba(17,17,17,.07) 1px,transparent 1.4px) 0 0/22px 22px;animation:dotdrift 60s linear infinite}
 @keyframes dotdrift{to{transform:translate(22px,22px)}}
 @media(prefers-reduced-motion:reduce){body:before{animation:none}}
+/* Phones and tablets: the dotted background stays still (a moving full-page layer costs memory the
+   live TV needs on an iPhone). */
+@media(hover:none){body:before{animation:none}}
 a{color:inherit;text-decoration:none}
 a:hover{color:var(--red)}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -2351,3 +2354,43 @@ body.ds-open{overflow:hidden}
 .ds-read{display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;border-radius:14px;background:#fff;color:var(--tone,#AA0404);font-weight:700;font-size:16px;text-decoration:none}
 .ds-hint{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;color:rgba(255,255,255,.85)}
 @media (prefers-reduced-motion: reduce){.ph-break-tag,.ds-view{animation:none}.ds-bars span.on i{animation:none;width:100%}}
+
+/* Rashtrix TV full screen on an iPhone (the frame covers the page): the page behind it is taken
+   out of the picture, so its images and moving parts let go of memory. */
+html.tvp-fs-lock body:before{display:none}
+html.tvp-fs-lock .ticker-move{animation:none}
+html.tvp-fs-lock .watch .wrap>:not(.tv-watch),html.tvp-fs-lock .tv-interact,html.tvp-fs-lock .site-footer,html.tvp-fs-lock .tabbar,html.tvp-fs-lock .ph-home>:not(.ph-tv){display:none!important}
+
+/* the app's own cards, swiped like ads (phone home) */
+.ph-promo{padding:20px 0 0}
+.hpr-track{display:flex;gap:12px;padding:0 16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:16px;scrollbar-width:none}
+.hpr-track::-webkit-scrollbar{display:none}
+.hpr-card{position:relative;flex:0 0 calc(100% - 44px);height:200px;border-radius:20px;overflow:hidden;scroll-snap-align:center;text-decoration:none;color:#fff;background:#AA0404;display:block}
+.hpr-card>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.hpr-card.hpr-ep>img{object-position:top center;filter:saturate(.95)}
+.hpr-card:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.78) 0%,rgba(0,0,0,.5) 52%,rgba(0,0,0,0) 100%)}
+.hpr-card.hpr-shorts{background:#7d0303}.hpr-card.hpr-shorts:after{display:none}
+.hpr-body{position:absolute;left:16px;top:16px;bottom:16px;width:62%;z-index:2;display:flex;flex-direction:column;gap:6px}
+.hpr-body b{font-family:var(--serif);font-weight:800;font-size:19px;line-height:1.3}
+.hpr-body>span:not(.hpr-tag):not(.hpr-go){font-size:13px;line-height:1.45;color:rgba(255,255,255,.88)}
+.hpr-tag{align-self:flex-start;display:inline-flex;align-items:center;gap:5px;background:var(--red);color:#fff;font:800 11px Montserrat,var(--sans);letter-spacing:.06em;padding:3px 8px;border-radius:6px}
+.hpr-tag i{width:6px;height:6px;border-radius:50%;background:#fff;animation:blink 1s infinite}
+.hpr-tag.gold{background:var(--gold);color:#111;font-family:var(--sans);letter-spacing:0;font-size:12px}
+.hpr-go{margin-top:auto;align-self:flex-start;background:#fff;color:#AA0404;font-weight:700;font-size:14px;padding:8px 14px;border-radius:10px}
+.hpr-phone{position:absolute;right:22px;top:18px;bottom:-30px;width:110px;border-radius:22px;border:3px solid rgba(255,255,255,.85);background:#1a0a0b;display:flex;align-items:flex-start;justify-content:center;padding-top:30px;box-sizing:border-box}
+.hpr-phone img{width:58px;border-radius:6px}
+.hpr-phone i{position:absolute;bottom:58px;left:14px;right:14px;height:6px;border-radius:3px;background:rgba(255,255,255,.3)}
+.hpr-dots{display:flex;justify-content:center;gap:6px;padding-top:10px}
+.hpr-dots i{width:6px;height:6px;border-radius:3px;background:color-mix(in srgb,var(--muted) 45%,transparent);transition:width .2s}
+.hpr-dots i.on{width:18px;background:var(--red)}
+
+/* today's front pages */
+.ph-fronts{padding:24px 0 0;display:flex;flex-direction:column;gap:10px}
+.ph-fronts[hidden]{display:none}
+.fp-row{display:flex;gap:12px;padding:0 16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:16px;scrollbar-width:none}
+.fp-row::-webkit-scrollbar{display:none}
+.fp-card{flex:0 0 78%;scroll-snap-align:start;text-decoration:none;color:var(--ink);display:flex;flex-direction:column;gap:8px}
+.fp-img{display:block;aspect-ratio:744/603;border-radius:10px;overflow:hidden;background:#f6f2ea;box-shadow:0 14px 30px -14px rgba(0,0,0,.45),0 0 0 1px var(--line)}
+.fp-img img{width:100%;height:100%;object-fit:cover;object-position:top}
+.fp-meta{display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--muted)}
+.fp-meta b{font-size:15px;color:var(--ink)}

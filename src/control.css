@@ -519,3 +519,17 @@ body.rec-on>header,body.rec-on>main,body.rec-on>nav,body.rec-on .cr-top{visibili
 .lr-log summary{cursor:pointer;font-weight:600}
 .lr-log .lr-list{margin-top:8px;max-height:300px;overflow:auto}
 @media(max-width:760px){.lr-grip{display:none}.lr-act{margin-left:0}}
+
+/* The header in one line: the brand, the page's name, the desks (scrolling sideways when they do
+   not fit), the clock and the language. */
+.cr-head{flex-wrap:nowrap}
+.cr-head h1{white-space:nowrap;flex:none}
+.cr-nav{flex:1 1 auto;min-width:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);padding-right:24px}
+.cr-nav::-webkit-scrollbar{display:none}
+.cr-nav a{white-space:nowrap;flex:none}
+.cr-head .spacer{display:none}
+.cr-head .cr-clock,.cr-head>.ui-lang{flex:none;white-space:nowrap}
+/* The LiveFeed desk's preview */
+.lf-frame{position:relative;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden}
+.lf-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.lf-empty{display:flex;align-items:center;justify-content:center;aspect-ratio:16/9;border:1px dashed var(--line);border-radius:10px;color:var(--mute);padding:16px;text-align:center}

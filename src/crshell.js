@@ -26,7 +26,7 @@ export const istNow = () => new Date(Date.now() + 5.5 * 3600e3);
 export const istClock = (t = Date.now(), sec = true) => new Date(t).toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", ...(sec ? { second: "2-digit" } : {}) });
 export const istDay = (t = Date.now()) => new Date(t + 5.5 * 3600e3).toISOString().slice(0, 10);
 
-const PAGES = [["/breaking.html", "Breaking desk"], ["/headlines.html", "Headlines desk"], ["/liverundown.html", "Live Rundown"], ["/producer.html", "Producer"], ["/avodesk.html", "AVO desk"], ["/progdesk.html", "Segment & bulletin desk"], ["/adsdesk.html", "Ad library desk"], ["/oapdesk.html", "OAP desk"], ["/newsprint.html", "Newsprint desk"], ["/charter.html", "Editorial Charter"], ["/pcr.html", "PCR"], ["/studio.html", "Studio"], ["/onair.html", "On-air desk"], ["/prompter.html", "Prompter"], ["/admin.html", "Control room"]];
+const PAGES = [["/breaking.html", "Breaking desk"], ["/livefeed.html", "LiveFeed desk"], ["/headlines.html", "Headlines desk"], ["/liverundown.html", "Live Rundown"], ["/producer.html", "Producer"], ["/avodesk.html", "AVO desk"], ["/progdesk.html", "Segment & bulletin desk"], ["/adsdesk.html", "Ad library desk"], ["/oapdesk.html", "OAP desk"], ["/newsprint.html", "Newsprint desk"], ["/charter.html", "Editorial Charter"], ["/pcr.html", "PCR"], ["/studio.html", "Studio"], ["/onair.html", "On-air desk"], ["/prompter.html", "Prompter"], ["/admin.html", "Control room"]];
 // Draws the header and checks the person is staff. Returns the user, or null (with a message).
 export async function shell(title, { staff = true } = {}) {
   await initUiLang();
@@ -37,6 +37,8 @@ export async function shell(title, { staff = true } = {}) {
     <span class="spacer"></span><span class="cr-clock" data-no-tr></span>`;
   head.append(langSwitch());
   document.body.prepend(head);
+  // (the desk open now, in view in the line of desks)
+  { const cur = head.querySelector(".cr-nav a[aria-current]"), nav = head.querySelector(".cr-nav"); if (cur && nav) nav.scrollLeft = cur.offsetLeft - nav.clientWidth / 2 + cur.offsetWidth / 2; }
   const clock = $(".cr-clock", head);
   const tick = () => { clock.textContent = `${digits(istClock())} IST`; };
   tick(); setInterval(tick, 1000);
