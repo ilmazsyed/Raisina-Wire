@@ -317,3 +317,9 @@ html,body{overflow-x:clip}
    it was set at, so nothing spills out of its column) */
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .ep-sheet,.ep-sheet *{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+
+/* a picture that could not be had: the paper's own plate (the crest, faint, on newsprint) */
+.ph.nopic,.mh .ear .eph.nopic{background:#ece6d8}
+.ph.nopic > i,.ph.nopic > video,.eph.nopic > i,.eph.nopic > video{display:none}
+.ph.nopic::after,.eph.nopic::after{content:"";position:absolute;inset:0;background:url(/brand/epaper-crest.webp) center/auto 58% no-repeat;opacity:.16;filter:grayscale(1)}
+.ph.nopic .lv,.ph.nopic .play,.ph.nopic .snd{display:none}

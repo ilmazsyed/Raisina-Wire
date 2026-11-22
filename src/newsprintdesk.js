@@ -3,11 +3,16 @@
 // its deadline (45 minutes before the edition) from the stories the desks sent to the newsprint
 // and the day's news; here the editor chooses the lead, moves, orders and removes stories and
 // their pictures, adds others, and approves it. At the edition's time it is printed, approved or
-// not. The owner chooses who is reminded.
+// not. The owner chooses who is reminded. The English and Hindi editions are made from the Bengali
+// one, and each can be edited on its own (its lead, its stories, their words and pictures), before
+// it is printed and after: a printed paper changes for readers as soon as it is saved.
 import { shell, api, toast, fail, esc, $, $$, istClock } from "./crshell.js";
 import { digits } from "./i18n.js";
 
-const S = { list: null, id: "", ed: null, cands: [], dirty: false, showAdd: "", form: null };
+const S = { list: null, id: "", ed: null, cands: [], dirty: false, showAdd: "", form: null, lang: "bn" };
+const LANGS = { bn: "Bengali", en: "English", hi: "Hindi" };
+const LQ = () => `lang=${S.lang}`;
+const BY = { bn: "নিজস্ব সংবাদদাতা", en: "Our Correspondent", hi: "हमारे संवाददाता" };
 const SLOT = { morning: "Morning edition", evening: "Evening edition" };
 const PAGE = { front: "Front page", kolkata: "Kolkata", bengal: "West Bengal", india: "India", world: "World", sports: "Sports", life: "Entertainment & Life", stars: "Horoscope" };
 const STATUS = { draft: ["DRAFT", "amber"], approved: ["APPROVED", "green"], published: ["PRINTED", ""] };
@@ -32,7 +37,7 @@ function draw() {
   ${ed ? `<section class="panel pd">
     <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
       <h2 style="margin:0"><span>${SLOT[ed.slot]}</span> · <span data-no-tr>${esc(day(ed.day))}</span> <span class="tag ${STATUS[ed.status][1]}">${STATUS[ed.status][0]}</span></h2>
-      <div class="row" style="flex-wrap:wrap">${out ? `<a class="btn sm" href="/epaper?ed=${ed.day}/${ed.slot}" target="_blank" rel="noopener">Read it ↗</a>` : `
+      <div class="row" style="flex-wrap:wrap">${out ? `${S.dirty ? `<button class="btn sm green" id="npSave">Save changes to the printed paper</button>` : ""}<a class="btn sm" href="/epaper?lang=${S.lang}&ed=${ed.day}/${ed.slot}" target="_blank" rel="noopener">Read it ↗</a>` : `
         ${S.dirty ? `<button class="btn sm green" id="npSave">Save changes</button>` : ""}
         <button class="btn sm" id="npBuild" title="Draft it again from the latest news (your changes are lost)">Draft again</button>
         <button class="btn sm ${ed.status === "approved" ? "" : "green"}" id="npOk">${ed.status === "approved" ? "Withdraw approval" : "✓ Approve"}</button>
@@ -40,7 +45,12 @@ function draw() {
     <small class="muted">${out ? `<span>Printed at</span> <span data-no-tr>${istClock(Date.parse(ed.published_at), false)}</span>` : `<span>Deadline</span> <span data-no-tr>${istClock(Date.parse(E.deadline), false)}</span> · <span>prints at</span> <span data-no-tr>${istClock(Date.parse(E.at), false)}</span>`}
       ${ed.approved_by ? ` · <span>Approved by</span> <span data-no-tr>${esc(ed.approved_by)}</span>` : ""}${ed.built_at ? ` · <span>Drafted at</span> <span data-no-tr>${istClock(Date.parse(ed.built_at), false)}</span>` : ""}
       ${ed.touched ? " · <span>Edited by hand (no longer redrafted on its own)</span>" : out ? "" : " · <span>Untouched: redrafted every 20 minutes with the latest news</span>"}</small>
-    <div class="np-pages">${ed.pages.map((p, pi) => page(p, pi, out)).join("")}</div>
+    <div class="np-langs row" style="flex-wrap:wrap;gap:6px;margin-top:10px">${Object.entries(LANGS).map(([k, v]) => `<button type="button" class="btn sm ${S.lang === k ? "on" : ""}" data-eplang="${k}">${v} edition${k !== "bn" && ed.edited?.[k] ? " ✎" : ""}</button>`).join("")}</div>
+    ${S.lang === "bn" ? `<small class="muted">The Bengali edition. The English and Hindi editions are made from it at print, unless you edit them yourself.</small>`
+      : ed.own ? `<div class="row" style="gap:8px;flex-wrap:wrap"><small class="muted"><span>The ${LANGS[S.lang]} edition, edited by hand: it ${out ? "is" : "will be"} printed as you see it here.</span></small><button class="btn sm" id="npRelang">Make it again from the Bengali</button></div>`
+      : `<small class="muted">${ed.auto ? `<span>The ${LANGS[S.lang]} edition as it would be made from the Bengali now. Change anything (the lead, the stories, their words or pictures) and save to keep your own ${LANGS[S.lang]} edition.</span>` : `<span>The ${LANGS[S.lang]} edition as printed. Change anything and save to change it for readers.</span>`}</small>`}
+    ${out ? `<small class="muted">Printed: changes you save go to readers at once, and the front-page pictures on the home page are taken again within a few minutes.</small>` : ""}
+    <div class="np-pages">${ed.pages.map((p, pi) => page(p, pi, false)).join("")}</div>
   </section>` : S.id ? `<section class="panel pd"><p class="muted">Loading…</p></section>` : ""}
   <section class="panel pd">
     <h2>Sent to the newsprint <small class="muted">(${digits(L.pool.length)})</small></h2>
@@ -57,7 +67,7 @@ function draw() {
 }
 
 function page(p, pi, out) {
-  const stars = p.key === "stars", hz = S.ed.edition.horoscope?.bn || [];
+  const stars = p.key === "stars", hz = S.ed.edition.horoscope?.[S.lang] || S.ed.edition.horoscope?.bn || [];
   return `<div class="np-page"><div class="row" style="justify-content:space-between"><h3 style="margin:0"><span>${PAGE[p.key] || esc(p.title)}</span> <small class="muted">${stars ? "" : `(${digits(p.items.length)})`}</small></h3>
     ${out || stars ? "" : `<div class="row"><button class="btn sm green" data-write="${pi}">✍ Write a story</button><button class="btn sm" data-add="${pi}">${S.showAdd === String(pi) ? "Close" : "+ Add a story"}</button></div>`}</div>
     ${S.form && S.form.pi === pi && S.form.i < 0 ? form() : ""}
@@ -75,11 +85,11 @@ function page(p, pi, out) {
 }
 function form() {
   const F = S.form;
-  return `<div class="np-form pd-edit stack" style="gap:10px"><h3 style="margin:0">${F.i < 0 ? "Write a story for the paper" : "Edit this story in the paper"}</h3>
+  return `<div class="np-form pd-edit stack" style="gap:10px"><h3 style="margin:0">${F.i < 0 ? "Write a story for the paper" : "Edit this story in the paper"} <small class="muted">(${LANGS[S.lang]})</small></h3>
     ${F.loading ? `<p class="muted">Loading…</p>` : `
     <label class="stack" style="gap:4px"><small>Headline</small><input id="fTitle" maxlength="240" value="${esc(F.title)}" data-no-tr></label>
     <label class="stack" style="gap:4px"><small>Sub-headline</small><input id="fDek" maxlength="360" value="${esc(F.dek)}" data-no-tr></label>
-    <label class="stack" style="gap:4px;max-width:420px"><small>Byline (the writer's name; leave empty for none)</small><input id="fBy" maxlength="120" value="${esc(F.byline)}" data-no-tr placeholder="নিজস্ব সংবাদদাতা"></label>
+    <label class="stack" style="gap:4px;max-width:420px"><small>Byline (the writer's name; leave empty for none)</small><input id="fBy" maxlength="120" value="${esc(F.byline)}" data-no-tr placeholder="${BY[S.lang]}"></label>
     <label class="stack" style="gap:4px"><small>The story (a blank line between paragraphs)</small><textarea id="fBody" rows="12" data-no-tr>${esc(F.body)}</textarea></label>
     <div class="stack" style="gap:6px"><small>Pictures and video</small>
       <div class="np-media">${F.media.map((m, mi) => `<span class="np-m">${thumb(m) ? `<img src="${esc(thumb(m))}" alt="">` : `<i>▶</i>`}<small>${m.kind === "img" ? "Picture" : "Video"}</small><button type="button" title="Remove" data-fm="${mi}">×</button></span>`).join("") || `<small class="muted">None yet.</small>`}</div>
@@ -107,7 +117,7 @@ async function openForm(pi, i) {
   S.form = { pi, i, title: x?.title || "", dek: x?.dek || "", byline: x?.byline || "", body: x?.body || "", media: structuredClone(x?.media || []), loading: !!x && !x.body };
   S.showAdd = ""; draw();
   if (S.form.loading) {
-    try { const r = await api(`/api/admin/epaper/story?ref=${encodeURIComponent(x.ref)}`); Object.assign(S.form, { body: r.body || "", byline: x.byline || r.byline || "", orig: r.body || "" }); } catch (e) { fail(e); }
+    try { const r = await api(`/api/admin/epaper/story?ref=${encodeURIComponent(x.ref)}&${LQ()}`); Object.assign(S.form, { body: r.body || "", byline: x.byline || r.byline || "", orig: r.body || "" }); } catch (e) { fail(e); }
     S.form.loading = false; draw();
   }
 }
@@ -158,17 +168,23 @@ function wire() {
   $$("[data-move]").forEach(s => s.onchange = () => { if (s.value === "") return; change(P => { const [p, i] = at(s.dataset.move); const [x] = P[p].items.splice(i, 1); P[+s.value].items.push(x); }); });
   $$("[data-unmedia]").forEach(b => b.onclick = () => change(P => { const [p, i, m] = at(b.dataset.unmedia); P[p].items[i].media.splice(m, 1); }));
   $$("[data-add]").forEach(b => b.onclick = () => { S.showAdd = S.showAdd === b.dataset.add ? "" : b.dataset.add; draw(); });
-  $$("[data-pickc]").forEach(b => b.onclick = () => { const [p, ...r] = b.dataset.pickc.split(":"), ref = r.join(":"), x = S.cands.find(c => c.ref === ref); if (x) change(P => P[+p].items.push(x)); });
-  const save = async () => { if (!S.dirty) return; await api(`/api/admin/epaper/${id}`, { method: "PUT", body: { pages: S.ed.edition.pages } }); S.dirty = false; };
-  if ($("#npSave")) $("#npSave").onclick = async () => { try { await save(); toast("Saved."); openEd(); } catch (e) { fail(e); } };
-  if ($("#npBuild")) $("#npBuild").onclick = async () => { if (!confirm("Draft this edition again from the latest news? Changes made by hand are lost.")) return; try { await api(`/api/admin/epaper/${id}/build`, { method: "POST" }); S.dirty = false; toast("Drafted again."); openEd(); } catch (e) { fail(e); } };
+  $$("[data-pickc]").forEach(b => b.onclick = async () => {
+    const [p, ...r] = b.dataset.pickc.split(":"), ref = r.join(":"); let x = S.cands.find(c => c.ref === ref); if (!x) return;
+    if (S.lang !== "bn") { b.disabled = true; b.textContent = "…"; try { x = (await api(`/api/admin/epaper/localise?${LQ()}`, { method: "POST", body: { items: [x] } })).items[0] || x; } catch (e) { fail(e); } }
+    change(P => P[+p].items.push(structuredClone(x)));
+  });
+  $$("[data-eplang]").forEach(b => b.onclick = () => { if (b.dataset.eplang === S.lang) return; if (S.dirty && !confirm("Leave without saving your changes?")) return; S.lang = b.dataset.eplang; S.dirty = false; openEd(); });
+  if ($("#npRelang")) $("#npRelang").onclick = async () => { if (!confirm(`Make the ${LANGS[S.lang]} edition again from the Bengali? Your changes to it are lost.`)) return; try { await api(`/api/admin/epaper/${id}/relang?${LQ()}`, { method: "POST" }); S.dirty = false; toast("Made again from the Bengali."); openEd(); } catch (e) { fail(e); } };
+  const save = async () => { if (!S.dirty) return; await api(`/api/admin/epaper/${id}?${LQ()}`, { method: "PUT", body: { pages: S.ed.edition.pages } }); S.dirty = false; };
+  if ($("#npSave")) $("#npSave").onclick = async () => { try { await save(); toast(S.ed.edition.status === "published" ? "Saved: readers see the change now." : "Saved."); openEd(); } catch (e) { fail(e); } };
+  if ($("#npBuild")) $("#npBuild").onclick = async () => { if (!confirm("Draft this edition again from the latest news? Changes made by hand, in all three languages, are lost.")) return; try { await api(`/api/admin/epaper/${id}/build`, { method: "POST" }); S.dirty = false; toast("Drafted again."); openEd(); } catch (e) { fail(e); } };
   if ($("#npOk")) $("#npOk").onclick = async () => { const undo = S.ed.edition.status === "approved"; try { await save(); await api(`/api/admin/epaper/${id}/approve`, { method: "POST", body: { undo } }); toast(undo ? "Approval withdrawn." : "Approved: it prints at its time."); openEd(); load(true); } catch (e) { fail(e); } };
   if ($("#npPrint")) $("#npPrint").onclick = async () => { if (!confirm("Print this edition now? It goes out to readers at once.")) return; try { await save(); toast("Printing: the English and Hindi pages are being made…"); await api(`/api/admin/epaper/${id}/print`, { method: "POST" }); toast("Printed."); openEd(); load(true); } catch (e) { fail(e); } };
 }
 
 async function openEd() {
   S.ed = null; S.showAdd = ""; S.form = null; draw();
-  try { const r = await api(`/api/admin/epaper/${S.id}`); S.ed = r; S.cands = r.candidates || []; draw(); } catch (e) { fail(e); }
+  try { const r = await api(`/api/admin/epaper/${S.id}?${LQ()}`); S.ed = r; S.cands = r.candidates || []; draw(); } catch (e) { fail(e); }
 }
 async function load(quiet = false) {
   try {

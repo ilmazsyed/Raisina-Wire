@@ -118,8 +118,8 @@ export async function buildEdition(env, day, slot, { force = false, t = Date.now
   const items = await candidates(env, day, slot), pages = layout(items, row?.lead || "");
   const lead = pages[0]?.items[0]?.ref || "", hz = row && Object.keys(J(row.horoscope, {})).length ? row.horoscope : JSON.stringify(await horoscope(env, day, slot));
   await env.DB.prepare(`INSERT INTO epaper_editions (id,day,slot,status,lead,pages,horoscope,built_at,updated_at) VALUES (?,?,?,'draft',?,?,?,?,?)
-    ON CONFLICT(id) DO UPDATE SET lead=excluded.lead, pages=excluded.pages, horoscope=excluded.horoscope, built_at=excluded.built_at, updated_at=excluded.updated_at, touched=CASE WHEN ? THEN 0 ELSE touched END`)
-    .bind(id, day, slot, lead, JSON.stringify(pages), hz, nowIso(t), nowIso(t), force ? 1 : 0).run();
+    ON CONFLICT(id) DO UPDATE SET lead=excluded.lead, pages=excluded.pages, horoscope=excluded.horoscope, built_at=excluded.built_at, updated_at=excluded.updated_at, touched=CASE WHEN ? THEN 0 ELSE touched END, lang_edits=CASE WHEN ? THEN '{}' ELSE lang_edits END`)
+    .bind(id, day, slot, lead, JSON.stringify(pages), hz, nowIso(t), nowIso(t), force ? 1 : 0, force ? 1 : 0).run();
   return env.DB.prepare("SELECT * FROM epaper_editions WHERE id=?").bind(id).first();
 }
 
@@ -175,7 +175,9 @@ async function addText(env, pages, lang) {
 }
 export async function printEdition(env, id, by = "auto", t = Date.now()) {
   const row = await env.DB.prepare("SELECT * FROM epaper_editions WHERE id=?").bind(id).first(); if (!row) return null;
-  const pages = J(row.pages, []), langs = { bn: await addText(env, structuredClone(pages), "bn"), en: await addText(env, await localise(env, pages, "en"), "en"), hi: await addText(env, await localise(env, pages, "hi"), "hi") };
+  const pages = J(row.pages, []), own = J(row.lang_edits, {});
+  const made = async l => addText(env, own[l]?.length ? structuredClone(own[l]) : await localise(env, pages, l), l);
+  const langs = { bn: await addText(env, structuredClone(pages), "bn"), en: await made("en"), hi: await made("hi") };
   await env.DB.prepare("UPDATE epaper_editions SET status='published', langs=?, published_at=?, updated_at=?, approved_by=COALESCE(approved_by,?) WHERE id=?").bind(JSON.stringify(langs), nowIso(t), nowIso(t), by, id).run();
   return true;
 }
@@ -272,6 +274,28 @@ export async function handleNewsprint(request, env, url, user, { json, err, audi
     const next = []; for (const d of [istDay(t), istDay(t + 864e5)]) for (const slot of Object.keys(SLOTS)) { const at = editionAt(d, slot); if (at > t - 30 * 60e3) next.push({ id: `${d}:${slot}`, day: d, slot, at: new Date(at).toISOString(), deadline: new Date(at - DEADLINE).toISOString(), draftFrom: new Date(at - DEADLINE - REMIND).toISOString() }); }
     return json({ editions: eds.results, next: next.slice(0, 2), pool: pool.results.map(p => ({ ...p, content: J(p.content, {}) })), settings: s, owner: !!isOwner, users: users.results.map(u => ({ id: u.id, name: u.name || u.email, role: u.role })) }, 200, { "cache-control": "no-store" });
   }
+  const LG = ["en", "hi"].includes(url.searchParams.get("lang") || b.lang) ? (url.searchParams.get("lang") || b.lang) : "bn";
+  if (parts[0] === "story" && m === "GET" && LG !== "bn") {
+    // (its translation when there is one, else the Bengali put into the language now)
+    const ref = url.searchParams.get("ref") || "";
+    let src = { title: "", dek: "", body: "", byline: "" };
+    if (ref.startsWith("a:")) {
+      const t = await env.DB.prepare("SELECT title, dek, body FROM translations WHERE kind='article' AND ref=? AND lang=? AND status IN ('ready','manual')").bind(ref.slice(2), LG).first().catch(() => null);
+      if (t?.body) return json({ title: t.title || "", dek: t.dek || "", body: htmlText(t.body), byline: "" }, 200, { "cache-control": "no-store" });
+      const a = await env.DB.prepare("SELECT title, dek, body, lang FROM articles WHERE id=?").bind(ref.slice(2)).first();
+      if (a) { if ((a.lang || "bn") === LG) return json({ title: a.title, dek: a.dek || "", body: htmlText(a.body), byline: "" }, 200, { "cache-control": "no-store" }); src = { title: a.title, dek: a.dek || "", body: htmlText(a.body).slice(0, 4000) }; }
+    } else if (ref.startsWith("p:")) { const q = await env.DB.prepare("SELECT content FROM epaper_pool WHERE id=?").bind(ref.slice(2)).first(); const c = J(q?.content, {}); src = { title: c.title || "", dek: c.dek || "", body: htmlText(cleanBody(c.body)).slice(0, 4000) }; }
+    if (!src.body) return json({ title: "", dek: "", body: "", byline: "" }, 200, { "cache-control": "no-store" });
+    const done = await translateTexts(env, LG, [src.body], { from: "bn" }).catch(() => [""]);
+    return json({ title: "", dek: "", body: done[0] && done[0] !== src.body ? done[0] : "", byline: "" }, 200, { "cache-control": "no-store" });
+  }
+  // stories added to the English or Hindi pages: their headlines put into the language
+  if (parts[0] === "localise" && m === "POST") {
+    if (LG === "bn") return ok({ items: b.items || [] });
+    const items = (Array.isArray(b.items) ? b.items : []).slice(0, 12).map(SAFE_ITEM).filter(x => x.ref && x.title);
+    const [pg] = await localise(env, [{ key: "front", title: "", items }], LG);
+    return ok({ items: pg.items });
+  }
   if (parts[0] === "story" && m === "GET") {
     const ref = url.searchParams.get("ref") || "";
     if (ref.startsWith("a:")) { const a = await env.DB.prepare("SELECT title, dek, body, kind, writer FROM articles WHERE id=?").bind(ref.slice(2)).first(); if (!a) return err("Story not found.", 404); return json({ title: a.title, dek: a.dek || "", body: htmlText(a.body), byline: a.kind === "article" && a.writer ? writer(a.writer)?.name || "" : "" }, 200, { "cache-control": "no-store" }); }
@@ -293,17 +317,40 @@ export async function handleNewsprint(request, env, url, user, { json, err, audi
     if (!row) row = await buildEdition(env, day, slot);
     // everything that could go in it (to add by hand)
     const items = (await candidates(env, day, slot)).sort(rank);
-    return json({ edition: { ...row, pages: J(row.pages, []), horoscope: J(row.horoscope, {}), langs: undefined }, candidates: items, deadline: new Date(editionAt(day, slot) - DEADLINE).toISOString(), at: new Date(editionAt(day, slot)).toISOString() }, 200, { "cache-control": "no-store" });
+    // English and Hindi: as edited by hand, else as printed, else made now from the Bengali draft
+    let pages = J(row.pages, []), own = false, auto = false;
+    if (LG !== "bn") { const e = J(row.lang_edits, {})[LG], pr = J(row.langs, {})[LG]; if (e?.length) { pages = e; own = true; } else if (row.status === "published" && pr?.length) pages = pr; else { pages = await localise(env, pages, LG); auto = true; } }
+    else if (row.status === "published" && J(row.langs, {}).bn?.length) pages = J(row.langs, {}).bn;
+    pages.forEach(p => p.items.forEach(x => { delete x.text; delete x.updated; delete x.pri; }));
+    const langs = J(row.lang_edits, {});
+    return json({ edition: { ...row, pages, lang: LG, own, auto, edited: { en: !!langs.en?.length, hi: !!langs.hi?.length }, horoscope: J(row.horoscope, {}), langs: undefined, lang_edits: undefined }, candidates: items, deadline: new Date(editionAt(day, slot) - DEADLINE).toISOString(), at: new Date(editionAt(day, slot)).toISOString() }, 200, { "cache-control": "no-store" });
   }
   const row = await env.DB.prepare("SELECT * FROM epaper_editions WHERE id=?").bind(id).first();
   if (parts[1] === "build" && m === "POST") { if (row?.status === "published") return err("This edition is already out."); await buildEdition(env, day, slot, { force: true }); await audit("epaper.build", "epaper", id, {}); return ok(); }
   if (!row) return err("Not found.", 404);
   if (!parts[1] && m === "PUT") {
-    if (row.status === "published") return err("This edition is already out.");
-    const pages = (Array.isArray(b.pages) ? b.pages : []).filter(p => PAGES.some(x => x.key === p.key)).map(p => ({ key: p.key, title: PAGES.find(x => x.key === p.key).title.bn, items: (p.items || []).slice(0, 12).map(SAFE_ITEM).filter(x => x.ref && x.title) }));
+    const out = row.status === "published";
+    const pages = (Array.isArray(b.pages) ? b.pages : []).filter(p => PAGES.some(x => x.key === p.key)).map(p => ({ key: p.key, title: PAGES.find(x => x.key === p.key).title[LG], items: (p.items || []).slice(0, 12).map(SAFE_ITEM).filter(x => x.ref && x.title) }));
     if (!pages.length || !pages[0].items.length) return err("The front page needs at least its lead story.");
-    await env.DB.prepare("UPDATE epaper_editions SET pages=?, lead=?, touched=1, status=CASE WHEN status='approved' THEN 'draft' ELSE status END, updated_at=? WHERE id=?").bind(JSON.stringify(pages), pages[0].items[0].ref, nowIso(), id).run();
-    await audit("epaper.edit", "epaper", id, {}); return ok();
+    const langs = J(row.langs, {}), own = J(row.lang_edits, {});
+    // (a printed paper: the readers' pages are made again from these at once, with their text)
+    if (out) langs[LG] = await addText(env, structuredClone(pages), LG);
+    if (LG === "bn") {
+      await env.DB.prepare("UPDATE epaper_editions SET pages=?, lead=?, langs=?, touched=1, status=CASE WHEN status='approved' THEN 'draft' ELSE status END, updated_at=? WHERE id=?").bind(JSON.stringify(pages), pages[0].items[0].ref, JSON.stringify(langs), nowIso(), id).run();
+    } else {
+      own[LG] = pages;
+      await env.DB.prepare("UPDATE epaper_editions SET lang_edits=?, langs=?, touched=1, status=CASE WHEN status='approved' THEN 'draft' ELSE status END, updated_at=? WHERE id=?").bind(JSON.stringify(own), JSON.stringify(langs), nowIso(), id).run();
+    }
+    await audit("epaper.edit", "epaper", id, { lang: LG, printed: out }); return ok();
+  }
+  // English or Hindi made again from the Bengali (the hand edits in that language are dropped)
+  if (parts[1] === "relang" && m === "POST") {
+    if (LG === "bn") return err("Choose English or Hindi.");
+    const own = J(row.lang_edits, {}); delete own[LG];
+    const langs = J(row.langs, {});
+    if (row.status === "published") langs[LG] = await addText(env, await localise(env, J(row.pages, []), LG), LG);
+    await env.DB.prepare("UPDATE epaper_editions SET lang_edits=?, langs=?, updated_at=? WHERE id=?").bind(JSON.stringify(own), JSON.stringify(langs), nowIso(), id).run();
+    await audit("epaper.relang", "epaper", id, { lang: LG }); return ok();
   }
   if (parts[1] === "approve" && m === "POST") {
     if (row.status === "published") return err("This edition is already out.");

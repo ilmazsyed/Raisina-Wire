@@ -60,16 +60,18 @@ const EP_SLUG = "__epaper";
 export const cardKey = async env => (await tvSettings(env, "h")).key;
 export async function renderEpaperCard(env, origin) {
   if (!env.BROWSER || !origin) return { skipped: true };
-  const ed = await env.DB.prepare("SELECT id FROM epaper_editions WHERE status='published' ORDER BY published_at DESC LIMIT 1").first().catch(() => null);
+  const ed = await env.DB.prepare("SELECT id, updated_at FROM epaper_editions WHERE status='published' ORDER BY published_at DESC LIMIT 1").first().catch(() => null);
   if (!ed) return { none: true };
+  // (an edition edited after it was printed is taken again: its edit time is in the mark)
+  const mark = `${ed.id}@2xp${ed.updated_at ? "~" + Date.parse(ed.updated_at).toString(36) : ""}`;
   const row = await env.DB.prepare("SELECT title FROM og_cards WHERE slug=?").bind(EP_SLUG).first().catch(() => null);
   const key = await cardKey(env);
   let done = false;
-  if (row?.title !== ed.id) done = !!(await renderSlugs(env, origin, [{ slug: EP_SLUG, title: ed.id }], { headers: { "x-rw-card": key }, wait: 7000 }))[0];
+  if (row?.title !== mark) done = !!(await renderSlugs(env, origin, [{ slug: EP_SLUG, title: mark }], { headers: { "x-rw-card": key }, wait: 7000 }))[0];
   // The top half of each language's front page, for the app's home page.
   const fronts = [];
   // (taken at twice the size, so they are sharp on a phone's screen; "@2x" marks those)
-  for (const l of EP_LANGS) { const r = await env.DB.prepare("SELECT title FROM og_cards WHERE slug=?").bind(`__epf_${l}`).first().catch(() => null); if (r?.title !== `${ed.id}@2xm`) fronts.push({ slug: `__epf_${l}`, title: `${ed.id}@2xm` }); }
+  for (const l of EP_LANGS) { const r = await env.DB.prepare("SELECT title FROM og_cards WHERE slug=?").bind(`__epf_${l}`).first().catch(() => null); if (r?.title !== mark) fronts.push({ slug: `__epf_${l}`, title: mark }); }
   if (fronts.length) await renderSlugs(env, origin, fronts, { headers: { "x-rw-card": key }, wait: 7000, viewport: { width: 744, height: 603, deviceScaleFactor: 2 } });
   return { done, fronts: fronts.length };
 }
@@ -151,6 +153,8 @@ async function renderSlugs(env, origin, rows, { headers, wait = 0, viewport = { 
           await Promise.all(want.map(s => document.fonts.load(s, "দৈনিক রাষ্ট্রিক্স दैनिक राष्ट्रिक्स").catch(() => null)));
           await document.fonts.ready;
         }).catch(() => null), new Promise(r => setTimeout(r, 9000))]);
+        // (and until every picture on the page has arrived: src/epaperview.js says so)
+        for (const f of page.frames()) if (f !== page.mainFrame()) await f.waitForFunction("window.__epReady === true", { timeout: 25000 }).catch(() => null);
         if (wait) await new Promise(r => setTimeout(r, wait));
         const shot = await page.screenshot({ type: "jpeg", quality: 84 });
         const bytes = shot instanceof Uint8Array ? shot : new Uint8Array(shot);
