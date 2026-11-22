@@ -1,8 +1,11 @@
 // Shared by the control-room screens (producer, PCR, prompter, studio desk): the header with the
 // full Rashtrix logo, the staff check, the language switch, a clock in India time and helpers.
 import "./control.css";
-import { initUiLang, langSwitch } from "./uilang.js";
-import { digits } from "./i18n.js";
+// The control room is in English only (its words are not translated, and its numbers are
+// Western digits); what goes on air stays in Bengali.
+import { digits, setLang } from "./i18n.js";
+export function englishOnly() { setLang("en"); document.documentElement.lang = "en"; document.documentElement.dataset.lang = "en"; }
+englishOnly();
 import { mountPhoneNav, foldPanels } from "./crmobile.js";
 
 export const esc = (s = "") => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -29,13 +32,12 @@ export const istDay = (t = Date.now()) => new Date(t + 5.5 * 3600e3).toISOString
 const PAGES = [["/breaking.html", "Breaking desk"], ["/livefeed.html", "LiveFeed desk"], ["/headlines.html", "Headlines desk"], ["/liverundown.html", "Live Rundown"], ["/producer.html", "Producer"], ["/avodesk.html", "AVO desk"], ["/progdesk.html", "Segment & bulletin desk"], ["/library.html", "Content Library"], ["/adsdesk.html", "Ad library desk"], ["/oapdesk.html", "OAP desk"], ["/newsprint.html", "Newsprint desk"], ["/charter.html", "Editorial Charter"], ["/pcr.html", "PCR"], ["/studio.html", "Studio"], ["/onair.html", "On-air desk"], ["/prompter.html", "Prompter"], ["/admin.html", "Control room"]];
 // Draws the header and checks the person is staff. Returns the user, or null (with a message).
 export async function shell(title, { staff = true } = {}) {
-  await initUiLang();
+  englishOnly();
   const head = document.createElement("header");
   head.className = "cr-head";
   head.innerHTML = `<a class="cr-brand cx-brand" href="/admin.html" aria-label="Control room · Calibrex"><img src="/partners/calibrex-mark.svg" alt="" width="26" height="26"><span class="cx-word">CALIBRE<span>X</span></span></a><h1>${esc(title)}</h1>
     <div class="cr-navw"><button class="cr-nb l" type="button" aria-label="Earlier desks" hidden>‹</button><nav class="cr-nav">${PAGES.map(([h, n]) => `<a href="${h}"${location.pathname.replace(/\.html$/, "") === h.replace(/\.html$/, "") ? ' aria-current="page"' : ""}>${n}</a>`).join("")}</nav><button class="cr-nb r" type="button" aria-label="More desks" hidden>›</button></div>
     <span class="spacer"></span><span class="cr-clock" data-no-tr></span>`;
-  head.append(langSwitch());
   document.body.prepend(head);
   // (the desk open now, in view in the line of desks)
   // The line of desks scrolls sideways: the mouse wheel, the arrows at its ends (shown when there
@@ -61,7 +63,6 @@ export async function shell(title, { staff = true } = {}) {
   // panels that fold. (The prompter is full screen: no tab bar.)
   if (location.pathname !== "/prompter.html") {
     const nav = mountPhoneNav({ owner: !!me.user?.owner, hidden: me.user?.role === "admin" ? [] : ["members", "sales", "social"] });
-    const ls = langSwitch(); ls.classList.add("m-lang"); nav?.sheet.querySelector(".m-foot").prepend(ls);
     const main = $("main"); if (main) foldPanels(main);
   }
   if (!me.user || !["admin", "editor"].includes(me.user.role)) {

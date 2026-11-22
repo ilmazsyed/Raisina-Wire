@@ -1,5 +1,4 @@
 import "./style.css";
-import "./tv.css";
 import { mountTV } from "./tvplayer.js";
 import { brandMark, fullLogo, BRAND } from "./brand.js";
 import { WRITERS, writer, setGuestWriters } from "./writers.js";
@@ -2264,8 +2263,8 @@ function mountHomeTV() {
     if (hostV) hostV.closest(".home-live").hidden = true;
     return;
   }
-  homeTV = mountTV(host, { channel: "h", muted: true, tapUnmute: false });
-  if (hostV && matchMedia("(min-width: 1181px)").matches) homeTVv = mountTV(hostV, { channel: "v", muted: true, tapUnmute: false });
+  homeTV = mountTV(host, { channel: "h", muted: true, tapUnmute: false, offscreen: true });
+  if (hostV && matchMedia("(min-width: 1181px)").matches) homeTVv = mountTV(hostV, { channel: "v", muted: true, tapUnmute: false, offscreen: true });
   else if (hostV) hostV.closest(".home-live").hidden = true;
 }
 // Each page load that starts the home channel is noted; one that is still open after 90 seconds

@@ -1857,6 +1857,17 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .v .nd-clock{width:520px;height:520px;right:-8%;top:68%}
 .v .nd-cal{grid-template-columns:repeat(7,60px)}
 .v .nd-radar{width:900px;height:900px}
+/* The light player (src/engine.js LITE: phones and small tablets in the app): the programme is the
+   same; the endless decorative motion, the glass effects and the background art are not drawn.
+   What carries information keeps moving: the tickers, the progress bars, LIVE dots, spinners. */
+.tvp-lite .tvp-bg,.tvp-lite .nd{display:none!important}
+.tvp-lite *{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+.tvp-lite .tv-bug,.tvp-lite .tv-bug:after,.tvp-lite .tv-bug .bug-back:after,.tvp-lite .tv-l3 .lt-tag:after,.tvp-lite .tv-ad:after,.tvp-lite .tv-ad b,
+.tvp-lite .lb-side .lb-logo,.tvp-lite .lb-side .lb-logo i,.tvp-lite .wx-sky *,.tvp-lite .wx-ico,.tvp-lite .wx-ico:after,.tvp-lite .mk-ico,.tvp-lite .mk-ico *,.tvp-lite .mk-ico *:before,
+.tvp-lite .mk-drop,.tvp-lite .mk-pool,.tvp-lite .cid-art *,.tvp-lite .so-stripes,.tvp-lite .so-wm,.tvp-lite .so-ico svg,.tvp-lite .so-ico i,.tvp-lite .pr-tile svg,.tvp-lite .pr-when svg,
+.tvp-lite .ph-face svg,.tvp-lite .ph-ring,.tvp-lite .ph-wave i,.tvp-lite .sp-panel::before,.tvp-lite .sp-head::after,.tvp-lite .sx-mapbox .pin .ring,.tvp-lite .so-mapbox .pin .ring,
+.tvp-lite .hx-sweep,.tvp-lite .hx-streak,.tvp-lite .nb-ring,.tvp-lite .bs-glow{animation-iteration-count:1!important}
+.tvp-lite .hx-streak,.tvp-lite .bs-glow,.tvp-lite .hx-sweep{display:none}
 /* the app on phones: lighter (fewer moving parts) */
 .tvp-app .nd-pan path,.tvp-app .nd-globe .spin,.tvp-app .nd-scan,.tvp-app .nd-words b,.tvp-app .nd-rain i,.tvp-app .nd-digits b,.tvp-app .nd-star{animation:none}
 
