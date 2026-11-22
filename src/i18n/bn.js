@@ -1323,4 +1323,5 @@ export default {
   "AVO": "এভিও",
   "Done.": "হয়ে গিয়েছে।",
   "Added": "যোগ হয়েছে",
+  "With sound": "শব্দসহ",
 };

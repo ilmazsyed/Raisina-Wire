@@ -655,7 +655,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // cover over it is lifted, with a hint, until it plays. The one player then plays every video.
   // The YouTube player never keeps the focus (a focused player shows its own pause button).
   const unfocusYt = () => { host.querySelectorAll("iframe").forEach(f => { f.tabIndex = -1; if (document.activeElement === f) f.blur(); }); try { if (document.activeElement?.tagName === "IFRAME") { document.activeElement.blur(); window.focus(); } } catch { /* none */ } };
-  const needTap = on => { if (on) ytHold(true); else if (host.querySelector(".tvp-ytlayer")?.classList.contains("tap")) st.tapDone = Date.now(); host.querySelector(".tvp-ytlayer")?.classList.toggle("tap", on); host.querySelector(".tvp")?.classList.toggle("yt-tap", on); if (tapHint) tapHint.hidden = !on; };
+  const needTap = on => { if (on) ytHold(true); else if (host.querySelector(".tvp-ytlayer")?.classList.contains("tap")) st.tapDone = Date.now(); host.querySelector(".tvp-ytlayer")?.classList.toggle("tap", on); host.querySelector(".tvp")?.classList.toggle("yt-tap", on); if (tapHint) tapHint.hidden = !on; host.classList.toggle("tvp-needtap", !!on); };
 
   /* like and share (app) */
   const likeBtn = host.querySelector(".tvp-like"), shareBtn = host.querySelector(".tvp-share");

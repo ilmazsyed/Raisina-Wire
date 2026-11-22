@@ -2455,3 +2455,49 @@ html.tvp-fs-lock .watch .wrap>:not(.tv-watch),html.tvp-fs-lock .tv-interact,html
 @media(max-width:760px) and (prefers-reduced-motion:reduce){#app>header .live-tv-btn,#app>header .mast-rule{animation:none}}
 /* nothing on a phone page reaches past the screen's edge sideways */
 @media(max-width:760px){html,body{overflow-x:clip}}
+
+/* ---------- The live counter in the header (src/main.js mastLive): a small TV clock. India time in
+   flip digits under a LIVE tag, and a line that turns over: the date, the Bengali date and the
+   weather in Kolkata and other places, in Bengali and English. The same in every language. ---------- */
+.mast-live{display:grid;grid-template-rows:auto auto auto;justify-items:center;gap:3px;min-width:118px;padding:6px 10px 7px;border-radius:12px;background:linear-gradient(160deg,#16070a,#2a0a0d 60%,#3a0c10);color:#fff;box-shadow:0 10px 24px -14px rgba(120,0,0,.75),inset 0 0 0 1px rgba(212,160,23,.35);font-family:Montserrat,"Hind Siliguri",var(--sans);line-height:1;user-select:none}
+.mast-live:empty{display:none}
+.ml-top{display:flex;align-items:center;gap:5px;font:800 9px/1 Montserrat,sans-serif;letter-spacing:.16em;color:#ff5a4f}
+.ml-top i{width:6px;height:6px;border-radius:50%;background:#ff2a1f;box-shadow:0 0 0 0 rgba(255,42,31,.6);animation:ml-pulse 1.6s ease-out infinite}
+.ml-top em{font-style:normal;color:#d9b45a;letter-spacing:.12em}
+@keyframes ml-pulse{70%{box-shadow:0 0 0 6px rgba(255,42,31,0)}100%{box-shadow:0 0 0 0 rgba(255,42,31,0)}}
+.ml-clock{display:flex;gap:1px;perspective:120px}
+.ml-d{display:inline-grid;place-items:center;min-width:13px;height:21px;padding:0 1px;border-radius:3px;background:linear-gradient(180deg,#2b2f3a 0 49%,#1a1d25 51%);box-shadow:inset 0 -1px 0 rgba(0,0,0,.6),0 1px 0 rgba(255,255,255,.06);font:700 15px/1 "Hind Siliguri",sans-serif;color:#fff;transform-origin:50% 50%}
+.ml-d.flip{animation:ml-flip .42s cubic-bezier(.3,.7,.3,1)}
+@keyframes ml-flip{0%{transform:rotateX(-90deg);filter:brightness(.6)}100%{transform:none;filter:none}}
+.ml-col{font:700 14px/21px "Hind Siliguri",sans-serif;color:#d9b45a;padding:0 1px}
+.ml-line{position:relative;display:block;width:100%;height:14px;overflow:hidden;perspective:120px;text-align:center}
+.ml-line b{position:absolute;inset:0;display:block;font:600 11px/14px "Hind Siliguri",Montserrat,sans-serif;color:#f3d27a;white-space:nowrap;overflow:hidden;text-overflow:clip;letter-spacing:.02em}
+.ml-line b.in{animation:ml-in .45s cubic-bezier(.3,.7,.3,1) both}
+.ml-line b.out{animation:ml-out .42s ease-in both}
+@keyframes ml-in{from{transform:rotateX(90deg) translateY(-6px);opacity:0}}
+@keyframes ml-out{to{transform:rotateX(-90deg) translateY(6px);opacity:0}}
+@media (prefers-reduced-motion:reduce){.ml-d.flip,.ml-line b.in,.ml-line b.out,.ml-top i{animation:none}}
+/* on the phone: the counter in the space right of the logo and the tagline */
+@media(max-width:760px){
+  #app>header.wrap{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"logo tl live" "logo ts live" "acts acts acts" "rule rule rule"}
+  #app>header .mast-live{grid-area:live;align-self:center;min-width:104px;padding:5px 8px 6px;margin-left:2px}
+  #app>header .tagline{font-size:15px}
+  #app>header .tagline-sub{font-size:11px}
+  .ph-home .ph-today{display:none}
+}
+@media(max-width:370px){#app>header .mast-live{min-width:92px;padding:4px 6px 5px}.ml-d{min-width:11px;height:19px;font-size:13px}.ml-line b{font-size:10px}}
+
+/* ---------- The home player's bar: slim (about a fifth of the card), now and next on the left, two
+   small pills on the right, a thin progress line along its top edge ---------- */
+.ph-tv-dock{position:relative;display:flex;align-items:center;gap:10px;padding:9px 12px 10px;background:#0d0d0f}
+.ph-tv-dock .ph-tv-info{flex:1;min-width:0;padding:0;gap:2px;min-height:0}
+.ph-tv-dock .ph-tv-bar{position:absolute;left:0;right:0;top:0;height:2px;border-radius:0;background:rgba(255,255,255,.08)}
+.ph-tv-dock .ph-tv-bar i{height:2px;border-radius:0}
+.ph-tv-dock .ph-tv-now{gap:6px;min-width:0}
+.ph-tv-dock .ph-tv-k{font-size:10.5px;letter-spacing:.02em}
+.ph-tv-dock .ph-tv-now b{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ph-tv-dock .ph-tv-next{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ph-tv-dock .ph-tv-acts{display:flex;gap:6px;padding:0;flex:none}
+.ph-pill{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 10px;border-radius:999px;border:1px solid rgba(255,255,255,.22);color:#fff;font:700 11.5px/1 var(--sans);text-decoration:none;white-space:nowrap}
+.ph-pill svg{width:11px;height:11px}
+.ph-pill.red{background:linear-gradient(135deg,#d0140f,#9c0606);border-color:transparent;box-shadow:0 4px 12px -6px rgba(200,16,15,.8)}

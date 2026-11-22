@@ -1269,4 +1269,5 @@ export default {
   "Clips": "क्लिप",
   "TV only": "सिर्फ़ टीवी",
   "Kept": "रखा गया",
+  "With sound": "आवाज़ के साथ",
 };

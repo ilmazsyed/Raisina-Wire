@@ -181,7 +181,7 @@ function renderShell() {
     </div>
     <div class="masthead" id="masthead">
       <div class="nameplate"><a class="nameplate-link" href="/" aria-label="Rashtrix 24×7 News home">${fullLogo("mast-logo")}</a>
-        <div class="nameplate-tag"><a class="ep-btn ep-tagbtn" href="/epaper${lang === "bn" ? "" : `?lang=${lang}`}" aria-label="E-paper"><span class="ep-circ" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h12.5v13a1.5 1.5 0 0 0 1.5 1.5H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M16.5 9H20v9.5a1.5 1.5 0 0 1-3 0"/><path d="M7 9h6.5M7 12h6.5M7 15h4"/></svg></span><span class="ep-word">E-paper</span></a><p class="tagline brand-line" lang="bn" data-no-tr>${BRAND.line.split(", ").map((x, i, all) => `<span class="tl-part">${x}${i < all.length - 1 ? "," : ""}</span>`).join(" ")}</p><p class="tagline-sub" lang="bn" data-no-tr>${BRAND.tagline.split("।").map((x, i, all) => `<span class="tl-part">${x.trim()}${i < all.length - 1 ? " ।" : ""}</span>`).join(" ")}</p><p class="tag-sub"><span class="l">Kolkata</span> <span class="l">·</span> <span class="l">West Bengal</span> <span class="l">·</span> <span class="l">India</span> <span class="l">·</span> <span class="l">World</span></p></div></div>
+        <div class="nameplate-tag"><a class="ep-btn ep-tagbtn" href="/epaper${lang === "bn" ? "" : `?lang=${lang}`}" aria-label="E-paper"><span class="ep-circ" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h12.5v13a1.5 1.5 0 0 0 1.5 1.5H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M16.5 9H20v9.5a1.5 1.5 0 0 1-3 0"/><path d="M7 9h6.5M7 12h6.5M7 15h4"/></svg></span><span class="ep-word">E-paper</span></a><p class="tagline brand-line" lang="bn" data-no-tr>${BRAND.line.split(", ").map((x, i, all) => `<span class="tl-part">${x}${i < all.length - 1 ? "," : ""}</span>`).join(" ")}</p><p class="tagline-sub" lang="bn" data-no-tr>${BRAND.tagline.split("।").map((x, i, all) => `<span class="tl-part">${x.trim()}${i < all.length - 1 ? " ।" : ""}</span>`).join(" ")}</p><p class="tag-sub"><span class="l">Kolkata</span> <span class="l">·</span> <span class="l">West Bengal</span> <span class="l">·</span> <span class="l">India</span> <span class="l">·</span> <span class="l">World</span></p></div><div class="mast-live" id="mastLive" data-no-tr aria-hidden="true"></div></div>
       <span class="mast-rule" aria-hidden="true"></span>
     </div>
   </header>
@@ -566,8 +566,8 @@ function viewHomePhone() {
     <div class="ph-today" id="phToday"></div>
     <section class="ph-tv" aria-label="Rashtrix TV"><div class="ph-tv-card">
       <div class="ph-tv-screen"><div class="hl-player" id="homeTV" data-no-tr></div></div>
-      <div class="ph-tv-info" id="phTvInfo"></div>
-      <div class="ph-tv-acts"><a class="ph-btn red" href="${withLang("/watch")}">${ICON_PLAY}<span>Watch with sound</span></a><a class="ph-btn ghost" href="${withLang("/watch?ch=v")}"><span>Shorts live</span></a></div>
+      <div class="ph-tv-dock"><div class="ph-tv-info" id="phTvInfo"></div>
+        <div class="ph-tv-acts"><a class="ph-pill red" href="${withLang("/watch")}">${ICON_PLAY}<span>With sound</span></a><a class="ph-pill" href="${withLang("/watch?ch=v")}"><span>Shorts</span></a></div></div>
     </div></section>
     ${desks.length ? `<section class="ph-bubbles" aria-label="Desks" id="phBubbles"></section>` : ""}
     ${glance.length ? `<section class="ph-glance" aria-labelledby="phGlanceT"><div class="ph-glance-head"><h2 id="phGlanceT">At a glance</h2><span>Today's news in thirty seconds</span></div>
@@ -630,6 +630,55 @@ function phLive() {
     return `<a class="ph-live-card${i ? "" : " first"}" href="${withLang(`/coverage/${encodeURIComponent(d.item.slug)}`)}"><span class="ph-live-meta"><span class="ph-tag">Live</span><b data-no-tr>${esc(d.item.title)}</b><span class="ph-meta">${u ? ago(u.createdAt) : ""}</span></span><b class="ph-h" data-no-tr>${esc(text)}</b>${d.updates?.length ? `<span class="ph-meta"><span data-no-tr>${digits(d.updates.length)}</span> <span>updates</span></span>` : ""}</a>`;
   }).join("")}` : "";
 }
+// The live counter in the header, the same on every page and in every language: India time in
+// flip digits under a LIVE tag, and a line that turns over every few seconds: the date in Bengali
+// and in English, the Bengali calendar date, then the weather in Kolkata and other places, each in
+// Bengali and in English (Open-Meteo, through /api/home; read again every ten minutes).
+const ML_BN = x => String(x).replace(/\d/g, d => "০১২৩৪৫৬৭৮৯"[d]);
+const ML_ICO = { sun: "☀", clear: "☾", cloud: "☁", rain: "☂", storm: "⚡", wind: "≋", heat: "☀", fog: "≈" };
+let mlData = null, mlAt = 0, mlI = 0, mlLast = "";
+async function mastLiveData() {
+  if (state.homeX?.wxs) return state.homeX;
+  if (!mlData || Date.now() - mlAt > 10 * 60e3) { mlAt = Date.now(); try { const r = await fetch("/api/home", { cache: "no-cache" }); if (r.ok) mlData = await r.json(); } catch { /* the clock shows without it */ } }
+  return mlData || {};
+}
+function mastLiveSlides(x) {
+  const now = new Date(), Z = { timeZone: "Asia/Kolkata" };
+  const out = [
+    now.toLocaleDateString("bn-IN", { ...Z, weekday: "long", day: "numeric", month: "long" }),
+    now.toLocaleDateString("en-GB", { ...Z, weekday: "short", day: "numeric", month: "short" }).replace(",", "").toUpperCase()
+  ];
+  if (x.bangabda) out.push(ML_BN(x.bangabda));
+  for (const w of (x.wxs || []).slice(0, 6)) {
+    const i = ML_ICO[w.k] || "";
+    out.push(`${i} ${w.bn} ${ML_BN(w.t)}°`, `${i} ${w.en.toUpperCase()} ${w.t}°C`);
+  }
+  if (!x.wxs?.length && x.weather) out.push(`কলকাতা ${ML_BN(x.weather.temp)}°`, `KOLKATA ${x.weather.temp}°C`);
+  return out;
+}
+function mastLive() {
+  const host = document.getElementById("mastLive"); if (!host || host.dataset.on) return;
+  host.dataset.on = "1";
+  host.innerHTML = `<span class="ml-top"><i></i>LIVE<em>IST</em></span><span class="ml-clock"></span><span class="ml-line"><b></b></span>`;
+  const clock = host.querySelector(".ml-clock"), line = host.querySelector(".ml-line");
+  const tick = () => {
+    const t = new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }), txt = ML_BN(t);
+    if (clock.children.length !== txt.length) clock.innerHTML = [...txt].map(c => `<span class="${c === ":" ? "ml-col" : "ml-d"}">${c}</span>`).join("");
+    // (a digit that changes turns over like a flip clock)
+    [...txt].forEach((c, i) => { const el = clock.children[i]; if (el.textContent !== c) { el.textContent = c; el.classList.remove("flip"); void el.offsetWidth; el.classList.add("flip"); } });
+  };
+  const turn = async () => {
+    const slides = mastLiveSlides(await mastLiveData()); if (!slides.length) return;
+    const text = slides[mlI++ % slides.length]; if (text === mlLast) return; mlLast = text;
+    const b = document.createElement("b"); b.textContent = text; b.className = "in";
+    const old = line.querySelector("b"); if (old) { old.className = "out"; setTimeout(() => old.remove(), 450); }
+    line.append(b);
+  };
+  tick(); turn();
+  setInterval(() => { if (!document.hidden) tick(); }, 1000);
+  setInterval(() => { if (!document.hidden) turn(); }, 3500);
+}
+
 function phToday() {
   const host = $("#phToday"); if (!host) return;
   // One sleek line: the day, the Bengali date (without the year), Kolkata's weather and the time.
@@ -650,7 +699,7 @@ function phTvNow() {
   const next = (tv?.next || []).find(x => x.at > t);
   const nowTitle = fixed ? `<b data-no-tr>${esc(fixed.title)}</b>` : `<b>${SEG_WORDS[type] || "News and videos"}</b>`;
   const pct = fixed ? Math.max(0, Math.min(100, (t - fixed.at) / (fixed.dur * 10))) : 0;
-  host.innerHTML = `<div class="ph-tv-now"><span class="ph-tv-k">On now</span>${nowTitle}</div>${fixed ? `<div class="ph-tv-bar"><i style="width:${pct.toFixed(1)}%"></i></div>` : ""}
+  host.innerHTML = `<i class="ph-tv-bar"><i style="width:${fixed ? pct.toFixed(1) : 0}%"></i></i><div class="ph-tv-now"><span class="ph-tv-k">On now</span>${nowTitle}</div>
     ${next ? `<div class="ph-tv-next"><span>Next</span> <b data-no-tr>${digits(clock(new Date(next.at).toISOString()))} · ${esc(next.title)}</b></div>` : ""}`;
 }
 function phBreak() {
@@ -691,7 +740,7 @@ function phPromo() {
   const cards = [
     `<a class="hpr-card hpr-tv" href="${withLang("/watch")}"><img src="/brand/studio-wide.webp" alt="" loading="lazy"><span class="hpr-body"><span class="hpr-tag" data-no-tr><i></i>LIVE</span><b>Rashtrix TV, live round the clock</b><span>Bulletins, HEADLINES and the news as it happens</span><span class="hpr-go">Watch now →</span></span></a>`,
     `<a class="hpr-card hpr-shorts" href="${withLang("/watch?ch=v")}"><span class="hpr-phone" aria-hidden="true"><img src="/brand/logo-sm.webp" alt=""><i></i></span><span class="hpr-body"><span class="hpr-tag" data-no-tr><i></i>LIVE</span><b>Rashtrix Shorts, live</b><span>Short videos and the news on a vertical screen</span><span class="hpr-go">Watch Shorts →</span></span></a>`,
-    ...(fronts.length ? ["bn", "en", "hi"].filter(l => fronts.includes(l)).map(l => `<a class="hpr-card hpr-ep" href="${epHref(l, e)}"><img src="/og/epaper-${l}.jpg?v=${encodeURIComponent(`${e.day}${e.slot}2x`)}" alt="" loading="lazy"><span class="hpr-body"><span class="hpr-tag gold">E-paper</span><b>${tr(`${EP_LANG[l]} e-paper`)}</b><span>Today's paper, morning and evening</span><span class="hpr-go">Read today's paper →</span></span></a>`)
+    ...(fronts.length ? ["bn", "en", "hi"].filter(l => fronts.includes(l)).map(l => `<a class="hpr-card hpr-ep" href="${epHref(l, e)}"><img src="/og/epaper-${l}.jpg?v=${encodeURIComponent(`${e.day}${e.slot}2xf`)}" alt="" loading="lazy"><span class="hpr-body"><span class="hpr-tag gold">E-paper</span><b>${tr(`${EP_LANG[l]} e-paper`)}</b><span>Today's paper, morning and evening</span><span class="hpr-go">Read today's paper →</span></span></a>`)
       : [`<a class="hpr-card hpr-ep" href="${withLang("/epaper")}"><img src="/og/epaper.jpg" alt="" loading="lazy"><span class="hpr-body"><span class="hpr-tag gold">E-paper</span><b>Rashtrix e-papers</b><span>Bengali, English and Hindi, morning and evening</span><span class="hpr-go">Read today's paper →</span></span></a>`])
   ];
   const keep = host.querySelector(".hpr-track")?.scrollLeft || 0;
@@ -718,7 +767,7 @@ function phFronts() {
   if (!fronts.length) return;
   const slotName = e.slot === "morning" ? "Morning edition" : "Evening edition";
   host.innerHTML = `<div class="ph-sec-head"><h2 id="phFrontsT">Today's front pages</h2><a href="${withLang("/epaper")}">E-paper</a></div>
-    <div class="fp-row">${fronts.map(l => `<a class="fp-card" href="${epHref(l, e)}"><span class="fp-img"><img src="/og/epaper-${l}.jpg?v=${encodeURIComponent(`${e.day}${e.slot}2x`)}" alt="" loading="lazy"></span><span class="fp-meta"><b>${tr(EP_LANG[l])}</b><span><span>${slotName}</span> · <span data-no-tr>${esc(shortDate(e.day))}</span></span></span></a>`).join("")}</div>`;
+    <div class="fp-row">${fronts.map(l => `<a class="fp-card" href="${epHref(l, e)}"><span class="fp-img"><img src="/og/epaper-${l}.jpg?v=${encodeURIComponent(`${e.day}${e.slot}2xf`)}" alt="" loading="lazy"></span><span class="fp-meta"><b>${tr(EP_LANG[l])}</b><span><span>${slotName}</span> · <span data-no-tr>${esc(shortDate(e.day))}</span></span></span></a>`).join("")}</div>`;
 }
 async function phExtras() {
   try {
@@ -2738,6 +2787,7 @@ articlesReady = loadArticles();
 userReady = fetch("/api/auth/me").then(r => r.json()).then(async d => { state.user = d.user || null; if (state.user) await loadTopics(); ownerHint(); }).catch(() => {});
 ownerInit();
 renderShell();
+mastLive();
 startTranslator(document.body); // draws the interface in Bengali or Hindi
 trackVisit();
 watchScroll();
