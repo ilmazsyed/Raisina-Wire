@@ -54,6 +54,7 @@ export default defineConfig({
         epaper: resolve(import.meta.dirname, "epaper.html"),
         charter: resolve(import.meta.dirname, "charter.html"),
         headlines: resolve(import.meta.dirname, "headlines.html"),
+        liverundown: resolve(import.meta.dirname, "liverundown.html"),
         oapdesk: resolve(import.meta.dirname, "oapdesk.html"),
         avorec: resolve(import.meta.dirname, "avorec.html")
       }

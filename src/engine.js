@@ -942,6 +942,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const key = hhmmOf(at), per = H.secs || 10;
     return (H.items || []).filter(x => !x.when || x.when.includes(key)).slice(0, H.count || 12).map(x => ({ ...x, d: Math.max(per, x.secs ? x.secs + 1.5 : 0) }));
   }
+  const lrdSkip = k => (st.tv?.lrd?.skip || []).includes(k);
   const headsDur = list => Math.round((HEADS_STING + list.reduce((n, x) => n + x.d, 0) + 0.6) * 10) / 10;
   // AVO stories: how often this viewer (or this output) has seen each, kept on the device.
   // Each AVO story stays on screen exactly as long as its reading (plus a breath either side);
@@ -1107,6 +1108,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     for (const k of ["a", "b"]) {
       const at = half + SLOT_MIN[k] * 60e3;
       if (t < at || t >= at + 6 * 60e3 || q.segDone.includes(at)) continue;
+      if (lrdSkip(`s:${at}`)) { q.segDone = [...q.segDone.slice(-8), at]; continue; }
       q.segDone = [...q.segDone.slice(-8), at];
       const list = dp[k] || [], r = Math.floor(t / 1800e3) % Math.max(1, list.length);
       for (const name of [...list.slice(r), ...list.slice(0, r), ...SEG_FALLBACK]) { const b = segBuild(name); if (b) return b; }
@@ -1169,7 +1171,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       } else {
         // This quarter's segment; with nothing to show, the next on the daypart's list that has.
         const list = daypart(slot)?.c || [], first = list.indexOf(cName(slot));
-        let b = null; for (let k = 0; k < list.length && !b; k++) b = segBuild(list[(Math.max(0, first) + k) % list.length]);
+        let b = null; if (!lrdSkip(`c:${slot}`)) for (let k = 0; k < list.length && !b; k++) b = segBuild(list[(Math.max(0, first) + k) % list.length]);
         if (b) out.push({ type: "seg", name: b.name, head: b.head, items: b.items, dur: b.dur, sting: true });
       }
       return out;
@@ -1228,6 +1230,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       st.preWant = after ? { id: after.ytId, at: 0 } : null;
       return q.seg;
     }
+    // The Live Rundown's changes: a bulletin or HEADLINES skipped is let go.
+    if (lrdSkip(`h:${headsAt(t)}`) && !q.hDone.includes(headsAt(t))) q.hDone = [...q.hDone.slice(-8), headsAt(t)];
+    if (lrdSkip(`b:${slot}`) && !q.bDone.includes(slot)) { q.bDone = [...q.bDone.slice(-8), slot]; if (q.bNext === slot) q.bNext = null; }
     // HEADLINES at :58 and :28, when the item on air has ended; the bulletin follows it at once.
     const hAt = headsAt(t);
     if (headsOn() && !q.hDone.includes(hAt) && t - hAt < HEADS_WIN) {
@@ -1254,6 +1259,17 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       q.pending = (q.pending || []).filter(x => x.type !== "flash");
       st.preWant = null;
       return q.seg;
+    }
+    // An item the Live Rundown put in at a time: when the item on air ends (within ten minutes of
+    // its time), before the ads and the rest of the running order.
+    const add = (st.tv?.lrd?.adds || []).find(a => t >= a.at && t - a.at < 10 * 60e3 && !(q.addDone || []).includes(a.id));
+    if (add) {
+      q.addDone = [...(q.addDone || []).slice(-40), add.id];
+      if (q.item?.type === "upnext") q.resume = q.item.video;
+      const after = () => { const v = loop.slice(q.i).concat(loop.slice(0, q.i)).find(x => x.type === "video"); st.preWant = v ? { id: v.ytId, at: 0 } : null; };
+      if (add.kind === "avo") { const x = (st.tv?.avo || []).find(y => y.id === add.ref); if (x) { q.sinceAvo = 0; q.n++; q.item = { type: "avo", dur: avoTotal([x]), stories: [x] }; q.start = t; q.seg = { type: "avo", stories: [x], dur: avoTotal([x]), start: t, in: 0, sting: true, n: q.n }; after(); return q.seg; } }
+      if (add.kind === "seg") { const b = segBuild(add.ref); if (b) { q.n++; q.item = { type: "seg", dur: b.dur }; q.start = t; q.seg = { type: "seg", name: b.name, head: b.head, items: b.items, dur: b.dur, start: t, in: 0, sting: true, n: q.n }; after(); return q.seg; } }
+      if (add.kind === "video" && add.dur > 0) (q.pending ||= []).unshift({ type: "video", ytId: add.ref, title: add.title, line: add.title, dur: add.dur, in: 0 });
     }
     // A quarter whose bulletin could not start in time is let go.
     if ((st.tv?.bulletin || []).length && !q.bDone.includes(slot0) && t - slot0 >= 11 * 60e3) q.bDone = [...q.bDone.slice(-8), slot0];
@@ -1359,6 +1375,13 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     const s = st.tv; if (!s) return null;
     if (s.live) return { layout: "full", sources: [String(s.live.ytId).startsWith("fb:") ? { kind: "fb", url: String(s.live.ytId).slice(3) } : { kind: "yt", id: s.live.ytId }], label: s.live.title, key: `live:${s.live.ytId}` };
     const seg = continuitySeg(); if (!seg) return { layout: "graphic", graphic: { kind: "headlines" }, key: "c:none" };
+    // (each item autopilot puts on air goes in the as-run log, from the broadcast output; the AVO
+    //  stories are logged one by one as they come on)
+    if (output && seg.n !== st.asrunN && !["upnext", "ident", "avo"].includes(seg.type)) {
+      st.asrunN = seg.n;
+      const NAMES = st.tv?.segNames || {}, title = seg.type === "seg" ? NAMES[seg.name] || seg.name : seg.type === "heads" ? "HEADLINES" : seg.type === "bulletin" ? (bulletinMs(seg.slot || seg.start) === 120e3 ? "সংবাদ বুলেটিন" : "খবর সংক্ষেপে") : seg.title || seg.line || seg.type;
+      fetch("/api/tv/asrun", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ch: channel, key, type: seg.type === "seg" ? "segment" : seg.type, title, dur: Math.round(seg.dur || 0) }) }).catch(() => {});
+    }
     const transition = seg.sting ? { type: "stinger", ms: 1200 } : { type: "mix", ms: 500 };
     if (seg.type === "video") return { layout: "full", sources: [{ kind: "yt", id: seg.ytId, in: seg.in || 0, title: seg.line || seg.title }], label: seg.line || seg.title, startAt: seg.start, key: `c:${seg.ytId}:${seg.start}`, transition };
     // An ad: full screen, clean (no jacket over it).

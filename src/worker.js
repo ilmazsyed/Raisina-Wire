@@ -58,6 +58,7 @@ import { adPlayed, seedBrandFilm } from "./ads.js";
 import { epaperStep, handleNewsprint, readerEdition, epaperSettings } from "./epaper.js";
 import { handleCharter } from "./charter.js";
 import { handleHeads, prepareHeadVoices } from "./headlines.js";
+import { handleLrd, asrunPost } from "./liverundown.js";
 import { applyVoice, handleVoice } from "./voicelab.js";
 import { handleStudio } from "./studioapi.js";
 import { handleExtras, tvExtras } from "./extras.js";
@@ -1288,6 +1289,12 @@ async function api(request, env, ctx) {
     const outputOk = !!b.key && CHANNELS.includes(b.ch) && await checkKey(env, b.ch, String(b.key));
     return json(await adPlayed(env, b, outputOk).catch(() => ({ ok: false })), 200, { "cache-control": "no-store" });
   }
+  // An autopilot item the broadcast output put on air: the as-run log (src/liverundown.js).
+  if (url.pathname === "/api/tv/asrun" && request.method === "POST") {
+    const b = await request.json().catch(() => ({}));
+    const outputOk = !!b.key && CHANNELS.includes(b.ch) && await checkKey(env, b.ch, String(b.key));
+    return json(await asrunPost(env, b, outputOk), 200, { "cache-control": "no-store" });
+  }
   if (url.pathname === "/api/tv/avo/played" && request.method === "POST") {
     const b = await request.json().catch(() => ({}));
     const outputOk = !!b.key && CHANNELS.includes(b.ch) && await checkKey(env, b.ch, String(b.key));
@@ -1335,6 +1342,14 @@ async function api(request, env, ctx) {
   if (/^\/api\/(ws\/ctl|ctl|companion|admin\/(rundowns|templates|asrun|proof|clips|progs|ads|macros|companion|copy-image|inputs))(\/|$)/.test(url.pathname)) {
     const out = await handleControlRoom(request, env, url, { json, err, currentUser, isStaff, auditFn: (u, ...a) => audit(env, u, ...a) });
     if (out) return out;
+  }
+  // ---- The Live Rundown (src/liverundown.js): the day's 48 half-hours, the desk's changes, as-run.
+  if (url.pathname === "/api/admin/lrd" || url.pathname === "/api/admin/lrd/report") {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const res = await handleLrd(request, env, url, user, { json, err, audit: (...a) => audit(env, user, ...a), settingsOf: ch => tvSettings(env, ch) });
+    if (request.method === "PUT") clearTvCache();
+    return res;
   }
   // ---- The Headlines desk (src/headlines.js): HEADLINES at :58 and :28.
   if (url.pathname === "/api/admin/heads") {
