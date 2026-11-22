@@ -46,6 +46,7 @@ import m0044 from "../migrations/0044_avo_extra.sql";
 import m0045 from "../migrations/0045_source_desk.sql";
 import m0046 from "../migrations/0046_library.sql";
 import m0047 from "../migrations/0047_explainers.sql";
+import m0048 from "../migrations/0048_epaper_langs.sql";
 import { handleExplainers, explainerForScreens } from "./explainer.js";
 import { libraryData, libraryPurge, libraryAvoKeep } from "./library.js";
 import m0037 from "../migrations/0037_hidden_langs.sql";
@@ -124,7 +125,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031], ["0032_avo.sql", m0032], ["0033_avo_manual.sql", m0033], ["0034_avo_pictures.sql", m0034], ["0035_tv_evergreen.sql", m0035], ["0036_avo_updates.sql", m0036], ["0037_hidden_langs.sql", m0037], ["0038_photo_checks.sql", m0038], ["0039_rundown_pcr.sql", m0039], ["0040_avo_bytes.sql", m0040], ["0041_programmes.sql", m0041], ["0042_ads.sql", m0042], ["0043_epaper.sql", m0043], ["0044_avo_extra.sql", m0044], ["0045_source_desk.sql", m0045], ["0046_library.sql", m0046], ["0047_explainers.sql", m0047]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031], ["0032_avo.sql", m0032], ["0033_avo_manual.sql", m0033], ["0034_avo_pictures.sql", m0034], ["0035_tv_evergreen.sql", m0035], ["0036_avo_updates.sql", m0036], ["0037_hidden_langs.sql", m0037], ["0038_photo_checks.sql", m0038], ["0039_rundown_pcr.sql", m0039], ["0040_avo_bytes.sql", m0040], ["0041_programmes.sql", m0041], ["0042_ads.sql", m0042], ["0043_epaper.sql", m0043], ["0044_avo_extra.sql", m0044], ["0045_source_desk.sql", m0045], ["0046_library.sql", m0046], ["0047_explainers.sql", m0047], ["0048_epaper_langs.sql", m0048]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -1316,7 +1317,7 @@ async function api(request, env, ctx) {
     const [hs, ex, log, pop, ed, wx, brief] = await Promise.all([
       tvSettings(env, "h").catch(() => null), tvExtras(env).catch(() => null), deskSettings(env, "tv:breaklog", []),
       env.DB.prepare("SELECT v.slug, SUM(v.views) AS n FROM story_views v JOIN articles a ON a.slug=v.slug AND a.status='published' WHERE v.day>=? GROUP BY v.slug ORDER BY n DESC LIMIT 5").bind(since(1)).all().then(r => r.results).catch(() => []),
-      env.DB.prepare("SELECT id, day, slot, pages FROM epaper_editions WHERE status='published' ORDER BY published_at DESC LIMIT 1").first().catch(() => null),
+      env.DB.prepare("SELECT id, day, slot, pages, updated_at FROM epaper_editions WHERE status='published' ORDER BY published_at DESC LIMIT 1").first().catch(() => null),
       kolkataWeather(env).catch(() => null), weatherBrief(env).catch(() => null)
     ]);
     // (the header's live counter: Kolkata first, then the rest of Bengal and the big cities)
@@ -1328,7 +1329,7 @@ async function api(request, env, ctx) {
     let pages = 0; try { pages = JSON.parse(ed?.pages || "[]").length; } catch { /* none */ }
     return json({ breaking, bangabda: ex?.bangabda || "", weather: wx && wx.temp != null ? { temp: wx.temp, text: wx.text } : null, wxs,
       poll: (ex?.polls || []).find(q => q.status === "open") || null, popular: (pop || []).map(r => r.slug), tv,
-      epaper: ed ? { day: ed.day, slot: ed.slot, pages, fronts: (await env.DB.prepare("SELECT slug FROM og_cards WHERE slug IN ('__epf_bn','__epf_en','__epf_hi') AND title IN (?,?,?)").bind(`${ed.id}@2x`, `${ed.id}@2xf`, `${ed.id}@2xm`).all().catch(() => ({ results: [] }))).results.map(r => r.slug.slice(6)) } : null }, 200, { "cache-control": "public, max-age=30" });
+      epaper: ed ? { day: ed.day, slot: ed.slot, pages, ...await (async () => { const fr = (await env.DB.prepare("SELECT slug, title FROM og_cards WHERE slug IN ('__epf_bn','__epf_en','__epf_hi') AND title LIKE ?").bind(`${ed.id}@2x%`).all().catch(() => ({ results: [] }))).results; return { fronts: fr.map(r => r.slug.slice(6)), fv: Object.fromEntries(fr.map(r => [r.slug.slice(6), r.title.slice(ed.id.length + 1)])) }; })() } : null }, 200, { "cache-control": "public, max-age=30" });
   }
   if (url.pathname === "/api/tv/videos" && request.method === "GET") {
     const { results } = await env.DB.prepare(`SELECT i.channel, i.yt_id AS id, i.title, i.thumb, i.duration, i.published_at AS publishedAt FROM tv_items i JOIN tv_sources s ON s.id=i.source_id

@@ -49,6 +49,25 @@ function media(m, h, { lead = false } = {}) {
   if (m.kind === "yt") return `<div class="ph" ${st}><i style="background-image:url('${yt(m.id)}')"></i><b class="gleam"></b><span class="play">▶</span>${lead ? `<span class="lv">▶ ${W.moving}</span>` : ""}</div>`;
   return `<div class="ph" ${st}><i style="background-image:url('${esc(m.url)}')"></i><b class="gleam"></b></div>`;
 }
+// Every picture on a page, fetched before it is shown (the share card waits for them, and tries
+// again); one that cannot be had, and a film in a still picture, leave the paper's own plate in
+// their place, never a black hole.
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const loadPic = u => new Promise(res => { const im = new Image(); im.onload = () => (im.decode ? im.decode() : Promise.resolve()).then(() => res(im.naturalWidth > 1), () => res(im.naturalWidth > 1)); im.onerror = () => res(false); im.src = u; });
+async function pictures(root, still = false) {
+  const els = [...root.querySelectorAll(".ph > i, .eph > i")];
+  const one = async i => {
+    const u = (i.style.backgroundImage.match(/url\(["']?(.*?)["']?\)/) || [])[1]; if (!u) return;
+    for (let k = 0; k < (still ? 3 : 1); k++) {
+      const v = k ? `${u}${u.includes("?") ? "&" : "?"}r=${k}` : u;
+      if (await loadPic(v)) { if (k) i.style.backgroundImage = `url('${v}')`; return; }
+      await sleep(900 * (k + 1));
+    }
+    i.parentElement.classList.add("nopic");
+  };
+  await Promise.race([Promise.all(els.map(one)), sleep(still ? 22000 : 30000)]);
+  if (still) root.querySelectorAll(".ph > video, .eph > video").forEach(v => v.parentElement.classList.add("nopic"));
+}
 const pic = x => (x?.media || []).find(m => m.kind === "video") || (x?.media || [])[0] || null;
 const byline = (x, def = false) => x.byline ? `<p class="by">${esc(x.byline)}</p>` : def ? `<p class="by">${CORR} <span>· ${W.city}</span></p>` : "";
 const desk = x => esc((DESKS[x.desk] || [])[LI] || x.desk || "");
@@ -372,7 +391,8 @@ async function start() {
   for (const pg of pages) { stage.appendChild(pg); try { pg._fill(); } catch (e) { console.error(e); } fitMast(pg); prepareInk(pg); }
   pages.forEach(p => p.remove()); stage.remove();
   // The share card's view (src/ogcard.js): the front page alone, at full size, finished.
-  if (q.has("card")) { app.innerHTML = ""; document.body.classList.add("ep-card"); app.appendChild(pages[0]); window.__epReady = true; return; }
+  if (q.has("card")) { app.innerHTML = ""; document.body.classList.add("ep-card"); app.appendChild(pages[0]); await pictures(pages[0], true); window.__epReady = true; return; }
+  pages.forEach(pg => pictures(pg));
   const want = Math.max(0, Math.min(pages.length - 1, (+q.get("p") || 1) - 1));
   if (want === 0 && !q.has("p")) { $(".ep-sheet").appendChild(folded(pages[0])); cur = 0; $("#epPg").textContent = `${W.page} ${D(1)} / ${D(pages.length)}`; }
   else show(want);
