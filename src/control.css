@@ -209,7 +209,7 @@ dialog::backdrop { background: #000a; }
   .cr-head { flex-wrap: nowrap; gap: 10px; padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top)); }
   .cr-brand img { height: 30px; }
   .cr-head h1 { font-size: 15px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cr-nav, .cr-head > .ui-lang { display: none; }
+  .cr-navw, .cr-nav, .cr-head > .ui-lang { display: none; }
   .cr-clock { font-size: 13px; margin-left: auto; }
   body { font-size: 15px; }
   input, select, textarea { font-size: 16px !important; min-height: 44px; padding: 8px 10px; }
@@ -524,8 +524,11 @@ body.rec-on>header,body.rec-on>main,body.rec-on>nav,body.rec-on .cr-top{visibili
    not fit), the clock and the language. */
 .cr-head{flex-wrap:nowrap}
 .cr-head h1{white-space:nowrap;flex:none}
-.cr-nav{flex:1 1 auto;min-width:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);padding-right:24px}
-.cr-nav::-webkit-scrollbar{display:none}
+.cr-navw{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:4px}
+.cr-nav{flex:1 1 auto;min-width:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent;padding-bottom:3px}
+.cr-nav::-webkit-scrollbar{height:4px}.cr-nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:2px}
+.cr-nb{flex:none;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:var(--panel2,#1a1f2b);color:var(--ink);font-size:18px;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0}
+.cr-nb[hidden]{display:none}.cr-nb:hover{border-color:var(--gold,#D4A017)}
 .cr-nav a{white-space:nowrap;flex:none}
 .cr-head .spacer{display:none}
 .cr-head .cr-clock,.cr-head>.ui-lang{flex:none;white-space:nowrap}

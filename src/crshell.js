@@ -33,12 +33,25 @@ export async function shell(title, { staff = true } = {}) {
   const head = document.createElement("header");
   head.className = "cr-head";
   head.innerHTML = `<a class="cr-brand cx-brand" href="/admin.html" aria-label="Control room · Calibrex"><img src="/partners/calibrex-mark.svg" alt="" width="26" height="26"><span class="cx-word">CALIBRE<span>X</span></span></a><h1>${esc(title)}</h1>
-    <nav class="cr-nav">${PAGES.map(([h, n]) => `<a href="${h}"${location.pathname === h ? ' aria-current="page"' : ""}>${n}</a>`).join("")}</nav>
+    <div class="cr-navw"><button class="cr-nb l" type="button" aria-label="Earlier desks" hidden>‹</button><nav class="cr-nav">${PAGES.map(([h, n]) => `<a href="${h}"${location.pathname.replace(/\.html$/, "") === h.replace(/\.html$/, "") ? ' aria-current="page"' : ""}>${n}</a>`).join("")}</nav><button class="cr-nb r" type="button" aria-label="More desks" hidden>›</button></div>
     <span class="spacer"></span><span class="cr-clock" data-no-tr></span>`;
   head.append(langSwitch());
   document.body.prepend(head);
   // (the desk open now, in view in the line of desks)
-  { const cur = head.querySelector(".cr-nav a[aria-current]"), nav = head.querySelector(".cr-nav"); if (cur && nav) nav.scrollLeft = cur.offsetLeft - nav.clientWidth / 2 + cur.offsetWidth / 2; }
+  // The line of desks scrolls sideways: the mouse wheel, the arrows at its ends (shown when there
+  // is more that way), a drag of the thin scrollbar, or a swipe.
+  {
+    const nav = head.querySelector(".cr-nav"), cur = nav?.querySelector("a[aria-current]"), [bl, br] = head.querySelectorAll(".cr-nb");
+    const arrows = () => { bl.hidden = nav.scrollLeft < 4; br.hidden = nav.scrollLeft + nav.clientWidth > nav.scrollWidth - 4; };
+    if (nav) {
+      if (cur) nav.scrollLeft = cur.offsetLeft - nav.clientWidth / 2 + cur.offsetWidth / 2;
+      nav.addEventListener("wheel", e => { if (nav.scrollWidth <= nav.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; e.preventDefault(); nav.scrollLeft += e.deltaY; }, { passive: false });
+      nav.addEventListener("scroll", arrows, { passive: true });
+      bl.onclick = () => nav.scrollBy({ left: -nav.clientWidth * 0.7, behavior: "smooth" });
+      br.onclick = () => nav.scrollBy({ left: nav.clientWidth * 0.7, behavior: "smooth" });
+      new ResizeObserver(arrows).observe(nav); arrows();
+    }
+  }
   const clock = $(".cr-clock", head);
   const tick = () => { clock.textContent = `${digits(istClock())} IST`; };
   tick(); setInterval(tick, 1000);
