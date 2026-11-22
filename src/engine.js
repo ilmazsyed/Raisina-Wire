@@ -860,7 +860,18 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         v.preload = "auto"; v.src = src.url;
         const at0 = (src.in || 0) + offset;
         if (at0 > 0.5) v.addEventListener("loadedmetadata", () => { try { v.currentTime = at0; } catch { /* none */ } }, { once: true });
-        const go = () => { const pr = v.play(); if (pr?.catch) pr.catch(() => { v.muted = true; v.play().catch(() => {}); }); };
+        // Sound refused (an iPhone without the viewer's tap): the clip plays on muted and the sound
+        // button shows, so the viewer's tap brings the sound back. Refused even muted (an iPhone in
+        // Low Power Mode): a "tap to play" button over the picture, and the viewer's tap starts it.
+        const tapToPlay = () => {
+          if (!isMain || output || el.querySelector(".tvs-tap")) return;
+          el.classList.add("tap-play"); el.dataset.tapAt = String(Date.now());
+          const b = document.createElement("button"); b.type = "button"; b.className = "tvs-hint tvs-tap"; b.textContent = "▶ ভিডিও চালাতে ট্যাপ করুন";
+          b.addEventListener("click", () => { v.muted = !!st.muted; v.play().then(() => { b.remove(); el.classList.remove("tap-play"); if (!st.muted) { st.ytMuted = false; if (soundBtn) soundBtn.hidden = true; } }).catch(() => { v.muted = true; v.play().then(() => b.remove()).catch(() => {}); }); });
+          el.append(b);
+        };
+        const go = () => { const pr = v.play(); if (pr?.catch) pr.catch(() => { if (!v.muted && isMain && !output) soundOff(); v.muted = true; v.play().then(() => el.querySelector(".tvs-tap")?.remove()).catch(tapToPlay); }); };
+        v.addEventListener("playing", () => { el.querySelector(".tvs-tap")?.remove(); el.classList.remove("tap-play"); });
         v.addEventListener("error", () => { clipErr = true; });
         go();
         // (every half second: a clip that is not moving is started again, muted from the second try)
@@ -869,7 +880,9 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           if (!el.isConnected || !st.alive) { clearInterval(clipWd); return; }
           if (v.ended || Date.now() < (st.breakUntil || 0) || document.hidden) return;
           if (v.currentTime > lastT + 0.01) { lastT = v.currentTime; clipMoved = Date.now(); tries = 0; return; }
-          if (Date.now() - Math.max(clipMoved, clipT0, st.backAt || 0) > 1500 + tries * 1500 && tries < 4) { tries++; if (tries >= 2) v.muted = true; if (tries === 3) { try { v.load(); } catch { /* none */ } } go(); }
+          // (waiting for the viewer's tap: up to fifteen seconds, then the channel moves on)
+          if (el.querySelector(".tvs-tap")) { if (Date.now() - (+el.dataset.tapAt || 0) < 15000) clipT0 = Date.now(); return; }
+          if (Date.now() - Math.max(clipMoved, clipT0, st.backAt || 0) > 1500 + tries * 1500 && tries < 4) { tries++; if (tries >= 2 && !v.muted) { v.muted = true; if (isMain && !output) soundOff(); } if (tries === 3) { try { v.load(); } catch { /* none */ } } go(); }
         }, 500);
       }
       if (src.kind === "hls") playHls(v, src.url, st.ctl?.delay || 0).then(x => { extra = x; v.play().catch(() => {}); }).catch(() => {});

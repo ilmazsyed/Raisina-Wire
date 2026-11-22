@@ -571,12 +571,12 @@ function viewHomePhone() {
       <div class="ph-tv-acts"><a class="ph-btn red" href="${withLang("/watch")}">${ICON_PLAY}<span>Watch with sound</span></a><a class="ph-btn ghost" href="${withLang("/watch?ch=v")}"><span>Shorts live</span></a></div>
     </div></section>
     ${desks.length ? `<section class="ph-bubbles" aria-label="Desks" id="phBubbles"></section>` : ""}
-    <section class="ph-shorts" id="phShorts" aria-label="Shorts" hidden></section>
-    ${top.length ? `<section class="ph-top" aria-label="Top stories">${top.map(e => `<a class="ph-row" href="${edHref(e)}"><span class="ph-row-body"><span class="ph-kick" style="color:${DESK_TONE[e.category] || "var(--red)"}">${newTag(e)}${esc(e.category)}</span><b class="ph-h">${esc(e.title)}</b><span class="ph-meta">${ago(e.publishedAt)}</span></span>${e.image ? `<span class="ph-thumb">${img(e.image)}</span>` : ""}</a>`).join("")}</section>` : ""}
-    <section class="ph-promo" id="phPromo" aria-roledescription="carousel" aria-label="Rashtrix"></section>
     ${glance.length ? `<section class="ph-glance" aria-labelledby="phGlanceT"><div class="ph-glance-head"><h2 id="phGlanceT">At a glance</h2><span>Today's news in thirty seconds</span></div>
       <ol>${glance.map((e, i) => `<li><span class="ph-num" data-no-tr>${digits(i + 1)}</span><a href="${edHref(e)}">${esc(e.title)}</a></li>`).join("")}</ol></section>` : ""}
     <section class="ph-fronts" id="phFronts" aria-labelledby="phFrontsT" hidden></section>
+    <section class="ph-shorts" id="phShorts" aria-label="Shorts" hidden></section>
+    ${top.length ? `<section class="ph-top" aria-label="Top stories">${top.map(e => `<a class="ph-row" href="${edHref(e)}"><span class="ph-row-body"><span class="ph-kick" style="color:${DESK_TONE[e.category] || "var(--red)"}">${newTag(e)}${esc(e.category)}</span><b class="ph-h">${esc(e.title)}</b><span class="ph-meta">${ago(e.publishedAt)}</span></span>${e.image ? `<span class="ph-thumb">${img(e.image)}</span>` : ""}</a>`).join("")}</section>` : ""}
+    <section class="ph-promo" id="phPromo" aria-roledescription="carousel" aria-label="Rashtrix"></section>
     <section class="ph-live-list" id="phLive" aria-label="Live updates" hidden></section>
     ${desks.map(d => phDesk(d, used)).join("")}
     <section class="ph-popular" id="phPopular" aria-labelledby="phPopT" hidden></section>

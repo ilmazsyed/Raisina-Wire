@@ -17,7 +17,8 @@ export async function serveClip(request, env, ctx) {
   const u = new URL(request.url), key = decodeURIComponent(u.pathname.slice(1));   // "clips/…"
   if (!/^clips\/[\w./-]+$/.test(key) || key.includes("..")) return new Response("Not found", { status: 404 });
   const range = request.headers.get("range");
-  const cache = typeof caches !== "undefined" ? caches.default : null, ck = new Request(`${u.origin}/${key}`);
+  // (v2: the cached copy carries only whole-file headers; the first copies could carry a range's)
+  const cache = typeof caches !== "undefined" ? caches.default : null, ck = new Request(`${u.origin}/${key}?c=2`);
   if (cache && request.method === "GET") {
     const hit = await cache.match(range ? new Request(ck, { headers: { range } }) : ck).catch(() => null);
     if (hit) return hit;
@@ -30,7 +31,7 @@ export async function serveClip(request, env, ctx) {
     caching.add(key);
     ctx.waitUntil((async () => {
       const full = await env.CLIPS.get(key); if (!full) return;
-      const hh = new Headers(h); hh.set("content-length", String(full.size)); hh.set("cache-control", "public, max-age=2592000, immutable");
+      const hh = new Headers(h); hh.delete("content-range"); hh.set("content-length", String(full.size)); hh.set("cache-control", "public, max-age=2592000, immutable");
       await cache.put(ck, new Response(full.body, { headers: hh }));
     })().catch(() => {}).finally(() => setTimeout(() => caching.delete(key), 60e3)));
   }
