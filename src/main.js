@@ -670,7 +670,7 @@ function mastLive() {
   const turn = async () => {
     const slides = mastLiveSlides(await mastLiveData()); if (!slides.length) return;
     const text = slides[mlI++ % slides.length]; if (text === mlLast) return; mlLast = text;
-    const b = document.createElement("b"); b.textContent = text; b.className = "in";
+    const b = document.createElement("b"); b.textContent = text; b.className = "in"; b.style.color = /°/.test(text) ? "#c8100f" : "#111";
     const old = line.querySelector("b"); if (old) { old.className = "out"; setTimeout(() => old.remove(), 450); }
     line.append(b);
   };

@@ -212,8 +212,13 @@ async function recordLine(i) {
   $("#rGo", d).onclick = async e => {
     const b = e.currentTarget;
     if (!rec) { const type = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm"].find(t => MediaRecorder.isTypeSupported?.(t)) || ""; rec = new MediaRecorder(stream, type ? { mimeType: type } : {}); chunks = []; rec.ondataavailable = ev => chunks.push(ev.data); rec.start(); t0 = Date.now(); b.textContent = "■ Stop and keep"; return; }
-    const secs = (Date.now() - t0) / 1000; await new Promise(r => { rec.onstop = r; rec.stop(); });
-    const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" }); b.disabled = true; b.textContent = "Saving…";
+    // (the last word is kept: the recorder runs on for a moment after Stop and hands over everything it holds,
+    //  and the line's length is the recording's own, read from the audio, not the time between the clicks)
+    b.disabled = true; b.textContent = "Finishing…"; await new Promise(r => setTimeout(r, 700));
+    const clicked = (Date.now() - t0) / 1000; await new Promise(r => { rec.onstop = r; rec.requestData?.(); rec.stop(); });
+    const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" }); b.textContent = "Saving…";
+    let secs = clicked; try { secs = (await ac.decodeAudioData(await blob.arrayBuffer())).duration || clicked; } catch { /* the clicks' time */ }
+    if (!(secs > 0.3) || !Number.isFinite(secs)) secs = clicked;
     try { const r = await fetch(`/api/admin/explainers/${x.id}/rec/${i}`, { method: "POST", headers: { "content-type": blob.type, "x-secs": String(Math.round(secs * 100) / 100) }, body: blob }); const out = await r.json(); if (!r.ok) throw new Error(out.error || "Saving failed.");
       s.voice = out.voice; toast(`Line ${i + 1} recorded.`); close(); await open(x.id); } catch (err) { fail(err); b.disabled = false; b.textContent = "■ Stop and keep"; }
   };
