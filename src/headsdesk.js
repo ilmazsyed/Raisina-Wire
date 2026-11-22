@@ -8,6 +8,7 @@ import { lightenVideo } from "./lightclip.js";
 import { shell, api, toast, fail, esc, $, $$ } from "./crshell.js";
 import { mountTV } from "./engine.js";
 import { digits } from "./i18n.js";
+import { libraryPicker } from "./libpick.js";
 
 const S = { d: null, items: [], edits: {}, hidden: [], set: null, dirty: false, pv: null, open: null, order: [], lock: false, brk: [], secsOf: {}, runs: {}, run: "", drag: "" };
 const pad = n => String(n).padStart(2, "0");
@@ -81,7 +82,7 @@ const mediaRow = (k, x) => `<div class="hd-media">
   ${x.image ? `<img src="${esc(x.image)}" alt="">` : ""}${x.video ? `<video src="${esc(x.video)}" muted playsinline></video>` : ""}
   <label class="btn sm">Picture<input type="file" accept="image/*" data-up-img="${k}" hidden></label>
   <label class="btn sm">Video<input type="file" accept="video/mp4,video/quicktime,video/webm" data-up-vid="${k}" hidden></label>
-  <button class="btn sm" type="button" data-link="${k}">Link</button>
+  <button class="btn sm" type="button" data-link="${k}">Link</button><button class="btn sm" type="button" data-lib="${k}">Library</button>
   ${x.image || x.video ? `<button class="btn sm red" type="button" data-unmedia="${k}">Remove media</button>` : ""}</div>`;
 
 function draw() {
@@ -214,6 +215,7 @@ function wire() {
   $$("[data-ahide]").forEach(b => b.onclick = () => { const id = b.dataset.ahide; S.hidden = S.hidden.includes(id) ? S.hidden.filter(x => x !== id) : [...S.hidden, id]; mark(); draw(); });
   $$("[data-up-img]").forEach(f => f.onchange = async () => { const file = f.files[0]; if (!file) return; try { toast("Uploading the picture…"); const x = target(f.dataset.upImg); x.image = await uploadImage(file); x.video = ""; x.noimg = false; mark(); draw(); } catch (e) { fail(e); } });
   $$("[data-up-vid]").forEach(f => f.onchange = async () => { const file = f.files[0]; if (!file) return; try { toast("Uploading the video…"); const x = target(f.dataset.upVid); x.video = await uploadVideo(file, $(".hd-bar")); mark(); draw(); toast("Video uploaded."); } catch (e) { fail(e); } });
+  $$("[data-lib]").forEach(b => b.onclick = () => libraryPicker({ title: "A video behind the headline", note: "Video files play muted behind the headline.", types: ["clip"], onPick: x => { const t = target(b.dataset.lib); t.video = x.url; mark(); draw(); } }));
   $$("[data-link]").forEach(b => b.onclick = () => {
     const v = prompt("Paste a picture link (https://…jpg, png or webp) or a video file link (https://…mp4). Videos play muted, behind the headline.");
     if (!v) return; const u = v.trim(); if (!/^https:\/\//.test(u)) return toast("The link must start with https://", true);

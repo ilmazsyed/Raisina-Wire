@@ -44,6 +44,8 @@ import m0042 from "../migrations/0042_ads.sql";
 import m0043 from "../migrations/0043_epaper.sql";
 import m0044 from "../migrations/0044_avo_extra.sql";
 import m0045 from "../migrations/0045_source_desk.sql";
+import m0046 from "../migrations/0046_library.sql";
+import { libraryData, libraryPurge, libraryAvoKeep } from "./library.js";
 import m0037 from "../migrations/0037_hidden_langs.sql";
 import m0038 from "../migrations/0038_photo_checks.sql";
 import { bulletinImages, bulletinImageRoute } from "./bulletinimg.js";
@@ -120,7 +122,7 @@ function getCookie(request, name) {
 }
 // Apply pending migrations/ on first database use, so a new D1 database needs no manual setup.
 // Uses wrangler's own d1_migrations table, so `wrangler d1 migrations apply` sees them as applied.
-const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031], ["0032_avo.sql", m0032], ["0033_avo_manual.sql", m0033], ["0034_avo_pictures.sql", m0034], ["0035_tv_evergreen.sql", m0035], ["0036_avo_updates.sql", m0036], ["0037_hidden_langs.sql", m0037], ["0038_photo_checks.sql", m0038], ["0039_rundown_pcr.sql", m0039], ["0040_avo_bytes.sql", m0040], ["0041_programmes.sql", m0041], ["0042_ads.sql", m0042], ["0043_epaper.sql", m0043], ["0044_avo_extra.sql", m0044], ["0045_source_desk.sql", m0045]];
+const MIGRATIONS = [["0001_init.sql", m0001], ["0002_platform_modules.sql", m0002], ["0003_editorial_console.sql", m0003], ["0004_app_completion.sql", m0004], ["0005_editions_media_writers.sql", m0005], ["0006_tags_views_alerts.sql", m0006], ["0007_tts_audio.sql", m0007], ["0008_community_votes.sql", m0008], ["0009_translations.sql", m0009], ["0010_community_language.sql", m0010], ["0011_machine_translation.sql", m0011], ["0012_live_images.sql", m0012], ["0013_live_results.sql", m0013], ["0014_audience.sql", m0014], ["0015_guest_writers.sql", m0015], ["0016_media_full.sql", m0016], ["0017_article_video.sql", m0017], ["0020_oauth.sql", m0020], ["0021_rashtrix.sql", m0021], ["0022_tv.sql", m0022], ["0023_studio.sql", m0023], ["0024_tv_channels.sql", m0024], ["0025_tv_likes.sql", m0025], ["0026_tv_headline.sql", m0026], ["0027_og_cards.sql", m0027], ["0028_tv_vertical.sql", m0028], ["0029_bulletin_images.sql", m0029], ["0030_tv_keep.sql", m0030], ["0031_tv_cutins.sql", m0031], ["0032_avo.sql", m0032], ["0033_avo_manual.sql", m0033], ["0034_avo_pictures.sql", m0034], ["0035_tv_evergreen.sql", m0035], ["0036_avo_updates.sql", m0036], ["0037_hidden_langs.sql", m0037], ["0038_photo_checks.sql", m0038], ["0039_rundown_pcr.sql", m0039], ["0040_avo_bytes.sql", m0040], ["0041_programmes.sql", m0041], ["0042_ads.sql", m0042], ["0043_epaper.sql", m0043], ["0044_avo_extra.sql", m0044], ["0045_source_desk.sql", m0045], ["0046_library.sql", m0046]];
 let schemaReady = null;
 function sqlStatements(sql) {
   return sql.replace(/--[^\n]*/g, "").split(";").map(x => x.trim()).filter(Boolean);
@@ -1414,6 +1416,21 @@ async function api(request, env, ctx) {
     if (!ed) return json({ edition: null }, 404, { "cache-control": "no-store" });
     return json({ edition: ed }, 200, { "cache-control": lang === "bn" ? "public, max-age=60" : "private, max-age=60" });
   }
+  // ---- The Content Library desk (src/library.js): the last 36 hours of everything the channels can air
+  if (url.pathname.startsWith("/api/admin/library")) {
+    const user = await currentUser(request, env);
+    if (!isStaff(user)) return err("Editor access required.", 403);
+    const parts = url.pathname.split("/").slice(4).map(decodeURIComponent);
+    try {
+      if (!parts.length && request.method === "GET") return json(await libraryData(env), 200, { "cache-control": "no-store" });
+      if (parts[0] === "avo" && parts[1] && request.method === "PUT") {
+        const b = await request.json().catch(() => ({}));
+        await libraryAvoKeep(env, parts[1], !!b.keep); await audit(env, user, b.keep ? "library.keep" : "library.unkeep", "avo", parts[1], {}); clearTvCache();
+        return json({ ok: true });
+      }
+      return err("Not found.", 404);
+    } catch (e) { return err(e.message); }
+  }
   if (url.pathname.startsWith("/api/admin/tv")) {
     const user = await currentUser(request, env);
     if (!isStaff(user)) return err("Editor access required.", 403);
@@ -1580,7 +1597,7 @@ async function api(request, env, ctx) {
           if (b.onAir) await env.DB.prepare("UPDATE tv_sources SET on_air=0 WHERE channel=?").bind(src.channel).run();
           // Straight to air: read the live's state now rather than at the next ten-minute refresh.
           if (b.onAir && src.kind === "live" && ytReady(env) && !String(src.yt_id).startsWith("fb:")) await refreshSource(env, src).catch(() => {});
-          await env.DB.prepare("UPDATE tv_sources SET active=?, on_air=?, title=? WHERE id=?").bind(b.active === undefined ? src.active : b.active ? 1 : 0, b.onAir === undefined ? src.on_air : b.onAir ? 1 : 0, b.title !== undefined ? clean(b.title, 200) : src.title, second).run();
+          await env.DB.prepare("UPDATE tv_sources SET active=?, on_air=?, title=?, keep_all=? WHERE id=?").bind(b.active === undefined ? src.active : b.active ? 1 : 0, b.onAir === undefined ? src.on_air : b.onAir ? 1 : 0, b.title !== undefined ? clean(b.title, 200) : src.title, b.keepAll === undefined ? src.keep_all || 0 : b.keepAll ? 1 : 0, second).run();
           await audit(env, user, b.onAir !== undefined ? (b.onAir ? "tv.live.on" : "tv.live.off") : "tv.source.edit", "tv_source", second, b);
           return done();
         }
@@ -2010,6 +2027,7 @@ async function scheduled(env) {
   await step("subject desks", () => refileSubjects(env));
   await step("Kolkata desk", () => refileKolkata(env));
   await step("Probashi desk", () => refileProbashi(env));
+  await step("content library", () => libraryPurge(env));
   await step("wix feed", () => syncWixFeed(env));
   await step("wix backfill", () => backfillWix(env));
   // Rashtrix TV: refresh YouTube sources (each at most every ten minutes).

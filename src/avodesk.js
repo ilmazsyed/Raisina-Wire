@@ -9,6 +9,9 @@ import { shell, api, toast, fail, esc, $, $$, fmt, istDay } from "./crshell.js";
 import { mountTV } from "./engine.js";
 import { digits } from "./i18n.js";
 import { lightenVideo } from "./lightclip.js";
+import { libraryPicker } from "./libpick.js";
+// A clip or a YouTube video from the Content Library (its 36 hours, and what is kept).
+const pickLib = use => libraryPicker({ title: "Pick from the Content Library", types: ["clip", "video"], onPick: x => { use({ url: x.url, duration: x.dur || 0 }); toast("Added. Save the story to put it on air."); } });
 
 const S = { list: [], quota: {}, today: {}, daily: 45, edit: null, images: [], rundowns: [], filter: (() => { try { return localStorage.getItem("avoFilter") || "all"; } catch { return "all"; } })(), send: [], sendQ: "", videos: [], bytes: [], byteMode: "avo", byteCount: 1, phone: null, order: ["story", "bytes", "phone"], full: null, scene: "", bg: "", len: 0 };
 const secsOf = v => { const p = String(v || "").trim().split(":").map(Number); if (p.some(isNaN)) return 0; return p.reduce((a, x) => a * 60 + x, 0); };
@@ -155,7 +158,7 @@ function drawForm() {
       <label style="flex-direction:row;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="fMore" ${e ? (e.findMore ? "checked" : "") : "checked"}> Find more pictures automatically when there are fewer than four</label></div>
     <div class="ad-vids"><b>Videos</b> <small class="muted">(upload one, use one already uploaded, or paste a link; shown like the pictures, muted, and only when added)</small>
       ${S.videos.map((v, i) => `<div class="row ad-vrow"><span class="tag">${/youtu/.test(v) ? "YOUTUBE" : /^\/clips\//.test(v) ? "UPLOADED" : "VIDEO"}</span><small data-no-tr style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${/^\/clips\//.test(v) ? "Uploaded video" : esc(v)}</small><button class="btn sm red" type="button" data-vrm="${i}">Remove</button></div>`).join("")}
-      ${S.videos.length < 6 ? `<div class="row" style="flex-wrap:wrap"><label class="btn">Upload video<input type="file" id="fVidFile" accept="video/mp4,video/quicktime,video/webm" hidden></label><button class="btn" type="button" id="fVidPick">Uploaded clips</button><input id="fVid" placeholder="or a YouTube or video link (https://…)" style="flex:1;min-width:220px" data-no-tr><button class="btn" type="button" id="fVidAdd">Add video</button></div>` : ""}</div>
+      ${S.videos.length < 6 ? `<div class="row" style="flex-wrap:wrap"><label class="btn">Upload video<input type="file" id="fVidFile" accept="video/mp4,video/quicktime,video/webm" hidden></label><button class="btn" type="button" id="fVidPick">Content Library</button><input id="fVid" placeholder="or a YouTube or video link (https://…)" style="flex:1;min-width:220px" data-no-tr><button class="btn" type="button" id="fVidAdd">Add video</button></div>` : ""}</div>
     <div class="ad-byte"><b>Plays as</b>
       <div class="row ad-seg"><button type="button" class="btn ${S.byteMode === "avo" ? "on" : ""}" data-bm="avo">AVO only</button><button type="button" class="btn ${S.byteMode === "byte" ? "on" : ""}" data-bm="byte">AVO + byte</button></div>
       ${S.byteMode === "byte" ? `<p class="muted" style="margin:0">After the reading, the bytes play in full, one after another, with the Rashtrix wipe between them and the person's name on screen.</p>
@@ -199,8 +202,8 @@ function drawForm() {
     try { const r = await uploadClip(f, $("#fProg"), `AVO: ${$("#fTitle").value.trim() || f.name}`); S.videos.push(r.url); toast("Video uploaded."); drawForm(); } catch (err) { fail(err); } });
   $$("[data-bup]").forEach(x => x.onchange = async e => { const f = e.target.files[0]; if (!f) return; const i = +x.dataset.bup; keep(); toast("Uploading the byte…");
     try { const r = await uploadClip(f, $("#fProg"), `Byte: ${S.bytes[i].name || f.name}`); Object.assign(S.bytes[i], { url: r.url, secs: r.secs || S.bytes[i].secs }); toast("Byte uploaded."); drawForm(); } catch (err) { fail(err); } });
-  $("#fVidPick")?.addEventListener("click", () => { keep(); pickClip(c => { S.videos.push(c.url); drawForm(); }); });
-  $$("[data-bpick]").forEach(b => b.onclick = () => { const i = +b.dataset.bpick; keep(); pickClip(c => { Object.assign(S.bytes[i], { url: c.url, secs: c.duration || S.bytes[i].secs }); drawForm(); }); });
+  $("#fVidPick")?.addEventListener("click", () => { keep(); pickLib(c => { S.videos.push(c.url); drawForm(); }); });
+  $$("[data-bpick]").forEach(b => b.onclick = () => { const i = +b.dataset.bpick; keep(); pickLib(c => { Object.assign(S.bytes[i], { url: c.url, secs: c.duration || S.bytes[i].secs }); drawForm(); }); });
   $("#fVidAdd")?.addEventListener("click", () => { const u = $("#fVid").value.trim(); if (!/^https:\/\//.test(u)) return toast("Paste a link that starts with https://"); keep(); S.videos.push(u); drawForm(); });
   $$("[data-bm]").forEach(b => b.onclick = () => { keep(); S.byteMode = b.dataset.bm; if (S.byteMode === "byte" && !S.bytes.length) S.bytes.push({ url: "", name: "", title: "", secs: 0 }); drawForm(); });
   $$("[data-bf]").forEach(x => x.oninput = () => { const b = S.bytes[+x.dataset.bi]; b[x.dataset.bf] = x.dataset.bf === "secs" ? secsOf(x.value) : x.value; });
@@ -217,7 +220,7 @@ function drawForm() {
   $("#fvSecs")?.addEventListener("input", e => { S.full.secs = secsOf(e.target.value); });
   $("#fvUp")?.addEventListener("change", async e => { const f = e.target.files[0]; if (!f) return; keep(); toast("Uploading the video…");
     try { const r = await uploadClip(f, $("#fProg"), `AVO full video: ${$("#fTitle").value.trim() || f.name}`); Object.assign(S.full, { url: r.url, secs: r.secs || S.full.secs }); toast("Video uploaded."); drawForm(); } catch (err) { fail(err); } });
-  $("#fvPick")?.addEventListener("click", () => { keep(); pickClip(c => { Object.assign(S.full, { url: c.url, secs: c.duration || S.full.secs }); drawForm(); }); });
+  $("#fvPick")?.addEventListener("click", () => { keep(); pickLib(c => { Object.assign(S.full, { url: c.url, secs: c.duration || S.full.secs }); drawForm(); }); });
   $("#lkScene")?.addEventListener("change", e => { S.scene = e.target.value; });
   $("#lkBg")?.addEventListener("change", e => { S.bg = e.target.value; });
   $("#lkLen")?.addEventListener("change", e => { S.len = Number(e.target.value) || 0; });

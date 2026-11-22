@@ -5,6 +5,7 @@
 import { shell, api, toast, fail, esc, $, $$, fmt, parseTime, istDay, istClock, printDoc } from "./crshell.js";
 import { ITEM_TYPES, LAYOUTS, timings, autopilotOn } from "./scenes.js";
 import { digits } from "./i18n.js";
+import { libraryPicker } from "./libpick.js";
 
 const S = { ch: "h", day: istDay(), list: [], rd: null, sel: null, clips: [], templates: [], onair: null, archive: false };
 const main = $("main");
@@ -196,26 +197,13 @@ async function moveBy(id, d) {
   const [it] = items.splice(i, 1); items.splice(j, 0, it); S.sel = id; drawItems();
   try { await api(`/api/admin/rundowns/${S.rd.id}/order`, { method: "PUT", body: { ids: items.map(x => x.id) } }); openRundown(S.rd.id); } catch (e) { fail(e); openRundown(S.rd.id); }
 }
-// The library: the channel's YouTube videos and the AVO stories of the last three days, by age.
-async function libraryDialog() {
+// The library: the Content Library's YouTube videos and AVO stories (its 36 hours, and what is kept).
+function libraryDialog() {
   if (!S.rd) return toast("Open a rundown first.");
-  const d = dialog(`<h3>Library</h3><p class="muted">${S.ch === "h" ? "Rashtrix TV" : "Rashtrix Shorts"}: YouTube videos and AVO stories from the last three days. Add any to the rundown; it goes in after the selected item.</p>
-    <div class="row lib-tabs"><button class="btn sm on" data-lt="all">All</button><button class="btn sm" data-lt="video">Videos</button><button class="btn sm" data-lt="avo">AVO</button></div><div id="lib" class="lib"><p class="muted">Loading…</p></div>`);
-  let L; try { L = await api(`/api/admin/rundowns/library?channel=${S.ch}`); } catch (e) { $("#lib", d).innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
-  const age = t => (Date.now() - Date.parse(t)) / 3600e3, BANDS = [[0, 24, "Last 24 hours"], [24, 48, "24 to 48 hours ago"], [48, 72, "48 to 72 hours ago"]];
-  const t = s => new Date(s).toLocaleString("en-GB", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-  const all = [...L.videos.map(v => ({ k: "video", id: v.ytId, at: v.at, v })), ...L.avo.map(x => ({ k: "avo", id: x.id, at: x.at, x }))].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-  let tab = "all";
-  const draw = () => { const list = all.filter(i => tab === "all" || i.k === tab);
-    $("#lib", d).innerHTML = BANDS.map(([a, b, name]) => { const g = list.filter(i => age(i.at) >= a && age(i.at) < b);
-      return `<section><h4>${name} <small class="muted">${digits(g.length)}</small></h4>${g.map(i => i.k === "video"
-        ? `<div class="clip"><img src="${esc(i.v.thumb || `https://i.ytimg.com/vi/${i.v.ytId}/mqdefault.jpg`)}" alt=""><div style="flex:1"><span class="type video">Video</span> <b data-no-tr>${esc(i.v.title)}</b><br><small>${digits(fmt(i.v.dur || 0))} · ${t(i.at)}</small></div><button class="btn sm" data-lv="${esc(i.id)}">Add</button></div>`
-        : `<div class="clip"><img src="${esc(i.x.images[0]?.src || "/partners/calibrex-mark.svg")}" alt=""><div style="flex:1"><span class="type avo">AVO</span> <b data-no-tr>${esc(i.x.title)}</b><br><small>${digits(Math.round(i.x.secs || 0))} s voice · ${digits(i.x.images.length)} pictures · ${t(i.at)}</small></div><button class="btn sm" data-la="${esc(i.id)}">Add</button></div>`).join("") || `<p class="muted">Nothing.</p>`}</section>`; }).join("");
-    $$("[data-lv]", d).forEach(b => b.onclick = () => addFromLib(b, { type: "video", title: (L.videos.find(v => v.ytId === b.dataset.lv).title || "").slice(0, 200), duration: L.videos.find(v => v.ytId === b.dataset.lv).dur || 60, data: { ytId: b.dataset.lv } }));
-    $$("[data-la]", d).forEach(b => b.onclick = () => { const x = L.avo.find(y => y.id === b.dataset.la); addFromLib(b, { type: "avo", title: x.title.slice(0, 200), duration: avoDur(x), data: { story: x, avoId: x.id } }); });
-  };
-  $$("[data-lt]", d).forEach(b => b.onclick = () => { tab = b.dataset.lt; $$("[data-lt]", d).forEach(x => x.classList.toggle("on", x === b)); draw(); });
-  draw();
+  libraryPicker({ title: "Add from the Content Library", note: `${S.ch === "h" ? "Rashtrix TV" : "Rashtrix Shorts"}: it goes in after the selected item.`, types: ["video", "avo"], channel: S.ch, keepOpen: true,
+    onPick: (x, b) => x.type === "video"
+      ? addFromLib(b, { type: "video", title: x.title.slice(0, 200), duration: x.dur || 60, data: { ytId: x.id } })
+      : addFromLib(b, { type: "avo", title: x.title.slice(0, 200), duration: avoDur(x.story), data: { story: x.story, avoId: x.id } }) });
 }
 async function addFromLib(btn, body) {
   btn.disabled = true;

@@ -113,6 +113,8 @@ export async function shortsList(env, limit = 60) {
 // hours goes on air, except videos the control room marks "keep running" (and, when nothing at
 // all is that new, the most recent ten).
 export const VIDEO_FRESH_HOURS = 30, DAILY_MIN = 10;
+export const LIB_HOURS = 36;
+const libCutoff = () => new Date(Date.now() - LIB_HOURS * 3600e3).toISOString();
 export function freshOnly(list, now = Date.now()) {
   const t = v => Date.parse(v.publishedAt || "") || 0;
   const ist = new Date(now + 5.5 * 3600e3), midnight = Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()) - 5.5 * 3600e3;
@@ -129,8 +131,13 @@ async function playable(env, ch, s = {}) {
   // By shape, whichever channel's source brought the video in: portrait videos play only on the
   // vertical channel, landscape videos only on the horizontal one (YouTube's player size says
   // which). A video in both channels' sources counts once.
-  const rows = (await env.DB.prepare(`SELECT i.yt_id AS ytId, i.title, i.duration, i.thumb, i.headline, i.description, i.published_at AS publishedAt, i.keep, i.channel AS src FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
-    WHERE i.vertical=? AND i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0 ORDER BY (i.channel=?) DESC, i.published_at DESC LIMIT 400`).bind(ch === "v" ? 1 : 0, ch).all()).results;
+  // Only what is in the Content Library (src/library.js): videos that came in within its 36 hours,
+  // or kept; with nothing at all there, the channel's videos as before (it never runs dry).
+  const q = lib => env.DB.prepare(`SELECT i.yt_id AS ytId, i.title, i.duration, i.thumb, i.headline, i.description, i.published_at AS publishedAt, i.keep, i.channel AS src FROM tv_items i JOIN tv_sources s ON s.id=i.source_id
+    WHERE i.vertical=? AND i.excluded=0 AND i.playable=1 AND s.active=1 AND i.duration>0${lib ? " AND (i.keep=1 OR i.evergreen=1 OR s.keep_all=1 OR i.added_at>=?)" : ""} ORDER BY (i.channel=?) DESC, i.published_at DESC LIMIT 400`)
+    .bind(...(lib ? [ch === "v" ? 1 : 0, libCutoff(), ch] : [ch === "v" ? 1 : 0, ch])).all().then(r => r.results);
+  let rows = await q(true).catch(() => []);
+  if (!rows.length) rows = await q(false);
   const seen = new Set(), list = rows.filter(v => !seen.has(v.ytId) && seen.add(v.ytId));
   // Safety net for the vertical channel: if YouTube reports no portrait video at all, its own
   // Shorts play as before.
