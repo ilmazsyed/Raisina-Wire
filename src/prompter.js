@@ -4,7 +4,7 @@
 // beam-splitter glass. Keys: Space pause/run, ↑/↓ speed, ←/→ previous/next story, M mirror,
 // +/− size, H hide the controls.
 import "./control.css";
-import { initUiLang } from "./uilang.js";
+import { englishOnly } from "./crshell.js";
 import { esc } from "./crshell.js";
 
 const q = new URLSearchParams(location.search), ch = q.get("ch") === "v" ? "v" : "h";
@@ -73,7 +73,7 @@ document.addEventListener("keydown", e => {
 window.addEventListener("wheel", e => { P.y += e.deltaY; }, { passive: true });
 
 (async () => {
-  await initUiLang();
+  englishOnly();
   document.body.innerHTML = `<div class="prompter" data-no-tr-scroll><div class="cue"></div><div class="scroll" data-no-tr></div><div class="pctl"></div></div>`;
   controls();
   // With the controls hidden, a tap anywhere brings them back (a phone has no hover).

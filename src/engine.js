@@ -13,6 +13,7 @@
 // Outputs apply changes after the broadcast delay; DUMP throws away what is waiting and puts the
 // standby slate up. Outputs report their health every five seconds.
 // On-air graphics are in Bengali whatever the reader's language.
+import "./tv.css";
 import { LAYOUTS } from "./scenes.js";
 
 const esc = (s = "") => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -461,7 +462,12 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // scene asked to (the AVO desk's recording page).
   const loud = mode === "app" || output || sound;
   const [W, H] = SIZE[channel];
-  host.innerHTML = `<div class="tvp-fit"><div class="tvp tvp-${channel}${mode === "app" ? " tvp-app" : ""}" style="width:${W}px;height:${H}px">
+  // The light player (phones and small tablets in the app, a reader who asked for less motion, or
+  // data saver): the same programme, without the decorative moving backgrounds and glass effects,
+  // so a phone keeps far less in graphics memory (an iPhone closes a page that runs out of it).
+  const LITE = mode === "app" && !output && (matchMedia("(pointer: coarse)").matches || innerWidth <= 900 || matchMedia("(prefers-reduced-motion: reduce)").matches
+    || !!navigator.connection?.saveData || (navigator.deviceMemory && navigator.deviceMemory <= 4) || /[?&]lite\b/.test(location.search));
+  host.innerHTML = `<div class="tvp-fit"><div class="tvp tvp-${channel}${mode === "app" ? " tvp-app" : ""}${LITE ? " tvp-lite" : ""}" style="width:${W}px;height:${H}px">
       <div class="tvp-bg"><i class="dots"></i><i class="arc a1"></i><i class="arc a2"></i><i class="sheen"></i></div>
       ${mode === "app" ? `<div class="tvp-ytlayer" hidden><div class="tvs-ytwrap"><div class="tvs-yt"></div></div><div class="tvp-ythold on"><img alt=""><i class="tvp-ytspin"></i><span class="tvp-yttap"><b>▶</b>ভিডিও চালু করতে ছুঁয়ে দিন</span></div><div class="tvp-shield"></div></div>` : ""}
       <div class="tvp-stage"></div>
@@ -1579,6 +1585,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // newsrooms lit up with lines from Kolkata, a turning globe, signal rings and NEWS in outline.
   const DECO_CITIES = [["কলকাতা", 88.4, 22.6, 1], ["দিল্লি", 77.2, 28.6], ["ঢাকা", 90.4, 23.8], ["লন্ডন", -0.1, 51.5], ["নিউ ইয়র্ক", -74, 40.7], ["বেজিং", 116.4, 39.9], ["দুবাই", 55.3, 25.3], ["মস্কো", 37.6, 55.8], ["সিডনি", 151.2, -33.9], ["নাইরোবি", 36.8, -1.3]];
   function newsDeco(theme = "bulletin") {
+    if (LITE) return "";   // (the light player: no decorative background art)
     const P = (lon, lat) => [(lon + 180) / 360 * 1920, (84 - lat) / 142 * 900];
     const T = { world: "world", bangladesh: "asia", kolkata10: "asia", city: "asia", sports: "sports", entertainment: "film", lifestyle: "life", numbers: "chart", markets: "chart", onthisday: "time", weather: "weather", soth: "radar" }[theme] || "world";
     const words = `<div class="nd-words" data-no-tr><b>NEWS</b><b>NEWS</b><b>NEWS</b></div><i class="nd-scan"></i>`;

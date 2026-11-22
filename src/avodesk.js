@@ -19,7 +19,7 @@ const mmss = n => n ? `${Math.floor(n / 60)}:${String(Math.round(n % 60)).padSta
 // An AVO story's length on air: its reading, then its bytes (with the wipe before each).
 export const avoDur = x => Math.ceil((x.secs > 0 ? Math.max(8, x.secs + 2) : 20) + 4 + (x.bytes || []).reduce((n, b) => n + 1.2 + (Number(b.secs) || 30) + 4, 0));
 const REGION = { bengal: "Bengal & Kolkata", india: "India", neighbours: "Bangladesh, USA, China, Russia, South Asia", world: "World" };
-const DESKS = { Kolkata: "কলকাতা", "West Bengal": "রাজ্য", India: "দেশ", "Probashi Bangali": "প্রবাসী বাঙালি", World: "বিশ্ব", Sports: "খেলা", Entertainment: "বিনোদন", Lifestyle: "লাইফস্টাইল", Breaking: "এইমাত্র" };
+const DESKS = { Kolkata: "Kolkata", "West Bengal": "West Bengal", India: "India", "Probashi Bangali": "Probashi Bangali", World: "World", Sports: "Sports", Entertainment: "Entertainment", Lifestyle: "Lifestyle", Breaking: "Breaking" };
 const DK = { kolkata: "Kolkata", bengal: "Bengal", india: "India", bangladesh: "Bangladesh", world: "World", sports: "Sports", business: "Business", other: "Other" };
 const WT = { heavy: "Heavy", mid: "Medium", light: "Light" };
 const ORIGIN = { auto: "Wire", manual: "Desk", breaking: "Breaking", edited: "Wire · edited", sent: "Sent" };
@@ -151,7 +151,7 @@ function drawForm() {
     <label>Headline (Bengali, shown in the NEWS UPDATE strip)<input id="fTitle" maxlength="200" data-no-tr value="${esc(e?.title || "")}"></label>
     <label>Brief to be read (the newsreader reads it; up to ${MAXF} characters, about ${MAXF > MAX ? 60 : 30} seconds)<textarea id="fBrief" rows="6" maxlength="${MAXF}" data-no-tr>${esc(e ? e.lines.join(" ") : "")}</textarea><small class="muted" id="fCount"></small></label>
     <div class="row"><label style="flex:1">Region<select id="fRegion">${Object.entries(REGION).map(([k, n]) => `<option value="${k}" ${(e?.region || "bengal") === k ? "selected" : ""}>${n}</option>`).join("")}</select></label>
-    <label style="flex:1">Desk<select id="fDesk">${Object.entries(DESKS).map(([k, n]) => `<option value="${k}" ${(e?.desk || "Kolkata") === k ? "selected" : ""}>${n} · ${k}</option>`).join("")}</select></label></div>
+    <label style="flex:1">Desk<select id="fDesk">${Object.entries(DESKS).map(([k, n]) => `<option value="${k}" ${(e?.desk || "Kolkata") === k ? "selected" : ""}>${n}</option>`).join("")}</select></label></div>
     <div><b>Pictures</b> <small class="muted">(four or more look best; each shows full screen for a few seconds)</small>
       <div class="ad-pics">${S.images.map((x, i) => `<div class="ad-pic"><img src="${esc(x.url)}" alt=""><input data-credit="${i}" placeholder="Credit (e.g. Rashtrix / photographer)" value="${esc(x.credit || "")}" data-no-tr><div class="row"><button class="btn sm" data-left="${i}" ${i ? "" : "disabled"}>◀</button><button class="btn sm" data-right="${i}" ${i < S.images.length - 1 ? "" : "disabled"}>▶</button><button class="btn sm red" data-rm="${i}">Remove</button></div></div>`).join("")}</div>
       <div class="row"><label class="btn">Upload pictures<input type="file" id="fFiles" accept="image/*" multiple hidden></label><input id="fLink" placeholder="or paste a picture link (https://…)" style="flex:1"><button class="btn" id="fAddLink">Add link</button></div>
