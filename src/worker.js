@@ -58,10 +58,10 @@ import { adPlayed, seedBrandFilm } from "./ads.js";
 import { epaperStep, handleNewsprint, readerEdition, epaperSettings } from "./epaper.js";
 import { handleCharter, charterCheck, getCharter } from "./charter.js";
 import { handleHeads, prepareHeadVoices, headVoiceAgain } from "./headlines.js";
-import { handleLrd, asrunPost } from "./liverundown.js";
+import { handleLrd, asrunPost, upNext } from "./liverundown.js";
 import { applyVoice, handleVoice } from "./voicelab.js";
 import { handleStudio } from "./studioapi.js";
-import { handleExtras, tvExtras } from "./extras.js";
+import { handleExtras, tvExtras, weather as kolkataWeather } from "./extras.js";
 import { rundownHousekeeping, rundownCues } from "./rundown.js";
 export { TvControl } from "./control.js";
 import { shortsList } from "./tvchannel.js";
@@ -1299,6 +1299,25 @@ async function api(request, env, ctx) {
     const b = await request.json().catch(() => ({}));
     const outputOk = !!b.key && CHANNELS.includes(b.ch) && await checkKey(env, b.ch, String(b.key));
     return json(await avoPlayed(env, b, outputOk), 200, { "cache-control": "no-store" });
+  }
+  // ---- The phone home page's live bits (src/main.js, viewHomePhone): the breaking from the
+  // Breaking desk (45 minutes), the Bengali date and Kolkata's weather, the open poll, the five
+  // most-read stories of the last day, what Rashtrix TV has on now and next, and the e-paper.
+  if (url.pathname === "/api/home" && request.method === "GET") {
+    const since = d => new Date(Date.now() - d * 864e5).toISOString().slice(0, 10);
+    const [hs, ex, log, pop, ed, wx] = await Promise.all([
+      tvSettings(env, "h").catch(() => null), tvExtras(env).catch(() => null), deskSettings(env, "tv:breaklog", []),
+      env.DB.prepare("SELECT v.slug, SUM(v.views) AS n FROM story_views v JOIN articles a ON a.slug=v.slug AND a.status='published' WHERE v.day>=? GROUP BY v.slug ORDER BY n DESC LIMIT 5").bind(since(1)).all().then(r => r.results).catch(() => []),
+      env.DB.prepare("SELECT day, slot, pages FROM epaper_editions WHERE status='published' ORDER BY published_at DESC LIMIT 1").first().catch(() => null),
+      kolkataWeather(env).catch(() => null)
+    ]);
+    const last = (log || []).find(x => x.act === "breaking" || x.act === "clear");
+    const breaking = last?.act === "breaking" && Date.now() - Date.parse(last.at) < 45 * 60e3 ? { text: (last.lines || [])[0] || String(last.text || "").split(" · ")[0], at: last.at } : null;
+    const tv = hs?.on ? await upNext(env, "h", hs).catch(() => null) : null;
+    let pages = 0; try { pages = JSON.parse(ed?.pages || "[]").length; } catch { /* none */ }
+    return json({ breaking, bangabda: ex?.bangabda || "", weather: wx && wx.temp != null ? { temp: wx.temp, text: wx.text } : null,
+      poll: (ex?.polls || []).find(q => q.status === "open") || null, popular: (pop || []).map(r => r.slug), tv,
+      epaper: ed ? { day: ed.day, slot: ed.slot, pages } : null }, 200, { "cache-control": "public, max-age=30" });
   }
   if (url.pathname === "/api/tv/videos" && request.method === "GET") {
     const { results } = await env.DB.prepare(`SELECT i.channel, i.yt_id AS id, i.title, i.thumb, i.duration, i.published_at AS publishedAt FROM tv_items i JOIN tv_sources s ON s.id=i.source_id

@@ -406,6 +406,8 @@ function wireEmpty() {
 // Rashtrix's own stories (with photos) lead; the wire desk's rewrites and briefs run in the
 // latest-news stream as text. Then a section per desk.
 function viewHome() {
+  // Phones (the app) have their own home page (viewHomePhone).
+  if (isPhone() && (stories().length || (state.coverageAll || []).length)) return viewHomePhone();
   stashHomeTV();
   const all = stories().sort((x, y) => (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0));
   if (!all.length && !(state.coverageAll || []).length) { $("#view").innerHTML = `<div class="wrap home"><section id="liveBanner" class="band-tight" hidden></section>${articlesSettled ? `<div class="empty" style="margin-top:30px">No stories yet.</div>` : `<div class="skeleton" style="height:420px;margin-top:20px"></div>`}</div>`; renderLiveBanner(); return; }
@@ -519,6 +521,231 @@ function renderBriefBand() {
   host.innerHTML = briefs.length ? `<div class="section-head"><h2 id="briefTitle">Briefs</h2><span class="meta">The news in 100 words</span><a class="link-gold" href="/briefs">All briefs →</a></div>
     <div class="brief-row">${briefs.map(b => `<a class="brief-card glass" href="${edHref(b)}"><span class="kicker">${esc(b.category)} · ${ago(b.publishedAt)}</span><b>${esc(b.title)}</b></a>`).join("")}</div>` : "";
 }
+/* ---------- Home on phones (the app) ----------
+   The breaking bar (from the Breaking desk), the day (date, বঙ্গাব্দ, Kolkata's weather, the time),
+   Rashtrix TV with what is on now and next, the desks as story bubbles, the Shorts row, the
+   desk's own top stories, "At a glance" (five headlines), live coverage, each desk in its colour,
+   the most read, the poll of the day and the e-paper. Wire rewrites and briefs stay text only. */
+const DESK_TONE = { Kolkata: "#7d0303", "West Bengal": "#A43F44", India: "#1f3a6b", "Probashi Bangali": "#7a4f00", World: "#0f5f66", Entertainment: "#6b2f8a", Sports: "#137a55", Lifestyle: "#94365f" };
+const byNew = l => l.sort((x, y) => (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0));
+const deskStories = d => byNew(stories().filter(a => a.category === d)).filter(a => Date.now() - (Date.parse(a.publishedAt) || 0) < 48 * 3600e3).slice(0, 8);
+const DESK_ICON = (() => {
+  const g = d => `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  return {
+    Kolkata: g('<path d="M2 20h20M4 20V10M20 20V10M4 10c4-5 12-5 16 0M8 20v-6M12 20v-7M16 20v-6"/>'),
+    "West Bengal": g('<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>'),
+    India: g('<path d="M5 21V4M5 4h12l-2 4 2 4H5"/>'),
+    "Probashi Bangali": g('<path d="M2 16l20-8-6 12-3-5-5-1z"/><path d="M13 15l9-7"/>'),
+    World: g('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>'),
+    Entertainment: g('<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 6l2 4M12 6l2 4M17 6l2 4"/>'),
+    Sports: g('<circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10z"/><path d="M12 7V3M16 10l4-1M14.5 14.5l2.5 3.5M9.5 14.5L7 18M8 10L4 9"/>'),
+    Lifestyle: g('<path d="M5 19c0-8 6-14 15-14 0 9-6 15-14 15"/><path d="M5 19l8-8"/>')
+  };
+})();
+const seenBub = () => new Set(store.get("rw-seen-bub", []));
+const ICON_PLAY = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7z"/></svg>`;
+const ICON_GO = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
+let phTimer = null;
+
+function viewHomePhone() {
+  stashHomeTV();
+  const all = byNew(stories()), ageH = a => (Date.now() - (Date.parse(a.publishedAt) || 0)) / 3600e3;
+  // The desk's own stories of the last day lead (with their photos); "At a glance" is the wire's
+  // most important of the last six hours, in the channel's order, then the newest.
+  const top = all.filter(a => !isWire(a) && ageH(a) < 24).slice(0, 3);
+  const used = new Set(top.map(a => a.id));
+  const glance = [...all.filter(a => isWire(a) && ageH(a) < 6 && !used.has(a.id)).sort((x, y) => (x.pri ?? 10) - (y.pri ?? 10) || (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0))];
+  if (glance.length < 5) glance.push(...all.filter(a => !used.has(a.id) && !glance.includes(a)).slice(0, 5 - glance.length));
+  glance.splice(5); glance.forEach(a => used.add(a.id));
+  const desks = DESKS.filter(d => stories().some(a => a.category === d));
+  $("#view").innerHTML = `<div class="ph-home">
+    <a class="ph-break" id="phBreak" hidden></a>
+    <div class="ph-today" id="phToday"></div>
+    <section class="ph-tv" aria-label="Rashtrix TV"><div class="ph-tv-card">
+      <div class="ph-tv-screen"><div class="hl-player" id="homeTV" data-no-tr></div></div>
+      <div class="ph-tv-info" id="phTvInfo"></div>
+      <div class="ph-tv-acts"><a class="ph-btn red" href="${withLang("/watch")}">${ICON_PLAY}<span>Watch with sound</span></a><a class="ph-btn ghost" href="${withLang("/watch?ch=v")}"><span>Shorts live</span></a></div>
+    </div></section>
+    ${desks.length ? `<section class="ph-bubbles" aria-label="Desks" id="phBubbles"></section>` : ""}
+    <section class="ph-shorts" id="phShorts" aria-label="Shorts" hidden></section>
+    ${top.length ? `<section class="ph-top" aria-label="Top stories">${top.map(e => `<a class="ph-row" href="${edHref(e)}"><span class="ph-row-body"><span class="ph-kick" style="color:${DESK_TONE[e.category] || "var(--red)"}">${newTag(e)}${esc(e.category)}</span><b class="ph-h">${esc(e.title)}</b><span class="ph-meta">${ago(e.publishedAt)}</span></span>${e.image ? `<span class="ph-thumb">${img(e.image)}</span>` : ""}</a>`).join("")}</section>` : ""}
+    ${glance.length ? `<section class="ph-glance" aria-labelledby="phGlanceT"><div class="ph-glance-head"><h2 id="phGlanceT">At a glance</h2><span>Today's news in thirty seconds</span></div>
+      <ol>${glance.map((e, i) => `<li><span class="ph-num" data-no-tr>${digits(i + 1)}</span><a href="${edHref(e)}">${esc(e.title)}</a></li>`).join("")}</ol></section>` : ""}
+    <section class="ph-live-list" id="phLive" aria-label="Live updates" hidden></section>
+    ${desks.map(d => phDesk(d, used)).join("")}
+    <section class="ph-popular" id="phPopular" aria-labelledby="phPopT" hidden></section>
+    <section class="ph-poll" id="phPoll" aria-label="Poll of the day" hidden></section>
+    <a class="ph-epaper" id="phEpaper" href="${withLang("/epaper")}" hidden></a>
+    <p class="ph-end">You are all caught up.</p>
+  </div>`;
+  mountHomeTV(); phBubbles(); phShorts(); phLive(); phExtras(); phToday();
+  clearInterval(phTimer);
+  phTimer = setInterval(() => { if (!document.getElementById("phToday")) { clearInterval(phTimer); return; } phToday(); phTvNow(); }, 15e3);
+}
+// A desk in its colour: its own story with a photo first (if it has one), then four headlines;
+// "More stories" shows the next five here, without leaving the page.
+function phDesk(d, used) {
+  const list = byNew(stories().filter(a => a.category === d)), tone = DESK_TONE[d] || "var(--red)";
+  const lead = list.find(a => !isWire(a) && a.image && !used.has(a.id));
+  const rest = list.filter(a => a !== lead);
+  const row = e => `<a class="ph-line" href="${edHref(e)}"><time data-no-tr>${clock(e.publishedAt)}</time><b>${esc(e.title)}</b></a>`;
+  return `<section class="ph-desk" style="--tone:${tone}" aria-label="${esc(tr(d))}">
+    <div class="ph-desk-head"><i></i><h2><a href="${deskHref(d)}">${esc(d)}</a></h2><a class="ph-all" href="${deskHref(d)}">All news</a></div>
+    ${lead ? `<a class="ph-desk-lead" href="${edHref(lead)}"><span class="ph-desk-pic">${img(lead.image)}</span><b class="ph-h big">${esc(lead.title)}</b><span class="ph-meta">${ago(lead.publishedAt)}</span></a>` : ""}
+    <div class="ph-lines">${rest.slice(0, 4).map(row).join("")}<div class="ph-more" hidden>${rest.slice(4, 9).map(row).join("")}</div></div>
+    ${rest.length > 4 ? `<button class="ph-btn outline" type="button" data-action="ph-more">More stories</button>` : ""}
+  </section>`;
+}
+function phBubbles() {
+  const host = $("#phBubbles"); if (!host) return;
+  const seen = seenBub(), desks = DESKS.filter(d => deskStories(d).length);
+  // (a desk with a story the reader has not opened here has a red ring; a desk read through, grey;
+  //  unread desks come first)
+  const fresh = d => deskStories(d).some(a => !seen.has(a.id));
+  const order = [...desks.filter(fresh), ...desks.filter(d => !fresh(d))];
+  host.innerHTML = `<div class="ph-bub-row">${order.map(d => `<button class="ph-bub${fresh(d) ? "" : " seen"}" type="button" data-action="ph-desk-stories" data-desk="${esc(d)}" aria-label="${esc(tr(d))}">
+    <span class="ph-bub-ring"><span class="ph-bub-face" style="background:${DESK_TONE[d]}">${DESK_ICON[d] || ""}</span></span><span class="ph-bub-name">${esc(d)}</span></button>`).join("")}</div>`;
+}
+// The Shorts row in place of the lead picture: the live Shorts channel first, then the newest.
+function phShorts() {
+  const host = $("#phShorts"); if (!host) return;
+  const when = x => Date.parse(x.publishedAt || "") || 0, list = shorts();
+  const items = [...list.map((m, i) => ({ t: when(m), html: `<button class="ph-short" type="button" data-action="short" data-index="${i}" aria-label="Play: ${esc(m.title)}">${thumbImg(m.thumbnailUrl, i < 3)}<span class="ph-short-play" aria-hidden="true">${ICON_PLAY}</span><b>${esc(m.title)}</b></button>` })),
+    ...(state.ytShorts || []).slice(0, 20).map(s => ({ t: when(s), html: `<a class="ph-short" href="${withLang(`/shorts?v=${encodeURIComponent(s.id)}`)}" aria-label="Play: ${esc(s.title)}"><img src="${esc(ytThumb(s))}" alt="" loading="lazy" decoding="async"><span class="ph-short-play" aria-hidden="true">${ICON_PLAY}</span><b data-no-tr>${esc(s.title)}</b></a>` }))]
+    .sort((a, b) => b.t - a.t).slice(0, 20);
+  host.hidden = false;
+  host.innerHTML = `<div class="ph-sec-head"><h2>Shorts</h2><a href="${withLang("/shorts")}">See all</a></div>
+    <div class="ph-short-row"><a class="ph-short live" href="${withLang("/watch?ch=v")}" aria-label="Rashtrix Shorts live"><img src="/brand/logo-sm.webp" alt="" class="ph-short-logo"><span class="ph-live" data-no-tr><i></i>LIVE</span><b>Rashtrix Shorts, live now</b></a>${items.map(x => x.html).join("")}</div>`;
+}
+function phLive() {
+  const host = $("#phLive"); if (!host) return;
+  const all = (state.coverageAll || []).filter(d => d?.item);
+  host.hidden = !all.length;
+  host.innerHTML = all.length ? `<div class="ph-sec-head"><h2><i class="dot-live"></i>Live updates</h2></div>${all.slice(0, 4).map((d, i) => {
+    const u = d.updates?.[0], text = u ? (u.title || firstLine(u.body)) : d.item.title;
+    return `<a class="ph-live-card${i ? "" : " first"}" href="${withLang(`/coverage/${encodeURIComponent(d.item.slug)}`)}"><span class="ph-live-meta"><span class="ph-tag">Live</span><b data-no-tr>${esc(d.item.title)}</b><span class="ph-meta">${u ? ago(u.createdAt) : ""}</span></span><b class="ph-h" data-no-tr>${esc(text)}</b>${d.updates?.length ? `<span class="ph-meta"><span data-no-tr>${digits(d.updates.length)}</span> <span>updates</span></span>` : ""}</a>`;
+  }).join("")}` : "";
+}
+function phToday() {
+  const host = $("#phToday"); if (!host) return;
+  const x = state.homeX || {}, now = new Date();
+  const day = now.toLocaleDateString(LOCALE, { ...IST, weekday: "long", day: "numeric", month: "long" });
+  host.innerHTML = `<span>${esc(day)}</span>${x.bangabda ? `<i aria-hidden="true">·</i><span data-no-tr>${esc(x.bangabda)}</span>` : ""}${x.weather ? `<i aria-hidden="true">·</i><span><span>Kolkata</span> <span data-no-tr>${digits(x.weather.temp)}°</span></span>` : ""}<i aria-hidden="true">·</i><b data-no-tr>${digits(clock(now.toISOString()))}</b>`;
+}
+// What Rashtrix TV has on: the channel's fixed item (bulletin, HEADLINES, a segment) when one is
+// on, else what the player shows; and the next item with its time.
+const SEG_WORDS = { video: "Videos", avo: "News", bulletin: "News bulletin", heads: "Headlines", seg: "Programme", card: "Headlines", ad: "Advertisement", weather: "Weather", market: "Markets", poll: "Poll" };
+function phTvNow() {
+  const host = $("#phTvInfo"); if (!host) return;
+  const tv = state.homeX?.tv, t = Date.now();
+  const fixed = tv?.now && t < tv.now.at + tv.now.dur * 1000 ? tv.now : null;
+  const type = String(document.querySelector("#homeTV [data-seg]")?.dataset.seg || "").split(":")[0];
+  const next = (tv?.next || []).find(x => x.at > t);
+  const nowTitle = fixed ? `<b data-no-tr>${esc(fixed.title)}</b>` : `<b>${SEG_WORDS[type] || "News and videos"}</b>`;
+  const pct = fixed ? Math.max(0, Math.min(100, (t - fixed.at) / (fixed.dur * 10))) : 0;
+  host.innerHTML = `<div class="ph-tv-now"><span class="ph-tv-k">On now</span>${nowTitle}</div>${fixed ? `<div class="ph-tv-bar"><i style="width:${pct.toFixed(1)}%"></i></div>` : ""}
+    ${next ? `<div class="ph-tv-next"><span>Next</span> <b data-no-tr>${digits(clock(new Date(next.at).toISOString()))} · ${esc(next.title)}</b></div>` : ""}`;
+}
+function phBreak() {
+  const host = $("#phBreak"); if (!host) return;
+  const b = state.homeX?.breaking;
+  host.hidden = !b;
+  if (!b) return;
+  // (the breaking's story, when the desk has one with the same headline)
+  const s = stories().find(a => a.title === b.text);
+  host.href = s ? edHref(s) : withLang("/live");
+  host.innerHTML = `<span class="ph-break-tag"><i></i><span>Just in</span></span><b data-no-tr>${esc(b.text)}</b>${ICON_GO}`;
+}
+function phPopular() {
+  const host = $("#phPopular"); if (!host) return;
+  const list = (state.homeX?.popular || []).map(slug => stories().find(a => a.slug === slug)).filter(Boolean).slice(0, 5);
+  host.hidden = list.length < 3;
+  host.innerHTML = list.length >= 3 ? `<div class="ph-sec-head"><h2 id="phPopT">Most read today</h2></div><ol>${list.map((e, i) => `<li><span class="ph-rank" data-no-tr>${digits(i + 1)}</span><a href="${edHref(e)}">${esc(e.title)}</a></li>`).join("")}</ol>` : "";
+}
+function phPoll() {
+  const host = $("#phPoll"); if (!host) return;
+  const p = state.homeX?.poll; host.hidden = !p;
+  if (!p) return;
+  const voted = store.get("rw-voted", {}), mine = voted[p.id], total = (p.counts || []).reduce((a, b) => a + b, 0);
+  const show = mine !== undefined;
+  host.innerHTML = `<div class="ph-poll-head"><span class="ph-tag gold">Poll of the day</span><span class="ph-meta">Results are shown on TV too</span></div>
+    <b class="ph-poll-q" data-no-tr>${esc(p.question)}</b>
+    <div class="ph-poll-opts">${p.options.map((o, i) => { const pc = total ? Math.round((p.counts[i] || 0) * 100 / total) : 0;
+      return `<button type="button" class="ph-opt${mine === i ? " mine" : ""}" data-action="ph-vote" data-i="${i}" ${show ? "disabled" : ""}>${show ? `<i style="width:${pc}%"></i>` : ""}<span data-no-tr>${esc(o)}</span>${show ? `<em data-no-tr>${digits(pc)}%</em>` : ""}</button>`; }).join("")}</div>
+    ${show ? `<span class="ph-meta"><span data-no-tr>${digits(total.toLocaleString("en-IN"))}</span> <span>votes</span></span>` : `<span class="ph-meta">Tap an answer to vote</span>`}`;
+}
+function phEpaper() {
+  const host = $("#phEpaper"); if (!host) return;
+  const e = state.homeX?.epaper; host.hidden = !e;
+  if (!e) return;
+  host.innerHTML = `<span class="ph-ep-page" aria-hidden="true"><i class="r"></i><i class="p"></i><i></i><i></i><i class="s"></i><i class="p2"></i></span>
+    <span class="ph-ep-body"><span class="ph-kick gold">E-paper</span><b>Read today's paper</b><span class="ph-meta" data-no-tr>${esc(shortDate(e.day))}${e.pages ? ` · ${digits(e.pages)} ${tr("pages")}` : ""}</span></span>${ICON_GO}`;
+}
+async function phExtras() {
+  try {
+    const r = await fetch("/api/home", { cache: "no-cache" });
+    if (r.ok) state.homeX = await r.json();
+  } catch { /* the page shows without them */ }
+  if (!document.getElementById("phToday")) return;
+  phToday(); phTvNow(); phBreak(); phPopular(); phPoll(); phEpaper();
+  clearTimeout(phExtras.t); phExtras.t = setTimeout(() => { if (document.getElementById("phToday")) phExtras(); }, 60e3);
+}
+async function phVote(i) {
+  const p = state.homeX?.poll; if (!p) return;
+  try {
+    await apiJSON(`/api/polls/${p.id}/vote`, { choice: i });
+    const voted = store.get("rw-voted", {}); voted[p.id] = i; store.set("rw-voted", voted);
+    p.counts = p.options.map((_, k) => (p.counts?.[k] || 0) + (k === i ? 1 : 0));
+    toast("Thank you. Your vote is counted."); phPoll();
+  } catch (e) { toast(e.message); }
+}
+/* A desk's stories as full-screen cards: one headline a screen in the desk's colour; tap the right
+   side for the next, the left for the one before; each moves on by itself after seven seconds. */
+let deskView = null;
+function openDeskStories(d) {
+  const list = deskStories(d); if (!list.length) return;
+  const seen = seenBub(), start = Math.max(0, list.findIndex(a => !seen.has(a.id)));
+  let el = $("#deskStories");
+  if (!el) { el = document.createElement("div"); el.id = "deskStories"; el.className = "ds-view"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); document.body.append(el); }
+  deskView = { d, list, i: start };
+  el.style.setProperty("--tone", DESK_TONE[d] || "#AA0404");
+  el.setAttribute("aria-label", tr(d));
+  el.hidden = false; document.body.classList.add("ds-open");
+  el.onclick = e => {
+    if (e.target.closest("[data-ds=close]")) return closeDeskStories();
+    // (the full story opens; the cards close behind it)
+    if (e.target.closest("a")) { clearTimeout(deskView?.t); deskView = null; el.hidden = true; document.body.classList.remove("ds-open"); setTimeout(() => { el.innerHTML = ""; phBubbles(); }, 0); return; }
+    stepDeskStories(e.clientX < innerWidth * 0.35 ? -1 : 1);
+  };
+  el.onkeydown = e => { if (e.key === "Escape") closeDeskStories(); if (e.key === "ArrowRight") stepDeskStories(1); if (e.key === "ArrowLeft") stepDeskStories(-1); };
+  showDeskStory();
+}
+function showDeskStory() {
+  const el = $("#deskStories"), v = deskView; if (!el || !v) return;
+  const a = v.list[v.i];
+  const seen = seenBub(); seen.add(a.id); store.set("rw-seen-bub", [...seen].slice(-400));
+  el.innerHTML = `<div class="ds-bars">${v.list.map((_, k) => `<span class="${k < v.i ? "done" : k === v.i ? "on" : ""}"><i></i></span>`).join("")}</div>
+    <div class="ds-head"><span class="ds-face">${DESK_ICON[v.d] || ""}</span><span class="ds-who"><b>${esc(v.d)}</b><span><span data-no-tr>${digits(v.i + 1)} / ${digits(v.list.length)}</span> · ${ago(a.publishedAt)}</span></span>
+      <button type="button" class="ds-x" data-ds="close" aria-label="Close">${ICON_X}</button></div>
+    <div class="ds-body"><h2>${esc(a.title)}</h2>${a.dek ? `<p>${esc(a.dek)}</p>` : ""}</div>
+    <div class="ds-foot"><a class="ds-read" href="${edHref(a)}"><span>Read the full story</span> →</a><span class="ds-hint"><span>Tap the left side for the one before</span><span>the right for the next</span></span></div>`;
+  el.querySelector(".ds-x").focus({ preventScroll: true });
+  clearTimeout(v.t);
+  v.t = setTimeout(() => stepDeskStories(1), 7000);
+}
+function stepDeskStories(dir) {
+  const v = deskView; if (!v) return;
+  const i = v.i + dir;
+  if (i < 0) return showDeskStory();
+  if (i >= v.list.length) return closeDeskStories();
+  v.i = i; showDeskStory();
+}
+function closeDeskStories() {
+  const el = $("#deskStories"); if (deskView) clearTimeout(deskView.t);
+  deskView = null; if (el) { el.hidden = true; el.innerHTML = ""; }
+  document.body.classList.remove("ds-open"); phBubbles();
+}
+
 /* ---------- Desks, briefs and the latest stream ---------- */
 function viewDesk(r) {
   const d = deskOf(r.arg); if (!d) return viewNotFound();
@@ -1191,6 +1418,9 @@ async function onAction(e) {
   if (a === "voice") toggleVoice();
   if (a === "tv-ch") { store.set("rw-tv-ch", el.dataset.ch); $$("[data-action=tv-ch]").forEach(b => b.setAttribute("aria-selected", String(b === el))); $("#tvWatch")?.classList.toggle("is-v", el.dataset.ch === "v"); mountWatchTV(); }
   if (a === "short") openShorts(Number(el.dataset.index) || 0);
+  if (a === "ph-desk-stories") openDeskStories(el.dataset.desk);
+  if (a === "ph-vote") phVote(Number(el.dataset.i));
+  if (a === "ph-more") { const box = el.closest(".ph-desk")?.querySelector(".ph-more"); if (box) box.hidden = false; el.remove(); }
   if (a === "w-cat") { $$("[data-action=w-cat]").forEach(b => b.setAttribute("aria-pressed", String(b === el))); filterWatch(undefined, el.dataset.cat); }
   if (a === "play-video") playInline(el.dataset.id);
   if (a === "lead-step") { const t = document.getElementById("lcTrack"), c = t?.children[0]; if (t && c) t.scrollBy({ left: Number(el.dataset.dir) * (c.offsetWidth + 16), behavior: "smooth" }); }
@@ -1456,6 +1686,7 @@ function liveTile(lead) {
 // peeks in), with dots, "1 / 3", and a gentle advance every 8 s that stops once the reader touches it.
 let liveSlide = 0, liveAuto = true;
 function renderLiveBanner() {
+  phLive();
   const host = $("#liveBanner"); if (!host) return;
   const all = state.coverageAll || [];
   if (!all.length) { host.innerHTML = ""; host.hidden = true; return; }
@@ -1777,6 +2008,7 @@ function videoCard(m) {
 // The first bubble in the Shorts row opens the live Shorts channel (Rashtrix Shorts on the Watch page).
 const liveBubble = () => `<a class="short-bubble live-bubble" href="${withLang("/watch?ch=v")}" aria-label="Rashtrix Shorts live"><span class="short-ring"><span class="short-face"><img src="/brand/logo-sm.webp" alt=""></span></span><span class="live-pill" data-no-tr><i></i>LIVE</span><span class="short-name">Shorts live</span></a>`;
 function renderHomeMedia() {
+  phShorts();
   const rail = $("#shortsRail"), band = $("#videoBand");
   if (rail) {
     // One row, newest upload first: the Shorts uploaded here and the channel's YouTube Shorts.

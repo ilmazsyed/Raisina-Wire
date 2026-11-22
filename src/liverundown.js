@@ -60,6 +60,18 @@ function plan(day, clock, headMins) {
   return out.sort((a, b) => a.at - b.at);
 }
 
+// The app's live TV card: the channel's fixed item on now and the next ones, after the Live
+// Rundown's skips and moves.
+export async function upNext(env, ch, settings, n = 2) {
+  const heads = await headsSettings(env).catch(() => null), mins = heads?.on === false ? [] : heads?.mins || [58, 28];
+  const now = Date.now(), e = await lrdEdits(env, ch), skip = new Set(e.skip), sh = k => (Number(e.shift?.[k]) || 0) * 60e3;
+  const items = [...plan(istDayOf(now), clockOf(settings), mins), ...plan(istDayOf(now + DAY), clockOf(settings), mins)]
+    .filter(x => !skip.has(x.key)).map(x => ({ ...x, at: x.at + sh(x.key) })).sort((a, b) => a.at - b.at);
+  const one = x => ({ title: x.kind === "heads" ? "শিরোনাম" : x.title, kind: x.kind, at: x.at, dur: x.dur });
+  const on = items.filter(x => x.at <= now && now < x.at + x.dur * 1000).pop();
+  return { now: on ? one(on) : null, next: items.filter(x => x.at > now).slice(0, n).map(one) };
+}
+
 // /api/admin/lrd?ch=&day=  GET: the day (plan, changes, as-run); PUT {ch, skip, adds}: the changes.
 // /api/admin/lrd/report?ch=&day=&format=csv: the as-run report.
 export async function handleLrd(request, env, url, user, { json, err, audit, settingsOf }) {
