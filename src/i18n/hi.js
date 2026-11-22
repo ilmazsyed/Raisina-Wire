@@ -1796,4 +1796,5 @@ export default {
   "A picture: paste an https picture address, or an uploaded one.": "तस्वीर: https तस्वीर का पता, या अपलोड की गई तस्वीर का पता डालें।",
   "Give it a name and press Save. Click the source to put it in the preview, check it there, then TAKE.": "एक नाम देकर सेव करें। स्रोत पर क्लिक करने से वह प्रीव्यू में आएगा। वहाँ देखकर TAKE करें।",
   "In a layout with several windows, choose each window's source, and which window carries the sound, under Windows next to the layouts.": "कई विंडो वाले लेआउट में हर विंडो का स्रोत, और किस विंडो की आवाज़ जाएगी, लेआउट के पास ‘विंडो’ में चुनें।",
+  "Watch Rashtrix TV": "राष्ट्रिक्स टीवी देखें",
 };

@@ -2182,3 +2182,7 @@ header.wrap .nameplate-tag p.tagline-sub{margin:0;font:700 21px/1.3 "Noto Serif 
   .ep-tagbtn .ep-circ:before{inset:-2px;border-width:1.5px}
 }
 @media(max-width:440px){header.wrap .nameplate-tag{padding-right:78px}.ep-tagbtn{font-size:11px;padding-right:7px}}
+
+/* The home channel after the phone closed the page twice: started by a tap */
+.tv-safe-start{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;aspect-ratio:16/9;border:0;border-radius:14px;background:linear-gradient(135deg,#1a0607,#AA0404);color:#fff;font:700 18px "Hind Siliguri",system-ui,sans-serif;cursor:pointer}
+.tv-safe-start span{display:grid;place-items:center;width:52px;height:52px;border-radius:50%;background:#fff;color:#AA0404;font-size:22px}

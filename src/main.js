@@ -1984,9 +1984,35 @@ function mountHomeTV() {
   const host = $("#homeTV"), hostV = $("#homeTVv"); if (!host) return;
   // Rashtrix TV (muted): on phones the first of the swipe cards, on wider screens under them;
   // Rashtrix Shorts beside it on laptops and desktops.
+  // A page that was closed by the phone (out of memory) twice in a few minutes does not start the
+  // channel by itself the next time: the reader taps to watch, and the news is readable meanwhile.
+  if (tvCrashGuard()) {
+    host.innerHTML = `<button class="tv-safe-start" type="button"><span>▶</span> ${tr("Watch Rashtrix TV")}</button>`;
+    host.querySelector("button").onclick = () => { tvBoots(true); host.innerHTML = ""; homeTV = mountTV(host, { channel: "h", muted: true, tapUnmute: false }); };
+    if (hostV) hostV.closest(".home-live").hidden = true;
+    return;
+  }
   homeTV = mountTV(host, { channel: "h", muted: true, tapUnmute: false });
   if (hostV && matchMedia("(min-width: 1181px)").matches) homeTVv = mountTV(hostV, { channel: "v", muted: true, tapUnmute: false });
   else if (hostV) hostV.closest(".home-live").hidden = true;
+}
+// Each page load that starts the home channel is noted; one that is still open after 90 seconds
+// clears the note. Two loads noted within five minutes mean the phone closed the page.
+let tvBootNoted = false;
+function tvBoots(clear = false) {
+  let list = []; try { list = JSON.parse(localStorage.getItem("rw-tv-boots") || "[]"); } catch { /* private mode */ }
+  list = clear ? [] : list.filter(t => Date.now() - t < 5 * 60e3);
+  try { localStorage.setItem("rw-tv-boots", JSON.stringify(list)); } catch { /* private mode */ }
+  return list;
+}
+function tvCrashGuard() {
+  const before = tvBoots();
+  if (!tvBootNoted) {
+    tvBootNoted = true;
+    try { localStorage.setItem("rw-tv-boots", JSON.stringify([...before, Date.now()])); } catch { /* private mode */ }
+    setTimeout(() => tvBoots(true), 90e3);
+  }
+  return before.length >= 2;
 }
 function mountWatchTV() {
   const host = $("#tvWatch"); if (!host) return;
