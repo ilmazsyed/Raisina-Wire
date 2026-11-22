@@ -9,6 +9,10 @@ export function breakingOf(b) {
   if (u && (/^https:\/\//.test(u) || /^\/(media|clips)\//.test(u))) {
     const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([\w-]{11})/);
     media = yt ? { kind: "yt", id: yt[1], url: u } : { kind: b.media.kind === "video" || /^\/clips\/|\.(mp4|webm|mov|m3u8)(\?|$)/i.test(u) ? "video" : "image", url: u };
+    // A video can play in full (the breaking lasts as long as it does, its lines shared over it),
+    // and with its own sound.
+    if (media.kind !== "image") { media.sound = !!b.media.sound; const vs = Math.round(Number(b.media.secs) || 0); if (b.media.full && vs > 0) { media.full = true; media.secs = Math.min(600, vs); } }
   }
-  return { text: lines[0], lines, seconds, total: seconds * lines.length, music: b?.music !== false, media };
+  const total = media?.full ? Math.max(seconds * lines.length, media.secs) : seconds * lines.length;
+  return { text: lines[0], lines, seconds: media?.full ? Math.round(total / lines.length) : seconds, total, music: b?.music !== false, media };
 }

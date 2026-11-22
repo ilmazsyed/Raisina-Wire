@@ -953,7 +953,14 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // An AVO story's parts, in the order the desk set (src/avo.js cleanExtra): the story (its reading
   // over its pictures, never more than 45 seconds), the bytes, the reporter's phone-in.
   const AVO_VIS_MAX = 45, PHONE_WIPE = 1.2;
-  const storyLen = x => Math.min(AVO_VIS_MAX, avoVoiceLen(x));
+  // (a full-length video: as long as it is, at most 45 seconds, and, muted under the reading, at
+  //  least as long as the reading; a length set on the desk: never shorter than the reading)
+  const storyLen = x => {
+    const v = avoVoiceLen(x), voiced = Number(x?.secs) > 0;
+    if (x?.full?.url) return Math.min(AVO_VIS_MAX, x.full.sound ? Number(x.full.secs) || 30 : Math.max(Number(x.full.secs) || 30, v));
+    if (x?.len) return Math.min(AVO_VIS_MAX, Math.max(x.len, voiced ? v : 0));
+    return Math.min(AVO_VIS_MAX, v);
+  };
   const phoneLen = x => x?.phone?.url ? PHONE_WIPE + Math.max(3, Number(x.phone.secs) || 30) : 0;
   const partsOf = x => { let a = 0; return (x?.order?.length ? x.order : ["story", "bytes", "phone"]).map(kind => { const len = kind === "story" ? storyLen(x) : kind === "bytes" ? bytesLen(x) : kind === "phone" ? phoneLen(x) : 0; const p = { kind, at: a, len }; a += len; return p; }).filter(p => p.len > 0); };
   const avoLen = x => Math.round(partsOf(x).reduce((n, p) => n + p.len, 0) * 10) / 10;
@@ -1916,7 +1923,8 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       // A story with fewer than two verified photos (src/bulletinimg.js) is told in motion
       // graphics: its headline with the story's icon, the map of its places, its figure counting up,
       // its sentences lighting up as they are read (and its one photo, if it has one).
-      const graphic = x => !(x.images || []).length;
+      // (the desk can choose the look: motion graphics, or photos even when few)
+      const graphic = x => x.scene === "motion" || (x.scene !== "photo" && !(x.images || []).length);
       // An AVO made from a breaking is a story by the time it airs: none of the breaking look
       // (no এই মুহূর্তে, no BREAKING NEWS card, no এইমাত্র tags); its words, pictures and videos stay.
       const calm = x => x?.origin === "breaking" || String(x?.id || "").startsWith("brk:");
@@ -2049,7 +2057,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       const storyHTML = (x, k) => x.ex ? `<div class="avo ex${channel === "v" ? " v" : ""}" data-k="${k}" data-ex="1"><div class="avo-pics"></div>
         <small class="avo-credit"></small>
         <div class="avo-steps ex-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${lens[j]}s"></i>`).join("")}</div></div>`
-        : `<div class="avo${channel === "v" ? " v" : ""}" data-k="${k}"><div class="avo-pics"></div><i class="avo-shade"></i>
+        : `<div class="avo${channel === "v" ? " v" : ""}${x.bg ? ` bg-${x.bg}` : ""}" data-k="${k}"><div class="avo-pics"></div><i class="avo-shade"></i>
         <div class="avo-kick"><i class="lt-pulse"></i><b>${calm(x) ? "খবর" : "এই মুহূর্তে"}</b><span>${esc(calm(x) ? "বিস্তারিত" : deskOf(x))}</span></div>
         <div class="avo-l3"><span class="lt-tag"><i class="lt-pulse"></i><b>NEWS<br>UPDATE</b><small>${calm(x) ? "বিস্তারিত" : "এই মুহূর্তে"}</small></span><span class="lt-text">${esc(x.title)}</span></div>
         <small class="avo-credit"></small>
@@ -2061,7 +2069,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         const bl = x.bytes; let bi = 0, acc = 0;
         while (bi < bl.length - 1 && t >= acc + BYTE_WIPE + Math.max(3, Number(bl[bi].secs) || 30)) { acc += BYTE_WIPE + Math.max(3, Number(bl[bi].secs) || 30); bi++; }
         const bkey = `${at0}:${k}:${bi}`; if (st.byteKey === bkey && el.querySelector(".avo-byte")) return;
-        st.byteKey = bkey; st.phoneKey = ""; shownS = -1;
+        st.byteKey = bkey; st.phoneKey = ""; st.fullKey = ""; shownS = -1;
         // (this byte on the story's clock: from after its wipe to its planned end)
         const run = st.byteRun = { key: bkey, at0, base: starts[k] + (partsOf(x).find(p => p.kind === "bytes")?.at || 0), end: acc + BYTE_WIPE + Math.max(3, Number(bl[bi].secs) || 30), started: false, ended: false, t0: Date.now() };
         voStop(); st.voice?.pause?.(); st.voice = null; st.bed?.(); st.bed = null;
@@ -2150,7 +2158,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           if (tx && tx.dataset.i !== String(li)) { tx.dataset.i = li; tx.innerHTML = `<p>${lines[li].split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</p>`; }
         };
         if (st.phoneKey === pkey && el.querySelector(".avo-phone")) { tick(); return; }
-        st.phoneKey = pkey; st.byteKey = ""; shownS = -1;
+        st.phoneKey = pkey; st.byteKey = ""; st.fullKey = ""; shownS = -1;
         voStop(); st.voice?.pause?.(); st.voice = null; st.bed?.(); st.bed = null;
         const w = document.createElement("div"); w.className = "tvp-stinger avo-sting"; w.innerHTML = `<img src="${LOGO}" alt="">`;
         stage.append(w); if (!st.muted && st.audio && loud && t < PHONE_WIPE) stingerSound(st.audio);
@@ -2180,6 +2188,39 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           });
         };
         setTimeout(paint, t < PHONE_WIPE ? 550 : 0);
+      };
+      // A full-length video instead of the pictures (at most 45 seconds): with its own sound (the
+      // music and the newsreader stop) or muted under the reading; the headline and the story's lines
+      // come over it as animated captions, one after another.
+      const fullStep = (x, k, t) => {
+        const f = x.full, fkey = `${at0}:${k}:fv`, len = storyLen(x), V = channel === "v" ? " v" : "", sound = !!f.sound && !st.muted && loud;
+        const lines = (x.lines || []).length ? x.lines : [x.title];
+        const tick = () => {
+          const box = el.querySelector(".avo-full"); if (!box) return;
+          const li = Math.min(lines.length - 1, Math.floor(Math.max(0, t) / (len / lines.length))), cap = box.querySelector(".fv-cap");
+          if (cap && cap.dataset.i !== String(li)) { cap.dataset.i = li; cap.innerHTML = `<p>${String(lines[li]).split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</p>`; }
+          const bar = box.querySelector(".fv-prog i"); if (bar) bar.style.width = `${Math.min(100, Math.max(0, t / len * 100)).toFixed(1)}%`;
+        };
+        if (st.fullKey === fkey && el.querySelector(".avo-full")) { tick(); return; }
+        st.fullKey = fkey; st.byteKey = ""; st.phoneKey = ""; shownS = -1;
+        // (each story is logged once, as when its pictures come on)
+        const logKey = `${x.id}@${Math.round(at0 + starts[k] * 1000)}`;
+        if ((mode === "app" || output) && !avoLogged.has(logKey)) { avoLogged.add(logKey); markAvoSeen(x.id); fetch("/api/tv/avo/played", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: x.id, ch: channel, key: output ? key : "" }), keepalive: true }).catch(() => {}); }
+        voStop(); st.voice?.pause?.(); st.voice = null;
+        if (f.sound) { st.bed?.(); st.bed = null; } else if (!st.bed) startBed(st.current?.scene);
+        const off = Math.max(0, t);
+        const media = f.kind === "yt" ? `<iframe class="fv-yt" src="https://www.youtube.com/embed/${esc(f.id)}?autoplay=1&mute=${sound ? 0 : 1}&start=${Math.floor(off)}&controls=0&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3&fs=0&disablekb=1&loop=1&playlist=${esc(f.id)}" allow="autoplay; encrypted-media" title=""></iframe>`
+          : `<video class="fv-vid" src="${esc(f.url)}" autoplay playsinline ${sound ? "" : "muted"} ${f.sound ? "" : "loop"} preload="auto"></video>`;
+        el.innerHTML = `<div class="avo-full${V}"><div class="fv-media">${media}</div><i class="fv-shade"></i>
+          <div class="fv-top"><span class="fv-tag"><i class="lt-pulse"></i>${calm(x) ? "খবর" : "এই মুহূর্তে"}</span><span class="fv-desk">${esc(deskOf(x))}</span></div>
+          <h2 class="fv-title">${String(x.title || "").split(/\s+/).map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(" ")}</h2>
+          <div class="fv-cap"></div>
+          <div class="fv-prog"><i></i></div>
+          <div class="avo-steps">${list.map((_, j) => `<i class="${j < k ? "done" : j === k ? "on" : ""}" style="--d:${lens[j]}s"></i>`).join("")}</div></div>`;
+        const vid = el.querySelector("video.fv-vid");
+        if (vid) { vid.addEventListener("loadedmetadata", () => { try { if (off > 0.5) vid.currentTime = Math.min(off, Math.max(0, vid.duration - 0.3)); } catch { /* none */ } }, { once: true }); const pr = vid.play(); if (pr?.catch) pr.catch(() => { vid.muted = true; vid.play().catch(() => {}); }); }
+        tick();
+        if (!f.sound) { speakAvo(x); st.resumeVoice = () => { if (el.isConnected) speakAvo(x); }; }
       };
       // Uploaded bytes and their elements, loaded in advance: each story's bytes start loading the
       // moment the story is on screen (while the newsreader reads), so a byte plays at once.
@@ -2237,6 +2278,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
         const parts = partsOf(x), part = parts.findLast(p => e - starts[k] >= p.at) || parts[0] || { kind: "story", at: 0 };
         if (part.kind === "bytes") { byteStep(x, k, e - starts[k] - part.at); return; }
         if (part.kind === "phone") { phoneStep(x, k, e - starts[k] - part.at); return; }
+        if (x.full?.url) { fullStep(x, k, e - starts[k] - part.at); return; }
         const into = e - starts[k] - part.at, vlen = storyLen(x);
         const cap = Math.max(2, Math.min(7, Math.floor(vlen / 4.5))), want = Math.max(2, Math.min(cap, real.length));
         // A picture that finishes loading may add a slide, only when that leaves the slide on screen as it is.
@@ -2249,7 +2291,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
           // A fresh frame always gets its first slide (a slide drawn into the old frame during the
           // wipe must not count, or the new story stays black until its second slide).
           stage.classList.toggle("ex-on", !!x.ex); stage.classList.remove("byte-on");
-          const paint = () => { el.innerHTML = storyHTML(x, k); shownS = -1; st.byteKey = ""; st.phoneKey = ""; if (stage.classList.contains("byte-on")) { stage.classList.remove("byte-on"); drawJacket(); } if (!st.bed) startBed(st.current?.scene); speakAvo(x); st.resumeVoice = () => { if (el.isConnected) speakAvo(x); }; drawA(); };
+          const paint = () => { el.innerHTML = storyHTML(x, k); shownS = -1; st.byteKey = ""; st.phoneKey = ""; st.fullKey = ""; if (stage.classList.contains("byte-on")) { stage.classList.remove("byte-on"); drawJacket(); } if (!st.bed) startBed(st.current?.scene); speakAvo(x); st.resumeVoice = () => { if (el.isConnected) speakAvo(x); }; drawA(); };
           // Each story is logged: an airing from the broadcast output, a view from the app or site.
           const logKey = `${x.id}@${Math.round(at0 + starts[k] * 1000)}`;
           if ((mode === "app" || output) && !avoLogged.has(logKey)) { avoLogged.add(logKey); markAvoSeen(x.id); fetch("/api/tv/avo/played", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: x.id, ch: channel, key: output ? key : "" }), keepalive: true }).catch(() => {}); }
@@ -2755,15 +2797,18 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     // (a new breaking replaces one still on screen)
     clearTimeout(st.brT); stage.querySelectorAll(".tv-breaking,.tv-intro").forEach(x => x.remove());
     const intro = document.createElement("div"); intro.className = "tv-intro"; intro.innerHTML = introCard(true); stage.append(intro);
-    if (b.music && !st.muted) breakingSting(st.audio, Math.min(b.seconds, 8));
+    // (a video with its own sound: the sting only under the opening card)
+    if (b.music && !st.muted) breakingSting(st.audio, b.media?.sound ? 2.2 : Math.min(b.seconds, 8));
     st.brT = setTimeout(() => { intro.remove(); showBreakingStory(b); }, 2000);
   }
   // The breaking: its lines one after another (each for b.seconds), with its picture, muted video
   // or YouTube video (muted) behind, if it has one.
   function showBreakingStory(b) {
     const lines = (b.lines?.length ? b.lines : [b.text]).filter(Boolean), m = b.media, per = Math.max(5, Number(b.seconds) || 20);
-    const media = !m ? "" : m.kind === "yt" ? `<div class="br-media"><iframe src="https://www.youtube.com/embed/${esc(m.id)}?autoplay=1&mute=1&controls=0&loop=1&playlist=${esc(m.id)}&playsinline=1&modestbranding=1&rel=0" allow="autoplay; encrypted-media" title=""></iframe><i></i></div>`
-      : m.kind === "video" ? `<div class="br-media"><video src="${esc(m.url)}" autoplay muted loop playsinline></video><i></i></div>`
+    // (a video plays with its own sound when the desk chose it, and in full when it chose that)
+    const snd = !!m?.sound && !st.muted && loud, loop = m?.full ? "" : "loop";
+    const media = !m ? "" : m.kind === "yt" ? `<div class="br-media"><iframe src="https://www.youtube.com/embed/${esc(m.id)}?autoplay=1&mute=${snd ? 0 : 1}&controls=0${m.full ? "" : `&loop=1&playlist=${esc(m.id)}`}&playsinline=1&modestbranding=1&rel=0" allow="autoplay; encrypted-media" title=""></iframe><i></i></div>`
+      : m.kind === "video" ? `<div class="br-media"><video src="${esc(m.url)}" autoplay ${snd ? "" : "muted"} ${loop} playsinline></video><i></i></div>`
       : `<div class="br-media"><img src="${esc(m.url)}" alt="" referrerpolicy="no-referrer"><i></i></div>`;
     const dots = lines.length > 1 ? `<span class="br-dots">${lines.map((_, i) => `<i data-i="${i}"></i>`).join("")}</span>` : "";
     const el = document.createElement("div"); el.className = `tv-breaking${!m ? " br-plain" : ["yt", "video"].includes(m.kind) ? " has-media has-vid" : " has-media has-img"}`;
@@ -2771,6 +2816,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       ? `${media}<div class="br-slash"></div><div class="br-in"><span class="br-tag">এইমাত্র পাওয়া খবর</span>${dots}<b class="br-line"></b>${m ? "" : `<img src="${LOGO}" alt="">`}</div><div class="br-bar"></div>`
       : vJacket(`<div class="br-v">${media}<span class="br-tag">এইমাত্র পাওয়া খবর</span>${dots}<b class="br-line"></b></div>`, "এইমাত্র পাওয়া খবর");
     stage.append(el);
+    if (snd) { const v = el.querySelector(".br-media video"); if (v) { const pr = v.play(); if (pr?.catch) pr.catch(() => { v.muted = true; v.play().catch(() => {}); }); } }
     const show = i => { const t = el.querySelector(".br-line"); if (!t) return; t.textContent = lines[i]; t.style.animation = "none"; void t.offsetWidth; t.style.animation = ""; el.querySelectorAll(".br-dots i").forEach((d, j) => d.classList.toggle("on", j === i)); };
     show(0); lines.slice(1).forEach((_, i) => setTimeout(() => el.isConnected && show(i + 1), per * 1000 * (i + 1)));
     st.current?.slots.forEach(s => s.setMuted(true));

@@ -217,11 +217,11 @@ export function screenStory(r) {
     // after the reading.
     videos: j(r.videos, "[]"), bytes: r.byte_mode ? j(r.bytes, "[]").slice(0, Math.max(1, r.byte_count || 1)) : [],
     // The phone-in and the order of the parts (cleanExtra).
-    ...(() => { const e = j(r.extra, "{}"); return { phone: e.phone || null, order: e.order || null }; })(),
+    ...(() => { const e = j(r.extra, "{}"); return { phone: e.phone || null, order: e.order || null, full: e.full || null, scene: e.scene || "", bg: e.bg || "", len: e.len || 0 }; })(),
     upd: (r.origin || "auto") === "auto" && !!(r.prepared_at && r.created_at && Date.parse(r.prepared_at) - Date.parse(String(r.created_at).replace(" ", "T") + "Z") > 15 * 60e3),
     // The explainer look (src/engine.js exSlides): West Bengal, Kolkata and India politics, the world
     // and Bangladesh. Other stories keep the AVO's own look.
-    ex: bulletinRank(r.desk, `${r.title} ${j(r.script, "[]").slice(0, 2).join(" ")}`) <= 2 || ["World"].includes(r.desk) || /বাংলাদেশ|ঢাকা/.test(r.title || ""),
+    ex: (() => { const sc = j(r.extra, "{}").scene; return sc ? sc === "explainer" : null; })() ?? (bulletinRank(r.desk, `${r.title} ${j(r.script, "[]").slice(0, 2).join(" ")}`) <= 2 || ["World"].includes(r.desk) || /বাংলাদেশ|ঢাকা/.test(r.title || "")),
     ...labelsOf(r.desk, `${r.title} ${j(r.script, "[]").join(" ")}`, (() => { try { return JSON.parse(r.labels || "null"); } catch { return null; } })()) };
 }
 
@@ -288,8 +288,14 @@ function cleanManual(b, max = 450) {
 // The story's extra settings (the column `extra`):
 //   phone: a reporter's phone-in: the call's audio (uploaded or a link), name, place, picture,
 //          length and an optional transcript shown line by line as it plays;
-//   order: the order of the parts: the story (its reading over its pictures), the bytes, the phone-in.
-const PARTS = ["story", "bytes", "phone"];
+//   order: the order of the parts: the story (its reading over its pictures), the bytes, the phone-in;
+//   full:  a full-length video played instead of the pictures (at most 45 seconds of it), with its
+//          own sound (then the newsreader does not read) or muted under the reading; the headline
+//          and the story's lines come over it as animated captions;
+//   scene: the look (auto, explainer, motion graphics or photos); bg: the background colour of the
+//          story's text cards; len: how long the story's own pictures run (10 to 45 seconds; never
+//          shorter than its reading).
+const PARTS = ["story", "bytes", "phone"], SCENES = ["explainer", "motion", "photo"], BGS = ["red", "navy", "black", "maroon", "teal", "gold"];
 export function cleanExtra(e) {
   e = e && typeof e === "object" ? e : {};
   const s = (v, n) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
@@ -300,6 +306,11 @@ export function cleanExtra(e) {
     transcript: String(p.transcript || "").replace(/\r/g, "").trim().slice(0, 4000) };
   const order = (Array.isArray(e.order) ? e.order : []).filter((x, i, a) => PARTS.includes(x) && a.indexOf(x) === i);
   if (order.length) out.order = [...order, ...PARTS.filter(x => !order.includes(x))];
+  const f = e.full, fv = f && url(f.url) ? vidOf(f.url) : null;
+  if (fv) out.full = { ...fv, sound: !!f.sound, secs: Math.max(3, Math.min(900, Math.round(Number(f.secs) || 0))) || 45 };
+  if (SCENES.includes(e.scene)) out.scene = e.scene;
+  if (BGS.includes(e.bg)) out.bg = e.bg;
+  const len = Math.round(Number(e.len) || 0); if (len) out.len = Math.max(10, Math.min(45, len));
   return out;
 }
 // A video link: YouTube (any address) or a video file (https …mp4/webm/mov, or the clip store).
