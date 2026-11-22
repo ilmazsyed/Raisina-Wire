@@ -18,6 +18,10 @@ const DESK_SLUG = { Kolkata: "kolkata", "West Bengal": "west-bengal", India: "in
 const deskOf = slug => DESKS.find(d => DESK_SLUG[d] === slug);
 const deskHref = d => `/desk/${DESK_SLUG[d] || "world"}`;
 const isWire = a => a?.kind === "rewrite" || a?.kind === "brief";
+// A story on a desk: its own desk; the Kolkata desk also carries every story whose headline is set
+// in Kolkata or around it, whatever desk it was filed on (a concert in the city, the derby).
+const KOLKATA_HEAD = new RegExp("kolkata|calcutta|howrah|salt ?lake|bidhannagar|new ?town|rajarhat|dum ?dum|behala|jadavpur|tollygunge|garia|kasba|sealdah|esplanade|park street|কলকাতা|কলিকাতা|হাওড়া|সল্টলেক|বিধাননগর|নিউ ?টাউন|রাজারহাট|দমদম|বেহালা|যাদবপুর|টালিগঞ্জ|গড়িয়া|কসবা|শিয়ালদহ|ধর্মতলা|পার্ক স্ট্রিট|कोलकाता|हावड़ा".normalize("NFC"), "i");
+const onDesk = (a, d) => a.category === d || (d === "Kolkata" && !!a && KOLKATA_HEAD.test(String(a.title || "").normalize("NFC")));
 const kindLabel = a => a?.kind === "brief" ? "Brief" : a?.kind === "rewrite" ? "Rashtrix Wire" : "";
 
 /* ---------- Formatting ---------- */
@@ -507,7 +511,7 @@ function renderHomeDesks(used = new Set()) {
     // The four newest on each desk, wire briefs and reports included; a desk with fewer new
     // ones also shows its stories from the top of the page, and any slot still empty becomes a
     // "more from this desk" tile, so no row has a gap.
-    const all = newest(stories().filter(a => a.category === d));
+    const all = newest(stories().filter(a => onDesk(a, d)));
     const pickd = [...all.filter(a => !used.has(a.id)), ...all.filter(a => used.has(a.id))].slice(0, 4);
     host.closest(".desk-band").hidden = !pickd.length;
     const more = pickd.length && pickd.length < 4 ? `<a class="ed-card glass desk-more" href="${deskHref(d)}"><span class="body"><span class="kicker">${esc(tr(d))}</span><h3>${esc(tr("More from this desk"))} →</h3><span class="meta">${esc(tr("All the latest stories"))}</span></span></a>` : "";
@@ -528,7 +532,7 @@ function renderBriefBand() {
    the most read, the poll of the day and the e-paper. Wire rewrites and briefs stay text only. */
 const DESK_TONE = { Kolkata: "#7d0303", "West Bengal": "#A43F44", India: "#1f3a6b", "Probashi Bangali": "#7a4f00", World: "#0f5f66", Entertainment: "#6b2f8a", Sports: "#137a55", Lifestyle: "#94365f" };
 const byNew = l => l.sort((x, y) => (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0));
-const deskStories = d => byNew(stories().filter(a => a.category === d)).filter(a => Date.now() - (Date.parse(a.publishedAt) || 0) < 48 * 3600e3).slice(0, 8);
+const deskStories = d => byNew(stories().filter(a => onDesk(a, d))).filter(a => Date.now() - (Date.parse(a.publishedAt) || 0) < 48 * 3600e3).slice(0, 8);
 const DESK_ICON = (() => {
   const g = d => `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   return {
@@ -557,7 +561,7 @@ function viewHomePhone() {
   const glance = [...all.filter(a => isWire(a) && ageH(a) < 6 && !used.has(a.id)).sort((x, y) => (x.pri ?? 10) - (y.pri ?? 10) || (Date.parse(y.publishedAt) || 0) - (Date.parse(x.publishedAt) || 0))];
   if (glance.length < 5) glance.push(...all.filter(a => !used.has(a.id) && !glance.includes(a)).slice(0, 5 - glance.length));
   glance.splice(5); glance.forEach(a => used.add(a.id));
-  const desks = DESKS.filter(d => stories().some(a => a.category === d));
+  const desks = DESKS.filter(d => stories().some(a => onDesk(a, d)));
   $("#view").innerHTML = `<div class="ph-home">
     <a class="ph-break" id="phBreak" hidden></a>
     <div class="ph-today" id="phToday"></div>
@@ -586,7 +590,7 @@ function viewHomePhone() {
 // A desk in its colour: its own story with a photo first (if it has one), then four headlines;
 // "More stories" shows the next five here, without leaving the page.
 function phDesk(d, used) {
-  const list = byNew(stories().filter(a => a.category === d)), tone = DESK_TONE[d] || "var(--red)";
+  const list = byNew(stories().filter(a => onDesk(a, d))), tone = DESK_TONE[d] || "var(--red)";
   const lead = list.find(a => !isWire(a) && a.image && !used.has(a.id));
   const rest = list.filter(a => a !== lead);
   const row = e => `<a class="ph-line" href="${edHref(e)}"><time data-no-tr>${clock(e.publishedAt)}</time><b>${esc(e.title)}</b></a>`;
@@ -785,7 +789,7 @@ function closeDeskStories() {
 /* ---------- Desks, briefs and the latest stream ---------- */
 function viewDesk(r) {
   const d = deskOf(r.arg); if (!d) return viewNotFound();
-  const list = stories().filter(a => a.category === d);
+  const list = stories().filter(a => onDesk(a, d));
   document.title = `${tr(d)} · ${tr("Rashtrix 24×7 News")}`;
   const own = list.filter(a => !isWire(a)), wire = list.filter(isWire);
   $("#view").innerHTML = `<div class="wrap"><div class="page-head"><div><div class="kicker">Desk</div><h1>${esc(d)}</h1></div>${followBtn(d)}</div>

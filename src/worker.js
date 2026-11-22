@@ -1,7 +1,7 @@
 import { itemScene } from "./scenes.js";
 import { cached, categorize, DESKS } from "./feeds.js";
 import { bulletinRank } from "./labels.js";
-import { runWireDesk, wireDeskReport, saveWireSettings, wireSettings, fetchSources, groupItems, writeJob, quota, videoHeadlines, refileSubjects } from "./wiredesk.js";
+import { runWireDesk, wireDeskReport, saveWireSettings, wireSettings, fetchSources, groupItems, writeJob, quota, videoHeadlines, refileSubjects, refileKolkata } from "./wiredesk.js";
 import { syncWixFeed, backfillWix, wixStatus, restartWixBackfill } from "./wix.js";
 import m0001 from "../migrations/0001_init.sql";
 import m0002 from "../migrations/0002_platform_modules.sql";
@@ -2006,6 +2006,7 @@ async function scheduled(env) {
   // The wire desk (approved sources → rewrites and briefs) and the Wix import (rashtrix.live).
   await step("wire desk", () => runWireDesk(env, { onAlert: a => storyAlert(env, null, null, { ...a, status: "published", kind: "rewrite", published_at: new Date().toISOString() }) }));
   await step("subject desks", () => refileSubjects(env));
+  await step("Kolkata desk", () => refileKolkata(env));
   await step("wix feed", () => syncWixFeed(env));
   await step("wix backfill", () => backfillWix(env));
   // Rashtrix TV: refresh YouTube sources (each at most every ten minutes).

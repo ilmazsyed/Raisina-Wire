@@ -173,6 +173,14 @@ const SCHEMA = { type: "OBJECT", properties: { place: PLACE_SCHEMA, scope: { typ
 // used only when it gives no place.
 const KOLKATA_AREA = /kolkata|calcutta|howrah|salt ?lake|bidhannagar|new ?town|rajarhat|dum ?dum|baranagar|behala|jadavpur|tollygunge|garia|kasba|barasat|sonarpur|কলকাতা|হাওড়া|সল্টলেক|বিধাননগর|নিউ ?টাউন|রাজারহাট|দমদম|বরানগর|বেহালা|যাদবপুর|টালিগঞ্জ|গড়িয়া|কসবা/i;
 const IN_BENGAL = /west ?bengal|পশ্চিমবঙ্গ|^bengal$/i;
+// State-level news that happens in Kolkata but belongs to the West Bengal desk: the state
+// government, the chief minister, the assembly and its members, the governor, the High Court.
+const STATE_LEVEL_RE = /nabanna|chief minister|\bcm\b|assembly|governor|high court|state government|\bminister|\bmla\b|election commission|নবান্ন|মুখ্যমন্ত্রী|বিধানসভা|রাজ্যপাল|হাইকোর্ট|হাই কোর্ট|রাজ্য সরকার|মন্ত্রী|বিধায়ক|নির্বাচন কমিশন|मुख्यमंत्री|विधानसभा|राज्यपाल|हाईकोर्ट|विधायक|मंत्री/i;
+// (Bengali য় can be written as one letter or as য with a dot below: the text and the patterns are
+//  both brought to one form before they are compared)
+const nf = t => String(t || "").normalize("NFC");
+const STATE_LEVEL = new RegExp(nf(STATE_LEVEL_RE.source), "i"), KOLKATA_NF = new RegExp(nf(KOLKATA_AREA.source), KOLKATA_AREA.flags);
+const isKolkata = t => KOLKATA_NF.test(nf(t)), isStateLevel = t => STATE_LEVEL.test(nf(t));
 const IN_INDIA = /^(india|bharat|ভারত|भारत)$/i;
 const BEAT_DESK = { entertainment: "Entertainment", sports: "Sports", lifestyle: "Lifestyle" };
 export function deskFor(out) {
@@ -189,7 +197,13 @@ export function deskFor(out) {
   if (scope === "international" && !IN_BENGAL.test(state)) return "World";
   if (state && !IN_BENGAL.test(state) && !KOLKATA_AREA.test(local)) return "India";
   if (scope === "national" && !state) return "India";
-  if (IN_BENGAL.test(state) || KOLKATA_AREA.test(local)) return scope === "city" && KOLKATA_AREA.test(local) ? "Kolkata" : "West Bengal";
+  // Kolkata: a story that happened in Kolkata or around it (the model rarely calls one "city", so
+  // its place decides), unless it is state-level news, which stays on the West Bengal desk.
+  if (IN_BENGAL.test(state) || KOLKATA_AREA.test(local)) {
+    const head = `${out?.en?.title || ""} ${out?.bn?.title || ""}`;
+    const inCity = isKolkata(local) || (!local.trim() && isKolkata(head));
+    return inCity && (scope === "city" || !isStateLevel(head)) ? "Kolkata" : "West Bengal";
+  }
   return PLACE_DESKS.includes(out?.desk) ? out.desk : "India";
 }
 
@@ -450,6 +464,22 @@ export async function videoHeadlines(env, n = 15) {
   return { done: stmts.length, written: Object.keys(lines).length };
 }
 
+
+/* ---------- The Kolkata desk: earlier Kolkata stories filed under West Bengal (once) ---------- */
+// Until the rule above, almost every Kolkata story went to the West Bengal desk (the model seldom
+// called a story "city"). Those whose headline is set in Kolkata or around it, and
+// that are not state-level news, are moved to the Kolkata desk, once, on the newest 2,000.
+const KOLKATA_KEY = "desks_kolkata_v1";
+export async function refileKolkata(env) {
+  const done = await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(KOLKATA_KEY).first().catch(() => null);
+  if (done) return { done: 0 };
+  const { results } = await env.DB.prepare("SELECT id, title, dek FROM articles WHERE category='West Bengal' ORDER BY published_at DESC LIMIT 2000").all();
+  // (by the headline: a standfirst often names Kolkata in passing, for a story from elsewhere)
+  const ids = results.filter(r => isKolkata(r.title) && !isStateLevel(r.title)).map(r => r.id);
+  for (let i = 0; i < ids.length; i += 50) await env.DB.batch(ids.slice(i, i + 50).map(id => env.DB.prepare("UPDATE articles SET category='Kolkata' WHERE id=?").bind(id)));
+  await env.DB.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(KOLKATA_KEY, String(ids.length)).run();
+  return { done: ids.length };
+}
 
 /* ---------- Moving earlier stories to the subject desks (once per rule change) ---------- */
 // Entertainment, sport and lifestyle stories filed under a place desk before those desks
