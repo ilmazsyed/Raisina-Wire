@@ -20,6 +20,8 @@ body{background:radial-gradient(ellipse at 50% 20%,#f3f4f6 0%,#dcdee2 70%,#cdd0d
 .ep-holder{margin:0 auto;position:relative}
 /* ---------- the paper ---------- */
 .ep-sheet{position:absolute;left:0;top:0;width:1240px;height:2010px;transform-origin:0 0}
+/* (on phones and tablets the pictures stay still: their slow drift made the page seem to wobble) */
+@media (hover:none){.alive .ph > i{animation:develop 2.6s cubic-bezier(.3,.6,.3,1) var(--pd, .2s) both!important}.alive .ph .gleam,.crestw::after{animation:none!important}}
 .ep-page{position:absolute;left:0;top:0;width:1240px;height:2010px;background:var(--paper);overflow:hidden;box-shadow:0 26px 50px rgba(40,44,52,.26),0 2px 6px rgba(0,0,0,.06)}
 .ep-page::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:30;background:linear-gradient(118deg,rgba(255,255,255,0) 28%,rgba(255,255,255,.16) 41%,rgba(255,255,255,0) 54%)}
 .ep-in{position:absolute;left:30px;top:24px;width:1180px;height:1962px}
@@ -295,3 +297,13 @@ body.ep-card *{animation-duration:0s!important;animation-delay:0s!important;tran
   .ep-print .ep-page *{animation:none!important;transition:none!important;opacity:1!important;filter:none!important}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+/* the English nameplate: Old English lettering, the crest between the words */
+.mh .np .olde{display:block;height:132px;width:auto;object-fit:contain}
+.mh .np .olde.d{height:126px}
+.rh .nm .olde-s{height:34px;width:auto;vertical-align:middle;margin-right:8px}
+/* the toolbar keeps to the screen's width: on a phone it scrolls sideways within itself */
+.ep-bar{max-width:100vw;box-sizing:border-box;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+.ep-bar::-webkit-scrollbar{display:none}
+.ep-bar>*{flex:none}
+html,body{overflow-x:clip}

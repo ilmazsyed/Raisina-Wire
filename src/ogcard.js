@@ -68,8 +68,9 @@ export async function renderEpaperCard(env, origin) {
   if (row?.title !== ed.id) done = !!(await renderSlugs(env, origin, [{ slug: EP_SLUG, title: ed.id }], { headers: { "x-rw-card": key }, wait: 7000 }))[0];
   // The top half of each language's front page, for the app's home page.
   const fronts = [];
-  for (const l of EP_LANGS) { const r = await env.DB.prepare("SELECT title FROM og_cards WHERE slug=?").bind(`__epf_${l}`).first().catch(() => null); if (r?.title !== ed.id) fronts.push({ slug: `__epf_${l}`, title: ed.id }); }
-  if (fronts.length) await renderSlugs(env, origin, fronts, { headers: { "x-rw-card": key }, wait: 7000, viewport: { width: 744, height: 603 } });
+  // (taken at twice the size, so they are sharp on a phone's screen; "@2x" marks those)
+  for (const l of EP_LANGS) { const r = await env.DB.prepare("SELECT title FROM og_cards WHERE slug=?").bind(`__epf_${l}`).first().catch(() => null); if (r?.title !== `${ed.id}@2x`) fronts.push({ slug: `__epf_${l}`, title: `${ed.id}@2x` }); }
+  if (fronts.length) await renderSlugs(env, origin, fronts, { headers: { "x-rw-card": key }, wait: 7000, viewport: { width: 744, height: 603, deviceScaleFactor: 2 } });
   return { done, fronts: fronts.length };
 }
 const EP_LANGS = ["bn", "en", "hi"];
@@ -136,7 +137,7 @@ async function renderSlugs(env, origin, rows, { headers, wait = 0, viewport = { 
   const browser = await puppeteer.launch(env.BROWSER), out = [], now = new Date().toISOString();
   try {
     const page = await browser.newPage();
-    await page.setViewport({ ...viewport, deviceScaleFactor: 1 });
+    await page.setViewport({ deviceScaleFactor: 1, ...viewport });
     if (headers) await page.setExtraHTTPHeaders(headers);
     for (const r of rows) {
       try {
