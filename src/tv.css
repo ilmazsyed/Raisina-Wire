@@ -2118,3 +2118,7 @@ html.tvp-fs-lock,html.tvp-fs-lock body{overflow:hidden}
 .sp-bar i{background:#c8100f}
 .sp-wait{color:#8a8a8f}
 @media (prefers-reduced-motion: reduce){.sp-panel::before,.sp-head::after{animation:none}}
+/* One hint at a time on the app's player: while a video waits for the viewer's tap, its own
+   "tap to play" sign on the picture is the only one (no second hint under it, no sound button). */
+.tvp-taphint{display:none!important}
+.tvp-needtap .tvp-sound{display:none!important}

@@ -64,7 +64,7 @@ import { handleHeads, prepareHeadVoices, headVoiceAgain } from "./headlines.js";
 import { handleLrd, asrunPost, upNext } from "./liverundown.js";
 import { applyVoice, handleVoice } from "./voicelab.js";
 import { handleStudio } from "./studioapi.js";
-import { handleExtras, tvExtras, weather as kolkataWeather } from "./extras.js";
+import { handleExtras, tvExtras, weather as kolkataWeather, weatherBrief } from "./extras.js";
 import { rundownHousekeeping, rundownCues } from "./rundown.js";
 export { TvControl } from "./control.js";
 import { shortsList } from "./tvchannel.js";
@@ -1309,19 +1309,22 @@ async function api(request, env, ctx) {
   // most-read stories of the last day, what Rashtrix TV has on now and next, and the e-paper.
   if (url.pathname === "/api/home" && request.method === "GET") {
     const since = d => new Date(Date.now() - d * 864e5).toISOString().slice(0, 10);
-    const [hs, ex, log, pop, ed, wx] = await Promise.all([
+    const [hs, ex, log, pop, ed, wx, brief] = await Promise.all([
       tvSettings(env, "h").catch(() => null), tvExtras(env).catch(() => null), deskSettings(env, "tv:breaklog", []),
       env.DB.prepare("SELECT v.slug, SUM(v.views) AS n FROM story_views v JOIN articles a ON a.slug=v.slug AND a.status='published' WHERE v.day>=? GROUP BY v.slug ORDER BY n DESC LIMIT 5").bind(since(1)).all().then(r => r.results).catch(() => []),
       env.DB.prepare("SELECT id, day, slot, pages FROM epaper_editions WHERE status='published' ORDER BY published_at DESC LIMIT 1").first().catch(() => null),
-      kolkataWeather(env).catch(() => null)
+      kolkataWeather(env).catch(() => null), weatherBrief(env).catch(() => null)
     ]);
+    // (the header's live counter: Kolkata first, then the rest of Bengal and the big cities)
+    const WXS = ["Kolkata", "Darjeeling", "Howrah", "Medinipur", "Murshidabad", "Delhi", "Mumbai", "Bengaluru", "Guwahati", "Chennai"];
+    const wxs = WXS.map(n => (brief?.places || []).find(p => p.en === n)).filter(Boolean).map(p => ({ en: p.en, bn: p.bn, t: p.temp, k: p.kind, ken: p.kindEn, kbn: p.kindBn }));
     const last = (log || []).find(x => x.act === "breaking" || x.act === "clear");
     const breaking = last?.act === "breaking" && Date.now() - Date.parse(last.at) < 45 * 60e3 ? { text: (last.lines || [])[0] || String(last.text || "").split(" · ")[0], at: last.at } : null;
     const tv = hs?.on ? await upNext(env, "h", hs).catch(() => null) : null;
     let pages = 0; try { pages = JSON.parse(ed?.pages || "[]").length; } catch { /* none */ }
-    return json({ breaking, bangabda: ex?.bangabda || "", weather: wx && wx.temp != null ? { temp: wx.temp, text: wx.text } : null,
+    return json({ breaking, bangabda: ex?.bangabda || "", weather: wx && wx.temp != null ? { temp: wx.temp, text: wx.text } : null, wxs,
       poll: (ex?.polls || []).find(q => q.status === "open") || null, popular: (pop || []).map(r => r.slug), tv,
-      epaper: ed ? { day: ed.day, slot: ed.slot, pages, fronts: (await env.DB.prepare("SELECT slug FROM og_cards WHERE slug IN ('__epf_bn','__epf_en','__epf_hi') AND title=?").bind(`${ed.id}@2x`).all().catch(() => ({ results: [] }))).results.map(r => r.slug.slice(6)) } : null }, 200, { "cache-control": "public, max-age=30" });
+      epaper: ed ? { day: ed.day, slot: ed.slot, pages, fronts: (await env.DB.prepare("SELECT slug FROM og_cards WHERE slug IN ('__epf_bn','__epf_en','__epf_hi') AND title IN (?,?)").bind(`${ed.id}@2x`, `${ed.id}@2xf`).all().catch(() => ({ results: [] }))).results.map(r => r.slug.slice(6)) } : null }, 200, { "cache-control": "public, max-age=30" });
   }
   if (url.pathname === "/api/tv/videos" && request.method === "GET") {
     const { results } = await env.DB.prepare(`SELECT i.channel, i.yt_id AS id, i.title, i.thumb, i.duration, i.published_at AS publishedAt FROM tv_items i JOIN tv_sources s ON s.id=i.source_id

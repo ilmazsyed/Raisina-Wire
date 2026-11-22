@@ -69,7 +69,7 @@ export async function renderEpaperCard(env, origin) {
   // The top half of each language's front page, for the app's home page.
   const fronts = [];
   // (taken at twice the size, so they are sharp on a phone's screen; "@2x" marks those)
-  for (const l of EP_LANGS) { const r = await env.DB.prepare("SELECT title FROM og_cards WHERE slug=?").bind(`__epf_${l}`).first().catch(() => null); if (r?.title !== `${ed.id}@2x`) fronts.push({ slug: `__epf_${l}`, title: `${ed.id}@2x` }); }
+  for (const l of EP_LANGS) { const r = await env.DB.prepare("SELECT title FROM og_cards WHERE slug=?").bind(`__epf_${l}`).first().catch(() => null); if (r?.title !== `${ed.id}@2xf`) fronts.push({ slug: `__epf_${l}`, title: `${ed.id}@2xf` }); }
   if (fronts.length) await renderSlugs(env, origin, fronts, { headers: { "x-rw-card": key }, wait: 7000, viewport: { width: 744, height: 603, deviceScaleFactor: 2 } });
   return { done, fronts: fronts.length };
 }
@@ -143,6 +143,14 @@ async function renderSlugs(env, origin, rows, { headers, wait = 0, viewport = { 
       try {
         await page.goto(`${origin}/og/card/${encodeURIComponent(r.slug)}`, { waitUntil: "networkidle0", timeout: 20000 });
         await page.evaluate(() => document.fonts.ready);
+        // The e-paper pages are drawn in frames: their own type (the mastheads' Noto Serif Bengali
+        // and Tiro Devanagari) is loaded there and waited for, or the picture is taken in a
+        // stand-in font.
+        for (const f of page.frames()) if (f !== page.mainFrame()) await Promise.race([f.evaluate(async () => {
+          const want = ['900 116px "Noto Serif Bengali"', '700 40px "Noto Serif Bengali"', '400 118px "Tiro Devanagari Hindi"', '400 20px "Tiro Bangla"', '800 26px "Noto Sans Bengali"', '700 14px "Noto Sans Devanagari"'];
+          await Promise.all(want.map(s => document.fonts.load(s, "দৈনিক রাষ্ট্রিক্স दैनिक राष्ट्रिक्स").catch(() => null)));
+          await document.fonts.ready;
+        }).catch(() => null), new Promise(r => setTimeout(r, 9000))]);
         if (wait) await new Promise(r => setTimeout(r, wait));
         const shot = await page.screenshot({ type: "jpeg", quality: 84 });
         const bytes = shot instanceof Uint8Array ? shot : new Uint8Array(shot);
