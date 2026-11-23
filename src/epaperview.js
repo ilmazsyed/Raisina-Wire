@@ -32,7 +32,8 @@ const $ = (s, el = document) => el.querySelector(s), $$ = (s, el = document) => 
 const CW = 136.125, GUT = 13, X = c => c * (CW + GUT), WD = n => n * CW + (n - 1) * GUT;
 const CREST = "/brand/epaper-crest.webp";
 document.documentElement.lang = LANG;
-document.title = `${W.daily} ${W.name} · ${W.epaper}`;
+// (the server gives the page its title, src/seo.js epaperPage)
+if (!document.title) document.title = `${W.daily} ${W.name} · ${W.epaper}`;
 
 /* ---------- pieces ---------- */
 const box = (c, n, top, h, inner, cls = "", attrs = "") => `<div class="g ${cls}" style="left:${X(c)}px;top:${top}px;width:${WD(n)}px;height:${h}px" ${attrs}>${inner}</div>`;

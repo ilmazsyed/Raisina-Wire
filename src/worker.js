@@ -83,7 +83,7 @@ import { LANGS, PAGE_LANGS, isLang, localiseArticles, localisePage, PAGES, pageV
 import { mtReady, translateFields, translateBody } from "./mt.js";
 import { vapidKeys, createAlert, drainAlerts } from "./push.js";
 import { briefStep, briefState, briefPick, saveBriefRules, sendBrief, telegramConnect, telegramHook, ownerTelegram } from "./ownerbrief.js";
-import { renderPage, sitemap, newsSitemap, robots, feed, PAGE_PATTERN } from "./seo.js";
+import { renderPage, sitemap, sitemapPart, newsSitemap, robots, feed, PAGE_PATTERN, APP_ROUTES, epaperPage, tagNamesStep } from "./seo.js";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -2083,6 +2083,7 @@ async function scheduled(env) {
   });
   // New and changed stories announced to Bing and the other IndexNow engines (src/indexnow.js).
   await step("indexnow", () => indexNow(env));
+  await step("tag names", () => tagNamesStep(env));
   // The site's own card: Rashtrix TV live with the top headline (src/ogcard.js).
   await step("site card", async () => {
     const origin = env.SITE_URL || (await env.DB.prepare("SELECT value FROM settings WHERE key='site_origin'").first())?.value;
@@ -2153,8 +2154,26 @@ export default {
       if (url.pathname === "/privacy.html" || url.pathname === "/terms.html") return Response.redirect(new URL(url.pathname.replace(".html", ""), request.url).toString(), 301);
       if (url.pathname === "/sitemap.xml" && env.DB) return await sitemap(request, env, ensureSchema);
       if (url.pathname === "/news-sitemap.xml" && env.DB) return await newsSitemap(request, env, ensureSchema);
+      { const sm = url.pathname.match(/^\/sitemaps\/([\w-]+)\.xml$/); if (sm && env.DB) return await sitemapPart(request, env, ensureSchema, sm[1]); }
       if ((url.pathname === "/feed.xml" || url.pathname === "/rss.xml") && env.DB) return await feed(request, env, ensureSchema);
       if (env.ASSETS && request.method === "GET" && PAGE_PATTERN.test(url.pathname.replace(/^\/(en|hi)(?=\/|$)/, "") || "/")) return await renderPage(request, env, ensureSchema);
+      // The e-paper: its own title, description, canonical address and schema.org data (src/seo.js).
+      if (env.ASSETS && request.method === "GET" && /^\/(?:(?:en|hi)\/)?epaper(?:\.html)?\/?$/.test(url.pathname)) { const res = await env.ASSETS.fetch(request); if (res.ok && (res.headers.get("content-type") || "").includes("text/html")) return await epaperPage(request, env, res); return res; }
+      // An address the app does not have (not a file, not one of its views): a real 404 for search
+      // engines (with noindex), never the home page with "200 OK" (a "soft 404" to Google).
+      if (env.ASSETS && request.method === "GET" && !/\.[a-z0-9]{2,5}$/i.test(url.pathname)) {
+        const seg = (url.pathname.replace(/^\/(en|hi)(?=\/|$)/, "").split("/").filter(Boolean)[0] || "").toLowerCase();
+        if (seg && !APP_ROUTES.has(seg)) {
+          const [res, idx] = await Promise.all([env.ASSETS.fetch(request), env.ASSETS.fetch(new Request(new URL("/", request.url)))]);
+          const tag = r => r.headers.get("etag") || "";
+          if (res.ok && tag(res) && tag(res) === tag(idx)) {
+            const out = new HTMLRewriter().on('meta[name="robots"]', { element(el) { el.setAttribute("content", "noindex"); } }).on("head", { element(el) { el.append('<meta name="robots" content="noindex">', { html: true }); } }).transform(res);
+            const h = new Headers(out.headers); h.delete("etag"); h.delete("content-length"); h.set("cache-control", "public, max-age=0, must-revalidate");
+            return new Response(out.body, { status: 404, headers: h });
+          }
+          return res;
+        }
+      }
     } catch (e) { /* fall through to the static app */ }
     if (env.ASSETS) return env.ASSETS.fetch(request);
     return new Response("Rashtrix assets are not built. Run npm run build.", { status: 503 });
