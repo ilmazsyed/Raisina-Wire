@@ -8,6 +8,7 @@ import { listPublished, getBySlug, textBlocks, isPublic, tagSlug, WRITERS, write
 import { LANGS, PAGE_LANGS, localiseArticles, articleTranslations, localisePage } from "./translate.js";
 import { DESKS } from "./feeds.js";
 import { siteCardVersion } from "./ogcard.js";
+import { translateTexts } from "./mt.js";
 
 const DEFAULT = "bn";
 const LOCALES = { bn: "bn-IN", en: "en-IN", hi: "hi-IN" };
@@ -75,13 +76,50 @@ const ssrNav = lang => `<nav class="ssr-nav" aria-label="Sections"><a href="${pr
 const ssrShell = (inner, lang) => `<div class="ssr"><header><a class="ssr-brand" href="${prefixed(lang, "/")}">RASHTRIX <span>24X7 NEWS</span></a>${ssrNav(lang)}</header><main>${inner}</main></div>`;
 const storyList = (stories, lang) => `<ul class="ssr-list">${stories.map(s => `<li><a href="${prefixed(lang, s.href)}">${esc(s.title)}</a> <small>${esc(DESK_NAMES[lang][s.category] || s.category)}${kindLabel(s.kind, lang) ? ` · ${kindLabel(s.kind, lang)}` : ""} · ${fmtDate(s.publishedAt, lang)}</small>${s.dek ? `<p>${esc(s.dek)}</p>` : ""}</li>`).join("")}</ul>`;
 
+// Every tag of the last thousand stories, with how many stories it has and when the newest was
+// published (the sitemap's date for it). A tag with fewer than three stories is a thin page: it
+// is kept out of the sitemap and marked noindex (its stories are indexed on their own).
 async function allTags(env) {
   const seen = new Map();
-  for (const a of await listPublished(env, { limit: 1000 })) for (const t of a.tags) if (!seen.has(tagSlug(t))) seen.set(tagSlug(t), { name: t, slug: tagSlug(t) });
+  for (const a of await listPublished(env, { limit: 1000 })) for (const t of a.tags) {
+    const k = tagSlug(t), x = seen.get(k) || { name: t, slug: k, n: 0, latest: "" };
+    x.n++; if (String(a.updatedAt || a.publishedAt || "") > x.latest) x.latest = String(a.updatedAt || a.publishedAt || "");
+    seen.set(k, x);
+  }
   return [...seen.values()];
+}
+const THIN_TAG = 3;
+// Tag names in Bengali and Hindi (tags are kept in English): translated once by the cron
+// (tagNamesStep) and kept in settings; until then the English name is shown.
+const tagNameMemo = {};
+async function tagNames(env, lang) {
+  if (lang === "en") return {};
+  const m = tagNameMemo[lang]; if (m && Date.now() - m.at < 300e3) return m.v;
+  let v = {}; try { v = JSON.parse((await env.DB.prepare("SELECT value FROM settings WHERE key=?").bind(`seo:tagnames:${lang}`).first())?.value || "{}"); } catch { /* none yet */ }
+  tagNameMemo[lang] = { v, at: Date.now() }; return v;
+}
+export async function tagNamesStep(env) {
+  const tags = (await allTags(env)).sort((a, b) => b.n - a.n), done = [];
+  for (const lang of ["bn", "hi"]) {
+    const have = await tagNames(env, lang), want = tags.filter(t => !have[t.slug]).slice(0, 80);
+    if (!want.length) continue;
+    const out = await translateTexts(env, lang, want.map(t => t.name), { from: "en" }).catch(() => null);
+    if (!out) continue;
+    want.forEach((t, i) => { const x = String(out[i] || "").trim(); if (x && x !== t.name) have[t.slug] = x.slice(0, 80); });
+    await env.DB.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(`seo:tagnames:${lang}`, JSON.stringify(have)).run();
+    tagNameMemo[lang] = { v: have, at: Date.now() }; done.push(`${lang} ${want.length}`);
+  }
+  return done.length ? done.join(", ") : null;
 }
 
 /* ---------- Page definitions ---------- */
+// The full stop of each language: the dari in Bengali and Hindi.
+const STOP = { bn: "।", en: ".", hi: "।" };
+const TV_SCHEDULE = {
+  bn: "প্রতি ঘণ্টার শুরুতে আর সাড়ে-তে খবরের বুলেটিন, তার দু'মিনিট আগে শিরোনাম; সোয়া আর পৌনে-তে খেলা, বিনোদন, বিশ্ব আর জীবনধারার অনুষ্ঠান; মাঝে এইমাত্র পাওয়া খবর, ভিডিও প্রতিবেদন আর লাইভ সম্প্রচার।",
+  en: "A news bulletin on the hour and the half hour, with the headlines two minutes before; sport, entertainment, world and lifestyle programmes at quarter past and quarter to; breaking news, video reports and live coverage in between.",
+  hi: "हर घंटे और हर आधे घंटे पर समाचार बुलेटिन, उससे दो मिनट पहले सुर्खियां; सवा और पौने पर खेल, मनोरंजन, दुनिया और लाइफस्टाइल कार्यक्रम; बीच में ब्रेकिंग न्यूज़, वीडियो रिपोर्ट और लाइव प्रसारण।"
+};
 async function pageFor(path, url, env, o, lang) {
   const [section, arg] = path.split("/").filter(Boolean).map(decodeURIComponent);
   const site = SITE[lang];
@@ -105,7 +143,7 @@ async function pageFor(path, url, env, o, lang) {
           publication: { "@type": "BroadcastEvent", name: t.h, isLiveBroadcast: true, startDate: "2026-10-01T00:00:00+05:30" } },
         { "@type": "BroadcastService", name: "Rashtrix TV", broadcastDisplayName: "রাষ্ট্রিক্স টিভি", broadcaster: { "@id": `${o}/#organization` }, inLanguage: "bn-IN", url: o + prefixed(lang, "/watch"),
           areaServed: [{ "@type": "State", name: "West Bengal" }, { "@type": "Country", name: "India" }] }] }],
-      body: `<h1>${esc(t.h)}</h1><p>${esc(t.description)}</p>` };
+      body: `<h1>${esc(t.h)}</h1><p>${esc(t.description)}</p><p>${esc(TV_SCHEDULE[lang])}</p><h2>${esc(HOME[lang].latest)}</h2>${storyList(await localiseArticles(env, lang, (await listPublished(env, { limit: 30 })).filter(a => shownIn(a, lang))), lang)}` };
   }
 
   if (section === "install") return { title: `${site}`, description: HOME[lang].description, noindex: true, body: `<h1>${esc(site)}</h1>` };
@@ -129,7 +167,7 @@ async function pageFor(path, url, env, o, lang) {
       article: { published: a.publishedAt, modified: a.updatedAt || a.publishedAt, section: desk, author: w.name, tags: a.tags },
       ld: [{ "@context": "https://schema.org", "@graph": [
         { "@type": a.kind === "article" ? "NewsArticle" : "ReportageNewsArticle", "@id": `${o}${here}#article`, mainEntityOfPage: `${o}${here}`, url: `${o}${here}`,
-          headline: clip(a.title, 110), description, image: [image], datePublished: a.publishedAt, dateModified: a.correctedAt || a.updatedAt || a.publishedAt,
+          headline: clip(a.title, 110), description, image: [...(a.image ? [abs(o, a.heroUrl || a.image)] : []), image], datePublished: a.publishedAt, dateModified: a.correctedAt || a.updatedAt || a.publishedAt,
           author: [personLd(o, w)], publisher: { "@id": `${o}/#organization` }, articleSection: desk, keywords: [...a.tags, desk].filter(Boolean).join(", "),
           wordCount: words, inLanguage: LOCALES[lang], isAccessibleForFree: true,
           ...(a.lang !== a.original ? { translationOfWork: { "@id": `${o}${prefixed(a.original, a.href)}#article` } } : {}),
@@ -149,23 +187,38 @@ async function pageFor(path, url, env, o, lang) {
     const name = DESK_NAMES[lang][desk];
     const BN_OF = { Kolkata: "কলকাতার", "West Bengal": "পশ্চিমবঙ্গের", India: "ভারতের", "Probashi Bangali": "প্রবাসী বাঙালির", World: "বিশ্বের", Entertainment: "বিনোদনের", Sports: "খেলার", Lifestyle: "জীবনধারার" };
     const title = { bn: `${BN_OF[desk]} খবর · ${site}`, en: `${name} news · ${site}`, hi: `${name} समाचार · ${site}` }[lang];
-    return { title, alternates: LANGS, description: clip(`${title}: ${stories.slice(0, 3).map(s => s.title).join("; ")}`, 160),
+    const about = { bn: `${BN_OF[desk]} সর্বশেষ খবর, প্রতি মুহূর্তে: রাজনীতি, প্রশাসন, অপরাধ, শহর আর মানুষের খবর। আজকের শিরোনাম`, en: `The latest ${name} news, as it happens: politics, government, crime, civic life and people. Today's headlines`, hi: `${name} की ताज़ा खबरें, पल-पल: राजनीति, प्रशासन, अपराध, शहर और लोग। आज की सुर्खियां` }[lang];
+    return { title, alternates: LANGS, description: clip(`${about}: ${stories.slice(0, 2).map(s => s.title).join("; ")}`, 160),
       ld: [{ "@context": "https://schema.org", "@graph": [{ "@type": "CollectionPage", url: o + prefixed(lang, `/desk/${arg}`), name: title, isPartOf: { "@id": `${o}/#website` },
         mainEntity: { "@type": "ItemList", itemListElement: stories.slice(0, 30).map((s, i) => ({ "@type": "ListItem", position: i + 1, url: o + prefixed(lang, s.href), name: s.title })) } }, breadcrumbs(o, [[site, prefixed(lang, "/")], [name, prefixed(lang, `/desk/${arg}`)]])] }],
-      body: `<h1>${esc(name)}</h1>${storyList(stories, lang)}` };
+      body: `<h1>${esc(name)}</h1><p>${esc(about)}${STOP[lang]}</p>${storyList(stories, lang)}` };
   }
 
   if (section === "live" || section === "briefs") {
     const stories = (await localiseArticles(env, lang, (await listPublished(env, { limit: 120 })).filter(a => shownIn(a, lang)))).filter(s => section === "briefs" ? s.kind === "brief" : true).slice(0, 60);
     const title = section === "briefs" ? { bn: "সংক্ষেপে: ১০০ শব্দে খবর", en: "Briefs: the news in 100 words", hi: "संक्षेप में: 100 शब्दों में खबर" }[lang] : { bn: "সর্বশেষ খবর", en: "Latest news", hi: "ताज़ा खबरें" }[lang];
-    return { title: `${title} · ${site}`, alternates: LANGS, description: HOME[lang].description, body: `<h1>${esc(title)}</h1>${storyList(stories, lang)}` };
+    const about = section === "briefs"
+      ? { bn: "দিনের প্রতিটি বড় খবর ১০০ শব্দে: কলকাতা, পশ্চিমবঙ্গ, ভারত আর বিশ্ব, এক নজরে", en: "Every big story of the day in 100 words: Kolkata, West Bengal, India and the world at a glance", hi: "दिन की हर बड़ी खबर 100 शब्दों में: कोलकाता, पश्चिम बंगाल, भारत और दुनिया एक नज़र में" }[lang]
+      : { bn: "এইমাত্র পাওয়া খবর, প্রতি মিনিটে: কলকাতা, পশ্চিমবঙ্গ, ভারত, প্রবাসী বাঙালি আর বিশ্বের সর্বশেষ খবর", en: "Breaking and latest news, minute by minute: Kolkata, West Bengal, India, Bengalis abroad and the world", hi: "ब्रेकिंग और ताज़ा खबरें, पल-पल: कोलकाता, पश्चिम बंगाल, भारत, प्रवासी बंगाली और दुनिया" }[lang];
+    return { title: `${title} · ${site}`, alternates: LANGS, description: clip(`${about}${STOP[lang]} ${stories[0]?.title || ""}`, 160),
+      ld: [{ "@context": "https://schema.org", "@graph": [{ "@type": "CollectionPage", url: o + prefixed(lang, `/${section}`), name: title, inLanguage: LOCALES[lang], isPartOf: { "@id": `${o}/#website` },
+        mainEntity: { "@type": "ItemList", itemListElement: stories.slice(0, 30).map((s, i) => ({ "@type": "ListItem", position: i + 1, url: o + prefixed(lang, s.href), name: s.title })) } },
+        breadcrumbs(o, [[site, prefixed(lang, "/")], [title, prefixed(lang, `/${section}`)]])] }],
+      body: `<h1>${esc(title)}</h1><p>${esc(about)}${STOP[lang]}</p>${storyList(stories, lang)}` };
   }
 
   if (section === "tag" && arg) {
     const t = (await allTags(env)).find(x => x.slug === arg);
     if (!t) return { status: 404, title: `404 · ${site}`, description: "", noindex: true, body: "<h1>404</h1>" };
     const stories = await localiseArticles(env, lang, (await listPublished(env, { tag: t.name, limit: 200 })).filter(a => shownIn(a, lang)));
-    return { title: `${t.name} · ${site}`, alternates: LANGS, description: clip(stories.slice(0, 3).map(x => x.title).join("; "), 160), body: `<h1>${esc(t.name)}</h1>${storyList(stories, lang)}` };
+    const name = (await tagNames(env, lang))[t.slug] || t.name;
+    const head = { bn: `${name}: সর্বশেষ খবর`, en: `${name}: latest news`, hi: `${name}: ताज़ा खबरें` }[lang];
+    const lead = { bn: `${name} নিয়ে রাষ্ট্রিক্সের সব খবর`, en: `All Rashtrix news on ${name}`, hi: `${name} पर राष्ट्रिक्स की सभी खबरें` }[lang];
+    return { title: `${head} · ${site}`, alternates: LANGS, noindex: stories.length < THIN_TAG, description: clip(`${lead}: ${stories.slice(0, 3).map(x => x.title).join("; ")}`, 160),
+      ld: [{ "@context": "https://schema.org", "@graph": [{ "@type": "CollectionPage", url: o + prefixed(lang, `/tag/${t.slug}`), name: head, inLanguage: LOCALES[lang], isPartOf: { "@id": `${o}/#website` }, about: { "@type": "Thing", name },
+        mainEntity: { "@type": "ItemList", itemListElement: stories.slice(0, 30).map((s, i) => ({ "@type": "ListItem", position: i + 1, url: o + prefixed(lang, s.href), name: s.title })) } },
+        breadcrumbs(o, [[site, prefixed(lang, "/")], [name, prefixed(lang, `/tag/${t.slug}`)]])] }],
+      body: `<h1>${esc(head)}</h1><p>${esc(lead)}${STOP[lang]}</p>${storyList(stories, lang)}` };
   }
 
   if (section === "author" && arg) {
@@ -234,7 +287,9 @@ export async function renderPage(request, env, ensureSchema) {
   const v = page.image ? "" : await siteCardVersion(env).catch(() => "");
   const image = page.image || `${o}${OG_IMAGE}${v ? `?v=${v}` : ""}`, card = !page.image || page.imageCard;
   const head = [
-    `<link rel="canonical" href="${esc(canonical)}">`, `<link rel="alternate" type="application/rss+xml" title="${esc(SITE[lang])}" href="${o}/feed.xml">`, ...hreflang,
+    `<link rel="canonical" href="${esc(canonical)}">`, `<link rel="alternate" type="application/rss+xml" title="${esc(SITE[lang])}" href="${o}/feed.xml${lang === DEFAULT ? "" : `?lang=${lang}`}">`, ...hreflang,
+    ...(env.GOOGLE_SITE_VERIFICATION ? [`<meta name="google-site-verification" content="${esc(env.GOOGLE_SITE_VERIFICATION)}">`] : []),
+    ...(env.BING_SITE_VERIFICATION ? [`<meta name="msvalidate.01" content="${esc(env.BING_SITE_VERIFICATION)}">`] : []),
     `<meta property="og:locale" content="${LOCALES[lang].replace("-", "_")}">`, `<meta property="og:url" content="${esc(canonical)}">`,
     ...LANGS.filter(l => l !== lang).map(l => `<meta property="og:locale:alternate" content="${LOCALES[l].replace("-", "_")}">`),
     `<meta name="twitter:title" content="${esc(page.ogTitle || page.title)}">`, `<meta name="twitter:description" content="${esc(page.description)}">`,
@@ -272,31 +327,59 @@ export async function renderPage(request, env, ensureSchema) {
 const lastmod = d => { const t = Date.parse(String(d || "").replace(" ", "T") + (/[zZ+]/.test(String(d)) ? "" : "Z")); return Number.isNaN(t) ? "" : new Date(t).toISOString(); };
 const xmlResponse = (body, type = "application/xml") => new Response(`<?xml version="1.0" encoding="UTF-8"?>\n${body}`, { headers: { "content-type": `${type}; charset=utf-8`, "cache-control": "public, max-age=900" } });
 
+// The sitemap index: the site's pages, the stories month by month (every language each exists
+// in, with its hreflang alternates and photo), the tags with three stories or more, and coverage
+// and discussions. Each part's date is its newest change, so search engines read only what moved.
+const monthOf = d => lastmod(d).slice(0, 7);
+async function sitemapData(env) {
+  const stories = await listPublished(env, { limit: 5000 });
+  return { stories, newest: stories[0]?.publishedAt || "" };
+}
 export async function sitemap(request, env, ensureSchema) {
   const o = origin(request, env);
   await ensureSchema(env);
-  const stories = await listPublished(env, { limit: 5000 });
-  const { results: posts } = await env.DB.prepare("SELECT id,created_at FROM community_posts WHERE status='published' ORDER BY created_at DESC LIMIT 1000").all();
-  const { results: cover } = await env.DB.prepare("SELECT slug,updated_at FROM live_coverage WHERE status IN ('live','ended') ORDER BY updated_at DESC LIMIT 500").all();
-  const newest = stories[0]?.publishedAt;
-  const tr = Object.fromEntries(await Promise.all(LANGS.map(async l => [l, await articleTranslations(env, l, stories)])));
-  const alt = (path, langs) => langs && langs.length > 1 ? langs.map(l => `<xhtml:link rel="alternate" hreflang="${LOCALES[l]}" href="${xml(o + prefixed(l, path))}"/>`).join("") : "";
+  const { stories, newest } = await sitemapData(env);
+  const months = new Map();
+  for (const s of stories) { const m = monthOf(s.publishedAt); if (!m) continue; const d = lastmod(s.updatedAt || s.publishedAt); if (!months.has(m) || d > months.get(m)) months.set(m, d); }
+  const tags = (await allTags(env)).filter(t => t.n >= THIN_TAG), tagDate = tags.reduce((x, t) => (lastmod(t.latest) > x ? lastmod(t.latest) : x), "");
+  const parts = [["pages", lastmod(newest)], ...[...months].sort((a, b) => b[0].localeCompare(a[0])).map(([m, d]) => [`articles-${m}`, d]), ...(tags.length ? [["tags", tagDate]] : []), ["more", lastmod(newest)]];
+  return xmlResponse(`<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${parts.map(([n, d]) => `<sitemap><loc>${o}/sitemaps/${n}.xml</loc>${d ? `<lastmod>${d}</lastmod>` : ""}</sitemap>`).join("\n")}
+</sitemapindex>`);
+}
+export async function sitemapPart(request, env, ensureSchema, name) {
+  const o = origin(request, env);
+  await ensureSchema(env);
+  const alt = (path, langs) => langs && langs.length > 1 ? [...langs.map(l => `<xhtml:link rel="alternate" hreflang="${LOCALES[l]}" href="${xml(o + prefixed(l, path))}"/>`), `<xhtml:link rel="alternate" hreflang="x-default" href="${xml(o + path)}"/>`].join("") : "";
   const all = (path, freq, pr, m = "") => LANGS.map(l => [prefixed(l, path), m, freq, pr, null, LANGS, path]);
-  const urls = [
-    ...all("/", "hourly", "1.0", newest), ...all("/watch", "always", "0.9", newest), ...all("/live", "always", "0.8", newest), ...all("/briefs", "hourly", "0.7", newest),
-    ...Object.values(DESK_SLUGS).flatMap(s => all(`/desk/${s}`, "hourly", "0.8", newest)),
-    ...all("/community", "daily", "0.5"), ...all("/events", "daily", "0.4"),
-    ["/about", "", "monthly", "0.4", null, ["bn", "en"], "/about"], ["/en/about", "", "monthly", "0.4", null, ["bn", "en"], "/about"],
-    ...LEGAL_ORDER.flatMap(([k]) => [[`/${k}`, LEGAL_UPDATED, "yearly", "0.2", null, ["bn", "en"], `/${k}`], [`/en/${k}`, LEGAL_UPDATED, "yearly", "0.2", null, ["bn", "en"], `/${k}`]]),
-    ...WRITERS.map(w => [`/author/${w.key}`, newest, "weekly", "0.5", null, null, `/author/${w.key}`]),
-    ...(await allTags(env)).map(t => [`/tag/${t.slug}`, newest, "weekly", "0.4", null, null, `/tag/${t.slug}`]),
-    ...stories.flatMap(s => { const langs = [s.lang, ...LANGS.filter(l => l !== s.lang && tr[l].has(s.id) && shownIn(s, l))]; return langs.map(l => [prefixed(l, s.href), s.updatedAt || s.publishedAt, "monthly", "0.8", s, langs, s.href]); }),
-    ...cover.map(c => [`/coverage/${encodeURIComponent(c.slug)}`, c.updated_at, "hourly", "0.6", null, null, ""]),
-    ...posts.map(p => [`/discussion/${encodeURIComponent(p.id)}`, p.created_at, "weekly", "0.3", null, null, ""])
-  ];
-  return xmlResponse(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:xhtml="http://www.w3.org/1999/xhtml">
-${urls.map(([p, m, f, pr, s, langs, bare]) => `<url><loc>${xml(o + p)}</loc>${lastmod(m) ? `<lastmod>${lastmod(m)}</lastmod>` : ""}<changefreq>${f}</changefreq><priority>${pr}</priority>${alt(bare, langs)}${s?.image ? `<image:image><image:loc>${xml(abs(o, s.heroUrl || s.image))}</image:loc></image:image>` : ""}</url>`).join("\n")}
+  let urls = null;
+  if (name === "pages") {
+    const { newest } = await sitemapData(env);
+    urls = [
+      ...all("/", "hourly", "1.0", newest), ...all("/watch", "always", "0.9", newest), ...all("/live", "always", "0.8", newest), ...all("/briefs", "hourly", "0.7", newest),
+      ...Object.values(DESK_SLUGS).flatMap(s => all(`/desk/${s}`, "hourly", "0.8", newest)),
+      ["/epaper", newest, "daily", "0.7", null, null, "/epaper"],
+      ...all("/community", "daily", "0.5"), ...all("/events", "daily", "0.4"),
+      ["/about", "", "monthly", "0.4", null, ["bn", "en"], "/about"], ["/en/about", "", "monthly", "0.4", null, ["bn", "en"], "/about"],
+      ...LEGAL_ORDER.flatMap(([k]) => [[`/${k}`, LEGAL_UPDATED, "yearly", "0.2", null, ["bn", "en"], `/${k}`], [`/en/${k}`, LEGAL_UPDATED, "yearly", "0.2", null, ["bn", "en"], `/${k}`]]),
+      ...WRITERS.flatMap(w => all(`/author/${w.key}`, "weekly", "0.5", newest))
+    ];
+  } else if (/^articles-\d{4}-\d{2}$/.test(name)) {
+    const month = name.slice(9), { stories } = await sitemapData(env), these = stories.filter(s => monthOf(s.publishedAt) === month);
+    const tr = Object.fromEntries(await Promise.all(LANGS.map(async l => [l, await articleTranslations(env, l, these)])));
+    urls = these.flatMap(s => { const langs = [s.lang, ...LANGS.filter(l => l !== s.lang && tr[l].has(s.id) && shownIn(s, l))]; return langs.map(l => [prefixed(l, s.href), s.updatedAt || s.publishedAt, "monthly", "0.8", s, langs, s.href]); });
+  } else if (name === "tags") {
+    urls = (await allTags(env)).filter(t => t.n >= THIN_TAG).flatMap(t => all(`/tag/${t.slug}`, "daily", "0.5", t.latest));
+  } else if (name === "more") {
+    const { results: posts } = await env.DB.prepare("SELECT id,created_at FROM community_posts WHERE status='published' ORDER BY created_at DESC LIMIT 1000").all();
+    const { results: cover } = await env.DB.prepare("SELECT slug,updated_at FROM live_coverage WHERE status IN ('live','ended') ORDER BY updated_at DESC LIMIT 500").all();
+    urls = [...cover.map(c => [`/coverage/${encodeURIComponent(c.slug)}`, c.updated_at, "hourly", "0.6", null, null, ""]), ...posts.map(p => [`/discussion/${encodeURIComponent(p.id)}`, p.created_at, "weekly", "0.3", null, null, ""])];
+  }
+  if (!urls) return new Response("Not found", { status: 404 });
+  const res = xmlResponse(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+${urls.map(([p, m, f, pr, s, langs, bare]) => `<url><loc>${xml(o + p)}</loc>${lastmod(m) ? `<lastmod>${lastmod(m)}</lastmod>` : ""}<changefreq>${f}</changefreq><priority>${pr}</priority>${alt(bare, langs)}${s?.image ? `<image:image><image:loc>${xml(abs(o, s.heroUrl || s.image))}</image:loc><image:title>${xml(s.title)}</image:title></image:image>` : ""}</url>`).join("\n")}
 </urlset>`);
+  return res;
 }
 
 // Google News: stories from the last two days, in each language they exist in.
@@ -342,3 +425,40 @@ ${stories.map(s => `<item><title>${xml(s.title)}</title><link>${o}${prefixed(s.l
 // Paths the Worker renders as HTML pages (the rest are app-only views or static files), tested
 // without the /en or /hi prefix.
 export const PAGE_PATTERN = /^\/(?:$|install\/?$|(?:edition|article|author|tag|discussion|coverage|desk)\/[^/]+\/?$|live\/?$|watch\/?$|briefs\/?$|community\/?$|events\/?$|(?:about|terms|privacy|disclaimer|copyright|corrections|community-guidelines|grievance)\/?$)/;
+
+// The app's own views (src/main.js), tested on the first part of the address without /en or /hi:
+// any other address that is not a file is a real 404 for search engines (src/worker.js).
+export const APP_ROUTES = new Set(["", "about", "coverage", "home", "desk", "briefs", "editions", "edition", "article", "author", "tag", "my", "live", "community", "discussion", "events", "watch", "tv", "shorts", "account", "saved", "search", "mybrief", "install", "epaper", ...LEGAL_ORDER.map(([k]) => k)]);
+
+// The e-paper (epaper.html, the app's e-paper view): its own title, description, canonical address,
+// languages and schema.org data. The Bengali paper is open to all and indexed; the English and Hindi
+// papers are for signed-in readers, so they are not.
+const EPAPER = {
+  bn: { title: "দৈনিক রাষ্ট্রিক্স ই-পেপার: আজকের কাগজ, প্রভাতী ও সান্ধ্য সংস্করণ", description: "দৈনিক রাষ্ট্রিক্সের ই-পেপার: রাষ্ট্রিক্স ২৪×৭ নিউজের ছাপা কাগজের মতো সাজানো প্রভাতী আর সান্ধ্য সংস্করণ, কলকাতা, পশ্চিমবঙ্গ, ভারত আর বিশ্বের খবর। বিনামূল্যে পড়ুন।", name: "দৈনিক রাষ্ট্রিক্স" },
+  en: { title: "Daily Rashtrix e-paper: today's paper, morning and evening editions", description: "Daily Rashtrix, the e-paper of Rashtrix 24×7 News: the morning and evening editions laid out like the printed paper, with news from Kolkata, West Bengal, India and the world.", name: "Daily Rashtrix" },
+  hi: { title: "दैनिक राष्ट्रिक्स ई-पेपर: आज का अख़बार, प्रभात और सांध्य संस्करण", description: "दैनिक राष्ट्रिक्स, राष्ट्रिक्स 24×7 न्यूज़ का ई-पेपर: छपे अख़बार जैसे सजे प्रभात और सांध्य संस्करण, कोलकाता, पश्चिम बंगाल, भारत और दुनिया की खबरें।", name: "दैनिक राष्ट्रिक्स" }
+};
+export async function epaperPage(request, env, res) {
+  const url = new URL(request.url), o = origin(request, env);
+  const lang = ["en", "hi"].includes(url.searchParams.get("lang")) ? url.searchParams.get("lang") : (url.pathname.match(/^\/(en|hi)\//) || [])[1] || "bn", t = EPAPER[lang];
+  if (url.searchParams.has("card")) return res;
+  const canonical = lang === "bn" ? `${o}/epaper` : `${o}/epaper?lang=${lang}`;
+  const head = [`<link rel="canonical" href="${esc(canonical)}">`, `<meta name="description" content="${esc(t.description)}">`, `<meta name="robots" content="${lang === "bn" ? "index, follow, max-image-preview:large" : "noindex, follow"}">`,
+    `<meta property="og:title" content="${esc(t.title)}">`, `<meta property="og:description" content="${esc(t.description)}">`, `<meta property="og:url" content="${esc(canonical)}">`,
+    `<meta property="og:locale" content="${LOCALES[lang].replace("-", "_")}">`, `<meta name="twitter:card" content="summary_large_image">`,
+    ld({ "@context": "https://schema.org", "@graph": [organization(o), { "@type": "WebPage", url: canonical, name: t.title, description: t.description, inLanguage: LOCALES[lang], isPartOf: { "@id": `${o}/#website` },
+      about: { "@type": "Periodical", name: t.name, alternateName: ["Daily Rashtrix", "দৈনিক রাষ্ট্রিক্স", "दैनिक राष्ट्रिक्स"], publisher: { "@id": `${o}/#organization` }, inLanguage: ["bn-IN", "en-IN", "hi-IN"] } },
+      breadcrumbs(o, [[SITE[lang], prefixed(lang, "/")], [t.name, lang === "bn" ? "/epaper" : `/epaper?lang=${lang}`]])] })].join("\n");
+  const out = new HTMLRewriter()
+    .on("html", { element(el) { el.setAttribute("lang", LOCALES[lang]); } })
+    .on("title", { element(el) { el.setInnerContent(t.title); } })
+    .on('meta[name="description"]', { element(el) { el.remove(); } })
+    .on('meta[property^="og:"]', { element(el) { el.remove(); } })
+    .on('meta[name^="twitter:"]', { element(el) { el.remove(); } })
+    .on('link[rel="canonical"]', { element(el) { el.remove(); } })
+    .on('meta[name="robots"]', { element(el) { el.remove(); } })
+    .on("head", { element(el) { el.append(head, { html: true }); } })
+    .transform(res);
+  const h = new Headers(out.headers); h.delete("content-length"); h.delete("etag");
+  return new Response(out.body, { status: res.status, headers: h });
+}
