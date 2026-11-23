@@ -2466,14 +2466,14 @@ html.tvp-fs-lock .watch .wrap>:not(.tv-watch),html.tvp-fs-lock .tv-interact,html
 .ml-top i{width:5px;height:5px;border-radius:50%;background:#e1121a;animation:ml-pulse 1.6s ease-in-out infinite}
 .ml-top em{font-style:normal;font-weight:600;color:#8a8a8f;letter-spacing:.16em}
 @keyframes ml-pulse{50%{opacity:.25}}
-.ml-clock{display:flex;align-items:baseline;gap:0;font:600 21px/1 "Hind Siliguri",sans-serif;color:#111;letter-spacing:.01em;font-variant-numeric:tabular-nums}
+.ml-clock{display:flex;align-items:baseline;gap:0;font:700 21px/1 Montserrat,"Noto Serif Bengali",serif;color:#111;letter-spacing:.01em;font-variant-numeric:tabular-nums}
 .ml-d{display:inline-block;min-width:.56em;text-align:center}
 .ml-col{color:#c8100f;padding:0 1px;font-weight:600;position:relative;top:-1px}
-.ml-sec{display:inline-flex;margin-left:3px;font:600 11px/1 "Hind Siliguri",sans-serif;color:#c8100f;align-self:flex-start;margin-top:2px}
+.ml-sec{display:inline-flex;margin-left:3px;font:700 11px/1 Montserrat,"Noto Serif Bengali",serif;color:#c8100f;align-self:flex-start;margin-top:2px}
 .ml-sec .ml-d{min-width:.58em}
 .ml-rule{display:block;width:70%;height:1px;background:linear-gradient(90deg,transparent,rgba(200,16,15,.35),transparent)}
 .ml-line{position:relative;display:block;width:100%;height:13px;overflow:hidden;text-align:center}
-.ml-line b{position:absolute;inset:0;display:block;font:600 10.5px/13px "Hind Siliguri",Montserrat,sans-serif;color:#111;white-space:nowrap;overflow:hidden;letter-spacing:.03em}
+.ml-line b{position:absolute;inset:0;display:block;font:600 10.5px/13px Montserrat,"Noto Serif Bengali",serif;color:#111;white-space:nowrap;overflow:hidden;letter-spacing:.03em}
 .ml-line b.wx{color:#c8100f}
 @media (prefers-reduced-motion:reduce){.ml-top i{animation:none}}
 /* on the phone: the counter in the space right of the logo and the tagline */
