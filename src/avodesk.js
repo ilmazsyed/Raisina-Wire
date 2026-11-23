@@ -185,7 +185,8 @@ function drawForm() {
     ${(() => { const has = { story: true, bytes: S.byteMode === "byte" && S.bytes.length, phone: !!S.phone }, ord = S.order.filter(k => has[k]); return ord.length > 1 ? `<div class="ad-byte"><b>Order on air</b> <small class="muted">(the story's own pictures never run past 45 seconds; bytes and phone-ins play in full)</small>
       <ol class="ad-order">${ord.map((k, i) => `<li><span>${{ story: "The story (reading over its pictures)", bytes: "The bytes", phone: "The phone-in" }[k]}</span>${i ? `<button class="btn sm" type="button" data-oup="${k}" aria-label="Move up">▲</button>` : ""}</li>`).join("")}</ol></div>` : ""; })()}
     <div class="bd-prog" id="fProg" hidden><i></i></div>
-    <div class="row"><button class="btn green" id="fSave">${e ? "Save and put on air" : "Make the AVO story"}</button>${e ? `<button class="btn" id="fCancel">Cancel</button>` : ""}<span class="muted" id="fNote"></span></div>`;
+    <div class="row"><button class="btn green" id="fSave">${e ? "Save and put on air" : "Make the AVO story"}</button>${e ? `<button class="btn" id="fCancel">Cancel</button>` : ""}<span class="muted" id="fNote"></span></div>
+    <div class="ad-status" id="fStatus" role="status" aria-live="polite" hidden></div>`;
   const brief = $("#fBrief"), count = () => { const n = brief.value.trim().length; $("#fCount").textContent = `${digits(n)} / ${digits(MAXF)} characters`; $("#fCount").style.color = n > MAXF ? "#ff6b6b" : ""; };
   brief.oninput = count; count();
   $$("[data-credit]").forEach(x => x.oninput = () => { S.images[+x.dataset.credit].credit = x.value; });
@@ -239,25 +240,44 @@ function drawForm() {
   function keep() { S.draft = { title: $("#fTitle").value, brief: brief.value, region: $("#fRegion").value, desk: $("#fDesk").value, more: $("#fMore").checked }; }
   if (S.draft) { $("#fTitle").value = S.draft.title; brief.value = S.draft.brief; $("#fRegion").value = S.draft.region; $("#fDesk").value = S.draft.desk; $("#fMore").checked = S.draft.more; S.draft = null; count(); }
 }
+// The button always answers: it says what it is doing, and what happened (or what is missing) stays
+// on screen under it. The Editorial Charter's warnings are asked here on the page (a browser's
+// pop-up can be blocked, and then nothing would happen).
+function status(msg, kind = "") { const el = $("#fStatus"); if (!el) return toast(msg, kind === "err"); el.hidden = !msg; el.className = `ad-status ${kind}`; el.innerHTML = msg; }
+const withTimeout = (p, ms, what) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error(`${what} did not answer in ${Math.round(ms / 1000)} seconds. Check the connection and press the button again.`)), ms))]);
+function charterAsk(warnings) {
+  return new Promise(res => {
+    status(`<b>Editorial Charter</b><ul>${warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul><div class="row"><button class="btn sm green" type="button" id="chOk">Save anyway</button><button class="btn sm" type="button" id="chNo">Change it</button></div>`, "warn");
+    $("#fStatus").scrollIntoView({ block: "center", behavior: "smooth" });
+    $("#chOk").onclick = () => res(true); $("#chNo").onclick = () => { status(""); res(false); };
+  });
+}
+let saving = false;
 async function save() {
+  if (saving) return;
+  const btn = $("#fSave"), label = btn?.textContent, say = (m, k = "err") => { status(esc(m), k); if (k === "err") toast(m, true); };
   const bytes = S.bytes.filter(b => String(b.url || "").trim());
-  if (S.byteMode === "byte" && !bytes.length) return toast("Add a byte link, or choose AVO only.");
-  if (bytes.some(b => !/^(https:\/\/|\/clips\/)/.test(b.url.trim()))) return toast("Each byte needs a link that starts with https://, or an uploaded video.");
+  if (S.byteMode === "byte" && !bytes.length) return say("Add a byte link, or choose AVO only.");
+  if (bytes.some(b => !/^(https:\/\/|\/clips\/)/.test(b.url.trim()))) return say("Each byte needs a link that starts with https://, or an uploaded video.");
   const body = { title: $("#fTitle").value.trim(), brief: $("#fBrief").value.trim(), region: $("#fRegion").value, desk: $("#fDesk").value, findMore: $("#fMore").checked, images: S.images,
     videos: S.videos, bytes, byteMode: S.byteMode, byteCount: Math.min(S.byteCount, bytes.length || 1), extra: { phone: S.phone?.url ? S.phone : null, order: S.order, full: S.full?.url ? S.full : null, scene: S.scene, bg: S.bg, len: S.len } };
-  if (S.phone && !S.phone.url) return toast("Add the phone-in's audio (upload or link), or remove the phone-in.");
-  if (!body.title) return toast("Write the headline.");
-  if (body.brief.length < 20) return toast("Write the brief to be read.");
-  if (body.brief.length > maxFor(S.edit)) return toast(`The brief is longer than ${maxFor(S.edit)} characters.`);
-  // The Editorial Charter: words it never uses, facts its corrections fix. The desk is warned and decides.
-  const w = await api("/api/admin/charter/check", { method: "POST", body: { text: `${body.title}\n${body.brief}` } }).catch(() => null);
-  if (w?.warnings?.length && !confirm(`Editorial Charter:\n\n• ${w.warnings.join("\n• ")}\n\nSave anyway?`)) return;
+  if (S.phone && !S.phone.url) return say("Add the phone-in's audio (upload or link), or remove the phone-in.");
+  if (!body.title) return say("Write the headline.");
+  if (body.brief.length < 20) return say("Write the brief to be read (at least a sentence, 20 characters or more).");
+  if (body.brief.length > maxFor(S.edit)) return say(`The brief is longer than ${maxFor(S.edit)} characters.`);
+  saving = true; if (btn) { btn.disabled = true; btn.textContent = "Checking…"; } status("Checking the words against the Editorial Charter…");
   try {
-    if (S.edit) await api(`/api/admin/tv/avo/${encodeURIComponent(S.edit.id)}`, { method: "PUT", body });
-    else await api("/api/admin/tv/avo", { method: "POST", body });
-    toast(S.edit ? "Saved. It is made again and goes on air within a minute or two." : "Made. It is voiced and goes into rotation within a minute.");
+    // The Editorial Charter: words it never uses, facts its corrections fix. The desk is warned and decides.
+    const w = await withTimeout(api("/api/admin/charter/check", { method: "POST", body: { text: `${body.title}\n${body.brief}` } }), 8000, "The charter check").catch(() => null);
+    if (w?.warnings?.length) { if (btn) btn.textContent = label; if (!(await charterAsk(w.warnings))) return; }
+    if (btn) btn.textContent = S.edit ? "Saving…" : "Making…"; status(S.edit ? "Saving the story…" : "Making the AVO story…");
+    if (S.edit) await withTimeout(api(`/api/admin/tv/avo/${encodeURIComponent(S.edit.id)}`, { method: "PUT", body }), 30000, "The server");
+    else await withTimeout(api("/api/admin/tv/avo", { method: "POST", body }), 30000, "The server");
+    const was = S.edit, msg = was ? `Saved: “${body.title}”. It is made again and goes on air within a minute or two.` : `Made: “${body.title}”. It is voiced and goes into rotation within a minute (see Being made, on the right).`;
     S.edit = null; S.images = []; S.videos = []; S.bytes = []; S.byteMode = "avo"; S.byteCount = 1; S.phone = null; S.order = ["story", "bytes", "phone"]; S.full = null; S.scene = ""; S.bg = ""; S.len = 0; drawForm(); load();
-  } catch (e) { fail(e); }
+    status(`✓ ${esc(msg)}`, "ok"); toast(was ? "Saved." : "Made.");
+  } catch (e) { say(`Not made: ${e.message || e}`); }
+  finally { saving = false; const b2 = $("#fSave"); if (b2) { b2.disabled = false; if (b2 === btn) b2.textContent = label; } }
 }
 
 function drawList() {
