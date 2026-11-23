@@ -3,6 +3,7 @@
 // dates, or forced at the next break). An ad never cuts what is on air: it plays in the next
 // break (src/engine.js adsDue). Ads the app made (the Rashtrix brand film) cannot be deleted, only
 // rescheduled or switched off; the channel's own ads can be deleted (src/ads.js).
+import { groupsBar, grouped, groupHead, savedTab, saveTab, within } from "./deskgroups.js";
 import { shell, api, toast, fail, esc, $, $$, istClock } from "./crshell.js";
 import { digits } from "./i18n.js";
 
@@ -61,8 +62,16 @@ function fields(f, p) {
 const read = p => ({ title: $(`#${p}Title`).value.trim(), category: $(`#${p}Cat`).value, channels: $(`#${p}Ch`).value, per30: +$(`#${p}Per`).value,
   from: $(`#${p}From`).value, to: $(`#${p}To`).value, times: $(`#${p}Times`).value, startDay: $(`#${p}Start`).value, endDay: $(`#${p}End`).value, active: $(`#${p}On`).checked });
 
+// The ads in the desks' groups (src/deskgroups.js): in rotation (switched on, within their dates,
+// with plays planned), out of rotation (switched off, or their dates over), and coming up (switched
+// on, their first day still to come, or no length known yet).
+const IST_DAY = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
+const comingUp = a => a.active && ((a.startDay && a.startDay > IST_DAY()) || !(a.secs > 0));
+const AGROUPS = [["air", "Made · in rotation", a => a.active && !comingUp(a) && !(a.endDay && a.endDay < IST_DAY())], ["out", "Made · out of rotation", a => !a.active || (a.endDay && a.endDay < IST_DAY())], ["new", "Coming up (starts later)", () => true]];
+const aRecent = a => within(a.createdAt);
 function draw() {
   const L = S.list.filter(a => S.tab === "all" || (S.tab === "app" ? a.origin === "app" : a.origin !== "app"));
+  S.grp ||= savedTab("ads");
   const count = k => S.list.filter(a => k === "all" || (k === "app" ? a.origin === "app" : a.origin !== "app")).length;
   const F = S.form;
   $("main").innerHTML = `<section class="panel pd">
@@ -81,11 +90,13 @@ function draw() {
       ${fields(F, "n")}
       <div class="row"><button class="btn green" type="button" id="nSave">Save</button><button class="btn" type="button" id="nCancel">Cancel</button></div></div>` : ""}
     <div class="row ad-filters" style="flex-wrap:wrap;gap:6px">${[["all", "All"], ["app", "Made by the app"], ["channel", "Channel ads"]].map(([k, l]) => `<button type="button" class="btn sm ${S.tab === k ? "on" : ""}" data-tab="${k}"><span>${l}</span> <small data-no-tr>${digits(count(k))}</small></button>`).join("")}</div>
-    <div class="pd-list">${L.map(card).join("") || `<p class="muted">No ads yet.</p>`}</div>
+    ${groupsBar(L, AGROUPS, aRecent, S.grp)}
+    <div class="pd-list">${grouped(L, AGROUPS, aRecent, S.grp).map(([k, name, g]) => groupHead(k, name, g.length) + g.map(card).join("")).join("") || `<p class="muted">${S.list.length ? "None here." : "No ads yet."}</p>`}</div>
   </section>`;
   $("#adR").onclick = load;
   if ($("#adNew")) $("#adNew").onclick = () => { S.form = blank(); draw(); };
   $$("[data-tab]").forEach(b => b.onclick = () => { S.tab = b.dataset.tab; draw(); });
+  $$("[data-grp]").forEach(b => b.onclick = () => { S.grp = b.dataset.grp; saveTab("ads", S.grp); draw(); });
   if (F) {
     const keep = () => Object.assign(F, read("n"), { secs: $("#nSecs").value, link: $("#nLink").value.trim() || (/^\/clips\//.test(F.link) ? F.link : "") });
     $("#nFile").onchange = async e => {
@@ -124,7 +135,7 @@ function card(a) {
   return `<div class="ad-story pd-card"><div class="row" style="gap:12px;align-items:flex-start;width:100%">${look}<div class="ad-body stack" style="gap:6px;flex:1;min-width:0">
     <div class="row" style="gap:6px;flex-wrap:wrap"><span class="tag ${app ? "amber" : "red"}">${app ? "MADE BY THE APP" : "CHANNEL AD"}</span><span class="tag">${CAT[a.category] || "Ad"}</span>${a.active ? '<span class="tag green">ON AIR</span>' : '<span class="tag">OFF</span>'}${forcedNow(a) ? '<span class="tag red">FORCED: NEXT BREAK</span>' : ""}
       <small class="muted"><span>${a.kind === "yt" ? "YouTube" : "Uploaded"}</span> · <span data-no-tr>${len(a.secs)}</span> · <span>${CH[a.channels] || a.channels}</span></small></div>
-    <b data-no-tr>${esc(a.title)}</b>
+    <b data-no-tr>${esc(a.title)}</b>${aRecent(a) ? ' <span class="dg-fresh">LAST HOUR</span>' : ""}
     <small class="muted">${plan(a)}</small>
     <small class="muted">${a.plays ? `<span>Played ${digits(a.plays)} times on air</span>${a.lastPlayed ? ` · <span>Last at ${when(a.lastPlayed)}</span>` : ""}` : "<span>Not played on air yet</span>"}</small>
     ${ed ? `<div class="pd-edit stack" style="gap:10px">${fields(a, "e")}${app ? "" : `<label class="stack" style="gap:4px;width:130px"><small>Length (seconds)</small><input id="eSecs" type="number" min="1" max="3600" value="${a.secs}"></label>`}

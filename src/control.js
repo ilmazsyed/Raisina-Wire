@@ -53,6 +53,8 @@ export class TvControl {
       if (!this.isRoom && this.onair) server.send(JSON.stringify({ type: "onair", onair: this.onair }));
       return new Response(null, { status: 101, webSocket: client });
     }
+    // The TV audience now (src/tvaudience.js): screens that reported in the last 90 seconds.
+    if (url.pathname === "/aud") return Response.json(this.audNow());
     if (url.pathname === "/state") return Response.json({ state: this.isRoom ? this.state.room || {} : this.state, health: this.health, serverTime: now(), onair: this.isRoom ? null : this.onair || null });
     if (url.pathname === "/cmd" && request.method === "POST") {
       const b = await request.json();
@@ -234,10 +236,58 @@ export class TvControl {
     this.ctx.waitUntil(import("./push.js").then(m => m.staffAlert(this.env, { title, body, url: "/pcr.html" })).catch(() => {}));
   }
 
+  /* ---------- the TV audience (src/tvaudience.js) ----------
+  Each app and site player sends one beat a minute: the seconds it was on screen (and in front),
+  how many of them with sound, on which item and kind of item, the device and the page. Nothing that
+  identifies a viewer is kept: the totals for the day are added up here and written once a minute
+  (a handful of rows, however many are watching); "watching now" is the players that sent a beat in
+  the last 90 seconds, read from their connections. */
+  audNow() {
+    const t = now(), seg = {}; let n = 0;
+    for (const ws of this.ctx.getWebSockets("viewer")) { let a = null; try { a = ws.deserializeAttachment(); } catch { /* none */ } if (a?.hb && t - a.hb < 90e3) { n++; if (a.seg) seg[a.seg] = (seg[a.seg] || 0) + 1; } }
+    return { channel: this.channel, now: n, seg, at: iso(t) };
+  }
+  audBeat(ws, m) {
+    const t = now(), sec = Math.max(0, Math.min(90, Math.round(Number(m.s) || 0))), soundS = Math.max(0, Math.min(sec, Math.round(Number(m.sound) || 0)));
+    const SEGS = ["video", "avo", "xpl", "bulletin", "heads", "seg", "ad", "flash", "card", "upnext", "weather", "market", "poll", "promo", "live", "breaking", "ident", "other"];
+    const seg = SEGS.includes(m.seg) ? m.seg : "other";
+    try { ws.serializeAttachment({ hb: t, seg }); } catch { /* fine */ }
+    const A = this.aud ||= { rows: new Map(), max: new Map(), flushed: 0 }, day = istDay(t), ch = this.channel;
+    const add = (metric, dim, n = 1) => { if (!n) return; const k = `${day}|${metric}|${dim}`; A.rows.set(k, (A.rows.get(k) || 0) + n); };
+    const top = (metric, dim, n) => { const k = `${day}|${metric}|${dim}`; A.max.set(k, Math.max(A.max.get(k) || 0, n)); };
+    const dev = ["mobile", "tablet", "desktop"].includes(m.dev) ? m.dev : "desktop", page = ["home", "watch", "app"].includes(m.page) ? m.page : "home";
+    if (m.first === true) { add("tvv", ch); add("tvvdev", `${ch}:${dev}`); add("tvvpage", `${ch}:${page}`); }
+    if (sec) {
+      const hr = new Date(t + 5.5 * 3600e3).getUTCHours();
+      add("tvs", ch, sec); add("tvsound", `${ch}:on`, soundS); add("tvsound", `${ch}:off`, sec - soundS);
+      add("tvhour", `${ch}:${hr}`, sec); add("tvdevs", `${ch}:${dev}`, sec); add("tvpages", `${ch}:${page}`, sec);
+      // the kinds of item, and the items themselves (videos, AVO stories, explainers, ads)
+      const segs = m.segs && typeof m.segs === "object" ? m.segs : { [seg]: sec };
+      for (const [k, v] of Object.entries(segs).slice(0, 12)) add("tvseg", `${ch}:${SEGS.includes(k) ? k : "other"}`, Math.max(0, Math.min(90, Math.round(Number(v) || 0))));
+      const items = Array.isArray(m.items) ? m.items : [];
+      for (const it of items.slice(0, 6)) { const k = String(it?.k || ""), v = Math.max(0, Math.min(90, Math.round(Number(it?.s) || 0))); if (/^(video|avo|xpl|ad):[\w:-]{3,64}$/.test(k) && v) add("tvitem", `${ch}:${k}`, v); }
+    }
+    // how many are watching: the most at once in each five minutes, and in the day
+    const live = this.audNow().now, d = new Date(t + 5.5 * 3600e3), slot = `${String(d.getUTCHours()).padStart(2, "0")}:${String(Math.floor(d.getUTCMinutes() / 5) * 5).padStart(2, "0")}`;
+    top("tvconc", `${ch}:${slot}`, live); top("tvpeak", ch, live);
+    if (t - A.flushed >= 60e3) this.ctx.waitUntil(this.audFlush());
+  }
+  async audFlush() {
+    const A = this.aud, db = this.env.DB; if (!A || !db) return;
+    A.flushed = now();
+    const rows = [...A.rows], max = [...A.max]; A.rows = new Map(); A.max = new Map();
+    const q = [];
+    for (const [k, n] of rows) { const [day, metric, dim] = k.split("|"); q.push(db.prepare("INSERT INTO metrics_daily (day,metric,dim,n) VALUES (?,?,?,?) ON CONFLICT(day,metric,dim) DO UPDATE SET n=n+excluded.n").bind(day, metric, dim, n)); }
+    for (const [k, n] of max) { const [day, metric, dim] = k.split("|"); q.push(db.prepare("INSERT INTO metrics_daily (day,metric,dim,n) VALUES (?,?,?,?) ON CONFLICT(day,metric,dim) DO UPDATE SET n=MAX(n,excluded.n)").bind(day, metric, dim, n)); }
+    for (let i = 0; i < q.length; i += 50) await db.batch(q.slice(i, i + 50)).catch(e => console.error("tv audience", e?.message || e));
+  }
+
   /* ---------- WebSocket messages ---------- */
   async webSocketMessage(ws, raw) {
     let m; try { m = JSON.parse(raw); } catch { return; }
     const [role, who] = this.ctx.getTags(ws);
+    // A viewer's minute (src/engine.js audience): kept in memory, written once a minute as totals.
+    if (m.type === "aud" && role === "viewer" && this.channel) { this.audBeat(ws, m); return; }
     if (m.type === "hb") {   // output and viewer heartbeats
       const prev = this.health[who] || {};
       this.health[who] = { role, seen: now(), playing: !!m.playing, stalledFor: Number(m.stalledFor) || 0, item: String(m.item || "").slice(0, 120), ua: String(m.ua || "").slice(0, 80), alerted: prev.alerted && now() - prev.seen > 30000 };

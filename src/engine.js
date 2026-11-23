@@ -1051,6 +1051,20 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     return vary(ok.slice(0, size + 2), 1).slice(0, size);
   }
 
+  // The explainers in rotation (the Explainer desk): one plays in the place of an AVO block, at
+  // most once every 45 minutes on a screen, never in the first ten minutes after it opens, the one
+  // this screen played longest ago first. (Kept on the device, so a reload does not bring one back.)
+  const XPL_EVERY = 45 * 60e3, XPL_WAIT = 10 * 60e3, openedAt = Date.now();
+  const xplLast = (() => { try { return JSON.parse(localStorage.getItem(`rw-xpl-last-${channel}`) || "{}"); } catch { return {}; } })();
+  function xplPick(q) {
+    const list = st.tv?.avoOn === false ? [] : st.tv?.xpl || [];
+    if (!list.length || q.resume || (q.pending || []).length || ["upnext", "avo", "xpl"].includes(q.item?.type)) return null;
+    if (q.sinceAvo === undefined || q.sinceAvo < avoEvery() || Date.now() - openedAt < XPL_WAIT) return null;
+    const last = Math.max(0, ...Object.values(xplLast)); if (Date.now() - last < XPL_EVERY) return null;
+    return list.slice().sort((a, b) => (xplLast[a.id] || 0) - (xplLast[b.id] || 0))[0];
+  }
+  const markXpl = id => { xplLast[id] = Date.now(); try { localStorage.setItem(`rw-xpl-last-${channel}`, JSON.stringify(Object.fromEntries(Object.entries(xplLast).slice(-30)))); } catch { /* private */ } };
+
   // When this viewer last saw each video: a video does not come back within the hour. When every
   // fresh video has played that recently, an evergreen video (marked in the control room) fills in;
   // only when none is left does the one played longest ago come back.
@@ -1366,6 +1380,16 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
       st.preWant = after ? { id: after.ytId, at: 0 } : null;
       return q.seg;
     }
+    // An explainer in rotation, now and then, in the place of an AVO block.
+    const xp = xplPick(q);
+    if (xp) {
+      markXpl(xp.id); q.sinceAvo = 0; q.n++;
+      q.item = { type: "xpl", dur: xp.secs }; q.start = t;
+      q.seg = { type: "xpl", id: xp.id, title: xp.title, dur: xp.secs, start: t, in: 0, sting: false, n: q.n };
+      const after = loop.slice(q.i).concat(loop.slice(0, q.i)).find(x => x.type === "video");
+      st.preWant = after ? { id: after.ytId, at: 0 } : null;
+      return q.seg;
+    }
     // The AVO Breaking Engine: a block of four to six AVO stories opens the channel and comes back
     // after every three videos (stories this viewer has seen least first, then the newest).
     if (avoDue(q)) {
@@ -1461,6 +1485,7 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
     if (seg.type === "heads") return { layout: "graphic", graphic: { kind: "heads", items: seg.items, at: seg.at }, startAt: seg.start, dur: seg.dur, key: `c:heads:${seg.start}`, transition, full: true };
     if (seg.type === "bulletin") return { layout: "graphic", graphic: { kind: "bulletin", slot: seg.slot }, startAt: seg.start, dur: seg.dur, key: `c:bulletin:${seg.start}`, transition, full: true };
     if (seg.type === "avo") return { layout: "graphic", graphic: { kind: "avo", stories: seg.stories }, startAt: seg.start, dur: seg.dur, key: `c:avo:${seg.start}`, transition, full: true };
+    if (seg.type === "xpl") return { layout: "graphic", sources: [], graphic: { kind: "explainer", id: seg.id }, label: seg.title, startAt: seg.start, dur: seg.dur, key: `c:xpl:${seg.start}`, transition, full: true };
     if (seg.type === "market") return { layout: "graphic", graphic: { kind: "market" }, startAt: seg.start, dur: seg.dur, key: `c:market:${seg.start}`, transition, full: true };
     if (seg.type === "weather") return { layout: "graphic", graphic: { kind: "weather" }, startAt: seg.start, dur: seg.dur, key: `c:weather:${seg.start}`, transition, full: true };
     if (seg.type === "news") return { layout: "graphic", graphic: { kind: "news" }, startAt: seg.start, dur: seg.dur, key: `c:news:${seg.start}`, transition };
@@ -3007,9 +3032,40 @@ export function mountTV(host, { channel = "h", output = false, mode, key = "", s
   // A remounted player that already has the channel's data draws its first frame at once.
   if (st.tv) tick();
   loadTv().then(tick); connect(); poll();
-  const timers = [setInterval(loadTv, 15000), setInterval(tick, 500), setInterval(() => { st.flash++; }, 8000), setInterval(poll, 5000), setInterval(heartbeat, 5000)];
+  // The TV audience (src/control.js audBeat, src/tvaudience.js): a viewer's player counts, every five
+  // seconds, whether it is on screen with the page in front, with sound or not, and on what; once a
+  // minute it sends the minute to the channel (nothing that identifies the viewer). The first beat
+  // of the day on this device counts one viewer of the channel for the day.
+  const AUD = { s: 0, sound: 0, segs: {}, items: {}, n: 0 };
+  const AUD_SEGS = { video: "video", avo: "avo", xpl: "xpl", bulletin: "bulletin", heads: "heads", seg: "seg", ad: "ad", flash: "flash", card: "card", upnext: "upnext", weather: "weather", market: "market", poll: "poll", promo: "promo", ident: "ident" };
+  const audDev = () => /iPad|Tablet/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ? "tablet" : /Mobi|Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop";
+  const audPage = () => /^\/(en\/|hi\/)?watch/.test(location.pathname) ? "watch" : "home";
+  function audSend() {
+    if (!AUD.s) return;
+    const day = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10); let first = false;
+    try { if (localStorage.getItem(`rw-tvday-${channel}`) !== day) { localStorage.setItem(`rw-tvday-${channel}`, day); first = true; } } catch { /* private */ }
+    const seg = AUD_SEGS[st.seq?.seg?.type] || (st.seq?.seg ? "other" : "video");
+    const b = { type: "aud", s: AUD.s, sound: AUD.sound, seg, segs: AUD.segs, items: Object.entries(AUD.items).map(([k, v]) => ({ k, s: v })), dev: audDev(), page: audPage(), first };
+    AUD.s = 0; AUD.sound = 0; AUD.segs = {}; AUD.items = {}; AUD.n = 0;
+    if (st.ws?.readyState === 1) { try { st.ws.send(JSON.stringify(b)); return; } catch { /* below */ } }
+    try { fetch("/api/m", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ t: "tv", s: b.s, first, ch: channel }), keepalive: true }).catch(() => {}); } catch { /* fine */ }
+  }
+  function audTick() {
+    if (mode !== "app" || output || !st.alive) return;
+    if (document.visibilityState === "visible" && st.current) {
+      const r = host.getBoundingClientRect();
+      if (r.width > 40 && r.bottom > 40 && r.top < innerHeight - 40) {
+        const sg = st.seq?.seg, type = AUD_SEGS[sg?.type] || "other";
+        AUD.s += 5; if (!st.muted) AUD.sound += 5; AUD.segs[type] = (AUD.segs[type] || 0) + 5;
+        const k = sg?.type === "video" && sg.ytId ? `video:${sg.ytId}` : sg?.type === "xpl" && sg.id ? `xpl:${sg.id}` : sg?.type === "ad" ? `ad:${sg.id || sg.ytId || ""}` : "";
+        if (k && k.length > 6) AUD.items[k] = (AUD.items[k] || 0) + 5;
+      }
+    }
+    if (++AUD.n >= 12) audSend();
+  }
+  const timers = [setInterval(loadTv, 15000), setInterval(tick, 500), setInterval(() => { st.flash++; }, 8000), setInterval(poll, 5000), setInterval(heartbeat, 5000), setInterval(audTick, 5000)];
   return {
-    destroy() { if (keepOrder && st.seq) RUNNING[channel] = { seq: st.seq, tv: st.tv, ctl: st.ctl, skew: st.skew, at: Date.now() }; st.alive = false; document.removeEventListener("visibilitychange", onVisible); st.offGesture?.(); try { st.wake?.release(); } catch { /* none */ } st.wake = null; st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null; try { st.audio?.close(); } catch { /* closed */ } document.removeEventListener("fullscreenchange", fsChange); document.removeEventListener("webkitfullscreenchange", fsChange); document.documentElement.classList.remove("tvp-fs-lock"); ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
+    destroy() { try { if (mode === "app" && !output) audSend(); } catch { /* gone */ } if (keepOrder && st.seq) RUNNING[channel] = { seq: st.seq, tv: st.tv, ctl: st.ctl, skew: st.skew, at: Date.now() }; st.alive = false; document.removeEventListener("visibilitychange", onVisible); st.offGesture?.(); try { st.wake?.release(); } catch { /* none */ } st.wake = null; st.bed?.(); st.bed = null; st.voice?.pause(); st.voice = null; try { st.audio?.close(); } catch { /* closed */ } document.removeEventListener("fullscreenchange", fsChange); document.removeEventListener("webkitfullscreenchange", fsChange); document.documentElement.classList.remove("tvp-fs-lock"); ["pointerdown", "keydown", "touchend", "click"].forEach(ev => document.removeEventListener(ev, firstTouch)); timers.forEach(clearInterval); ro.disconnect(); st.ws?.close(); st.current?.slots.forEach(s => s.destroy()); host.innerHTML = ""; },
     unmute, setScene(sc) { fixedScene = sc; tick(); }, avoExtra: () => st.avoExtra?.ms || 0, get state() { return st.ctl; }, sceneDur: () => fixedScene?.graphic?.items || fixedScene?.graphic?.kind !== "seg" ? fixedScene?.dur || 0 : 0
   };
 }

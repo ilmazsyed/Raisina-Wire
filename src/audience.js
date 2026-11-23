@@ -40,6 +40,8 @@ export async function recordEvent(env, b) {
     const sec = Math.round(Number(b.s));
     if (b.first === true) q.push(bump(env, day, "tv", "viewers"));
     if (sec >= 1 && sec <= 600) q.push(bump(env, day, "tv", "seconds", sec));
+    // (a player whose live connection was down: its minute still counts for its channel)
+    if (b.ch === "h" || b.ch === "v") { if (b.first === true) q.push(bump(env, day, "tvv", b.ch)); if (sec >= 1 && sec <= 90) q.push(bump(env, day, "tvs", b.ch, sec)); }
   } else if (b.t === "play") {       // an explainer started, on TV or on the Watch page
     const id = String(b.id || "");
     if (/^[\w-]{6,64}$/.test(id)) q.push(bump(env, day, "play", id));

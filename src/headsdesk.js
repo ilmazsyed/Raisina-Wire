@@ -9,8 +9,9 @@ import { shell, api, toast, fail, esc, $, $$ } from "./crshell.js";
 import { mountTV } from "./engine.js";
 import { digits } from "./i18n.js";
 import { libraryPicker } from "./libpick.js";
+import { groupsBar, grouped, groupHead, savedTab, saveTab, within, ago } from "./deskgroups.js";
 
-const S = { d: null, items: [], edits: {}, hidden: [], set: null, dirty: false, pv: null, open: null, order: [], lock: false, brk: [], secsOf: {}, runs: {}, run: "", drag: "" };
+const S = { d: null, items: [], ticker: [], grp: savedTab("heads"), tgrp: savedTab("ticker"), edits: {}, hidden: [], set: null, dirty: false, pv: null, open: null, order: [], lock: false, brk: [], secsOf: {}, runs: {}, run: "", drag: "" };
 const pad = n => String(n).padStart(2, "0");
 const IST = 5.5 * 3600e3;
 const hhmm = t => { const d = new Date(t + IST); return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`; };
@@ -85,6 +86,50 @@ const mediaRow = (k, x) => `<div class="hd-media">
   <button class="btn sm" type="button" data-link="${k}">Link</button><button class="btn sm" type="button" data-lib="${k}">Library</button>
   ${x.image || x.video ? `<button class="btn sm red" type="button" data-unmedia="${k}">Remove media</button>` : ""}</div>`;
 
+// The desk's own headlines in the desks' groups: in rotation (voiced, still to air), being made
+// (still to air, the newsreader's voice not ready yet), out of rotation (aired as often as set).
+const ownVoice = x => (S.d.onAir || []).find(o => o.id === x.id && o.text === x.text)?.voice || "";
+const usedUp = x => !!x.repeat && (x.aired || 0) >= x.repeat;
+const OWN_GROUPS = [["air", "Made · in rotation", x => !usedUp(x) && !!ownVoice(x)], ["out", "Made · out of rotation", usedUp], ["new", "Being made (the voice is being recorded)", x => !usedUp(x) && !ownVoice(x)]];
+const ownRecent = x => within(x.at) || !x.at;
+function ownGrouped(render) {
+  const rows = S.items.map((x, i) => ({ ...x, _i: i })), groups = grouped(rows, OWN_GROUPS, ownRecent, S.grp);
+  return groups.map(([k, name, g]) => groupHead(k, name, g.length) + g.map(x => render(S.items[x._i], x._i)).join("")).join("");
+}
+// The ticker lines (the NEWS UPDATE strip): on air now, or ended.
+const TICKER_GROUPS = [["air", "On air now (in rotation)", x => !x.off && (!x.until || Date.parse(x.until) > Date.now())], ["out", "Ended or paused (out of rotation)", () => true]];
+const CH_NAME = { hv: "TV + Shorts", h: "Rashtrix TV", v: "Rashtrix Shorts" };
+const untilText = x => x.off ? "paused" : !x.until ? "until you remove it" : Date.parse(x.until) > Date.now() ? `until ${hhmm(Date.parse(x.until))} IST` : `ended ${ago(x.until)}`;
+function tickerPanel() {
+  const rows = S.ticker.map((x, i) => ({ ...x, _i: i })), groups = grouped(rows, TICKER_GROUPS, x => within(x.at), S.tgrp);
+  return `<section class="panel pd hd-wrap" id="hdTicker">
+    <h3 style="margin:0">Ticker and NEWS UPDATE strip <small class="muted">· your own lines run first</small></h3>
+    ${groupsBar(rows, TICKER_GROUPS, x => within(x.at), S.tgrp, "data-tgrp")}
+    <div class="hd-own">${groups.map(([k, name, g]) => groupHead(k, name, g.length) + g.map(r => { const x = S.ticker[r._i], i = r._i; return `<div class="hd-row${k === "out" ? " done" : ""}">
+      <div class="stack" style="flex:1;gap:6px;min-width:0"><input data-tk="${i}" value="${esc(x.text)}" maxlength="160" data-no-tr>
+        <div class="row" style="flex-wrap:wrap;gap:8px"><span class="tag ${k === "air" ? "green" : ""}">${k === "air" ? "ON AIR" : "OFF AIR"}</span>${within(x.at) ? '<span class="dg-fresh">LAST HOUR</span>' : ""}
+          <small class="muted">${CH_NAME[x.ch || "hv"]} · ${untilText(x)} · added ${ago(x.at) || "now"}</small>
+          <select data-tkch="${i}">${Object.entries(CH_NAME).map(([c, n]) => `<option value="${c}" ${(x.ch || "hv") === c ? "selected" : ""}>${n}</option>`).join("")}</select>
+          <select data-tkfor="${i}"><option value="">Change how long…</option>${[[1, "1 hour more"], [3, "3 hours more"], [6, "6 hours more"], [24, "24 hours more"], [0, "Until removed"]].map(([h, l]) => `<option value="${h}">${l}</option>`).join("")}</select>
+          <button class="btn sm" type="button" data-tkoff="${i}">${x.off ? "Put back on air" : "Pause"}</button><button class="btn sm red" type="button" data-tkdel="${i}">Remove</button></div></div></div>`; }).join("")).join("") || `<p class="muted">${S.ticker.length ? "None here." : "No lines of your own yet. Write one above and tick “In the ticker”."}</p>`}</div>
+  </section>`;
+}
+// Write a headline of your own: into HEADLINES, the ticker, or both; saved at once.
+function quickPanel() {
+  return `<section class="panel pd hd-wrap hd-quick">
+    <h3 style="margin:0">Write your own headline</h3>
+    <div class="row" style="flex-wrap:wrap;gap:8px"><input id="qText" maxlength="160" placeholder="The headline (Bengali)" style="flex:1;min-width:240px;font-size:16px" data-no-tr><button class="btn green" type="button" id="qGo">Put it on air</button></div>
+    <div class="row" style="flex-wrap:wrap;gap:14px">
+      <label class="row" style="gap:6px"><input type="checkbox" id="qHeads" checked> In HEADLINES (read by the newsreader)</label>
+      <label class="row" style="gap:6px"><input type="checkbox" id="qTop"> First in line</label>
+      <label class="row" style="gap:6px"><input type="checkbox" id="qTick" checked> In the ticker / NEWS UPDATE strip</label>
+      <label>On <select id="qCh">${Object.entries(CH_NAME).map(([c, n]) => `<option value="${c}">${n}</option>`).join("")}</select></label>
+      <label>For <select id="qFor">${[[1, "1 hour"], [3, "3 hours"], [6, "6 hours"], [12, "12 hours"], [24, "24 hours"], [0, "until removed"]].map(([h, l]) => `<option value="${h}" ${h === 6 ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+    </div>
+    <small class="muted">HEADLINES: it goes before the wire's headlines from the next airing, and is voiced within a minute or two. Ticker: it runs first in the ticker on the channels chosen, for the time chosen.</small>
+  </section>`;
+}
+
 function draw() {
   const set = S.set, nx = nextAt(set.mins), list = lineup(nx), times = dayTimes(set.mins);
   $("main").innerHTML = `<section class="panel pd hd-wrap">
@@ -98,6 +143,8 @@ function draw() {
       <label>Seconds each <input id="hdSecs" type="number" min="6" max="20" value="${set.secs}" style="width:70px"></label>
     </div>
   </section>
+  ${quickPanel()}
+  ${tickerPanel()}
   <section class="panel pd hd-wrap">
     <div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3 style="margin:0">On air, in this order <small class="muted" data-no-tr>${digits(hhmm(nx))} IST · ${digits(list.length)} · ${digits(Math.round(5 + list.reduce((n, x) => n + x.d, 0)))} s</small></h3>
       <div class="row" style="flex-wrap:wrap"><label class="row" style="gap:6px"><input type="checkbox" id="hdLock" ${S.lock ? "checked" : ""}> Lock the list</label>${S.order.length ? `<button class="btn sm" id="hdAutoOrder" type="button">Back to the automatic order</button>` : ""}<button class="btn sm red" id="hdPv" type="button">▶ Preview with sound</button></div></div>
@@ -129,13 +176,14 @@ function draw() {
   <section class="panel pd hd-wrap">
     <div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3 style="margin:0">The desk's own headlines</h3><button class="btn sm green" id="hdAdd" type="button">+ Add a headline</button></div>
     <p class="muted" style="margin:0">They go before the wire's headlines (those marked First in line come first). Choose every HEADLINES or particular times, and how many times it airs (0: until you remove it).</p>
-    <div class="hd-own">${S.items.map((x, i) => `<div class="hd-row${(x.repeat && (x.aired || 0) >= x.repeat) ? " done" : ""}">
+    ${groupsBar(S.items, OWN_GROUPS, ownRecent, S.grp)}
+    <div class="hd-own">${ownGrouped((x, i) => `<div class="hd-row${(x.repeat && (x.aired || 0) >= x.repeat) ? " done" : ""}">
       <div class="stack" style="flex:1;gap:6px;min-width:0">
         <input data-own="${i}" value="${esc(x.text)}" placeholder="The headline (Bengali)" maxlength="160" data-no-tr>
         <div class="row" style="flex-wrap:wrap;gap:10px">
           <label>Desk <input data-odesk="${i}" value="${esc(x.desk || "")}" placeholder="রাজ্য" style="width:110px" data-no-tr></label>
           <label>Airs <input type="number" min="0" max="999" data-orep="${i}" value="${x.repeat || 0}" style="width:70px"> times</label>
-          <small class="muted">aired ${digits(x.aired || 0)}${x.repeat ? ` of ${digits(x.repeat)}` : ""}</small>
+          <small class="muted">aired ${digits(x.aired || 0)}${x.repeat ? ` of ${digits(x.repeat)}` : ""}${x.at ? ` · added ${ago(x.at)}` : ""}</small>${within(x.at) ? '<span class="dg-fresh">LAST HOUR</span>' : ""}
           <label class="row" style="gap:6px"><input type="checkbox" data-otop="${i}" ${x.top ? "checked" : ""}> First in line</label>
           <label class="row" style="gap:6px"><input type="checkbox" data-oall="${i}" ${x.when?.length ? "" : "checked"}> Every HEADLINES</label>
           ${x.aired ? `<button class="btn sm" type="button" data-oreset="${i}">Reset count</button>` : ""}
@@ -143,7 +191,7 @@ function draw() {
         </div>
         ${x.when?.length || S.open === `t${i}` ? `<div class="hd-times">${times.map(tm => `<label><input type="checkbox" data-otime="${i}" value="${tm}" ${(x.when || []).includes(tm) ? "checked" : ""}> <span data-no-tr>${digits(tm)}</span></label>`).join("")}</div>` : ""}
         ${mediaRow(`o${i}`, x)}
-      </div></div>`).join("") || '<p class="muted">None yet.</p>'}</div>
+      </div></div>`) || `<p class="muted">${S.items.length ? "None here." : "None yet."}</p>`}</div>
   </section>
   <section class="panel pd hd-wrap">
     <h3 style="margin:0">From the wire, by priority</h3>
@@ -171,6 +219,26 @@ function wire() {
   $("#hdSecs").onchange = e => { S.set.secs = Math.max(6, Math.min(20, +e.target.value || 10)); mark(); draw(); };
   $("#hdAdd").onclick = () => { S.items.unshift({ id: crypto.randomUUID(), text: "", desk: "", image: "", video: "", when: [], top: false, repeat: 0, aired: 0 }); mark(); draw(); $("[data-own='0']")?.focus(); };
   $("#hdPv").onclick = preview;
+  // Groups
+  $$("[data-grp]").forEach(b => b.onclick = () => { S.grp = b.dataset.grp; saveTab("heads", S.grp); draw(); });
+  $$("[data-tgrp]").forEach(b => b.onclick = () => { S.tgrp = b.dataset.tgrp; saveTab("ticker", S.tgrp); draw(); });
+  // Your own headline: HEADLINES and/or the ticker, saved at once
+  $("#qGo").onclick = async () => {
+    const text = $("#qText").value.trim(), heads = $("#qHeads").checked, tick = $("#qTick").checked, h = Number($("#qFor").value);
+    if (!text) return toast("Write the headline.", true);
+    if (!heads && !tick) return toast("Choose HEADLINES, the ticker, or both.", true);
+    const at = new Date().toISOString();
+    if (heads) S.items.unshift({ id: crypto.randomUUID(), text, desk: "", image: "", video: "", when: [], top: $("#qTop").checked, repeat: 0, aired: 0, at });
+    if (tick) S.ticker.unshift({ id: crypto.randomUUID(), text, ch: $("#qCh").value, until: h ? new Date(Date.now() + h * 3600e3).toISOString() : "", off: false, at });
+    mark(); await save(`On air: ${[heads ? "in HEADLINES from the next airing" : "", tick ? "in the ticker now" : ""].filter(Boolean).join(" and ")}.`);
+  };
+  // The ticker lines
+  const tk = i => S.ticker[+i];
+  $$("[data-tk]").forEach(x => x.oninput = () => { tk(x.dataset.tk).text = x.value; mark(); });
+  $$("[data-tkch]").forEach(x => x.onchange = () => { tk(x.dataset.tkch).ch = x.value; mark(); draw(); });
+  $$("[data-tkfor]").forEach(x => x.onchange = () => { if (x.value === "") return; const h = Number(x.value), t = tk(x.dataset.tkfor), base = Math.max(Date.now(), Date.parse(t.until) || 0); t.until = h ? new Date(base + h * 3600e3).toISOString() : ""; t.off = false; mark(); draw(); });
+  $$("[data-tkoff]").forEach(b => b.onclick = () => { const t = tk(b.dataset.tkoff); t.off = !t.off; if (!t.off && t.until && Date.parse(t.until) < Date.now()) t.until = new Date(Date.now() + 3 * 3600e3).toISOString(); mark(); draw(); });
+  $$("[data-tkdel]").forEach(b => b.onclick = () => { S.ticker.splice(+b.dataset.tkdel, 1); mark(); draw(); });
   // The order: drag, ▲ ▼, BREAKING, seconds, voice again, drop
   const moveTo = (id, to) => { const ids = allHeads().map(x => x.id).filter(x => x !== id); ids.splice(Math.max(0, Math.min(ids.length, to)), 0, id); S.order = ids; mark(); draw(); };
   const idx = id => allHeads().findIndex(x => x.id === id);
@@ -233,17 +301,18 @@ function preview() {
   S.pv?.unmute?.();
 }
 
-async function save() {
+async function save(msg) {
   for (const x of S.items) if (!x.text.trim()) return toast("Give every headline of the desk its words (or delete it).", true);
+  for (const x of S.ticker) if (!x.text.trim()) return toast("Give every ticker line its words (or remove it).", true);
   try {
-    await api("/api/admin/heads", { method: "PUT", body: { ...S.set, items: S.items, hidden: S.hidden, edits: S.edits, order: S.order, lock: S.lock, brk: S.brk, secsOf: S.secsOf, runs: S.runs } });
-    S.dirty = false; toast("Saved. HEADLINES uses it from the next airing."); load();
+    await api("/api/admin/heads", { method: "PUT", body: { ...S.set, items: S.items, ticker: S.ticker, hidden: S.hidden, edits: S.edits, order: S.order, lock: S.lock, brk: S.brk, secsOf: S.secsOf, runs: S.runs } });
+    S.dirty = false; toast(typeof msg === "string" ? msg : "Saved. HEADLINES uses it from the next airing; the ticker at once."); load();
   } catch (e) { fail(e); }
 }
 async function load() {
   try {
     S.d = await api("/api/admin/heads");
-    S.set = { ...S.d.settings }; S.items = structuredClone(S.d.items || []);
+    S.set = { ...S.d.settings }; S.items = structuredClone(S.d.items || []); S.ticker = structuredClone(S.d.ticker || []);
     S.hidden = [...(S.d.hidden || [])]; S.edits = structuredClone(S.d.edits || {});
     S.order = [...(S.d.order || [])]; S.lock = !!S.d.lock; S.brk = [...(S.d.brk || [])]; S.secsOf = { ...(S.d.secsOf || {}) }; S.runs = structuredClone(S.d.runs || {});
     S.dirty = false; draw();

@@ -6,12 +6,13 @@
 // as an MP4 and sends it on air.
 import { shell, api, toast, fail, esc, $, $$, fmt } from "./crshell.js";
 import { libraryPicker } from "./libpick.js";
+import { groupsBar, grouped, groupHead, savedTab, saveTab, within } from "./deskgroups.js";
 import { STYLES, SHOT_TYPES, timeline, playExplainer, makeExplainerFile, xplHasYouTube, loadAssets, film } from "./xpl.js";
 // (for the desk's own checks: ?rxdebug exposes the drawing engine)
 if (/[?&]rxdebug/.test(location.search)) window.__xpl = { loadAssets, film };
 import "./xpldesk.css";
 
-const S = { list: [], cfg: {}, cur: null, dirty: false, media: [], orient: "h", pv: null, stories: null, form: { style: "politics", minutes: 2, sex: "f" } };
+const S = { grp: savedTab("xpl"),  list: [], cfg: {}, cur: null, dirty: false, media: [], orient: "h", pv: null, stories: null, form: { style: "politics", minutes: 2, sex: "f" } };
 const ago = t => { const h = (Date.now() - Date.parse(String(t).replace(" ", "T") + (/[zZ]$/.test(t) ? "" : "Z"))) / 3600e3; return h < 1 ? `${Math.max(1, Math.round(h * 60))} min ago` : h < 48 ? `${Math.round(h)} h ago` : `${Math.round(h / 24)} days ago`; };
 const mmss = s => fmt(Math.round(s || 0));
 
@@ -34,6 +35,10 @@ async function open(id) {
 }
 
 /* ---------- left: new explainer and the list ---------- */
+// The explainers in the desks' groups (src/deskgroups.js): made (every line voiced) and in rotation
+// (the channels play it on their own), made and out of rotation, being made (lines still to voice).
+const XGROUPS = [["air", "Made · in rotation", x => x.inRotation], ["out", "Made · out of rotation", x => x.status === "voiced" && !x.inRotation], ["new", "Being made", () => true]];
+const xRecent = x => within(x.createdAt) || within(x.updatedAt);
 function drawList() {
   const f = S.form;
   $(".xd-side").innerHTML = `<section class="panel xd-new"><h2>New explainer</h2>
@@ -51,11 +56,12 @@ function drawList() {
         <div class="row"><label class="btn sm">Upload picture<input type="file" id="nImg" accept="image/*" multiple hidden></label><button class="btn sm" type="button" id="nLib">Video from the library</button><button class="btn sm" type="button" id="nByte">Add a byte</button><button class="btn sm" type="button" id="nLink">Picture or video link</button></div></div>
       <button class="btn red xd-go" type="button" id="nGo">Write the explainer</button>
       <p class="muted" style="font-size:12px;margin:0">The shot list is written from your source alone, in the house style. Nothing is voiced or aired before you have read it.</p></section>
-    <section class="panel xd-list"><h2>Explainers</h2>${S.list.map(x => `<button type="button" class="xd-item${S.cur?.id === x.id ? " on" : ""}" data-open="${esc(x.id)}" style="--a:${(STYLES[x.style] || STYLES.politics).acc}">
-      <b data-no-tr>${esc(x.title || "Untitled")}</b><small>${esc((STYLES[x.style] || {}).name || "")} · ${mmss(x.secs)} · ${x.status === "voiced" ? "voiced" : "draft"}${x.aired ? ` · aired ${x.aired}×` : ""} · ${ago(x.createdAt)}</small></button>`).join("") || `<p class="muted">None yet.</p>`}</section>`;
+    <section class="panel xd-list"><h2>Explainers</h2>${groupsBar(S.list, XGROUPS, xRecent, S.grp)}${grouped(S.list, XGROUPS, xRecent, S.grp).map(([k, name, g]) => groupHead(k, name, g.length) + g.map(x => `<button type="button" class="xd-item${S.cur?.id === x.id ? " on" : ""}" data-open="${esc(x.id)}" style="--a:${(STYLES[x.style] || STYLES.politics).acc}">
+      <b data-no-tr>${esc(x.title || "Untitled")}</b><small>${x.inRotation ? '<span class="tag green">IN ROTATION</span> ' : ""}${xRecent(x) ? '<span class="dg-fresh">LAST HOUR</span> ' : ""}${esc((STYLES[x.style] || {}).name || "")} · ${mmss(x.secs)} · ${x.status === "voiced" ? "voiced" : "being made"}${x.aired ? ` · aired ${x.aired}×` : ""} · ${ago(x.createdAt)}</small></button>`).join("")).join("") || `<p class="muted">${S.list.length ? "None here." : "None yet."}</p>`}</section>`;
   const keepForm = () => { f.title = $("#nTitle").value; f.text = $("#nText").value; f.links = $("#nLinks").value; f.storyQ = $("#nStoryQ").value; f.minutes = $("#nMin").value; f.sex = $("#nSex").value; };
   $$("[data-style]").forEach(b => b.onclick = () => { keepForm(); f.style = b.dataset.style; drawList(); });
   $$("[data-open]").forEach(b => b.onclick = () => open(b.dataset.open));
+  $$("[data-grp]").forEach(b => b.onclick = () => { keepForm(); S.grp = b.dataset.grp; saveTab("xpl", S.grp); drawList(); });
   $$("[data-mx]").forEach(b => b.onclick = () => { keepForm(); S.media.splice(+b.dataset.mx, 1); drawList(); });
   $("#nStoryX")?.addEventListener("click", () => { keepForm(); f.story = null; drawList(); });
   $("#nStoryFind").onclick = async () => {
@@ -128,6 +134,7 @@ function drawEditor() {
       <div class="row xd-acts"><button class="btn green" id="eSave">Save</button>${x.voiceMode === "tts" ? `<button class="btn" id="eVoiceAll"${S.cfg.voice === false ? " disabled title=\"The newsreader's voice is not set up\"" : ""}>Voice every line</button>` : ""}
         <span class="xd-sep"></span><button class="btn" id="eDlH">Download TV (16:9)</button><button class="btn" id="eDlV">Download Shorts (9:16)</button>
         <span class="xd-sep"></span><button class="btn red" id="ePlay">Play on air now</button>
+        <button class="btn ${x.inRotation ? "green" : ""}" id="eRot" title="In rotation, the channels play it on their own, about once every 45 minutes on each screen">${x.inRotation ? `In rotation until ${new Date(x.rotationUntil).toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })} · take out` : "Put in rotation (24 h)"}</button>
         <span class="spacer" style="flex:1"></span><label class="chk"><input type="checkbox" id="eKeep" ${x.keep ? "checked" : ""}> Keep</label><button class="btn" id="eDel">Delete</button></div>
       <div class="xd-prog" hidden><i></i><span></span></div></section>
     <section class="xd-body">
@@ -179,6 +186,12 @@ function wireEditor() {
   $("#eVoiceAll")?.addEventListener("click", async e => { const b = e.currentTarget; if (S.dirty) await save(); b.disabled = true; b.textContent = "Voicing… (about half a minute)";
     try { const d = await api(`/api/admin/explainers/${x.id}/voice`, { method: "POST" }); S.cur = d.explainer; toast("Every line has its voice."); drawEditor(); load(); } catch (err) { fail(err); b.disabled = false; b.textContent = "Voice every line"; } });
   $("#eDel").onclick = async () => { if (!confirm("Delete this explainer for good?")) return; try { await api(`/api/admin/explainers/${x.id}`, { method: "DELETE" }); S.cur = null; history.replaceState(null, "", location.pathname); drawEditor(); load(); toast("Deleted."); } catch (e) { fail(e); } };
+  $("#eRot").onclick = async () => {
+    if (S.dirty) await save();
+    const on = !S.cur.inRotation;
+    if (on && S.cur.status !== "voiced") return toast("Give every line its voice first (the newsreader, or recorded).", true);
+    try { await api(`/api/admin/explainers/${encodeURIComponent(S.cur.id)}/rotation`, { method: "POST", body: { on, hours: 24 } }); toast(on ? "In rotation: the channels play it on their own for 24 hours." : "Taken out of rotation."); await open(S.cur.id); await load(); } catch (e) { fail(e); }
+  };
   $("#ePlay").onclick = async () => { if (S.dirty) await save();
     const ch = prompt("Play it now on which channel? Type TV, Shorts or both.", "TV"); if (ch === null) return;
     const chs = /^tv$/i.test(ch.trim()) ? ["h"] : /^shorts$/i.test(ch.trim()) ? ["v"] : ["h", "v"];
