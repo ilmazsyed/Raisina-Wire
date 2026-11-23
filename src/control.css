@@ -557,3 +557,10 @@ body.rec-on>header,body.rec-on>main,body.rec-on>nav,body.rec-on .cr-top{visibili
 .lp-tx b{font-size:14px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .lp-tx small{color:var(--mute);font-size:12px}
 @media (max-width:600px){.lp-row{grid-template-columns:84px 1fr}.lp-row .btn{grid-column:1/-1}}
+
+/* AVO desk: what the Make button did (src/avodesk.js save) */
+.ad-status{padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:#1b2231;font-size:14px;line-height:1.45}
+.ad-status.ok{border-color:#2f8f5b;background:#12291d}
+.ad-status.err{border-color:var(--red);background:#2a1416}
+.ad-status.warn{border-color:#c79a1c;background:#2a2312}
+.ad-status ul{margin:6px 0 8px 18px;padding:0}
