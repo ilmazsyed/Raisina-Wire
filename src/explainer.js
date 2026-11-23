@@ -6,6 +6,7 @@
 //   POST   /api/admin/explainers/<id>/voice     every line without a voice is read by the newsreader
 //   POST   /api/admin/explainers/<id>/rec/<n>   a line recorded on the desk (the audio is the body)
 //   POST   /api/admin/explainers/<id>/play      {channels}: on air now, then back to autopilot
+//   POST   /api/admin/explainers/<id>/rotation  {on, hours}: in rotation (airs on its own) or out
 //   DELETE /api/admin/explainers/<id>
 //   GET    /api/tv/explainer/<id>               what the screens draw
 // The shot list is written by the free Gemini models from the source alone (no facts added), in
@@ -46,7 +47,7 @@ export function cleanShot(s) {
   return o;
 }
 const total = shots => INTRO + OUTRO + shots.reduce((n, s) => n + (s.t === "byte" ? (s.secs || 20) + .8 : s.voice?.secs ? s.voice.secs + GAP : Math.max(2.4, (s.say || "").length / 13 + GAP)), 0);
-const row = (r, full = true) => ({ id: r.id, title: r.title, kicker: r.kicker, style: r.style, status: r.status, voiceMode: r.voice_mode, sex: r.sex, minutes: r.minutes, secs: r.secs, keep: !!r.keep, aired: r.aired, lastAired: r.last_aired, createdBy: r.created_by, createdAt: r.created_at, updatedAt: r.updated_at,
+const row = (r, full = true) => ({ id: r.id, title: r.title, kicker: r.kicker, style: r.style, status: r.status, voiceMode: r.voice_mode, sex: r.sex, minutes: r.minutes, secs: r.secs, keep: !!r.keep, rotationUntil: r.rotation_until || "", inRotation: !!r.rotation_until && Date.parse(r.rotation_until) > Date.now() && r.status === "voiced", aired: r.aired, lastAired: r.last_aired, createdBy: r.created_by, createdAt: r.created_at, updatedAt: r.updated_at,
   ...(full ? { shots: j(r.shots, "[]"), media: j(r.media, "[]"), source: j(r.source, "{}") } : { shotCount: j(r.shots, "[]").length }) });
 
 /* ---------- writing the shot list ---------- */
@@ -210,6 +211,16 @@ export async function handleExplainers(request, env, url, user, { json, err, aud
       await audit(env, user, "explainer.play", "explainer", xid, { channels: chs });
       return json({ ok: true, seconds: dur });
     }
+    // In rotation: the channels' own running order plays it (src/engine.js), about once every 45
+    // minutes on each screen, for the hours chosen (24 by default); or out of rotation.
+    if (sub === "rotation" && m === "POST") {
+      const b = await request.json().catch(() => ({}));
+      if (b.on && r.status !== "voiced") return err("Give every line its voice first (the newsreader, or recorded).");
+      const hours = Math.max(1, Math.min(72, Number(b.hours) || 24)), until = b.on ? new Date(Date.now() + hours * 3600e3).toISOString() : null;
+      await env.DB.prepare("UPDATE explainers SET rotation_until=?, updated_at=? WHERE id=?").bind(until, now(), xid).run();
+      await audit(env, user, b.on ? "explainer.rotation.on" : "explainer.rotation.off", "explainer", xid, { hours });
+      return json({ ok: true, rotationUntil: until || "" });
+    }
     return err("Not found.", 404);
   } catch (e) { return err(e.message || String(e)); }
 }
@@ -224,4 +235,10 @@ export async function explainerForScreens(env, xid) {
 export async function explainerList(env, limit = 100) {
   const { results } = await env.DB.prepare("SELECT * FROM explainers ORDER BY created_at DESC LIMIT ?").bind(limit).all().catch(() => ({ results: [] }));
   return results.map(r => row(r, false));
+}
+
+// The explainers in rotation, for the screens (src/tvchannel.js): voiced, and their time not over.
+export async function xplForScreens(env) {
+  const { results } = await env.DB.prepare("SELECT id, title, style, secs, last_aired FROM explainers WHERE status='voiced' AND rotation_until IS NOT NULL AND rotation_until > ? ORDER BY rotation_until DESC LIMIT 8").bind(now()).all().catch(() => ({ results: [] }));
+  return results.map(r => ({ id: r.id, title: r.title, style: r.style, secs: Math.ceil(r.secs || 0) + 1 })).filter(x => x.secs > 20);
 }

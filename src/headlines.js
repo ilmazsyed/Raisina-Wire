@@ -15,7 +15,14 @@ import { synthesize, sha256, ttsEnabled } from "./tts.js";
 import { tvVoice, voiceRate, voiceBudget, chargeVoice } from "./bulletinvoice.js";
 
 const KEY = "headlines_desk";
-export const HEADS_DEFAULT = { on: true, mins: [58, 28], count: 12, secs: 10, items: [], hidden: [], edits: {} };
+export const HEADS_DEFAULT = { on: true, mins: [58, 28], count: 12, secs: 10, items: [], hidden: [], edits: {}, ticker: [] };
+// The desk's own ticker lines: they run first in the ticker (the NEWS UPDATE strip) on the channels
+// chosen, until the time set (or until removed), and are kept, done, on the desk for a day.
+//   { id, text, ch: "hv" | "h" | "v", until: ISO or "", at, by }
+export const tickerLive = (x, t = Date.now()) => !!x?.text && !x.off && (!x.until || Date.parse(x.until) > t);
+export function ownTicker(cfg, ch) {
+  return (cfg?.ticker || []).filter(x => tickerLive(x) && String(x.ch || "hv").includes(ch)).sort((a, b) => String(b.at).localeCompare(String(a.at))).map(x => x.text).slice(0, 10);
+}
 const clean = (v, n) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
 const int = (v, lo, hi, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };
 const mediaUrl = v => { const s = clean(v, 600); return /^(https:\/\/|\/media\/|\/clips\/|\/api\/)/.test(s) ? s : ""; };
@@ -120,7 +127,7 @@ export async function headVoiceAgain(env, text) {
 export async function handleHeads(request, env, user, { json, err, audit, state }) {
   if (request.method === "GET") {
     const cfg = await headsSettings(env), s = await state();
-    return json({ settings: { on: cfg.on, mins: cfg.mins, count: cfg.count, secs: cfg.secs }, items: cfg.items, edits: cfg.edits || {}, hidden: cfg.hidden || [], order: cfg.order || [], lock: !!cfg.lock, brk: cfg.brk || [], secsOf: cfg.secsOf || {}, runs: cfg.runs || {},
+    return json({ settings: { on: cfg.on, mins: cfg.mins, count: cfg.count, secs: cfg.secs }, items: cfg.items, ticker: cfg.ticker || [], edits: cfg.edits || {}, hidden: cfg.hidden || [], order: cfg.order || [], lock: !!cfg.lock, brk: cfg.brk || [], secsOf: cfg.secsOf || {}, runs: cfg.runs || {},
       auto: s?.heads?.auto || [], onAir: s?.heads?.items || [], pool: (s?.avo || []).map(x => ({ id: x.id, title: x.title, desk: x.desk, image: x.images?.[0]?.src || "" })).slice(0, 40) }, 200, { "cache-control": "no-store" });
   }
   if (request.method === "PUT") {
@@ -133,13 +140,20 @@ export async function handleHeads(request, env, user, { json, err, audit, state 
         when: (Array.isArray(x?.when) ? x.when : []).map(hhmm).filter(Boolean).slice(0, 48), top: !!x?.top,
         repeat: int(x?.repeat, 0, 999, 0), aired: x?.resetCount ? 0 : old.get(id)?.aired || 0, at: old.get(id)?.at || new Date().toISOString(), by: old.get(id)?.by || user.id };
     }).filter((x, i, all) => x.text && all.findIndex(y => y.id === x.id) === i);
+    // The ticker lines: kept for a day after they end, then gone.
+    const oldT = new Map((cfg.ticker || []).map(x => [x.id, x])), dayAgo = Date.now() - 864e5;
+    const ticker = (Array.isArray(b.ticker) ? b.ticker : cfg.ticker || []).slice(0, 40).map(x => {
+      const id = /^[\w-]{6,40}$/.test(String(x?.id || "")) ? String(x.id) : crypto.randomUUID(), until = Date.parse(x?.until || "");
+      return { id, text: clean(x?.text, 160), ch: ["hv", "h", "v"].includes(x?.ch) ? x.ch : "hv", until: Number.isFinite(until) ? new Date(until).toISOString() : "", off: !!x?.off,
+        at: oldT.get(id)?.at || new Date().toISOString(), by: oldT.get(id)?.by || user.id };
+    }).filter((x, i, all) => x.text && all.findIndex(y => y.id === x.id) === i && (tickerLive(x) || Date.parse(x.until || x.at) > dayAgo));
     const edits = {};
     for (const [id, e] of Object.entries(b.edits && typeof b.edits === "object" ? b.edits : {}).slice(0, 200)) {
       const v = { text: clean(e?.text, 160), image: mediaUrl(e?.image), video: mediaUrl(e?.video), noimg: !!e?.noimg && !mediaUrl(e?.image) };
       if (v.text || v.image || v.video || v.noimg) edits[clean(id, 60)] = v;
     }
     const next = { on: b.on === undefined ? cfg.on : !!b.on, mins: mins.length ? mins : HEADS_DEFAULT.mins, count: int(b.count, 6, 15, cfg.count), secs: int(b.secs, 6, 20, cfg.secs),
-      items, hidden: (Array.isArray(b.hidden) ? b.hidden : []).map(v => clean(v, 60)).filter(Boolean).slice(0, 200), edits,
+      items, ticker, hidden: (Array.isArray(b.hidden) ? b.hidden : []).map(v => clean(v, 60)).filter(Boolean).slice(0, 200), edits,
       // the on-air order, its lock, the BREAKING headlines, seconds per headline, and runs planned one by one
       order: ids(b.order, 60), lock: !!b.lock, brk: ids(b.brk, 20),
       secsOf: Object.fromEntries(Object.entries(b.secsOf && typeof b.secsOf === "object" ? b.secsOf : {}).slice(0, 80).map(([k, v]) => [clean(k, 60), int(v, 6, 30, 0)]).filter(([k, v]) => k && v)),

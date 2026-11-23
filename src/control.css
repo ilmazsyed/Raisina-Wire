@@ -564,3 +564,19 @@ body.rec-on>header,body.rec-on>main,body.rec-on>nav,body.rec-on .cr-top{visibili
 .ad-status.err{border-color:var(--red);background:#2a1416}
 .ad-status.warn{border-color:#c79a1c;background:#2a2312}
 .ad-status ul{margin:6px 0 8px 18px;padding:0}
+
+/* The desks' groups (src/deskgroups.js): tabs with counts, and a heading over each group */
+.dg-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.dg-tab{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:transparent;color:inherit;font:600 13px/1.2 inherit;cursor:pointer}
+.dg-tab b{min-width:20px;padding:1px 7px;border-radius:999px;background:rgba(255,255,255,.08);font-size:12px;text-align:center}
+.dg-tab.on{background:#e8eef9;color:#0f1522;border-color:#e8eef9}
+.dg-tab.on b{background:#0f1522;color:#fff}
+.dg-tab.hour:not(.on){border-color:#c79a1c}
+.dg-head{display:flex;align-items:center;gap:8px;margin:16px 0 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+.dg-head i{width:8px;height:8px;border-radius:50%;background:#8a93a6}
+.dg-head[data-g=air] i,.dg-head[data-g=on] i{background:#2fbf71;box-shadow:0 0 0 3px rgba(47,191,113,.2)}
+.dg-head[data-g=new] i{background:#e0a92b}
+.dg-head[data-g=bad] i{background:var(--red)}
+.dg-head small{font-weight:600;opacity:.6}
+.dg-when{font-size:12px;opacity:.7}
+.dg-fresh{display:inline-block;padding:1px 6px;border-radius:4px;background:#c79a1c;color:#111;font:700 10px/1.5 inherit;letter-spacing:.06em}

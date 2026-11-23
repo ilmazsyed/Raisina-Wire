@@ -287,3 +287,15 @@ input[type=checkbox],input[type=radio]{width:20px;height:20px;min-height:0!impor
 .cx-brand .cx-word span{color:#e8741a}
 .cx-brand .cx-word{color:#0f1422}
 @media(max-width:760px){.cx-brand .cx-word{display:none}}
+
+/* TV audience (src/tvaudview.js) */
+.tva{margin-bottom:26px;padding-bottom:18px;border-bottom:2px solid var(--line)}
+.tva .list-head h2{display:flex;align-items:center;gap:9px}
+.tva-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#b7bcc6}
+.tva-dot.on{background:#e1121a;box-shadow:0 0 0 0 rgba(225,18,26,.55);animation:tvaPulse 1.6s ease-out infinite}
+@keyframes tvaPulse{70%{box-shadow:0 0 0 8px rgba(225,18,26,0)}100%{box-shadow:0 0 0 0 rgba(225,18,26,0)}}
+.tva-line{height:180px}
+.aud-chart .grid{stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke}
+.tva-strip{margin-bottom:18px}
+.tva-strip .cards{margin-top:10px}
+.tva .top-list li span{min-width:0}

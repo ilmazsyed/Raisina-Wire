@@ -8,6 +8,8 @@ import { bnLine } from "./bnline.js";
 import { adsOnAir } from "./ads.js";
 import { headsSettings, buildHeads, headVoices } from "./headlines.js";
 import { lrdForScreens } from "./liverundown.js";
+import { xplForScreens } from "./explainer.js";
+import { ownTicker } from "./headlines.js";
 // Rashtrix TV, Phase 2: two channels, each on or off, each with its own secret output address
 // for OBS / vMix.
 //   h  horizontal 1920×1080: long videos, with the full designable jacket (bug, LIVE, clock,
@@ -336,7 +338,8 @@ export async function tvState(env, ch) {
     lbandAuto: ch === "h" ? { on: s.lbandAuto?.on !== false, every: s.lbandAuto?.every || 40, seconds: s.lbandAuto?.seconds || 10 } : null, lowerThird: s.lowerThird || "", band: s.band || "", appStream: s.appStream || null,
     ad: s.ad, sets: s.sets, setSeconds: s.setSeconds,
     programs: (s.programs || []).filter(p => p.on),
-    ticker: [...s.ticker, ...headlines.slice(0, 14).map(h => h.text)],
+    // (the desk's own ticker lines (the Headlines desk) first, then the control room's, then the wire's)
+    ticker: [...ownTicker(hcfg, ch), ...s.ticker, ...headlines.slice(0, 14).map(h => h.text)],
     headlines, bulletin, heads,
     // The Live Rundown's changes: fixed items skipped, items put in at a time (src/liverundown.js).
     lrd: s.on ? await lrdForScreens(env, ch).catch(() => null) : null,
@@ -346,6 +349,8 @@ export async function tvState(env, ch) {
     cutins: s.on ? cuts : [],
     // The AVO engine's stories in rotation (src/avo.js); empty when the control room turns it off.
     avoOn: s.avoOn !== false, avo: s.on ? avo : [],
+    // The explainers the Explainer desk put in rotation: the running order plays one now and then.
+    xpl: s.on ? await xplForScreens(env).catch(() => []) : [],
     // Evergreen videos (explainers, features) marked in the control room: they fill the channel
     // when every fresh video has played within the hour, before anything repeats.
     evergreen: s.on ? evergreen : [],
